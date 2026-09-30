@@ -1,0 +1,12 @@
+{
+  "id": "org.lemonneo.bass",
+  "name": "BASS Player",
+  "version": "1.0.0",
+  "entryAssembly": "LemonNeo.Plugin.Bass.dll",
+  "minimumHostVersion": "0.1.0",
+  "permissions": [
+    "audio-device",
+    "file-system",
+    "native-code"
+  ]
+}

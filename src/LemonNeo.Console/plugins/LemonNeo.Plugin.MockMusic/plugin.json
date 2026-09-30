@@ -1,0 +1,10 @@
+{
+  "id": "org.lemonneo.mockmusic",
+  "name": "Mock Music",
+  "version": "1.0.0",
+  "entryAssembly": "LemonNeo.Plugin.MockMusic.dll",
+  "minimumHostVersion": "0.1.0",
+  "permissions": [
+    "network"
+  ]
+}

@@ -1,0 +1,18 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/LemonNeo.Application/LemonNeo.Application.csproj" />
+    <Project Path="src/LemonNeo.Console/LemonNeo.Console.csproj" />
+    <Project Path="src/LemonNeo.Core/LemonNeo.Core.csproj" />
+    <Project Path="src/LemonNeo.Persistence/LemonNeo.Persistence.csproj" />
+    <Project Path="src/LemonNeo.Playback/LemonNeo.Playback.csproj" />
+    <Project Path="src/LemonNeo.Plugin.Abstractions/LemonNeo.Plugin.Abstractions.csproj" />
+    <Project Path="src/LemonNeo.Plugin.Runtime/LemonNeo.Plugin.Runtime.csproj" />
+    <Project Path="src/LemonNeo.Sync.Abstractions/LemonNeo.Sync.Abstractions.csproj" />
+  </Folder>
+  <Folder Name="/plugins/">
+    <Project Path="plugins/LemonNeo.Plugin.Bass/LemonNeo.Plugin.Bass.csproj" />
+    <Project Path="plugins/LemonNeo.Plugin.LocalMusic/LemonNeo.Plugin.LocalMusic.csproj" />
+    <Project Path="plugins/LemonNeo.Plugin.MockMusic/LemonNeo.Plugin.MockMusic.csproj" />
+    <Project Path="plugins/LemonNeo.Sync.MockGit/LemonNeo.Sync.MockGit.csproj" />
+  </Folder>
+</Solution>

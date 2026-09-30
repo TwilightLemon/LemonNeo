@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../LemonNeo.Application/LemonNeo.Application.csproj" />
+    <ProjectReference Include="../LemonNeo.Core/LemonNeo.Core.csproj" />
+    <ProjectReference Include="../LemonNeo.Persistence/LemonNeo.Persistence.csproj" />
+    <ProjectReference Include="../LemonNeo.Playback/LemonNeo.Playback.csproj" />
+    <ProjectReference Include="../LemonNeo.Plugin.Abstractions/LemonNeo.Plugin.Abstractions.csproj" />
+    <ProjectReference Include="../LemonNeo.Plugin.Runtime/LemonNeo.Plugin.Runtime.csproj" />
+    <ProjectReference Include="../LemonNeo.Sync.Abstractions/LemonNeo.Sync.Abstractions.csproj" />
+    <ProjectReference Include="../../plugins/LemonNeo.Sync.MockGit/LemonNeo.Sync.MockGit.csproj" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <DefaultPluginProjects Include="$(MSBuildProjectDirectory)\..\..\plugins\LemonNeo.Plugin.MockMusic\LemonNeo.Plugin.MockMusic.csproj" />
+    <DefaultPluginProjects Include="$(MSBuildProjectDirectory)\..\..\plugins\LemonNeo.Plugin.LocalMusic\LemonNeo.Plugin.LocalMusic.csproj" />
+    <DefaultPluginProjects Include="$(MSBuildProjectDirectory)\..\..\plugins\LemonNeo.Plugin.Bass\LemonNeo.Plugin.Bass.csproj" />
+  </ItemGroup>
+  <Target Name="BuildDefaultPlugins" BeforeTargets="Build">
+    <MSBuild Projects="@(DefaultPluginProjects)"
+             Targets="Build"
+             Properties="Configuration=$(Configuration);TargetFramework=$(TargetFramework)"
+             BuildInParallel="false" />
+  </Target>
+</Project>
