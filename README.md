@@ -29,15 +29,15 @@ The build deploys the default plugins beside the console under `plugins/`:
 The console discovers all seven dynamically and has no runtime assembly reference
 to the music/player plugin implementations.
 
-Run the automated phase-one walkthrough with an isolated library directory:
-
-```powershell
-dotnet run --project src/LemonNeo.Console -- --demo --library .demo-library
-```
-
 The default library uses the platform's per-user application-data directory. Run
 `paths` to inspect every resolved location. Use `--plugins <path>` or
 `--library <path>` to override either runtime location.
+
+The interactive console provides live command hints, syntax and output colors,
+history, and context-aware Tab completion. Playlist arguments open a searchable
+selection box; type `playlist` to choose and inspect a local playlist directly.
+Use the arrow keys to select a candidate, then Tab or Enter to insert it. Set the
+standard `NO_COLOR` environment variable to disable output colors.
 
 ## Application data and settings
 

@@ -24,17 +24,30 @@ internal sealed class CommandProcessor(
     FolderImportService folderImporter,
     PlaybackSessionService playback,
     PlaybackSourceDiscoveryService sourceDiscovery,
-    SyncService sync)
+    SyncService sync,
+    CommandCompletionService completions)
 {
     private readonly TextWriter _output = global::System.Console.Out;
 
     public async Task RunInteractiveAsync(CancellationToken cancellationToken)
     {
-        _output.WriteLine("Type 'help' for commands.");
+        _output.WriteLine("Type a command below. Tab completes; ↑↓ selects suggestions or history.");
+        var editor = InteractiveLineEditor.IsSupported
+            ? new InteractiveLineEditor(completions.Complete)
+            : null;
         while (!cancellationToken.IsCancellationRequested)
         {
-            _output.Write("> ");
-            var line = await global::System.Console.In.ReadLineAsync(cancellationToken);
+            string? line;
+            if (editor is null)
+            {
+                _output.Write("lemon > ");
+                line = await global::System.Console.In.ReadLineAsync(cancellationToken);
+            }
+            else
+            {
+                line = editor.ReadLine(cancellationToken);
+            }
+
             if (line is null)
             {
                 await library.SaveAsync(cancellationToken);
@@ -54,44 +67,6 @@ internal sealed class CommandProcessor(
                 _output.WriteLine($"Error: {exception.Message}");
             }
         }
-    }
-
-    public async Task RunDemoAsync(CancellationToken cancellationToken)
-    {
-        _output.WriteLine("Running phase-one demonstration...");
-        await ExecuteAsync("search Blinding Lights", cancellationToken);
-        await ExecuteAsync("remote-playlists mock", cancellationToken);
-        var imported = await importer.ImportAsync("mock", "coding", cancellationToken);
-        await library.SaveAsync(cancellationToken);
-        _output.WriteLine($"Imported \"{imported.Name}\"");
-        _output.WriteLine($"{imported.Items.Count} tracks");
-        _output.WriteLine($"Local Playlist ID: {imported.Id}");
-
-        var local = playlists.Create("Demo Local Playlist");
-        var track = await GetTrackAsync("mock", "track-001", cancellationToken);
-        var item = playlists.Add(local.Id, track);
-        playlists.Remove(local.Id, item.Id);
-        await library.SaveAsync(cancellationToken);
-        _output.WriteLine($"Created local playlist, added and removed item {item.Id}.");
-
-        var persistedPlaylistCount = library.Current.Playlists.Count;
-        await library.LoadAsync(cancellationToken);
-        _output.WriteLine($"Reloaded {library.Current.Playlists.Count} playlists from JSON (expected {persistedPlaylistCount}).");
-        try
-        {
-            await playback.PlayTrackAsync(
-                track,
-                new PlaybackRequest(RequiredSourceProviderId: "mock"),
-                cancellationToken);
-        }
-        catch (PlaybackResolutionException exception)
-        {
-            _output.WriteLine($"Expected unavailable mock source: {exception.Message}");
-        }
-        await ExecuteAsync("sync status", cancellationToken);
-        await ExecuteAsync("sync pull", cancellationToken);
-        await ExecuteAsync("sync push", cancellationToken);
-        _output.WriteLine("Phase-one demonstration completed.");
     }
 
     public async Task<bool> ExecuteAsync(string line, CancellationToken cancellationToken)
@@ -180,6 +155,16 @@ internal sealed class CommandProcessor(
                 break;
             case "playlists":
                 PrintPlaylists();
+                break;
+            case "playlist":
+                if (arguments.Count == 1)
+                {
+                    PrintPlaylists();
+                }
+                else
+                {
+                    PrintPlaylist(ResolvePlaylist(string.Join(' ', arguments.Skip(1))));
+                }
                 break;
             case "show-playlist":
                 Require(arguments, 2, "show-playlist <id>");
@@ -309,47 +294,20 @@ internal sealed class CommandProcessor(
 
     private void PrintHelp()
     {
-        _output.WriteLine(
-            """
-            help
-            plugins
-            providers
-            players
-            paths
-            auth <provider>
-            login <provider> [cookie]
-            logout <provider>
-            search <keyword>
-            metadata <provider> <track-id> [namespace ...]
-            enrich <provider> <track-id>
-            match-playlist <playlist-id|name> [namespace ...]
-            lyrics <provider> <track-id>
-            sources <provider> <track-id>
-            remote-playlists <provider>
-            import <provider> <playlist-id>
-            import-folder <path> [playlist-name]
-            playlists
-            show-playlist <id>
-            create-playlist <name>
-            add <playlist-id> <provider> <track-id>
-            remove <playlist-id> <item-id>
-            play <provider> <track-id> [--source <provider>]
-            play-playlist <playlist-id|name> [start-number] [--source <provider>]
-            play-current
-            previous
-            next
-            mode <sequential|repeat|shuffle>
-            now-playing
-            pause
-            resume
-            stop
-            queue [clear]
-            sync status
-            sync pull
-            sync push
-            save
-            exit
-            """);
+        _output.WriteLine("COMMANDS");
+        var usageWidth = CommandCatalog.Commands.Max(command => command.Usage.Length) + 2;
+        foreach (var command in CommandCatalog.Commands)
+        {
+            _output.WriteLine($"  {command.Usage.PadRight(usageWidth)}{command.Description}");
+        }
+
+        _output.WriteLine();
+        _output.WriteLine("KEYS");
+        _output.WriteLine("  Tab           Complete the selected command or argument");
+        _output.WriteLine("  ↑ / ↓         Select a candidate; browse history when no candidates are open");
+        _output.WriteLine("  Esc           Close suggestions (Ctrl+Space reopens them)");
+        _output.WriteLine("  Home / End    Move to the start or end of the input");
+        _output.WriteLine("  Ctrl+U        Delete everything before the cursor");
     }
 
     private void PrintPlugins()
@@ -771,6 +729,12 @@ internal sealed class CommandProcessor(
 
     private void PrintPlaylists()
     {
+        if (library.Current.Playlists.Count == 0)
+        {
+            _output.WriteLine("No local playlists.");
+            return;
+        }
+
         foreach (var playlist in library.Current.Playlists.OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase))
         {
             _output.WriteLine($"{playlist.Id} | {playlist.Name} | {playlist.Items.Count} tracks");

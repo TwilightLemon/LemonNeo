@@ -16,6 +16,11 @@ internal static class Program
 {
     public static async Task<int> Main(string[] args)
     {
+        if (HighlightingTextWriter.CanUseColor)
+        {
+            global::System.Console.SetOut(new HighlightingTextWriter(global::System.Console.Out));
+        }
+
         var appPaths = AppPathProvider.CreateDefault();
         var options = ConsoleOptions.Parse(args, appPaths);
         using var cancellation = new CancellationTokenSource();
@@ -64,6 +69,7 @@ internal static class Program
         collection.AddSingleton<IGitBackend, MockGitBackend>();
         collection.AddSingleton<ILibrarySyncProvider, MockGitSyncProvider>();
         collection.AddSingleton<SyncService>();
+        collection.AddSingleton<CommandCompletionService>();
         collection.AddSingleton<CommandProcessor>();
 
         await using var services = collection.BuildServiceProvider();
@@ -95,12 +101,6 @@ internal static class Program
             output.WriteLine();
 
             var commands = services.GetRequiredService<CommandProcessor>();
-            if (options.Demo)
-            {
-                await commands.RunDemoAsync(cancellation.Token);
-                return 0;
-            }
-
             await commands.RunInteractiveAsync(cancellation.Token);
             return 0;
         }
@@ -147,14 +147,12 @@ internal static class Program
     }
 }
 
-internal sealed record ConsoleOptions(string PluginDirectory, string LibraryDirectory, bool Demo)
+internal sealed record ConsoleOptions(string PluginDirectory, string LibraryDirectory)
 {
     public static ConsoleOptions Parse(string[] args, IAppPathProvider appPaths)
     {
         var pluginDirectory = Path.Combine(AppContext.BaseDirectory, "plugins");
         var libraryDirectory = appPaths.MusicLibraryDirectory;
-        var demo = false;
-
         for (var index = 0; index < args.Length; index++)
         {
             switch (args[index])
@@ -165,14 +163,11 @@ internal sealed record ConsoleOptions(string PluginDirectory, string LibraryDire
                 case "--library" when index + 1 < args.Length:
                     libraryDirectory = Path.GetFullPath(args[++index]);
                     break;
-                case "--demo":
-                    demo = true;
-                    break;
                 default:
                     throw new ArgumentException($"Unknown or incomplete option '{args[index]}'.");
             }
         }
 
-        return new ConsoleOptions(pluginDirectory, libraryDirectory, demo);
+        return new ConsoleOptions(pluginDirectory, libraryDirectory);
     }
 }
