@@ -26,6 +26,7 @@ internal sealed record CommandCompletion(
 
 internal sealed class CommandCompletionService(
     IProviderRegistry providers,
+    IPlaybackSourceProviderRegistry playbackSources,
     LibraryService library)
 {
     private static readonly string[] MetadataNamespaces =
@@ -41,7 +42,6 @@ internal sealed class CommandCompletionService(
         MusicIdNamespaces.Isrc,
         MusicIdNamespaces.File
     ];
-
     public CommandCompletion Complete(string input, int cursor)
     {
         var target = CompletionTarget.Parse(input, cursor);
@@ -80,9 +80,25 @@ internal sealed class CommandCompletionService(
             return CompletePlaylistItems(target, hint);
         }
 
-        if (TryGetProviderFilter(commandName, target, out var providerFilter))
+        if (IsSearchSourceArgument(commandName, target))
         {
-            return CompleteProviders(target, hint, providerFilter);
+            var searchNamespaces = providers.Providers
+                .OfType<ISearchNamespaceProvider>()
+                .SelectMany(provider => provider.SearchNamespaces)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Order(StringComparer.OrdinalIgnoreCase)
+                .Select(value => (value, "Catalog source namespace"))
+                .ToArray();
+            return CompleteValues(
+                target,
+                hint,
+                "Search source namespaces",
+                searchNamespaces);
+        }
+
+        if (TryGetProviderRole(commandName, target, out var providerRole))
+        {
+            return CompleteProviders(target, hint, providerRole);
         }
 
         if (string.Equals(commandName, "mode", StringComparison.OrdinalIgnoreCase) && argumentIndex == 1)
@@ -216,10 +232,10 @@ internal sealed class CommandCompletionService(
     private CommandCompletion CompleteProviders(
         CompletionTarget target,
         string hint,
-        Func<IMusicProvider, bool> filter)
+        ProviderParameterRole role)
     {
-        var suggestions = providers.Providers
-            .Where(filter)
+        var allowed = ProviderParameterRules.Allowed(providers, role, playbackSources);
+        var suggestions = allowed
             .Select(provider => new CommandSuggestion(
                 provider.Id,
                 provider.Id,
@@ -231,8 +247,8 @@ internal sealed class CommandCompletionService(
             target.Start,
             target.Length,
             matches,
-            "Providers",
-            hint,
+            ProviderParameterRules.Title(role),
+            $"{hint}  ·  Allowed: {ProviderParameterRules.AllowedValues(providers, role, playbackSources)}",
             CurrentValueIsExact: matches.Any(item =>
                 string.Equals(item.InsertText, target.Value, StringComparison.OrdinalIgnoreCase)));
     }
@@ -290,8 +306,23 @@ internal sealed class CommandCompletionService(
         (string.Equals(command, "metadata", StringComparison.OrdinalIgnoreCase) && argumentIndex >= 3) ||
         (string.Equals(command, "match-playlist", StringComparison.OrdinalIgnoreCase) && argumentIndex >= 2);
 
+    private static bool IsSearchSourceArgument(string command, CompletionTarget target) =>
+        string.Equals(command, "search", StringComparison.OrdinalIgnoreCase) &&
+        target.TokenIndex > 1 &&
+        string.Equals(
+            target.Tokens[target.TokenIndex - 1],
+            "--source",
+            StringComparison.OrdinalIgnoreCase);
+
     private static bool IsSourceOptionPosition(string command, CompletionTarget target)
     {
+        if (string.Equals(command, "search", StringComparison.OrdinalIgnoreCase))
+        {
+            return target.TokenIndex >= 2 &&
+                   !target.Tokens.Contains("--source", StringComparer.OrdinalIgnoreCase) &&
+                   (target.Value.Length == 0 || target.Value.StartsWith("-", StringComparison.Ordinal));
+        }
+
         if (string.Equals(command, "play", StringComparison.OrdinalIgnoreCase))
         {
             return target.TokenIndex == 3;
@@ -306,41 +337,44 @@ internal sealed class CommandCompletionService(
                (target.Value.Length == 0 || target.Value.StartsWith("-", StringComparison.Ordinal));
     }
 
-    private static bool TryGetProviderFilter(
+    private static bool TryGetProviderRole(
         string command,
         CompletionTarget target,
-        out Func<IMusicProvider, bool> filter)
+        out ProviderParameterRole role)
     {
-        filter = _ => true;
+        role = default;
         var argumentIndex = target.TokenIndex;
 
-        if (target.Tokens.Count > 1 &&
+        if (command.ToLowerInvariant() is "play" or "play-playlist" &&
+            target.Tokens.Count > 1 &&
             string.Equals(target.Tokens[Math.Max(0, argumentIndex - 1)], "--source", StringComparison.OrdinalIgnoreCase))
         {
-            filter = provider => provider is IPlaybackProvider;
+            role = ProviderParameterRole.PlaybackSource;
             return true;
         }
 
         if (argumentIndex == 1 && command.ToLowerInvariant() is "auth" or "login" or "logout")
         {
-            filter = provider => provider is IAuthenticationProvider;
+            role = ProviderParameterRole.Authentication;
             return true;
         }
 
         if (argumentIndex == 1 && command.ToLowerInvariant() is "remote-playlists" or "import")
         {
-            filter = provider => provider is IPlaylistProvider;
+            role = ProviderParameterRole.Playlist;
             return true;
         }
 
         if (argumentIndex == 1 && command.ToLowerInvariant() is
             "metadata" or "enrich" or "lyrics" or "sources" or "play")
         {
+            role = ProviderParameterRole.TrackLookup;
             return true;
         }
 
         if (argumentIndex == 2 && string.Equals(command, "add", StringComparison.OrdinalIgnoreCase))
         {
+            role = ProviderParameterRole.TrackLookup;
             return true;
         }
 

@@ -2,7 +2,10 @@ using LemonNeo.Core;
 
 namespace LemonNeo.Plugin.Abstractions;
 
-public sealed record SearchRequest(string Keyword, int Limit = 50);
+public sealed record SearchRequest(
+    string Keyword,
+    int Limit = 50,
+    string? SourceNamespace = null);
 
 public sealed record SearchResult(string ProviderId, IReadOnlyList<Track> Tracks);
 
@@ -105,6 +108,15 @@ public interface ISearchProvider
 }
 
 /// <summary>
+/// Advertises the source namespaces accepted by a search provider when it
+/// supports narrowing a search to one source.
+/// </summary>
+public interface ISearchNamespaceProvider
+{
+    IReadOnlyCollection<string> SearchNamespaces { get; }
+}
+
+/// <summary>
 /// Retrieves a track by the provider's native identifier without approximating
 /// the operation through text search.
 /// </summary>
@@ -182,6 +194,22 @@ public interface ITrackIdResolverProvider
         ExternalMusicId identifier,
         TrackMetadata metadata,
         CancellationToken cancellationToken = default);
+}
+
+public sealed record PlaybackSourceProviderRegistration(
+    string ProviderId,
+    IMusicProvider MusicProvider,
+    IPlaybackProvider PlaybackProvider,
+    IReadOnlyList<MusicIdScheme> AcceptedIdSchemes);
+
+/// <summary>
+/// Tracks the playback-source providers currently registered by loaded plugins.
+/// </summary>
+public interface IPlaybackSourceProviderRegistry
+{
+    IReadOnlyCollection<PlaybackSourceProviderRegistration> Sources { get; }
+
+    PlaybackSourceProviderRegistration? Get(string providerId);
 }
 
 public interface IAuthenticationProvider

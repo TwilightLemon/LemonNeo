@@ -62,7 +62,7 @@ public sealed class MetadataService(IProviderRegistry registry)
             track,
             targetNamespaces,
             cancellationToken: cancellationToken);
-        var reliable = lookup.Matches.Where(match => match.Confidence >= 0.9).ToArray();
+        var reliable = lookup.Matches.Where(match => match.Confidence >= 0.6).ToArray();
         if (reliable.Length == 0)
         {
             return (track, lookup);

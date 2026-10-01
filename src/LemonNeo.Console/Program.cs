@@ -45,6 +45,8 @@ internal static class Program
         collection.AddSingleton<IPluginDataStoreFactory, PluginDataStoreFactory>();
         collection.AddSingleton<ProviderRegistry>();
         collection.AddSingleton<IProviderRegistry>(services => services.GetRequiredService<ProviderRegistry>());
+        collection.AddSingleton<IPlaybackSourceProviderRegistry>(
+            services => services.GetRequiredService<ProviderRegistry>());
         collection.AddSingleton<IPlayerProvider>(_ => new ConsolePlayerProvider(global::System.Console.Out));
         collection.AddSingleton<PlayerRegistry>();
         collection.AddSingleton<IPlayerRegistry>(services => services.GetRequiredService<PlayerRegistry>());

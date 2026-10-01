@@ -17,11 +17,13 @@ public sealed class LyricifyMetadataPlugin :
     ILemonPlugin,
     IMusicProvider,
     ISearchProvider,
+    ISearchNamespaceProvider,
     ITrackLookupProvider,
     IMetadataProvider,
     ILyricsProvider
 {
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan CatalogSearchRetryDelay = TimeSpan.FromMilliseconds(250);
     private static readonly SourceDefinition[] Sources =
     [
         new(MusicIdNamespaces.QQMusic, HelperSearchers.QQMusic),
@@ -32,12 +34,6 @@ public sealed class LyricifyMetadataPlugin :
         new(MusicIdNamespaces.Musixmatch, HelperSearchers.Musixmatch),
         new(MusicIdNamespaces.SodaMusic, HelperSearchers.SodaMusic),
         new(MusicIdNamespaces.LrcLib, HelperSearchers.LRCLIB)
-    ];
-    private static readonly SourceDefinition[] CatalogSearchSources =
-    [
-        new(MusicIdNamespaces.QQMusic, HelperSearchers.QQMusic),
-        new(MusicIdNamespaces.NeteaseMusic, HelperSearchers.Netease),
-        new(MusicIdNamespaces.KugouMusic, HelperSearchers.Kugou)
     ];
     private static readonly MusicIdScheme[] LyricsIdSchemes =
     [
@@ -68,6 +64,8 @@ public sealed class LyricifyMetadataPlugin :
 
     public IReadOnlyCollection<string> MetadataNamespaces { get; } =
         Sources.Select(source => source.Namespace).ToArray();
+
+    public IReadOnlyCollection<string> SearchNamespaces => MetadataNamespaces;
 
     public ValueTask InitializeAsync(IPluginContext context, CancellationToken cancellationToken)
     {
@@ -122,8 +120,22 @@ public sealed class LyricifyMetadataPlugin :
             return new SearchResult(Id, []);
         }
 
-        var limitPerSource = Math.Max(1, (int)Math.Ceiling(request.Limit / (double)CatalogSearchSources.Length));
-        var searches = CatalogSearchSources.Select(source =>
+        var sourceNamespace = request.SourceNamespace?.Trim();
+        var catalogSources = string.IsNullOrWhiteSpace(sourceNamespace)
+            ? Sources
+            : Sources
+                .Where(source => string.Equals(
+                    source.Namespace,
+                    sourceNamespace,
+                    StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+        if (catalogSources.Length == 0)
+        {
+            return new SearchResult(Id, []);
+        }
+
+        var limitPerSource = Math.Max(1, (int)Math.Ceiling(request.Limit / (double)catalogSources.Length));
+        var searches = catalogSources.Select(source =>
             SearchCatalogSourceAsync(source, request.Keyword.Trim(), limitPerSource, cancellationToken));
         var sourceResults = await Task.WhenAll(searches);
         foreach (var failed in sourceResults.Where(result => result.Error is not null))
@@ -291,17 +303,44 @@ public sealed class LyricifyMetadataPlugin :
         int limit,
         CancellationToken cancellationToken)
     {
-        try
+        var attempts = source.Searcher == HelperSearchers.Netease ? 2 : 1;
+        string? lastError = null;
+        for (var attempt = 1; attempt <= attempts; attempt++)
         {
-            var results = await source.Searcher.GetNewSearcher()
-                .SearchForResults(keyword)
-                .WaitAsync(RequestTimeout, cancellationToken);
-            return new CatalogSearchResult(source.Namespace, results?.Take(limit).ToArray() ?? [], null);
+            try
+            {
+                var results = await source.Searcher.GetSearcher()
+                    .SearchForResults(keyword)
+                    .WaitAsync(RequestTimeout, cancellationToken);
+                if (results is not null)
+                {
+                    return new CatalogSearchResult(
+                        source.Namespace,
+                        results.Take(limit).ToArray(),
+                        null);
+                }
+
+                lastError = "The searcher returned no response.";
+            }
+            catch (TimeoutException exception)
+            {
+                return new CatalogSearchResult(source.Namespace, [], exception.Message);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                lastError = exception.Message;
+            }
+
+            if (attempt < attempts)
+            {
+                await Task.Delay(CatalogSearchRetryDelay, cancellationToken);
+            }
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            return new CatalogSearchResult(source.Namespace, [], exception.Message);
-        }
+
+        return new CatalogSearchResult(
+            source.Namespace,
+            [],
+            $"Search failed after {attempts} attempt(s): {lastError}");
     }
 
     private static Track ToSearchTrack(string sourceNamespace, ISearchResult result)
@@ -431,7 +470,7 @@ public sealed class LyricifyMetadataPlugin :
     {
         try
         {
-            var results = await source.Searcher.GetNewSearcher()
+            var results = await source.Searcher.GetSearcher()
                 .SearchForResults(helperTrack)
                 .WaitAsync(RequestTimeout, cancellationToken);
             var matches = results

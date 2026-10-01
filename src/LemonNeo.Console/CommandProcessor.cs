@@ -11,6 +11,7 @@ namespace LemonNeo.ConsoleApp;
 internal sealed class CommandProcessor(
     PluginLoader plugins,
     IProviderRegistry providers,
+    IPlaybackSourceProviderRegistry playbackSources,
     IPlayerRegistry playersRegistry,
     IAppPathProvider appPaths,
     ConsoleOptions options,
@@ -96,23 +97,27 @@ internal sealed class CommandProcessor(
                 PrintPaths();
                 break;
             case "auth":
-                Require(arguments, 2, "auth <provider>");
+                Require(arguments, 2, "auth <auth-provider>");
                 PrintAuthentication(arguments[1]);
                 break;
             case "login":
-                Require(arguments, 2, "login <provider> [cookie]");
+                Require(arguments, 2, "login <auth-provider> [cookie]");
                 await LoginAsync(arguments, cancellationToken);
                 break;
             case "logout":
-                Require(arguments, 2, "logout <provider>");
+                Require(arguments, 2, "logout <auth-provider>");
                 await LogoutAsync(arguments[1], cancellationToken);
                 break;
             case "search":
-                Require(arguments, 2, "search <keyword>");
-                await SearchAsync(string.Join(' ', arguments.Skip(1)), cancellationToken);
+                Require(arguments, 2, "search <keyword> [--source <namespace>]");
+                var searchOptions = ParseSearchOptions(arguments);
+                await SearchAsync(
+                    searchOptions.Keyword,
+                    searchOptions.SourceNamespace,
+                    cancellationToken);
                 break;
             case "metadata":
-                Require(arguments, 3, "metadata <provider> <track-id> [namespace ...]");
+                Require(arguments, 3, "metadata <track-provider> <track-id> [namespace ...]");
                 await PrintMetadataAsync(
                     arguments[1],
                     arguments[2],
@@ -120,7 +125,7 @@ internal sealed class CommandProcessor(
                     cancellationToken);
                 break;
             case "enrich":
-                Require(arguments, 3, "enrich <provider> <track-id>");
+                Require(arguments, 3, "enrich <track-provider> <track-id>");
                 await EnrichAsync(arguments[1], arguments[2], cancellationToken);
                 break;
             case "match-playlist":
@@ -131,19 +136,19 @@ internal sealed class CommandProcessor(
                     cancellationToken);
                 break;
             case "lyrics":
-                Require(arguments, 3, "lyrics <provider> <track-id>");
+                Require(arguments, 3, "lyrics <track-provider> <track-id>");
                 await PrintLyricsAsync(arguments[1], arguments[2], cancellationToken);
                 break;
             case "sources":
-                Require(arguments, 3, "sources <provider> <track-id>");
+                Require(arguments, 3, "sources <track-provider> <track-id>");
                 await PrintSourcesAsync(arguments[1], arguments[2], cancellationToken);
                 break;
             case "remote-playlists":
-                Require(arguments, 2, "remote-playlists <provider>");
+                Require(arguments, 2, "remote-playlists <playlist-provider>");
                 await PrintRemotePlaylistsAsync(arguments[1], cancellationToken);
                 break;
             case "import":
-                Require(arguments, 3, "import <provider> <playlist-id>");
+                Require(arguments, 3, "import <playlist-provider> <playlist-id>");
                 await ImportAsync(arguments[1], arguments[2], cancellationToken);
                 break;
             case "import-folder":
@@ -175,7 +180,7 @@ internal sealed class CommandProcessor(
                 await CreatePlaylistAsync(string.Join(' ', arguments.Skip(1)), cancellationToken);
                 break;
             case "add":
-                Require(arguments, 4, "add <playlist-id> <provider> <track-id>");
+                Require(arguments, 4, "add <playlist> <track-provider> <track-id>");
                 await AddAsync(arguments[1], arguments[2], arguments[3], cancellationToken);
                 break;
             case "remove":
@@ -183,7 +188,7 @@ internal sealed class CommandProcessor(
                 await RemoveAsync(arguments[1], arguments[2], cancellationToken);
                 break;
             case "play":
-                Require(arguments, 3, "play <provider> <track-id> [--source <provider>]");
+                Require(arguments, 3, "play <track-provider> <track-id> [--source <source-provider>]");
                 await PlayAsync(
                     arguments[1],
                     arguments[2],
@@ -191,7 +196,7 @@ internal sealed class CommandProcessor(
                     cancellationToken);
                 break;
             case "play-playlist":
-                Require(arguments, 2, "play-playlist <playlist-id|name> [start-number] [--source <provider>]");
+                Require(arguments, 2, "play-playlist <playlist> [start-number] [--source <source-provider>]");
                 var playlistOptions = ParsePlaylistPlaybackOptions(arguments);
                 await PlayPlaylistAsync(
                     ResolvePlaylist(arguments[1]),
@@ -299,6 +304,16 @@ internal sealed class CommandProcessor(
         foreach (var command in CommandCatalog.Commands)
         {
             _output.WriteLine($"  {command.Usage.PadRight(usageWidth)}{command.Description}");
+        }
+
+        _output.WriteLine();
+        _output.WriteLine("PROVIDER PARAMETERS");
+        foreach (var role in Enum.GetValues<ProviderParameterRole>())
+        {
+            _output.WriteLine(
+                $"  {ProviderParameterRules.Placeholder(role),-21}" +
+                $"{ProviderParameterRules.AllowedValues(providers, role, playbackSources)}");
+            _output.WriteLine($"    {ProviderParameterRules.Requirement(role)}.");
         }
 
         _output.WriteLine();
@@ -413,15 +428,23 @@ internal sealed class CommandProcessor(
 
     private IAuthenticationProvider GetAuthenticationProvider(string providerId)
     {
-        var provider = providers.Get(providerId)
-            ?? throw new ProviderException($"Provider '{providerId}' was not found.");
-        return provider as IAuthenticationProvider
-               ?? throw new ProviderException($"Provider '{providerId}' does not support authentication.");
+        var provider = ProviderParameterRules.GetRequired(
+            providers,
+            providerId,
+            ProviderParameterRole.Authentication);
+        return (IAuthenticationProvider)provider;
     }
 
-    private async Task SearchAsync(string keyword, CancellationToken cancellationToken)
+    private async Task SearchAsync(
+        string keyword,
+        string? sourceNamespace,
+        CancellationToken cancellationToken)
     {
-        var results = await search.SearchAsync(keyword, cancellationToken: cancellationToken);
+        var results = await search.SearchAsync(
+            keyword,
+            providerId: null,
+            sourceNamespace: sourceNamespace,
+            cancellationToken: cancellationToken);
         var populatedResults = results.Where(result => result.Tracks.Count > 0).ToArray();
         if (populatedResults.Length == 0)
         {
@@ -441,6 +464,39 @@ internal sealed class CommandProcessor(
                 _output.WriteLine($"   {track.Id}");
             }
         }
+    }
+
+    private static (string Keyword, string? SourceNamespace) ParseSearchOptions(
+        IReadOnlyList<string> arguments)
+    {
+        var keywordParts = new List<string>();
+        string? sourceNamespace = null;
+        for (var index = 1; index < arguments.Count; index++)
+        {
+            if (!string.Equals(arguments[index], "--source", StringComparison.OrdinalIgnoreCase))
+            {
+                keywordParts.Add(arguments[index]);
+                continue;
+            }
+
+            if (sourceNamespace is not null ||
+                index + 1 >= arguments.Count ||
+                string.IsNullOrWhiteSpace(arguments[index + 1]) ||
+                arguments[index + 1].StartsWith("--", StringComparison.Ordinal))
+            {
+                throw new ArgumentException("Usage: search <keyword> [--source <namespace>]");
+            }
+
+            sourceNamespace = arguments[++index];
+        }
+
+        var keyword = string.Join(' ', keywordParts);
+        if (string.IsNullOrWhiteSpace(keyword))
+        {
+            throw new ArgumentException("Usage: search <keyword> [--source <namespace>]");
+        }
+
+        return (keyword, sourceNamespace);
     }
 
     private async Task PrintMetadataAsync(
@@ -664,12 +720,11 @@ internal sealed class CommandProcessor(
 
     private async Task PrintRemotePlaylistsAsync(string providerId, CancellationToken cancellationToken)
     {
-        var provider = providers.Get(providerId)
-            ?? throw new ProviderException($"Provider '{providerId}' was not found.");
-        if (provider is not IPlaylistProvider playlistProvider)
-        {
-            throw new ProviderException($"Provider '{providerId}' does not support playlists.");
-        }
+        var provider = ProviderParameterRules.GetRequired(
+            providers,
+            providerId,
+            ProviderParameterRole.Playlist);
+        var playlistProvider = (IPlaylistProvider)provider;
 
         if (provider is IPlaylistCollectionProvider collectionProvider)
         {
@@ -705,6 +760,10 @@ internal sealed class CommandProcessor(
 
     private async Task ImportAsync(string providerId, string remoteId, CancellationToken cancellationToken)
     {
+        ProviderParameterRules.GetRequired(
+            providers,
+            providerId,
+            ProviderParameterRole.Playlist);
         var playlist = await importer.ImportAsync(providerId, remoteId, cancellationToken);
         await library.SaveAsync(cancellationToken);
         _output.WriteLine($"Imported \"{playlist.Name}\"");
@@ -749,11 +808,12 @@ internal sealed class CommandProcessor(
             _output.WriteLine(playlist.Description);
         }
 
+        var index = 1;
         foreach (var item in playlist.Items
                      .OrderBy(item => FractionalPlaylistOrderingService.Parse(item.SortKey))
                      .ThenBy(item => item.Id))
         {
-            _output.WriteLine($"{item.Id} | {item.SortKey} | {item.Track.Title ?? item.Track.Id.RemoteId} | {item.Track.Id}");
+            _output.WriteLine($"{index++} | {item.SortKey} | {item.Track.Title ?? item.Track.Id.RemoteId} | {item.Track.Id}");
         }
     }
 
@@ -800,6 +860,7 @@ internal sealed class CommandProcessor(
         string? requiredSourceProviderId,
         CancellationToken cancellationToken)
     {
+        ValidatePlaybackSourceProvider(requiredSourceProviderId);
         var track = await GetTrackAsync(providerId, trackId, cancellationToken);
         await playback.PlayTrackAsync(
             track,
@@ -813,6 +874,7 @@ internal sealed class CommandProcessor(
         string? requiredSourceProviderId,
         CancellationToken cancellationToken)
     {
+        ValidatePlaybackSourceProvider(requiredSourceProviderId);
         var tracks = playlist.Items
             .OrderBy(item => FractionalPlaylistOrderingService.Parse(item.SortKey))
             .ThenBy(item => item.Id)
@@ -842,7 +904,8 @@ internal sealed class CommandProcessor(
             return arguments[4];
         }
 
-        throw new ArgumentException("Usage: play <provider> <track-id> [--source <provider>]");
+        throw new ArgumentException(
+            "Usage: play <track-provider> <track-id> [--source <source-provider>]");
     }
 
     private static (int StartIndex, string? RequiredSourceProviderId) ParsePlaylistPlaybackOptions(
@@ -869,7 +932,7 @@ internal sealed class CommandProcessor(
                 string.IsNullOrWhiteSpace(arguments[argumentIndex + 1]))
             {
                 throw new ArgumentException(
-                    "Usage: play-playlist <playlist-id|name> [start-number] [--source <provider>]");
+                    "Usage: play-playlist <playlist> [start-number] [--source <source-provider>]");
             }
 
             requiredSourceProviderId = arguments[argumentIndex + 1];
@@ -1008,9 +1071,27 @@ internal sealed class CommandProcessor(
     private async Task<Track> GetTrackAsync(
         string providerId,
         string trackId,
-        CancellationToken cancellationToken) =>
-        await trackLookup.GetTrackAsync(providerId, trackId, cancellationToken)
-        ?? throw new ProviderException($"Track '{providerId}:{trackId}' was not found.");
+        CancellationToken cancellationToken)
+    {
+        ProviderParameterRules.GetRequired(
+            providers,
+            providerId,
+            ProviderParameterRole.TrackLookup);
+        return await trackLookup.GetTrackAsync(providerId, trackId, cancellationToken)
+               ?? throw new ProviderException($"Track '{providerId}:{trackId}' was not found.");
+    }
+
+    private void ValidatePlaybackSourceProvider(string? providerId)
+    {
+        if (providerId is not null)
+        {
+            ProviderParameterRules.GetRequired(
+                providers,
+                providerId,
+                ProviderParameterRole.PlaybackSource,
+                playbackSources);
+        }
+    }
 
     private static void Require(IReadOnlyCollection<string> arguments, int count, string usage)
     {

@@ -39,6 +39,14 @@ selection box; type `playlist` to choose and inspect a local playlist directly.
 Use the arrow keys to select a candidate, then Tab or Enter to insert it. Set the
 standard `NO_COLOR` environment variable to disable output colors.
 
+Provider parameters are capability-scoped. `<track-provider>` accepts only
+providers that can retrieve a track by native ID, while `<source-provider>`
+accepts playback source resolvers; playlist and authentication providers have
+their own ranges as well. Run `help` to see the concrete IDs loaded for every
+range. Completion uses the same rules as execution, so a source-only provider
+such as `gdstudio-netease` is offered after `--source`, not as the first argument
+to `play`.
+
 ## Application data and settings
 
 `LemonNeo.Configuration` owns paths and persistent JSON stores shared by the host
@@ -165,7 +173,7 @@ lyrics local <track-id>
 sources local <track-id>
 ```
 
-`enrich <provider> <track-id>` prints a transient enriched result. Persistent
+`enrich <track-provider> <track-id>` prints a transient enriched result. Persistent
 metadata belongs to playlist items, so use `match-playlist` when the result must
 survive a restart.
 
@@ -175,11 +183,14 @@ be unavailable or require their own credentials; failures are isolated and shown
 per source.
 
 The Lyricify plugin also participates in the normal `search <keyword>` command.
-Catalog search is currently limited to QQ Music, Netease Music, and Kugou Music;
-each returned track retains its source-specific external IDs for lyrics and later
-playback-source discovery. Search results are not cached by the application or
-written into the music library. Commands taking `<provider> <track-id>` use the
-provider's native ID lookup capability instead of simulating lookup with search.
+Use `search <keyword> --source <namespace>` to restrict its catalog search, for
+example `search "Jay Chou" --source netease`.
+Available search namespaces are reported by the loaded provider and offered by
+command completion. Each returned track retains its source-specific external IDs
+for lyrics and later playback-source discovery. Search results are not cached by
+the application or written into the music library. Commands taking
+`<track-provider> <track-id>` use the provider's native ID lookup capability
+instead of simulating lookup with search.
 
 Optional service credentials can be supplied without storing them in the library
 or plugin configuration files:
@@ -206,11 +217,17 @@ provider, and BASS plays the returned direct HTTP audio stream. The API request
 and audio stream both carry the recommended browser user agent.
 
 Use `--source` to require a specific playback-source provider. A required source
-does not fall back to another provider if resolution fails:
+does not fall back to another provider if resolution fails. If resolving it
+requires an online ExternalId lookup, metadata search is limited to the
+namespaces declared by that provider's accepted ID schemes:
 
 ```text
 play lyricify netease:song-id:29572502 --source gdstudio-netease
 ```
+
+Without `--source`, the same rule uses the union of ID schemes advertised by all
+playback-source providers loaded in the host. Metadata namespaces with no usable
+playback source are not queried during playback discovery.
 
 The mock provider includes a metadata-only playlist of popular The Weeknd songs.
 The following commands demonstrate importing unavailable tracks, explicitly

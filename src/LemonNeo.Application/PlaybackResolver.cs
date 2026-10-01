@@ -5,6 +5,7 @@ namespace LemonNeo.Application;
 
 public sealed class PlaybackResolver(
     IProviderRegistry registry,
+    IPlaybackSourceProviderRegistry playbackSources,
     IPlayerRegistry players,
     PlaybackSourceDiscoveryService sourceDiscovery)
 {
@@ -26,9 +27,12 @@ public sealed class PlaybackResolver(
                      playbackRequest.RequiredSourceProviderId,
                      track.Id.ProviderId,
                      StringComparison.OrdinalIgnoreCase)) &&
-                registry.Get(track.Id.ProviderId) is IPlaybackProvider playbackProvider)
+                playbackSources.Get(track.Id.ProviderId) is { } nativeSource)
             {
-                source = await playbackProvider.ResolvePlaybackAsync(track, playbackRequest, cancellationToken);
+                source = await nativeSource.PlaybackProvider.ResolvePlaybackAsync(
+                    track,
+                    playbackRequest,
+                    cancellationToken);
 
                 if (source is null && playbackRequest.RequiredSourceProviderId is not null)
                 {
@@ -85,14 +89,19 @@ public sealed class PlaybackResolver(
             return;
         }
 
-        var provider = registry.Get(request.RequiredSourceProviderId)
-            ?? throw new PlaybackResolutionException(
-                $"Required source provider '{request.RequiredSourceProviderId}' was not found.");
-        if (provider is not IPlaybackProvider)
+        if (playbackSources.Get(request.RequiredSourceProviderId) is not null)
+        {
+            return;
+        }
+
+        if (registry.Get(request.RequiredSourceProviderId) is null)
         {
             throw new PlaybackResolutionException(
-                $"Provider '{request.RequiredSourceProviderId}' does not supply playback sources.");
+                $"Required source provider '{request.RequiredSourceProviderId}' was not found.");
         }
+
+        throw new PlaybackResolutionException(
+            $"Provider '{request.RequiredSourceProviderId}' does not supply playback sources.");
     }
 
     public async Task StopAsync(CancellationToken cancellationToken = default)

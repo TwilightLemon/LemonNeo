@@ -15,7 +15,7 @@ public sealed record PlaybackSourceDiscoveryResult(
     IReadOnlyDictionary<string, string> ProviderErrors);
 
 public sealed class PlaybackSourceDiscoveryService(
-    IProviderRegistry registry,
+    IPlaybackSourceProviderRegistry playbackSources,
     MetadataService metadataService)
 {
     public Task<PlaybackSourceDiscoveryResult> FindKnownAsync(
@@ -39,9 +39,23 @@ public sealed class PlaybackSourceDiscoveryService(
         request ??= new PlaybackRequest();
         var candidates = new List<PlaybackSourceCandidate>();
         var errors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var metadataLookup = expandMetadata
+        var selectedSources = playbackSources.Sources
+            .Where(source => request.RequiredSourceProviderId is null ||
+                             string.Equals(
+                                 source.ProviderId,
+                                 request.RequiredSourceProviderId,
+                                 StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        var targetNamespaces = selectedSources
+            .SelectMany(source => source.AcceptedIdSchemes)
+            .Select(scheme => scheme.Namespace)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var shouldExpandMetadata = expandMetadata && targetNamespaces.Length > 0;
+        var metadataLookup = shouldExpandMetadata
             ? await metadataService.LookupAsync(
                 track,
+                targetNamespaces,
                 limitPerSource: 2,
                 minimumConfidence: 0.85,
                 cancellationToken: cancellationToken)
@@ -55,16 +69,11 @@ public sealed class PlaybackSourceDiscoveryService(
             .Concat(metadataLookup.Matches.Select(match => match.Metadata))
             .ToArray();
 
-        var playbackProviders = registry.Providers.OfType<IPlaybackProvider>()
-            .Where(provider => request.RequiredSourceProviderId is null ||
-                               string.Equals(
-                                   ((IMusicProvider)provider).Id,
-                                   request.RequiredSourceProviderId,
-                                   StringComparison.OrdinalIgnoreCase));
-        foreach (var provider in playbackProviders)
+        foreach (var sourceProvider in selectedSources)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var musicProvider = (IMusicProvider)provider;
+            var musicProvider = sourceProvider.MusicProvider;
+            var provider = sourceProvider.PlaybackProvider;
             try
             {
                 if (string.Equals(track.Id.ProviderId, musicProvider.Id, StringComparison.OrdinalIgnoreCase))

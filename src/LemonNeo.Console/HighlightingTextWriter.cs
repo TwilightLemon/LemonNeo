@@ -110,7 +110,7 @@ internal sealed class HighlightingTextWriter(TextWriter inner) : TextWriter
             return;
         }
 
-        if (value is "COMMANDS" or "KEYS" or "Capabilities:" ||
+        if (value is "COMMANDS" or "PROVIDER PARAMETERS" or "KEYS" or "Capabilities:" ||
             value.StartsWith("Lemon Neo", StringComparison.Ordinal))
         {
             WriteColored(value, ConsoleColor.Cyan);
