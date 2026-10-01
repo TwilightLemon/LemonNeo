@@ -87,8 +87,7 @@ public sealed class MockGitSyncProvider(IGitBackend backend) : ILibrarySyncProvi
             Id = new MusicItemId("mock", "track-003"),
             Title = "Midnight Compile",
             Artists = [new ArtistRef { Name = "Digital Cat" }],
-            ExternalIds = [new ExternalMusicId("isrc", "MOCK00000003")],
-            IsPlayable = true
+            ExternalIds = [new ExternalMusicId("isrc", "MOCK00000003")]
         };
         var playlist = new Playlist
         {
@@ -102,13 +101,13 @@ public sealed class MockGitSyncProvider(IGitBackend backend) : ILibrarySyncProvi
                 new PlaylistItem
                 {
                     Id = RemoteItemId,
-                    Track = track.ToReference(),
+                    Track = track,
                     SortKey = "1000",
                     AddedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z")
                 }
             ]
         };
 
-        return new MusicLibrary { Tracks = [track], Playlists = [playlist] };
+        return new MusicLibrary { Playlists = [playlist] };
     }
 }

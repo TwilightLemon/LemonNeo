@@ -6,7 +6,7 @@ namespace LemonNeo.Application;
 public sealed class MetadataService(IProviderRegistry registry)
 {
     public async Task<MetadataLookupResult> LookupAsync(
-        TrackReference track,
+        Track track,
         IReadOnlyList<string>? targetNamespaces = null,
         int limitPerSource = 3,
         double minimumConfidence = 0.7,
@@ -59,7 +59,7 @@ public sealed class MetadataService(IProviderRegistry registry)
         CancellationToken cancellationToken = default)
     {
         var lookup = await LookupAsync(
-            track.ToReference(),
+            track,
             targetNamespaces,
             cancellationToken: cancellationToken);
         var reliable = lookup.Matches.Where(match => match.Confidence >= 0.9).ToArray();
@@ -74,7 +74,6 @@ public sealed class MetadataService(IProviderRegistry registry)
             {
                 Namespace = id.Namespace.ToUpperInvariant(),
                 id.Value,
-                Authority = id.Authority?.ToUpperInvariant(),
                 Kind = id.Kind?.ToUpperInvariant()
             })
             .ToArray();
@@ -103,7 +102,7 @@ public sealed record LyricsLookupResult(
 public sealed class LyricsService(IProviderRegistry registry)
 {
     public async Task<LyricsLookupResult> GetLyricsAsync(
-        TrackReference track,
+        Track track,
         CancellationToken cancellationToken = default)
     {
         var errors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);

@@ -7,7 +7,6 @@ namespace LemonNeo.Persistence;
 public sealed class JsonLibraryRepository(string libraryDirectory) : ILibraryRepository
 {
     private const string IndexFileName = "library.json";
-    private const string TracksFileName = "tracks.json";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -31,10 +30,6 @@ public sealed class JsonLibraryRepository(string libraryDirectory) : ILibraryRep
         {
             var index = await ReadAsync<LibraryIndex>(indexPath, cancellationToken)
                 ?? throw new LibraryException($"Library index is empty: {indexPath}");
-            var tracksPath = ResolveLibraryPath(index.TracksFile);
-            var tracks = File.Exists(tracksPath)
-                ? await ReadAsync<List<Track>>(tracksPath, cancellationToken) ?? []
-                : [];
             var playlists = new List<Playlist>();
 
             foreach (var relativePath in index.PlaylistFiles.Order(StringComparer.Ordinal))
@@ -49,9 +44,6 @@ public sealed class JsonLibraryRepository(string libraryDirectory) : ILibraryRep
             {
                 FormatVersion = index.FormatVersion,
                 UpdatedAt = index.UpdatedAt,
-                Tracks = tracks.OrderBy(track => track.Id.ProviderId, StringComparer.Ordinal)
-                    .ThenBy(track => track.Id.RemoteId, StringComparer.Ordinal)
-                    .ToList(),
                 Playlists = playlists.OrderBy(playlist => playlist.Id).ToList(),
                 Mirrors = index.Mirrors.OrderBy(mirror => mirror.PlaylistId).ToList()
             };
@@ -71,9 +63,7 @@ public sealed class JsonLibraryRepository(string libraryDirectory) : ILibraryRep
         try
         {
             var playlistsDirectory = Path.Combine(_root, "playlists");
-            var metadataDirectory = Path.Combine(_root, "metadata");
             Directory.CreateDirectory(playlistsDirectory);
-            Directory.CreateDirectory(metadataDirectory);
 
             var playlistFiles = new List<string>();
             foreach (var playlist in library.Playlists.OrderBy(item => item.Id))
@@ -87,18 +77,10 @@ public sealed class JsonLibraryRepository(string libraryDirectory) : ILibraryRep
                     cancellationToken);
             }
 
-            var tracksRelativePath = Path.Combine("metadata", TracksFileName).Replace('\\', '/');
-            var tracks = library.Tracks
-                .OrderBy(track => track.Id.ProviderId, StringComparer.Ordinal)
-                .ThenBy(track => track.Id.RemoteId, StringComparer.Ordinal)
-                .ToArray();
-            await WriteAtomicAsync(ResolveLibraryPath(tracksRelativePath), tracks, cancellationToken);
-
             var index = new LibraryIndex
             {
                 FormatVersion = library.FormatVersion,
                 UpdatedAt = library.UpdatedAt,
-                TracksFile = tracksRelativePath,
                 PlaylistFiles = playlistFiles,
                 Mirrors = library.Mirrors.OrderBy(mirror => mirror.PlaylistId).ToArray()
             };
@@ -171,7 +153,6 @@ public sealed class JsonLibraryRepository(string libraryDirectory) : ILibraryRep
     {
         public int FormatVersion { get; init; } = 1;
         public DateTimeOffset UpdatedAt { get; init; }
-        public required string TracksFile { get; init; }
         public IReadOnlyList<string> PlaylistFiles { get; init; } = [];
         public IReadOnlyList<PlaylistMirror> Mirrors { get; init; } = [];
     }

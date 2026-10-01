@@ -245,7 +245,8 @@ local:43d553...
 ```csharp
 public sealed record ExternalMusicId(
     string Namespace,
-    string Value);
+    string Value,
+    string? Kind = null);
 ```
 
 例如：
@@ -253,12 +254,13 @@ public sealed record ExternalMusicId(
 ```text
 isrc:USUG11901452
 musicbrainz:xxxx
-spotify:xxxx
-qq:xxxx
-netease:xxxx
+spotify:track-id:xxxx
+qq:song-mid:xxxx
+netease:song-id:xxxx
 ```
 
-Track 可以包含多个 External ID。
+Track 可以包含多个 External ID。`Namespace + Kind` 定义 ID 的平台语义；
+Provider 的身份不属于 ID，也不参与跨插件匹配。
 
 ---
 
@@ -284,8 +286,6 @@ public sealed record Track
 
     public IReadOnlyList<ExternalMusicId> ExternalIds { get; init; }
         = [];
-
-    public bool IsPlayable { get; init; }
 }
 ```
 
@@ -303,6 +303,9 @@ HTTP Header
 ```
 
 放进 Track。
+
+Track 本身不声明能否播放。可播放性是一次动态解析的结果，由
+`IPlaybackProvider` 根据 Track、用户凭据和当前网络状态决定。
 
 ---
 
@@ -336,7 +339,7 @@ public sealed class PlaylistItem
 {
     public Guid Id { get; init; }
 
-    public required TrackReference Track { get; init; }
+    public required Track Track { get; init; }
 
     public string SortKey { get; set; }
 
@@ -442,6 +445,18 @@ public interface ISearchProvider
 }
 ```
 
+Search 只返回临时结果，不承担按 ID 查询。需要根据 Provider 原生 ID
+重新取得歌曲时使用独立能力：
+
+```csharp
+public interface ITrackLookupProvider
+{
+    Task<Track?> GetTrackAsync(
+        string trackId,
+        CancellationToken cancellationToken = default);
+}
+```
+
 ---
 
 ## Playlist
@@ -467,7 +482,7 @@ public interface IPlaylistProvider
 public interface IPlaybackProvider
 {
     Task<PlaybackSource?> ResolvePlaybackAsync(
-        TrackReference track,
+        Track track,
         PlaybackRequest request,
         CancellationToken cancellationToken = default);
 }
@@ -481,7 +496,7 @@ public interface IPlaybackProvider
 public interface ILyricsProvider
 {
     Task<Lyrics?> GetLyricsAsync(
-        TrackReference track,
+        Track track,
         CancellationToken cancellationToken = default);
 }
 ```
@@ -665,10 +680,10 @@ public interface IPlayer
 {
     PlayerState State { get; }
 
-    TrackReference? CurrentTrack { get; }
+    Track? CurrentTrack { get; }
 
     Task PlayAsync(
-        TrackReference track,
+        Track track,
         PlaybackSource source,
         CancellationToken cancellationToken = default);
 
@@ -749,12 +764,14 @@ Candidate Sources
 ```text
 LemonLibrary/
 ├── library.json
-├── playlists/
-│   ├── favorites.json
-│   └── coding.json
-└── metadata/
-    └── tracks.json
+└── playlists/
+    ├── favorites.json
+    └── coding.json
 ```
+
+`MusicLibrary` 不维护独立的全局 Tracks 集合。每个 PlaylistItem 直接保存
+完整 Track 快照（包括 ArtworkUri 和 ExternalIds），搜索结果则保持临时状态，
+避免搜索导致 Library 无界增长。
 
 不要把以下内容存进 Git Library：
 
@@ -1218,7 +1235,7 @@ xxxxxxxx
 内部：
 
 ```text
-TrackReference
+Track
       ↓
 PlaybackResolver
       ↓

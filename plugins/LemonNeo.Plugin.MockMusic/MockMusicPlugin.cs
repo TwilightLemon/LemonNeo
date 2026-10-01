@@ -8,6 +8,7 @@ public sealed class MockMusicPlugin :
     ILemonPlugin,
     IMusicProvider,
     ISearchProvider,
+    ITrackLookupProvider,
     IPlaylistProvider,
     IPlaybackProvider,
     ILyricsProvider
@@ -19,48 +20,42 @@ public sealed class MockMusicPlugin :
             Id = new MusicItemId("mock", "track-001"),
             Title = "Blinding Lights",
             Artists = [new ArtistRef { Name = "The Weeknd" }],
-            Album = new AlbumRef { Title = "After Hours" },
-            IsPlayable = false
+            Album = new AlbumRef { Title = "After Hours" }
         },
         new Track
         {
             Id = new MusicItemId("mock", "track-002"),
             Title = "Save Your Tears",
             Artists = [new ArtistRef { Name = "The Weeknd" }],
-            Album = new AlbumRef { Title = "After Hours" },
-            IsPlayable = false
+            Album = new AlbumRef { Title = "After Hours" }
         },
         new Track
         {
             Id = new MusicItemId("mock", "track-003"),
             Title = "Starboy",
             Artists = [new ArtistRef { Name = "The Weeknd" }],
-            Album = new AlbumRef { Title = "Starboy" },
-            IsPlayable = false
+            Album = new AlbumRef { Title = "Starboy" }
         },
         new Track
         {
             Id = new MusicItemId("mock", "track-004"),
             Title = "The Hills",
             Artists = [new ArtistRef { Name = "The Weeknd" }],
-            Album = new AlbumRef { Title = "Beauty Behind the Madness" },
-            IsPlayable = false
+            Album = new AlbumRef { Title = "Beauty Behind the Madness" }
         },
         new Track
         {
             Id = new MusicItemId("mock", "track-005"),
             Title = "Can't Feel My Face",
             Artists = [new ArtistRef { Name = "The Weeknd" }],
-            Album = new AlbumRef { Title = "Beauty Behind the Madness" },
-            IsPlayable = false
+            Album = new AlbumRef { Title = "Beauty Behind the Madness" }
         },
         new Track
         {
             Id = new MusicItemId("mock", "track-006"),
             Title = "Die For You",
             Artists = [new ArtistRef { Name = "The Weeknd" }],
-            Album = new AlbumRef { Title = "Starboy" },
-            IsPlayable = false
+            Album = new AlbumRef { Title = "Starboy" }
         }
     ];
 
@@ -133,6 +128,15 @@ public sealed class MockMusicPlugin :
         return Task.FromResult(new SearchResult(Id, matches));
     }
 
+    public Task<Track?> GetTrackAsync(
+        string trackId,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(Tracks.FirstOrDefault(track =>
+            string.Equals(track.Id.RemoteId, trackId, StringComparison.OrdinalIgnoreCase)));
+    }
+
     public Task<RemotePlaylist?> GetPlaylistAsync(
         string playlistId,
         CancellationToken cancellationToken = default)
@@ -153,7 +157,7 @@ public sealed class MockMusicPlugin :
     }
 
     public Task<PlaybackSource?> ResolvePlaybackAsync(
-        TrackReference track,
+        Track track,
         PlaybackRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -162,13 +166,13 @@ public sealed class MockMusicPlugin :
     }
 
     public Task<Lyrics?> GetLyricsAsync(
-        TrackReference track,
+        Track track,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var exists = Tracks.Any(candidate => candidate.Id == track.Id);
         return Task.FromResult<Lyrics?>(exists
-            ? new Lyrics($"Mock lyrics for {track.Title ?? track.Id.RemoteId}.", "en")
+            ? new Lyrics($"Mock lyrics for {track.Title}.", "en")
             : null);
     }
 }

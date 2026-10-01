@@ -9,6 +9,7 @@ namespace LemonNeo.Plugin.QqMusic;
 public sealed class QqMusicUserPlugin :
     ILemonPlugin,
     IMusicProvider,
+    ITrackLookupProvider,
     IPlaylistProvider,
     IPlaylistCollectionProvider,
     IAuthenticationProvider
@@ -201,6 +202,11 @@ public sealed class QqMusicUserPlugin :
             _ => throw new ProviderException($"Unsupported QQ Music collection type '{kind}'.")
         };
     }
+
+    public Task<Track?> GetTrackAsync(
+        string trackId,
+        CancellationToken cancellationToken = default) =>
+        Required(_api).GetTrackAsync(_authentication, trackId, cancellationToken);
 
     public static long CalculateGtk(string qqmusicKey)
     {

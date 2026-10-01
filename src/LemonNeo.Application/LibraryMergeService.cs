@@ -33,12 +33,6 @@ public sealed class LibraryMergeService : ILibraryMergeService
             }
         }
 
-        var tracks = local.Tracks.Concat(remote.Tracks)
-            .GroupBy(track => track.Id)
-            .Select(group => group.First())
-            .OrderBy(track => track.Id.ProviderId, StringComparer.Ordinal)
-            .ThenBy(track => track.Id.RemoteId, StringComparer.Ordinal)
-            .ToList();
         var mirrors = local.Mirrors.Concat(remote.Mirrors)
             .GroupBy(mirror => new { mirror.PlaylistId, mirror.ProviderId, mirror.RemotePlaylistId })
             .Select(group => group.First())
@@ -49,7 +43,6 @@ public sealed class LibraryMergeService : ILibraryMergeService
             {
                 FormatVersion = Math.Max(local.FormatVersion, remote.FormatVersion),
                 UpdatedAt = DateTimeOffset.UtcNow,
-                Tracks = tracks,
                 Playlists = playlists,
                 Mirrors = mirrors
             },

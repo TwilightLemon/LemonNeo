@@ -16,6 +16,7 @@ internal sealed class CommandProcessor(
     ConsoleOptions options,
     LibraryService library,
     SearchService search,
+    TrackLookupService trackLookup,
     MetadataService metadata,
     LyricsService lyrics,
     PlaylistService playlists,
@@ -68,8 +69,7 @@ internal sealed class CommandProcessor(
 
         var local = playlists.Create("Demo Local Playlist");
         var track = await GetTrackAsync("mock", "track-001", cancellationToken);
-        library.UpsertTrack(track);
-        var item = playlists.Add(local.Id, track.ToReference());
+        var item = playlists.Add(local.Id, track);
         playlists.Remove(local.Id, item.Id);
         await library.SaveAsync(cancellationToken);
         _output.WriteLine($"Created local playlist, added and removed item {item.Id}.");
@@ -80,7 +80,7 @@ internal sealed class CommandProcessor(
         try
         {
             await playback.PlayTrackAsync(
-                track.ToReference(),
+                track,
                 new PlaybackRequest(RequiredSourceProviderId: "mock"),
                 cancellationToken);
         }
@@ -296,6 +296,7 @@ internal sealed class CommandProcessor(
     {
         var capabilities = new List<string>();
         if (provider is ISearchProvider) capabilities.Add("Search");
+        if (provider is ITrackLookupProvider) capabilities.Add("Track Lookup");
         if (provider is IPlaylistProvider) capabilities.Add("Playlist");
         if (provider is IPlaylistCollectionProvider) capabilities.Add("Playlist Collections");
         if (provider is IPlaybackProvider) capabilities.Add("Playback");
@@ -492,7 +493,7 @@ internal sealed class CommandProcessor(
     {
         var track = await GetTrackAsync(providerId, trackId, cancellationToken);
         var result = await metadata.LookupAsync(
-            track.ToReference(),
+            track,
             targetNamespaces,
             cancellationToken: cancellationToken);
         if (result.Matches.Count == 0)
@@ -536,9 +537,8 @@ internal sealed class CommandProcessor(
             return;
         }
 
-        library.UpsertTrack(enriched);
-        await library.SaveAsync(cancellationToken);
         _output.WriteLine($"Enriched: {enriched.Title} - {string.Join(", ", enriched.Artists.Select(artist => artist.Name))}");
+        _output.WriteLine("This standalone result is transient; use match-playlist to persist metadata in a playlist.");
         _output.WriteLine($"External IDs: {enriched.ExternalIds.Count}");
         foreach (var id in enriched.ExternalIds)
         {
@@ -554,8 +554,7 @@ internal sealed class CommandProcessor(
         CancellationToken cancellationToken)
     {
         var tracks = playlist.Items
-            .Select(item => library.FindTrack(item.Track.Id))
-            .OfType<Track>()
+            .Select(item => item.Track)
             .DistinctBy(track => track.Id)
             .ToArray();
         if (tracks.Length == 0)
@@ -590,12 +589,22 @@ internal sealed class CommandProcessor(
                 continue;
             }
 
-            library.UpsertTrack(result.Track);
+            foreach (var item in playlist.Items.Where(item => item.Track.Id == result.Original.Id))
+            {
+                item.Track = result.Track;
+            }
+
             matched++;
             var namespaces = result.Track.ExternalIds
                 .Select(id => id.Namespace)
                 .Distinct(StringComparer.OrdinalIgnoreCase);
             _output.WriteLine($"Matched: {result.Track.Title} [{string.Join(", ", namespaces)}]");
+        }
+
+        if (matched > 0)
+        {
+            playlist.UpdatedAt = DateTimeOffset.UtcNow;
+            library.Touch();
         }
 
         await library.SaveAsync(cancellationToken);
@@ -609,7 +618,7 @@ internal sealed class CommandProcessor(
     private async Task PrintLyricsAsync(string providerId, string trackId, CancellationToken cancellationToken)
     {
         var track = await GetTrackAsync(providerId, trackId, cancellationToken);
-        var result = await lyrics.GetLyricsAsync(track.ToReference(), cancellationToken);
+        var result = await lyrics.GetLyricsAsync(track, cancellationToken);
         if (result.Lyrics is null)
         {
             _output.WriteLine("No lyrics found.");
@@ -655,7 +664,7 @@ internal sealed class CommandProcessor(
     private async Task PrintSourcesAsync(string providerId, string trackId, CancellationToken cancellationToken)
     {
         var track = await GetTrackAsync(providerId, trackId, cancellationToken);
-        var result = await sourceDiscovery.FindAsync(track.ToReference(), cancellationToken: cancellationToken);
+        var result = await sourceDiscovery.FindAsync(track, cancellationToken: cancellationToken);
         if (result.Candidates.Count == 0)
         {
             _output.WriteLine("No playable source found.");
@@ -679,8 +688,7 @@ internal sealed class CommandProcessor(
 
     private void PrintExternalId(ExternalMusicId id) =>
         _output.WriteLine(
-            $"  ID: namespace={id.Namespace}, authority={id.Authority ?? "-"}, " +
-            $"kind={id.Kind ?? "-"}, value={id.Value}");
+            $"  ID: namespace={id.Namespace}, kind={id.Kind ?? "-"}, value={id.Value}");
 
     private void PrintErrors(string heading, IReadOnlyDictionary<string, string> errors)
     {
@@ -800,8 +808,7 @@ internal sealed class CommandProcessor(
     {
         var playlist = ResolvePlaylist(playlistId);
         var track = await GetTrackAsync(providerId, trackId, cancellationToken);
-        library.UpsertTrack(track);
-        var item = playlists.Add(playlist.Id, track.ToReference());
+        var item = playlists.Add(playlist.Id, track);
         await library.SaveAsync(cancellationToken);
         _output.WriteLine($"Added {track.Title} as item {item.Id}.");
     }
@@ -829,10 +836,9 @@ internal sealed class CommandProcessor(
         string? requiredSourceProviderId,
         CancellationToken cancellationToken)
     {
-        var track = library.FindTrack(new MusicItemId(providerId, trackId))
-            ?? await GetTrackAsync(providerId, trackId, cancellationToken);
+        var track = await GetTrackAsync(providerId, trackId, cancellationToken);
         await playback.PlayTrackAsync(
-            track.ToReference(),
+            track,
             new PlaybackRequest(RequiredSourceProviderId: requiredSourceProviderId),
             cancellationToken);
     }
@@ -956,6 +962,12 @@ internal sealed class CommandProcessor(
         }
 
         _output.WriteLine($"Track: {track.Title ?? track.Id.RemoteId} ({track.Id})");
+        _output.WriteLine($"External IDs: {track.ExternalIds.Count}");
+        foreach (var id in track.ExternalIds)
+        {
+            PrintExternalId(id);
+        }
+
         _output.WriteLine(
             $"Timeline: {FormatTime(snapshot.Timeline.Position)} / " +
             (snapshot.Timeline.Duration is { } duration ? FormatTime(duration) : "unknown"));
@@ -1033,8 +1045,7 @@ internal sealed class CommandProcessor(
         string providerId,
         string trackId,
         CancellationToken cancellationToken) =>
-        library.FindTrack(new MusicItemId(providerId, trackId))
-        ?? await search.FindTrackAsync(providerId, trackId, cancellationToken)
+        await trackLookup.GetTrackAsync(providerId, trackId, cancellationToken)
         ?? throw new ProviderException($"Track '{providerId}:{trackId}' was not found.");
 
     private static void Require(IReadOnlyCollection<string> arguments, int count, string usage)

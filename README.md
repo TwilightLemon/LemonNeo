@@ -160,10 +160,14 @@ metadata, retrieve lyrics, and inspect all currently playable sources:
 ```text
 metadata local <track-id>
 metadata local <track-id> netease qqmusic lrclib
-enrich local <track-id>
+match-playlist "Instrumental" netease qqmusic
 lyrics local <track-id>
 sources local <track-id>
 ```
+
+`enrich <provider> <track-id>` prints a transient enriched result. Persistent
+metadata belongs to playlist items, so use `match-playlist` when the result must
+survive a restart.
 
 The metadata provider currently searches QQ Music, Netease Music, Kugou Music,
 Apple Music, Spotify, Musixmatch, Soda Music, and LRCLIB. Individual services can
@@ -173,7 +177,9 @@ per source.
 The Lyricify plugin also participates in the normal `search <keyword>` command.
 Catalog search is currently limited to QQ Music, Netease Music, and Kugou Music;
 each returned track retains its source-specific external IDs for lyrics and later
-playback-source discovery.
+playback-source discovery. Search results are not cached by the application or
+written into the music library. Commands taking `<provider> <track-id>` use the
+provider's native ID lookup capability instead of simulating lookup with search.
 
 Optional service credentials can be supplied without storing them in the library
 or plugin configuration files:
@@ -184,22 +190,20 @@ $env:LEMONNEO_APPLE_MUSIC_USER_TOKEN = '<Apple Music media user token>'
 $env:LEMONNEO_MUSIXMATCH_USER_TOKEN = '<Musixmatch user token>'
 ```
 
-External track identifiers are qualified by `(namespace, authority, kind)`. A
-playback provider may consume an identifier only when it explicitly declares that
-exact scheme. If schemes differ, Lemon Neo searches the target provider and uses
-the target provider's native track ID instead. This prevents, for example, a QQ
-Music numeric song ID from being mistaken for a song MID or for an ID issued by a
-different plugin.
+External track identifiers are qualified by `(namespace, kind)`. A playback
+provider may consume an identifier only when it explicitly declares that scheme.
+If schemes differ, Lemon Neo searches the target provider and uses the target
+provider's native track ID instead. This prevents, for example, a QQ Music
+numeric `song-id` from being mistaken for a `song-mid`.
 
 Run `players` to inspect the active player implementations. BASS has priority for
 local files and direct HTTP audio streams; the console player remains the fallback
 for non-audio prototype sources.
 
 GDStudio playback is resolved across plugins: Lyricify searches Netease and emits
-an authority-qualified `song-id`, the GDStudio provider accepts Netease `song-id`
-values issued by any metadata provider, and BASS plays the returned direct HTTP
-audio stream. The API request and audio stream both carry the recommended browser
-user agent.
+a Netease `song-id`, the GDStudio provider accepts that schema from any metadata
+provider, and BASS plays the returned direct HTTP audio stream. The API request
+and audio stream both carry the recommended browser user agent.
 
 Use `--source` to require a specific playback-source provider. A required source
 does not fall back to another provider if resolution fails:
@@ -211,14 +215,19 @@ play lyricify netease:song-id:29572502 --source gdstudio-netease
 The mock provider includes a metadata-only playlist of popular The Weeknd songs.
 The following commands demonstrate importing unavailable tracks, explicitly
 observing the failed mock source, batch-matching Netease IDs, and then playing the
-same library track through GDStudio:
+persisted playlist item through GDStudio:
 
 ```text
 import mock weeknd
 play mock track-001 --source mock
 match-playlist "The Weeknd Essentials" netease
-play mock track-001 --source gdstudio-netease
+play-playlist "The Weeknd Essentials" 1 --source gdstudio-netease
 ```
+
+The library index contains playlists and mirrors only. Each playlist item embeds
+its complete `Track` snapshot (including artwork and external IDs); there is no
+separate global track catalogue or `metadata/tracks.json` file. Temporary search
+results therefore cannot make the in-memory library grow.
 
 The BASS plugin carries the BASS.NET 2.4.14.1 wrapper, BASS 2.4.16, and the FLAC
 2.4.5 decoder copied from the referenced Lemon-App resources. Applications that

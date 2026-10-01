@@ -14,7 +14,7 @@ public sealed class GdStudioNeteasePlugin :
     ITrackIdResolverProvider
 {
     private const string ProviderId = "gdstudio-netease";
-    private const string OwnAuthority = "org.lemonneo.gdstudio.netease";
+    private const string PluginId = "org.lemonneo.gdstudio.netease";
     private const string UserAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
         "AppleWebKit/537.36 (KHTML, like Gecko) " +
@@ -25,7 +25,7 @@ public sealed class GdStudioNeteasePlugin :
     private ILogger<GdStudioNeteasePlugin>? _logger;
 
     public PluginDescriptor Descriptor { get; } = new(
-        OwnAuthority,
+        PluginId,
         "GDStudio Netease Playback Source",
         "1.0.0");
 
@@ -37,17 +37,13 @@ public sealed class GdStudioNeteasePlugin :
 
     public IReadOnlyCollection<MusicIdScheme> AcceptedIdSchemes { get; } =
     [
-        new(
-            MusicIdNamespaces.NeteaseMusic,
-            Authority: null,
-            Kind: "song-id",
-            MatchAnyAuthority: true)
+        new(MusicIdNamespaces.NeteaseMusic, "song-id")
     ];
 
     public ValueTask InitializeAsync(IPluginContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        _httpClient = context.HttpClientFactory.CreateClient(OwnAuthority);
+        _httpClient = context.HttpClientFactory.CreateClient(PluginId);
         _httpClient.Timeout = TimeSpan.FromSeconds(20);
         _logger = context.LoggerFactory.CreateLogger<GdStudioNeteasePlugin>();
         context.RegisterProvider(this);
@@ -63,7 +59,7 @@ public sealed class GdStudioNeteasePlugin :
         return ValueTask.CompletedTask;
     }
 
-    public Task<TrackReference?> ResolveTrackIdAsync(
+    public Task<Track?> ResolveTrackIdAsync(
         ExternalMusicId identifier,
         TrackMetadata metadata,
         CancellationToken cancellationToken = default)
@@ -71,24 +67,18 @@ public sealed class GdStudioNeteasePlugin :
         cancellationToken.ThrowIfCancellationRequested();
         if (!AcceptedIdSchemes.Any(scheme => scheme.Accepts(identifier)) || !IsValidSongId(identifier.Value))
         {
-            return Task.FromResult<TrackReference?>(null);
+            return Task.FromResult<Track?>(null);
         }
 
-        var ownIdentifier = new ExternalMusicId(
-            MusicIdNamespaces.NeteaseMusic,
-            identifier.Value,
-            OwnAuthority,
-            "song-id");
-        var externalIds = metadata.ExternalIds.Append(identifier).Append(ownIdentifier)
+        var externalIds = metadata.ExternalIds.Append(identifier)
             .DistinctBy(id => new
             {
                 Namespace = id.Namespace.ToUpperInvariant(),
                 id.Value,
-                Authority = id.Authority?.ToUpperInvariant(),
                 Kind = id.Kind?.ToUpperInvariant()
             })
             .ToArray();
-        return Task.FromResult<TrackReference?>(new TrackReference
+        return Task.FromResult<Track?>(new Track
         {
             Id = new MusicItemId(ProviderId, identifier.Value),
             Title = metadata.Title,
@@ -97,12 +87,13 @@ public sealed class GdStudioNeteasePlugin :
                 ? null
                 : new AlbumRef { Title = metadata.Album },
             Duration = metadata.Duration,
+            ArtworkUri = metadata.ArtworkUri,
             ExternalIds = externalIds
         });
     }
 
     public async Task<PlaybackSource?> ResolvePlaybackAsync(
-        TrackReference track,
+        Track track,
         PlaybackRequest request,
         CancellationToken cancellationToken = default)
     {

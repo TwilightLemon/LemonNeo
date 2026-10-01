@@ -14,7 +14,7 @@ public sealed record PlaybackTimelineInfo(TimeSpan Position, TimeSpan? Duration)
 
 public sealed record PlaybackSessionSnapshot(
     PlayerState State,
-    TrackReference? CurrentTrack,
+    Track? CurrentTrack,
     PlaybackTimelineInfo Timeline,
     PlaybackMode Mode,
     int CurrentIndex,
@@ -28,11 +28,11 @@ public sealed class PlaybackSessionChangedEventArgs(PlaybackSessionSnapshot snap
 }
 
 public sealed class PlaybackCompletedEventArgs(
-    TrackReference completedTrack,
-    TrackReference? nextTrack) : EventArgs
+    Track completedTrack,
+    Track? nextTrack) : EventArgs
 {
-    public TrackReference CompletedTrack { get; } = completedTrack;
-    public TrackReference? NextTrack { get; } = nextTrack;
+    public Track CompletedTrack { get; } = completedTrack;
+    public Track? NextTrack { get; } = nextTrack;
 }
 
 public sealed class PlaybackSessionService(
@@ -103,7 +103,7 @@ public sealed class PlaybackSessionService(
     }
 
     public async Task PlayTrackAsync(
-        TrackReference track,
+        Track track,
         PlaybackRequest? request = null,
         CancellationToken cancellationToken = default)
     {
@@ -137,7 +137,7 @@ public sealed class PlaybackSessionService(
     }
 
     public async Task PlayPlaylistAsync(
-        IEnumerable<TrackReference> tracks,
+        IEnumerable<Track> tracks,
         int startIndex = 0,
         PlaybackRequest? request = null,
         CancellationToken cancellationToken = default)
@@ -177,13 +177,13 @@ public sealed class PlaybackSessionService(
         Raise(StateChanged, new PlaybackSessionChangedEventArgs(snapshot));
     }
 
-    public async Task<TrackReference?> NextAsync(CancellationToken cancellationToken = default) =>
+    public async Task<Track?> NextAsync(CancellationToken cancellationToken = default) =>
         await MoveAsync(queue.MoveNext, stopWhenUnavailable: true, cancellationToken);
 
-    public async Task<TrackReference?> PreviousAsync(CancellationToken cancellationToken = default) =>
+    public async Task<Track?> PreviousAsync(CancellationToken cancellationToken = default) =>
         await MoveAsync(queue.MovePrevious, stopWhenUnavailable: false, cancellationToken);
 
-    public async Task<TrackReference?> PlayCurrentAsync(CancellationToken cancellationToken = default)
+    public async Task<Track?> PlayCurrentAsync(CancellationToken cancellationToken = default)
     {
         await _gate.WaitAsync(cancellationToken);
         PlaybackSessionSnapshot snapshot;
@@ -291,7 +291,7 @@ public sealed class PlaybackSessionService(
         }
     }
 
-    private async Task<TrackReference?> MoveAsync(
+    private async Task<Track?> MoveAsync(
         Func<PlaybackQueueItem?> move,
         bool stopWhenUnavailable,
         CancellationToken cancellationToken)
@@ -384,8 +384,8 @@ public sealed class PlaybackSessionService(
     {
         PlaybackSessionSnapshot snapshot;
         PlaybackSessionSnapshot previous;
-        TrackReference? completedTrack = null;
-        TrackReference? nextTrack = null;
+        Track? completedTrack = null;
+        Track? nextTrack = null;
 
         await _gate.WaitAsync(cancellationToken);
         try

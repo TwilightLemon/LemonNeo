@@ -10,7 +10,6 @@ public sealed record FolderImportResult(
 
 public sealed class FolderImportService(
     IProviderRegistry registry,
-    LibraryService library,
     PlaylistService playlists)
 {
     public async Task<FolderImportResult> ImportAsync(
@@ -44,8 +43,7 @@ public sealed class FolderImportService(
             $"Imported from {scan.DirectoryPath}");
         foreach (var track in scan.Tracks)
         {
-            library.UpsertTrack(track);
-            playlists.Add(playlist.Id, track.ToReference());
+            playlists.Add(playlist.Id, track);
         }
 
         return new FolderImportResult(playlist, scan.Tracks.Count, scan.SkippedFiles);

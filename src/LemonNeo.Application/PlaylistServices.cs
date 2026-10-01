@@ -55,7 +55,7 @@ public sealed class PlaylistService(
         return playlist;
     }
 
-    public PlaylistItem Add(Guid playlistId, TrackReference track)
+    public PlaylistItem Add(Guid playlistId, Track track)
     {
         var playlist = GetRequired(playlistId);
         var item = new PlaylistItem
@@ -89,7 +89,6 @@ public sealed class PlaylistService(
 
 public sealed class ImportService(
     IProviderRegistry registry,
-    LibraryService library,
     PlaylistService playlists)
 {
     public async Task<Playlist> ImportAsync(
@@ -119,8 +118,7 @@ public sealed class ImportService(
         var local = playlists.Create(remote.Name, remote.Description);
         foreach (var track in remote.Tracks)
         {
-            library.UpsertTrack(track);
-            playlists.Add(local.Id, track.ToReference());
+            playlists.Add(local.Id, track);
         }
 
         return local;

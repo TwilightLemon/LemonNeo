@@ -59,7 +59,7 @@ public sealed record TrackMetadata
 
 public sealed record MetadataLookupRequest
 {
-    public required TrackReference Track { get; init; }
+    public required Track Track { get; init; }
     public IReadOnlyList<string> TargetNamespaces { get; init; } = [];
     public int LimitPerSource { get; init; } = 3;
     public double MinimumConfidence { get; init; } = 0.7;
@@ -104,6 +104,17 @@ public interface ISearchProvider
         CancellationToken cancellationToken = default);
 }
 
+/// <summary>
+/// Retrieves a track by the provider's native identifier without approximating
+/// the operation through text search.
+/// </summary>
+public interface ITrackLookupProvider
+{
+    Task<Track?> GetTrackAsync(
+        string trackId,
+        CancellationToken cancellationToken = default);
+}
+
 public interface IPlaylistProvider
 {
     Task<RemotePlaylist?> GetPlaylistAsync(
@@ -142,7 +153,7 @@ public interface IFolderImportProvider
 public interface IPlaybackProvider
 {
     Task<PlaybackSource?> ResolvePlaybackAsync(
-        TrackReference track,
+        Track track,
         PlaybackRequest request,
         CancellationToken cancellationToken = default);
 }
@@ -150,7 +161,7 @@ public interface IPlaybackProvider
 public interface ILyricsProvider
 {
     Task<Lyrics?> GetLyricsAsync(
-        TrackReference track,
+        Track track,
         CancellationToken cancellationToken = default);
 }
 
@@ -167,7 +178,7 @@ public interface ITrackIdResolverProvider
 {
     IReadOnlyCollection<MusicIdScheme> AcceptedIdSchemes { get; }
 
-    Task<TrackReference?> ResolveTrackIdAsync(
+    Task<Track?> ResolveTrackIdAsync(
         ExternalMusicId identifier,
         TrackMetadata metadata,
         CancellationToken cancellationToken = default);
@@ -202,11 +213,11 @@ public sealed record PlayerTimeline(
 public interface IPlayer
 {
     PlayerState State { get; }
-    TrackReference? CurrentTrack { get; }
+    Track? CurrentTrack { get; }
     PlayerTimeline Timeline { get; }
 
     Task PlayAsync(
-        TrackReference track,
+        Track track,
         PlaybackSource source,
         CancellationToken cancellationToken = default);
 

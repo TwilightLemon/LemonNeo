@@ -10,6 +10,7 @@ public sealed class LocalMusicPlugin :
     ILemonPlugin,
     IMusicProvider,
     ISearchProvider,
+    ITrackLookupProvider,
     IPlaybackProvider,
     IFolderImportProvider,
     ITrackIdResolverProvider
@@ -34,7 +35,7 @@ public sealed class LocalMusicPlugin :
 
     public IReadOnlyCollection<MusicIdScheme> AcceptedIdSchemes { get; } =
     [
-        new(MusicIdNamespaces.File, "org.lemonneo.localmusic", "path")
+        new(MusicIdNamespaces.File, "path")
     ];
 
     public ValueTask InitializeAsync(IPluginContext context, CancellationToken cancellationToken)
@@ -65,6 +66,14 @@ public sealed class LocalMusicPlugin :
             .Take(Math.Max(0, request.Limit))
             .ToArray();
         return Task.FromResult(new SearchResult(Id, tracks));
+    }
+
+    public Task<Track?> GetTrackAsync(
+        string trackId,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_catalog.GetValueOrDefault(trackId));
     }
 
     public async Task<FolderScanResult> ScanFolderAsync(
@@ -120,7 +129,7 @@ public sealed class LocalMusicPlugin :
     }
 
     public Task<PlaybackSource?> ResolvePlaybackAsync(
-        TrackReference track,
+        Track track,
         PlaybackRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -145,7 +154,7 @@ public sealed class LocalMusicPlugin :
             : null);
     }
 
-    public Task<TrackReference?> ResolveTrackIdAsync(
+    public Task<Track?> ResolveTrackIdAsync(
         ExternalMusicId identifier,
         TrackMetadata metadata,
         CancellationToken cancellationToken = default)
@@ -153,10 +162,10 @@ public sealed class LocalMusicPlugin :
         cancellationToken.ThrowIfCancellationRequested();
         if (!AcceptedIdSchemes.Any(scheme => scheme.Accepts(identifier)) || !File.Exists(identifier.Value))
         {
-            return Task.FromResult<TrackReference?>(null);
+            return Task.FromResult<Track?>(null);
         }
 
-        return Task.FromResult<TrackReference?>(CreateTrack(identifier.Value).ToReference());
+        return Task.FromResult<Track?>(CreateTrack(identifier.Value));
     }
 
     private static Track CreateTrack(string path)
@@ -179,10 +188,8 @@ public sealed class LocalMusicPlugin :
                 new ExternalMusicId(
                     MusicIdNamespaces.File,
                     fullPath,
-                    "org.lemonneo.localmusic",
                     "path")
-            ],
-            IsPlayable = true
+            ]
         };
     }
 }

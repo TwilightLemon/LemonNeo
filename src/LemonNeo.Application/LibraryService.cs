@@ -37,28 +37,5 @@ public sealed class LibraryService(ILibraryRepository repository)
 
     public void Replace(MusicLibrary library) => Current = library;
 
-    public Track? FindTrack(MusicItemId id) => Current.Tracks.FirstOrDefault(track => track.Id == id);
-
-    public void UpsertTrack(Track track)
-    {
-        var index = Current.Tracks.FindIndex(candidate => candidate.Id == track.Id);
-        if (index < 0)
-        {
-            Current.Tracks.Add(track);
-        }
-        else
-        {
-            Current.Tracks[index] = track;
-        }
-
-        foreach (var item in Current.Playlists.SelectMany(playlist => playlist.Items)
-                     .Where(item => item.Track.Id == track.Id))
-        {
-            item.Track = track.ToReference();
-        }
-
-        Touch();
-    }
-
     public void Touch() => Current.UpdatedAt = DateTimeOffset.UtcNow;
 }

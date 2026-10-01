@@ -10,6 +10,7 @@ namespace LemonNeo.Plugin.Netease;
 public sealed class NeteaseUserPlugin :
     ILemonPlugin,
     IMusicProvider,
+    ITrackLookupProvider,
     IPlaylistProvider,
     IAuthenticationProvider
 {
@@ -17,7 +18,6 @@ public sealed class NeteaseUserPlugin :
     private const string CookieKey = "music-163-cookie";
     private const string UserIdKey = "user-id";
     private const string NicknameKey = "nickname";
-    private const string IdAuthority = "music.163.com/api";
     private const string UserAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36";
@@ -184,6 +184,31 @@ public sealed class NeteaseUserPlugin :
         };
     }
 
+    public async Task<Track?> GetTrackAsync(
+        string trackId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(trackId) || !trackId.All(char.IsAsciiDigit))
+        {
+            return null;
+        }
+
+        var requestValue = Uri.EscapeDataString($"[{{\"id\":{trackId}}}]");
+        using var document = await GetJsonAsync(
+            $"api/v3/song/detail?c={requestValue}",
+            _cookie ?? string.Empty,
+            cancellationToken);
+        EnsureApiSuccess(document.RootElement);
+        if (!document.RootElement.TryGetProperty("songs", out var songs) ||
+            songs.ValueKind != JsonValueKind.Array ||
+            songs.GetArrayLength() == 0)
+        {
+            return null;
+        }
+
+        return TryMapTrack(songs[0]);
+    }
+
     private async Task<(string UserId, string Nickname)> GetAccountAsync(
         string cookie,
         CancellationToken cancellationToken)
@@ -283,9 +308,8 @@ public sealed class NeteaseUserPlugin :
             ArtworkUri = artwork,
             ExternalIds =
             [
-                new ExternalMusicId(MusicIdNamespaces.NeteaseMusic, id, IdAuthority, "song-id")
-            ],
-            IsPlayable = false
+                new ExternalMusicId(MusicIdNamespaces.NeteaseMusic, id, "song-id")
+            ]
         };
     }
 

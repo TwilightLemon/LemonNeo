@@ -8,18 +8,14 @@ public readonly record struct MusicItemId(string ProviderId, string RemoteId)
 public sealed record ExternalMusicId(
     string Namespace,
     string Value,
-    string? Authority = null,
     string? Kind = null);
 
 public sealed record MusicIdScheme(
     string Namespace,
-    string? Authority,
-    string? Kind,
-    bool MatchAnyAuthority = false)
+    string? Kind)
 {
     public bool Accepts(ExternalMusicId id) =>
         string.Equals(Namespace, id.Namespace, StringComparison.OrdinalIgnoreCase) &&
-        (MatchAnyAuthority || string.Equals(Authority, id.Authority, StringComparison.OrdinalIgnoreCase)) &&
         string.Equals(Kind, id.Kind, StringComparison.OrdinalIgnoreCase);
 }
 
@@ -63,6 +59,11 @@ public sealed record Album
     public Uri? ArtworkUri { get; init; }
 }
 
+/// <summary>
+/// A self-contained metadata snapshot used by search results, playlist items, and
+/// playback queues. Playback availability is deliberately not stored here; it is
+/// determined at resolution time by playback-source providers.
+/// </summary>
 public sealed record Track
 {
     public required MusicItemId Id { get; init; }
@@ -71,34 +72,6 @@ public sealed record Track
     public AlbumRef? Album { get; init; }
     public TimeSpan? Duration { get; init; }
     public Uri? ArtworkUri { get; init; }
-    public IReadOnlyList<ExternalMusicId> ExternalIds { get; init; } = [];
-
-    /// <summary>
-    /// Indicates whether the track's originating provider declares a native playback path.
-    /// This is a provider-supplied availability hint, not a global playback permission:
-    /// tracks marked <see langword="false"/> may still be played through another provider
-    /// after metadata matching and playback-source discovery.
-    /// </summary>
-    public bool IsPlayable { get; init; }
-
-    public TrackReference ToReference() => new()
-    {
-        Id = Id,
-        Title = Title,
-        Artists = Artists,
-        Album = Album,
-        Duration = Duration,
-        ExternalIds = ExternalIds
-    };
-}
-
-public sealed record TrackReference
-{
-    public required MusicItemId Id { get; init; }
-    public string? Title { get; init; }
-    public IReadOnlyList<ArtistRef> Artists { get; init; } = [];
-    public AlbumRef? Album { get; init; }
-    public TimeSpan? Duration { get; init; }
     public IReadOnlyList<ExternalMusicId> ExternalIds { get; init; } = [];
 }
 
@@ -138,7 +111,7 @@ public enum PlaybackMode
 public sealed record PlaybackQueueItem
 {
     public Guid Id { get; init; } = Guid.NewGuid();
-    public required TrackReference Track { get; init; }
+    public required Track Track { get; init; }
     public DateTimeOffset AddedAt { get; init; } = DateTimeOffset.UtcNow;
 }
 
@@ -167,7 +140,7 @@ public sealed class Playlist
 public sealed class PlaylistItem
 {
     public Guid Id { get; init; } = Guid.NewGuid();
-    public required TrackReference Track { get; set; }
+    public required Track Track { get; set; }
     public required string SortKey { get; set; }
     public DateTimeOffset AddedAt { get; init; } = DateTimeOffset.UtcNow;
 }
@@ -183,7 +156,6 @@ public sealed record PlaylistMirror
 public sealed class MusicLibrary
 {
     public int FormatVersion { get; init; } = 1;
-    public List<Track> Tracks { get; init; } = [];
     public List<Playlist> Playlists { get; init; } = [];
     public List<PlaylistMirror> Mirrors { get; init; } = [];
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;

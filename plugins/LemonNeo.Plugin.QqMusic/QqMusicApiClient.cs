@@ -16,7 +16,6 @@ internal sealed record QqMusicProfile(
 internal sealed class QqMusicApiClient(HttpClient httpClient)
 {
     private const string ProviderId = "qqmusic";
-    private const string IdAuthority = "y.qq.com/api";
     private const string UserAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36";
@@ -251,6 +250,40 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
         };
     }
 
+    public async Task<Track?> GetTrackAsync(
+        QqMusicCredentials? authentication,
+        string trackId,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(trackId) ||
+            trackId.Length > 128 ||
+            !trackId.All(char.IsAsciiLetterOrDigit))
+        {
+            return null;
+        }
+
+        var userId = authentication?.UserId ?? "0";
+        var gtk = authentication?.Gtk ?? 5381;
+        var idParameter = trackId.All(char.IsAsciiDigit) ? "songid" : "songmid";
+        using var document = await GetJsonAsync(
+            $"https://c.y.qq.com/v8/fcg-bin/fcg_play_single_song.fcg?" +
+            $"{idParameter}={Uri.EscapeDataString(trackId)}&tpl=yqq_song_detail&format=json&" +
+            $"g_tk={gtk}&loginUin={Uri.EscapeDataString(userId)}&hostUin=0&" +
+            "inCharset=utf8&outCharset=utf-8&notice=0&platform=yqq&needNewCode=0",
+            authentication?.Cookie ?? string.Empty,
+            cancellationToken);
+        EnsureApiSuccess(document.RootElement, "track detail");
+        if (!TryGetArray(document.RootElement, out var tracks, "data") ||
+            tracks.GetArrayLength() == 0)
+        {
+            return null;
+        }
+
+        return TryMapTrack(tracks[0]) is { } track
+            ? track with { Id = new MusicItemId(ProviderId, trackId) }
+            : null;
+    }
+
     private async Task<JsonDocument> GetJsonAsync(
         string uri,
         string cookie,
@@ -349,7 +382,6 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
             externalIds.Add(new ExternalMusicId(
                 MusicIdNamespaces.QQMusic,
                 songId,
-                IdAuthority,
                 "song-id"));
         }
 
@@ -358,7 +390,6 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
             externalIds.Add(new ExternalMusicId(
                 MusicIdNamespaces.QQMusic,
                 songMid,
-                IdAuthority,
                 "song-mid"));
         }
 
@@ -381,8 +412,7 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
             ArtworkUri = string.IsNullOrWhiteSpace(albumMid)
                 ? null
                 : new Uri($"https://y.gtimg.cn/music/photo_new/T002R500x500M000{albumMid}.jpg"),
-            ExternalIds = externalIds,
-            IsPlayable = false
+            ExternalIds = externalIds
         };
     }
 

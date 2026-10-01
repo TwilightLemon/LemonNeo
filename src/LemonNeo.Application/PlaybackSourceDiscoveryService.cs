@@ -5,7 +5,7 @@ namespace LemonNeo.Application;
 
 public sealed record PlaybackSourceCandidate(
     string ProviderId,
-    TrackReference Track,
+    Track Track,
     PlaybackSource Source,
     double Confidence,
     string ResolutionMethod);
@@ -16,23 +16,22 @@ public sealed record PlaybackSourceDiscoveryResult(
 
 public sealed class PlaybackSourceDiscoveryService(
     IProviderRegistry registry,
-    LibraryService library,
     MetadataService metadataService)
 {
     public Task<PlaybackSourceDiscoveryResult> FindKnownAsync(
-        TrackReference track,
+        Track track,
         PlaybackRequest? request = null,
         CancellationToken cancellationToken = default) =>
         FindCoreAsync(track, request, expandMetadata: false, cancellationToken);
 
     public async Task<PlaybackSourceDiscoveryResult> FindAsync(
-        TrackReference track,
+        Track track,
         PlaybackRequest? request = null,
         CancellationToken cancellationToken = default) =>
         await FindCoreAsync(track, request, expandMetadata: true, cancellationToken);
 
     private async Task<PlaybackSourceDiscoveryResult> FindCoreAsync(
-        TrackReference track,
+        Track track,
         PlaybackRequest? request,
         bool expandMetadata,
         CancellationToken cancellationToken)
@@ -181,7 +180,7 @@ public sealed class PlaybackSourceDiscoveryService(
                         resolvedTrack,
                         source,
                         0.98,
-                        $"declared-id:{identifier.Namespace}/{identifier.Authority}/{identifier.Kind}");
+                        $"declared-id:{identifier.Namespace}/{identifier.Kind}");
                 }
             }
         }
@@ -204,8 +203,6 @@ public sealed class PlaybackSourceDiscoveryService(
             tracks.AddRange(result.Tracks);
         }
 
-        tracks.AddRange(library.Current.Tracks.Where(candidate =>
-            string.Equals(candidate.Id.ProviderId, musicProvider.Id, StringComparison.OrdinalIgnoreCase)));
         var best = tracks.DistinctBy(candidate => candidate.Id)
             .Select(candidate => new { Track = candidate, Score = Score(metadata, candidate) })
             .OrderByDescending(candidate => candidate.Score)
@@ -215,23 +212,24 @@ public sealed class PlaybackSourceDiscoveryService(
             return null;
         }
 
-        var source = await playbackProvider.ResolvePlaybackAsync(best.Track.ToReference(), request, cancellationToken);
+        var source = await playbackProvider.ResolvePlaybackAsync(best.Track, request, cancellationToken);
         return source is null
             ? null
             : new PlaybackSourceCandidate(
                 musicProvider.Id,
-                best.Track.ToReference(),
+                best.Track,
                 source,
                 best.Score,
                 "provider-search");
     }
 
-    private static TrackMetadata FromTrack(TrackReference track) => new()
+    private static TrackMetadata FromTrack(Track track) => new()
     {
-        Title = track.Title ?? track.Id.RemoteId,
+        Title = track.Title,
         Artists = track.Artists.Select(artist => artist.Name).ToArray(),
         Album = track.Album?.Title,
         Duration = track.Duration,
+        ArtworkUri = track.ArtworkUri,
         ExternalIds = track.ExternalIds
     };
 

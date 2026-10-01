@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using System.Text.Json;
 using LemonNeo.Core;
 using LemonNeo.Plugin.Abstractions;
 using Lyricify.Lyrics.Helpers;
@@ -17,10 +17,10 @@ public sealed class LyricifyMetadataPlugin :
     ILemonPlugin,
     IMusicProvider,
     ISearchProvider,
+    ITrackLookupProvider,
     IMetadataProvider,
     ILyricsProvider
 {
-    private const string AuthorityPrefix = "org.lyricify.helper";
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(20);
     private static readonly SourceDefinition[] Sources =
     [
@@ -39,8 +39,20 @@ public sealed class LyricifyMetadataPlugin :
         new(MusicIdNamespaces.NeteaseMusic, HelperSearchers.Netease),
         new(MusicIdNamespaces.KugouMusic, HelperSearchers.Kugou)
     ];
+    private static readonly MusicIdScheme[] LyricsIdSchemes =
+    [
+        new(MusicIdNamespaces.QQMusic, "song-id"),
+        new(MusicIdNamespaces.QQMusic, "song-mid"),
+        new(MusicIdNamespaces.NeteaseMusic, "song-id"),
+        new(MusicIdNamespaces.KugouMusic, "audio-hash"),
+        new(MusicIdNamespaces.AppleMusic, "catalog-song-id"),
+        new(MusicIdNamespaces.Spotify, "track-id"),
+        new(MusicIdNamespaces.Musixmatch, "track-id"),
+        new(MusicIdNamespaces.SodaMusic, "track-id"),
+        new(MusicIdNamespaces.LrcLib, "lyrics-id")
+    ];
 
-    private readonly ConcurrentDictionary<string, Track> _searchCache = new(StringComparer.OrdinalIgnoreCase);
+    private HttpClient? _httpClient;
     private ILogger<LyricifyMetadataPlugin>? _logger;
 
     public PluginDescriptor Descriptor { get; } = new(
@@ -60,6 +72,8 @@ public sealed class LyricifyMetadataPlugin :
     public ValueTask InitializeAsync(IPluginContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        _httpClient = context.HttpClientFactory.CreateClient(Descriptor.Id);
+        _httpClient.Timeout = RequestTimeout;
         _logger = context.LoggerFactory.CreateLogger<LyricifyMetadataPlugin>();
         ConfigureOptionalCredentials();
         context.RegisterProvider(this);
@@ -69,7 +83,8 @@ public sealed class LyricifyMetadataPlugin :
     public ValueTask ShutdownAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        _searchCache.Clear();
+        _httpClient?.Dispose();
+        _httpClient = null;
         _logger = null;
         return ValueTask.CompletedTask;
     }
@@ -107,11 +122,6 @@ public sealed class LyricifyMetadataPlugin :
             return new SearchResult(Id, []);
         }
 
-        if (_searchCache.TryGetValue(request.Keyword, out var cached))
-        {
-            return new SearchResult(Id, [cached]);
-        }
-
         var limitPerSource = Math.Max(1, (int)Math.Ceiling(request.Limit / (double)CatalogSearchSources.Length));
         var searches = CatalogSearchSources.Select(source =>
             SearchCatalogSourceAsync(source, request.Keyword.Trim(), limitPerSource, cancellationToken));
@@ -129,13 +139,151 @@ public sealed class LyricifyMetadataPlugin :
             .DistinctBy(track => track.Id)
             .Take(request.Limit)
             .ToArray();
-        foreach (var track in tracks)
-        {
-            _searchCache[track.Id.RemoteId] = track;
-        }
-
         return new SearchResult(Id, tracks);
     }
+
+    public async Task<Track?> GetTrackAsync(
+        string trackId,
+        CancellationToken cancellationToken = default)
+    {
+        var parts = trackId.Split(':', 3);
+        if (parts.Length != 3)
+        {
+            return null;
+        }
+
+        var sourceNamespace = parts[0];
+        var kind = parts[1];
+        var value = Uri.UnescapeDataString(parts[2]);
+        ISearchResult? result = sourceNamespace.ToLowerInvariant() switch
+        {
+            MusicIdNamespaces.QQMusic when kind is "song-mid" or "song-id" =>
+                await GetQqTrackAsync(value, cancellationToken),
+            MusicIdNamespaces.NeteaseMusic when kind == "song-id" =>
+                await GetNeteaseTrackAsync(value, cancellationToken),
+            MusicIdNamespaces.KugouMusic when kind == "audio-hash" =>
+                await GetKugouTrackAsync(value, cancellationToken),
+            _ => null
+        };
+        return result is null
+            ? null
+            : ToSearchTrack(sourceNamespace, result) with { Id = new MusicItemId(Id, trackId) };
+    }
+
+    private static async Task<ISearchResult?> GetQqTrackAsync(
+        string id,
+        CancellationToken cancellationToken)
+    {
+        var response = await new global::Lyricify.Lyrics.Providers.Web.QQMusic.Api()
+            .GetSong(id)
+            .WaitAsync(RequestTimeout, cancellationToken);
+        var song = response?.Data?.FirstOrDefault();
+        return song is null ? null : new QQMusicSearchResult(song);
+    }
+
+    private async Task<ISearchResult?> GetNeteaseTrackAsync(
+        string id,
+        CancellationToken cancellationToken)
+    {
+        if (!id.All(char.IsAsciiDigit))
+        {
+            return null;
+        }
+
+        var client = _httpClient ?? throw new InvalidOperationException("The Lyricify provider is not initialized.");
+        var requestValue = Uri.EscapeDataString($"[{{\"id\":{id}}}]");
+        using var message = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"https://music.163.com/api/v3/song/detail?c={requestValue}");
+        message.Headers.TryAddWithoutValidation("User-Agent", "Mozilla/5.0");
+        message.Headers.Referrer = new Uri("https://music.163.com/");
+        using var response = await client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+        if (!document.RootElement.TryGetProperty("songs", out var songs) ||
+            songs.ValueKind != JsonValueKind.Array ||
+            songs.GetArrayLength() == 0)
+        {
+            return null;
+        }
+
+        var song = songs[0];
+        var title = ReadJsonString(song, "name");
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            return null;
+        }
+
+        var artists = song.TryGetProperty("ar", out var artistValues) &&
+                      artistValues.ValueKind == JsonValueKind.Array
+            ? artistValues.EnumerateArray()
+                .Select(artist => ReadJsonString(artist, "name"))
+                .OfType<string>()
+                .ToArray()
+            : [];
+        var album = song.TryGetProperty("al", out var albumValue) &&
+                    albumValue.ValueKind == JsonValueKind.Object
+            ? ReadJsonString(albumValue, "name") ?? string.Empty
+            : string.Empty;
+        var duration = int.TryParse(ReadJsonString(song, "dt"), out var milliseconds)
+            ? milliseconds
+            : 0;
+        return new NeteaseSearchResult(title, artists, album, null, duration, id);
+    }
+
+    private async Task<ISearchResult?> GetKugouTrackAsync(
+        string hash,
+        CancellationToken cancellationToken)
+    {
+        var client = _httpClient ?? throw new InvalidOperationException("The Lyricify provider is not initialized.");
+        var uri = new Uri(
+            $"https://wwwapi.kugou.com/yy/index.php?r=play/getdata&hash={Uri.EscapeDataString(hash)}");
+        using var message = new HttpRequestMessage(HttpMethod.Get, uri);
+        message.Headers.TryAddWithoutValidation("User-Agent", "Mozilla/5.0");
+        message.Headers.Referrer = new Uri("https://www.kugou.com/");
+        using var response = await client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+        if (!document.RootElement.TryGetProperty("data", out var data) ||
+            data.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        var title = ReadJsonString(data, "song_name");
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            return null;
+        }
+
+        var artists = (ReadJsonString(data, "author_name") ?? string.Empty)
+            .Split(['、', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var duration = int.TryParse(ReadJsonString(data, "timelength"), out var milliseconds)
+            ? milliseconds
+            : 0;
+        return new KugouSearchResult(
+            title,
+            artists,
+            ReadJsonString(data, "album_name") ?? string.Empty,
+            null,
+            duration,
+            hash);
+    }
+
+    private static string? ReadJsonString(JsonElement value, string property) =>
+        value.TryGetProperty(property, out var child) && child.ValueKind != JsonValueKind.Null
+            ? child.ValueKind == JsonValueKind.String ? child.GetString() : child.ToString()
+            : null;
 
     private static async Task<CatalogSearchResult> SearchCatalogSourceAsync(
         SourceDefinition source,
@@ -175,8 +323,7 @@ public sealed class LyricifyMetadataPlugin :
             Duration = result.DurationMs is null
                 ? null
                 : TimeSpan.FromMilliseconds(result.DurationMs.Value),
-            ExternalIds = identifiers,
-            IsPlayable = false
+            ExternalIds = identifiers
         };
     }
 
@@ -204,10 +351,10 @@ public sealed class LyricifyMetadataPlugin :
     }
 
     public async Task<LemonLyrics?> GetLyricsAsync(
-        TrackReference track,
+        Track track,
         CancellationToken cancellationToken = default)
     {
-        var identifiers = track.ExternalIds.Where(IsHelperIdentifier).ToList();
+        var identifiers = track.ExternalIds.Where(IsSupportedLyricsIdentifier).ToList();
         if (identifiers.Count == 0)
         {
             var lookup = await LookupMetadataAsync(
@@ -234,10 +381,10 @@ public sealed class LyricifyMetadataPlugin :
 
         var preferences = new[]
         {
+            MusicIdNamespaces.QQMusic,
+            MusicIdNamespaces.NeteaseMusic,
             MusicIdNamespaces.AppleMusic,
             MusicIdNamespaces.Spotify,
-            MusicIdNamespaces.NeteaseMusic,
-            MusicIdNamespaces.QQMusic,
             MusicIdNamespaces.SodaMusic,
             MusicIdNamespaces.LrcLib,
             MusicIdNamespaces.KugouMusic,
@@ -248,7 +395,7 @@ public sealed class LyricifyMetadataPlugin :
             cancellationToken.ThrowIfCancellationRequested();
             var sourceIds = identifiers
                 .Where(id => string.Equals(id.Namespace, sourceNamespace, StringComparison.OrdinalIgnoreCase) &&
-                             IsHelperIdentifier(id))
+                             IsSupportedLyricsIdentifier(id))
                 .ToArray();
             if (sourceIds.Length == 0)
             {
@@ -269,7 +416,7 @@ public sealed class LyricifyMetadataPlugin :
                     exception,
                     "Failed to fetch {Source} lyrics for {Track}.",
                     sourceNamespace,
-                    track.Title ?? track.Id.RemoteId);
+                    track.Title);
             }
         }
 
@@ -322,33 +469,31 @@ public sealed class LyricifyMetadataPlugin :
 
     private static IReadOnlyList<ExternalMusicId> GetIdentifiers(string sourceNamespace, ISearchResult result)
     {
-        var authority = GetAuthority(sourceNamespace);
         return result switch
         {
             QQMusicSearchResult qq =>
             [
-                new(sourceNamespace, qq.Id, authority, "song-id"),
-                new(sourceNamespace, qq.Mid, authority, "song-mid")
+                new(sourceNamespace, qq.Id, "song-id"),
+                new(sourceNamespace, qq.Mid, "song-mid")
             ],
-            NeteaseSearchResult netease => [new(sourceNamespace, netease.Id, authority, "song-id")],
-            KugouSearchResult kugou => [new(sourceNamespace, kugou.Hash, authority, "audio-hash")],
-            AppleMusicSearchResult apple => [new(sourceNamespace, apple.Id, authority, "catalog-song-id")],
-            SpotifySearchResult spotify => [new(sourceNamespace, spotify.Id, authority, "track-id")],
-            MusixmatchSearchResult musixmatch => CreateMusixmatchIds(sourceNamespace, authority, musixmatch),
-            SodaMusicSearchResult soda => [new(sourceNamespace, soda.Id, authority, "track-id")],
-            LRCLIBSearchResult lrcLib => [new(sourceNamespace, lrcLib.Id.ToString(), authority, "lyrics-id")],
+            NeteaseSearchResult netease => [new(sourceNamespace, netease.Id, "song-id")],
+            KugouSearchResult kugou => [new(sourceNamespace, kugou.Hash, "audio-hash")],
+            AppleMusicSearchResult apple => [new(sourceNamespace, apple.Id, "catalog-song-id")],
+            SpotifySearchResult spotify => [new(sourceNamespace, spotify.Id, "track-id")],
+            MusixmatchSearchResult musixmatch => CreateMusixmatchIds(sourceNamespace, musixmatch),
+            SodaMusicSearchResult soda => [new(sourceNamespace, soda.Id, "track-id")],
+            LRCLIBSearchResult lrcLib => [new(sourceNamespace, lrcLib.Id.ToString(), "lyrics-id")],
             _ => []
         };
     }
 
     private static IReadOnlyList<ExternalMusicId> CreateMusixmatchIds(
         string sourceNamespace,
-        string authority,
         MusixmatchSearchResult result)
     {
         var ids = new List<ExternalMusicId>
         {
-            new(sourceNamespace, result.Id.ToString(), authority, "track-id")
+            new(sourceNamespace, result.Id.ToString(), "track-id")
         };
         if (!string.IsNullOrWhiteSpace(result.Isrc))
         {
@@ -358,9 +503,9 @@ public sealed class LyricifyMetadataPlugin :
         return ids;
     }
 
-    private static TrackMultiArtistMetadata ToHelperMetadata(TrackReference track) => new()
+    private static TrackMultiArtistMetadata ToHelperMetadata(Track track) => new()
     {
-        Title = track.Title ?? track.Id.RemoteId,
+        Title = track.Title,
         Artists = track.Artists.Select(artist => artist.Name).ToList(),
         Album = track.Album?.Title,
         DurationMs = track.Duration is null ? null : (int)track.Duration.Value.TotalMilliseconds,
@@ -371,7 +516,7 @@ public sealed class LyricifyMetadataPlugin :
     private static async Task<LemonLyrics?> FetchLyricsAsync(
         string sourceNamespace,
         IReadOnlyList<ExternalMusicId> ids,
-        TrackReference track,
+        Track track,
         CancellationToken cancellationToken) => sourceNamespace switch
         {
             MusicIdNamespaces.AppleMusic => await FetchAppleLyricsAsync(ids, cancellationToken),
@@ -513,7 +658,7 @@ public sealed class LyricifyMetadataPlugin :
 
     private static async Task<LemonLyrics?> FetchKugouLyricsAsync(
         IReadOnlyList<ExternalMusicId> ids,
-        TrackReference track,
+        Track track,
         CancellationToken cancellationToken)
     {
         var hash = Find(ids, "audio-hash");
@@ -595,10 +740,12 @@ public sealed class LyricifyMetadataPlugin :
     private static ExternalMusicId? Find(IEnumerable<ExternalMusicId> ids, string kind) =>
         ids.FirstOrDefault(id => string.Equals(id.Kind, kind, StringComparison.OrdinalIgnoreCase));
 
-    private static bool IsHelperIdentifier(ExternalMusicId id) =>
-        string.Equals(id.Authority, GetAuthority(id.Namespace), StringComparison.OrdinalIgnoreCase);
-
-    private static string GetAuthority(string sourceNamespace) => $"{AuthorityPrefix}/{sourceNamespace}";
+    /// <summary>
+    /// Accepts identifiers by the platform schema consumed by the lyrics API.
+    /// Namespace and kind distinguish values with different platform semantics.
+    /// </summary>
+    private static bool IsSupportedLyricsIdentifier(ExternalMusicId id) =>
+        LyricsIdSchemes.Any(scheme => scheme.Accepts(id));
 
     private static double Confidence(CompareHelper.MatchType? matchType) =>
         Math.Clamp(((int)(matchType ?? CompareHelper.MatchType.NoMatch)) / 100d, 0, 1);

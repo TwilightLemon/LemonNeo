@@ -51,6 +51,7 @@ internal static class Program
         collection.AddSingleton<IPlaylistOrderingService, FractionalPlaylistOrderingService>();
         collection.AddSingleton<PlaylistService>();
         collection.AddSingleton<SearchService>();
+        collection.AddSingleton<TrackLookupService>();
         collection.AddSingleton<MetadataService>();
         collection.AddSingleton<LyricsService>();
         collection.AddSingleton<ImportService>();
@@ -85,7 +86,12 @@ internal static class Program
             output.WriteLine();
             output.WriteLine("Library loaded.");
             output.WriteLine($"{library.Current.Playlists.Count} playlists.");
-            output.WriteLine($"{library.Current.Tracks.Count} tracks.");
+            var trackCount = library.Current.Playlists
+                .SelectMany(playlist => playlist.Items)
+                .Select(item => item.Track.Id)
+                .Distinct()
+                .Count();
+            output.WriteLine($"{trackCount} playlist tracks.");
             output.WriteLine();
 
             var commands = services.GetRequiredService<CommandProcessor>();

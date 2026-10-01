@@ -15,7 +15,6 @@ internal sealed class QqMusicPlaybackProvider(
     ITrackIdResolverProvider
 {
     private const string ProviderId = "qqmusic-playback";
-    private const string OwnAuthority = "org.lemonneo.qqmusic.playback";
     private const string UserAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36";
@@ -33,14 +32,10 @@ internal sealed class QqMusicPlaybackProvider(
 
     public IReadOnlyCollection<MusicIdScheme> AcceptedIdSchemes { get; } =
     [
-        new(
-            MusicIdNamespaces.QQMusic,
-            Authority: null,
-            Kind: "song-mid",
-            MatchAnyAuthority: true)
+        new(MusicIdNamespaces.QQMusic, "song-mid")
     ];
 
-    public Task<TrackReference?> ResolveTrackIdAsync(
+    public Task<Track?> ResolveTrackIdAsync(
         ExternalMusicId identifier,
         TrackMetadata metadata,
         CancellationToken cancellationToken = default)
@@ -49,24 +44,18 @@ internal sealed class QqMusicPlaybackProvider(
         if (!AcceptedIdSchemes.Any(scheme => scheme.Accepts(identifier)) ||
             !IsValidSongMid(identifier.Value))
         {
-            return Task.FromResult<TrackReference?>(null);
+            return Task.FromResult<Track?>(null);
         }
 
-        var ownIdentifier = new ExternalMusicId(
-            MusicIdNamespaces.QQMusic,
-            identifier.Value,
-            OwnAuthority,
-            "song-mid");
-        var externalIds = metadata.ExternalIds.Append(identifier).Append(ownIdentifier)
+        var externalIds = metadata.ExternalIds.Append(identifier)
             .DistinctBy(id => new
             {
                 Namespace = id.Namespace.ToUpperInvariant(),
                 id.Value,
-                Authority = id.Authority?.ToUpperInvariant(),
                 Kind = id.Kind?.ToUpperInvariant()
             })
             .ToArray();
-        return Task.FromResult<TrackReference?>(new TrackReference
+        return Task.FromResult<Track?>(new Track
         {
             Id = new MusicItemId(ProviderId, identifier.Value),
             Title = metadata.Title,
@@ -75,12 +64,13 @@ internal sealed class QqMusicPlaybackProvider(
                 ? null
                 : new AlbumRef { Title = metadata.Album },
             Duration = metadata.Duration,
+            ArtworkUri = metadata.ArtworkUri,
             ExternalIds = externalIds
         });
     }
 
     public async Task<PlaybackSource?> ResolvePlaybackAsync(
-        TrackReference track,
+        Track track,
         PlaybackRequest request,
         CancellationToken cancellationToken = default)
     {

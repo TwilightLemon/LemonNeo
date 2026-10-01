@@ -75,7 +75,7 @@ internal sealed class BassPlayer : IPlayer, IAsyncDisposable
     }
 
     public PlayerState State { get; private set; } = PlayerState.Stopped;
-    public TrackReference? CurrentTrack { get; private set; }
+    public Track? CurrentTrack { get; private set; }
     public PlayerTimeline Timeline
     {
         get
@@ -97,7 +97,7 @@ internal sealed class BassPlayer : IPlayer, IAsyncDisposable
     }
 
     public Task PlayAsync(
-        TrackReference track,
+        Track track,
         PlaybackSource source,
         CancellationToken cancellationToken = default)
     {

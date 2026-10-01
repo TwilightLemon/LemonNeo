@@ -14,8 +14,8 @@ public interface IPlaybackQueue
 
     void Restore(PlaybackQueueState state);
     PlaybackQueueState Snapshot();
-    void Replace(IEnumerable<TrackReference> tracks, int startIndex = 0);
-    PlaybackQueueItem Enqueue(TrackReference track);
+    void Replace(IEnumerable<Track> tracks, int startIndex = 0);
+    PlaybackQueueItem Enqueue(Track track);
     bool Remove(Guid itemId);
     PlaybackQueueItem? Select(Guid itemId);
     PlaybackQueueItem? MoveNext();
@@ -139,7 +139,7 @@ public sealed class PlaybackQueue : IPlaybackQueue
         }
     }
 
-    public void Replace(IEnumerable<TrackReference> tracks, int startIndex = 0)
+    public void Replace(IEnumerable<Track> tracks, int startIndex = 0)
     {
         ArgumentNullException.ThrowIfNull(tracks);
         lock (_gate)
@@ -170,7 +170,7 @@ public sealed class PlaybackQueue : IPlaybackQueue
         }
     }
 
-    public PlaybackQueueItem Enqueue(TrackReference track)
+    public PlaybackQueueItem Enqueue(Track track)
     {
         ArgumentNullException.ThrowIfNull(track);
         lock (_gate)
@@ -448,7 +448,7 @@ public sealed class ConsolePlayer(TextWriter output) : IPlayer
     private readonly Stopwatch _clock = new();
     private TimeSpan _elapsed;
     private PlayerState _state;
-    private TrackReference? _currentTrack;
+    private Track? _currentTrack;
 
     public PlayerState State
     {
@@ -461,7 +461,7 @@ public sealed class ConsolePlayer(TextWriter output) : IPlayer
         }
     }
 
-    public TrackReference? CurrentTrack
+    public Track? CurrentTrack
     {
         get
         {
@@ -494,7 +494,7 @@ public sealed class ConsolePlayer(TextWriter output) : IPlayer
     }
 
     public Task PlayAsync(
-        TrackReference track,
+        Track track,
         PlaybackSource source,
         CancellationToken cancellationToken = default)
     {
@@ -507,7 +507,7 @@ public sealed class ConsolePlayer(TextWriter output) : IPlayer
             _state = PlayerState.Playing;
 
             output.WriteLine("Now Playing");
-            output.WriteLine(track.Title ?? track.Id.RemoteId);
+            output.WriteLine(track.Title);
             output.WriteLine(track.Artists.Count == 0
                 ? $"Provider: {track.Id.ProviderId}"
                 : string.Join(", ", track.Artists.Select(artist => artist.Name)));

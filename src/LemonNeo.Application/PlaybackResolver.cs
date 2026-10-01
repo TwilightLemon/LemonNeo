@@ -11,7 +11,7 @@ public sealed class PlaybackResolver(
     public IPlayerProvider? ActivePlayer { get; private set; }
 
     public async Task<PlaybackSource> PlayAsync(
-        TrackReference track,
+        Track track,
         PlaybackRequest? request = null,
         CancellationToken cancellationToken = default)
     {
@@ -34,7 +34,7 @@ public sealed class PlaybackResolver(
                 {
                     throw new PlaybackResolutionException(
                         $"Required source provider '{playbackRequest.RequiredSourceProviderId}' reported that " +
-                        $"'{track.Title ?? track.Id.ToString()}' is unavailable.");
+                        $"'{track.Title}' is unavailable.");
                 }
             }
 
@@ -49,9 +49,9 @@ public sealed class PlaybackResolver(
                 var candidate = discovery.Candidates.FirstOrDefault()
                     ?? throw new PlaybackResolutionException(
                         playbackRequest.RequiredSourceProviderId is null
-                            ? $"No playable source could be found for '{track.Title ?? track.Id.ToString()}'."
+                            ? $"No playable source could be found for '{track.Title}'."
                             : $"Required source provider '{playbackRequest.RequiredSourceProviderId}' " +
-                              $"could not resolve '{track.Title ?? track.Id.ToString()}'.");
+                              $"could not resolve '{track.Title}'.");
                 source = candidate.Source;
                 resolvedTrack = candidate.Track;
             }
