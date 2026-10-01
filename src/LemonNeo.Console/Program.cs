@@ -39,6 +39,8 @@ internal static class Program
         collection.AddSingleton<IPlayerRegistry>(services => services.GetRequiredService<PlayerRegistry>());
         collection.AddSingleton<PluginLoader>();
         collection.AddSingleton<ILibraryRepository>(_ => new JsonLibraryRepository(options.LibraryDirectory));
+        collection.AddSingleton<IPlaybackStateRepository>(
+            _ => new JsonPlaybackStateRepository(options.LibraryDirectory));
         collection.AddSingleton<LibraryService>();
         collection.AddSingleton<IPlaylistOrderingService, FractionalPlaylistOrderingService>();
         collection.AddSingleton<PlaylistService>();
@@ -50,6 +52,7 @@ internal static class Program
         collection.AddSingleton<IPlaybackQueue, PlaybackQueue>();
         collection.AddSingleton<PlaybackSourceDiscoveryService>();
         collection.AddSingleton<PlaybackResolver>();
+        collection.AddSingleton<PlaybackSessionService>();
         collection.AddSingleton<ILibraryMergeService, LibraryMergeService>();
         collection.AddSingleton<IGitBackend, MockGitBackend>();
         collection.AddSingleton<ILibrarySyncProvider, MockGitSyncProvider>();
@@ -71,6 +74,8 @@ internal static class Program
 
             var library = services.GetRequiredService<LibraryService>();
             await library.LoadAsync(cancellation.Token);
+            var playbackSession = services.GetRequiredService<PlaybackSessionService>();
+            await playbackSession.InitializeAsync(cancellation.Token);
             output.WriteLine();
             output.WriteLine("Library loaded.");
             output.WriteLine($"{library.Current.Playlists.Count} playlists.");

@@ -76,6 +76,25 @@ internal sealed class BassPlayer : IPlayer, IAsyncDisposable
 
     public PlayerState State { get; private set; } = PlayerState.Stopped;
     public TrackReference? CurrentTrack { get; private set; }
+    public PlayerTimeline Timeline
+    {
+        get
+        {
+            lock (_gate)
+            {
+                if (_stream == InvalidStream)
+                {
+                    return new PlayerTimeline(TimeSpan.Zero, CurrentTrack?.Duration);
+                }
+
+                var position = ChannelTime(BassApi.BASS_ChannelGetPosition(_stream)) ?? TimeSpan.Zero;
+                var duration = ChannelTime(BassApi.BASS_ChannelGetLength(_stream)) ?? CurrentTrack?.Duration;
+                var hasEnded = State == PlayerState.Playing &&
+                               BassApi.BASS_ChannelIsActive(_stream) == BASSActive.BASS_ACTIVE_STOPPED;
+                return new PlayerTimeline(position, duration, hasEnded);
+            }
+        }
+    }
 
     public Task PlayAsync(
         TrackReference track,
@@ -241,6 +260,19 @@ internal sealed class BassPlayer : IPlayer, IAsyncDisposable
 
     private static InvalidOperationException BassFailure(string operation) =>
         new($"BASS could not {operation}. Error: {BassApi.BASS_ErrorGetCode()}.");
+
+    private TimeSpan? ChannelTime(long bytePosition)
+    {
+        if (bytePosition < 0)
+        {
+            return null;
+        }
+
+        var seconds = BassApi.BASS_ChannelBytes2Seconds(_stream, bytePosition);
+        return double.IsFinite(seconds) && seconds >= 0 && seconds <= TimeSpan.MaxValue.TotalSeconds
+            ? TimeSpan.FromSeconds(seconds)
+            : null;
+    }
 
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
 }

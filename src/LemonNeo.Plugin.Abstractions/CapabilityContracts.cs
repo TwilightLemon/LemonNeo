@@ -164,10 +164,16 @@ public enum PlayerState
     Paused
 }
 
+public sealed record PlayerTimeline(
+    TimeSpan Position,
+    TimeSpan? Duration,
+    bool HasEnded = false);
+
 public interface IPlayer
 {
     PlayerState State { get; }
     TrackReference? CurrentTrack { get; }
+    PlayerTimeline Timeline { get; }
 
     Task PlayAsync(
         TrackReference track,

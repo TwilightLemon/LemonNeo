@@ -18,9 +18,8 @@ internal sealed class CommandProcessor(
     PlaylistService playlists,
     ImportService importer,
     FolderImportService folderImporter,
-    PlaybackResolver playback,
+    PlaybackSessionService playback,
     PlaybackSourceDiscoveryService sourceDiscovery,
-    IPlaybackQueue queue,
     SyncService sync)
 {
     private readonly TextWriter _output = global::System.Console.Out;
@@ -35,6 +34,7 @@ internal sealed class CommandProcessor(
             if (line is null)
             {
                 await library.SaveAsync(cancellationToken);
+                await playback.SaveAsync(cancellationToken);
                 return;
             }
 
@@ -76,7 +76,7 @@ internal sealed class CommandProcessor(
         _output.WriteLine($"Reloaded {library.Current.Playlists.Count} playlists from JSON (expected {persistedPlaylistCount}).");
         try
         {
-            await playback.PlayAsync(
+            await playback.PlayTrackAsync(
                 track.ToReference(),
                 new PlaybackRequest(RequiredSourceProviderId: "mock"),
                 cancellationToken);
@@ -187,6 +187,43 @@ internal sealed class CommandProcessor(
                     ParseRequiredSource(arguments),
                     cancellationToken);
                 break;
+            case "play-playlist":
+                Require(arguments, 2, "play-playlist <playlist-id|name> [start-number] [--source <provider>]");
+                var playlistOptions = ParsePlaylistPlaybackOptions(arguments);
+                await PlayPlaylistAsync(
+                    ResolvePlaylist(arguments[1]),
+                    playlistOptions.StartIndex,
+                    playlistOptions.RequiredSourceProviderId,
+                    cancellationToken);
+                break;
+            case "play-current":
+                var current = await playback.PlayCurrentAsync(cancellationToken);
+                _output.WriteLine(current is null
+                    ? "The playback queue is empty."
+                    : $"Playing: {current.Title ?? current.Id.RemoteId}");
+                break;
+            case "previous":
+            case "prev":
+                var previous = await playback.PreviousAsync(cancellationToken);
+                _output.WriteLine(previous is null
+                    ? "No previous track is available."
+                    : $"Previous: {previous.Title ?? previous.Id.RemoteId}");
+                break;
+            case "next":
+                var next = await playback.NextAsync(cancellationToken);
+                _output.WriteLine(next is null
+                    ? "The end of the queue was reached."
+                    : $"Next: {next.Title ?? next.Id.RemoteId}");
+                break;
+            case "mode":
+                Require(arguments, 2, "mode <sequential|repeat|shuffle>");
+                var mode = ParsePlaybackMode(arguments[1]);
+                await playback.SetModeAsync(mode, cancellationToken);
+                _output.WriteLine($"Playback mode: {FormatPlaybackMode(mode)}");
+                break;
+            case "now-playing":
+                PrintNowPlaying();
+                break;
             case "pause":
                 await playback.PauseAsync(cancellationToken);
                 _output.WriteLine("Playback paused.");
@@ -200,7 +237,20 @@ internal sealed class CommandProcessor(
                 _output.WriteLine("Playback stopped.");
                 break;
             case "queue":
-                PrintQueue();
+                if (arguments.Count == 1)
+                {
+                    PrintQueue();
+                }
+                else if (arguments.Count == 2 &&
+                         string.Equals(arguments[1], "clear", StringComparison.OrdinalIgnoreCase))
+                {
+                    await playback.ClearQueueAsync(cancellationToken);
+                    _output.WriteLine("Playback queue cleared.");
+                }
+                else
+                {
+                    throw new ArgumentException("Usage: queue [clear]");
+                }
                 break;
             case "sync":
                 Require(arguments, 2, "sync <status|pull|push>");
@@ -208,11 +258,13 @@ internal sealed class CommandProcessor(
                 break;
             case "save":
                 await library.SaveAsync(cancellationToken);
+                await playback.SaveAsync(cancellationToken);
                 _output.WriteLine("Library saved.");
                 break;
             case "exit":
             case "quit":
                 await library.SaveAsync(cancellationToken);
+                await playback.SaveAsync(cancellationToken);
                 return false;
             default:
                 _output.WriteLine($"Unknown command '{arguments[0]}'. Type 'help' for commands.");
@@ -258,10 +310,16 @@ internal sealed class CommandProcessor(
             add <playlist-id> <provider> <track-id>
             remove <playlist-id> <item-id>
             play <provider> <track-id> [--source <provider>]
+            play-playlist <playlist-id|name> [start-number] [--source <provider>]
+            play-current
+            previous
+            next
+            mode <sequential|repeat|shuffle>
+            now-playing
             pause
             resume
             stop
-            queue
+            queue [clear]
             sync status
             sync pull
             sync push
@@ -642,10 +700,31 @@ internal sealed class CommandProcessor(
     {
         var track = library.FindTrack(new MusicItemId(providerId, trackId))
             ?? await GetTrackAsync(providerId, trackId, cancellationToken);
-        await playback.PlayAsync(
+        await playback.PlayTrackAsync(
             track.ToReference(),
             new PlaybackRequest(RequiredSourceProviderId: requiredSourceProviderId),
             cancellationToken);
+    }
+
+    private async Task PlayPlaylistAsync(
+        Playlist playlist,
+        int startIndex,
+        string? requiredSourceProviderId,
+        CancellationToken cancellationToken)
+    {
+        var tracks = playlist.Items
+            .OrderBy(item => FractionalPlaylistOrderingService.Parse(item.SortKey))
+            .ThenBy(item => item.Id)
+            .Select(item => item.Track)
+            .ToArray();
+        await playback.PlayPlaylistAsync(
+            tracks,
+            startIndex,
+            new PlaybackRequest(RequiredSourceProviderId: requiredSourceProviderId),
+            cancellationToken);
+        _output.WriteLine(
+            $"Playing \"{playlist.Name}\" from track {startIndex + 1}/{tracks.Length} " +
+            $"in {FormatPlaybackMode(playback.Queue.Mode)} mode.");
     }
 
     private static string? ParseRequiredSource(IReadOnlyList<string> arguments)
@@ -665,20 +744,99 @@ internal sealed class CommandProcessor(
         throw new ArgumentException("Usage: play <provider> <track-id> [--source <provider>]");
     }
 
+    private static (int StartIndex, string? RequiredSourceProviderId) ParsePlaylistPlaybackOptions(
+        IReadOnlyList<string> arguments)
+    {
+        var argumentIndex = 2;
+        var startNumber = 1;
+        if (argumentIndex < arguments.Count &&
+            !string.Equals(arguments[argumentIndex], "--source", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!int.TryParse(arguments[argumentIndex], out startNumber) || startNumber < 1)
+            {
+                throw new ArgumentException("Playlist start number must be a positive integer.");
+            }
+
+            argumentIndex++;
+        }
+
+        string? requiredSourceProviderId = null;
+        if (argumentIndex < arguments.Count)
+        {
+            if (argumentIndex + 2 != arguments.Count ||
+                !string.Equals(arguments[argumentIndex], "--source", StringComparison.OrdinalIgnoreCase) ||
+                string.IsNullOrWhiteSpace(arguments[argumentIndex + 1]))
+            {
+                throw new ArgumentException(
+                    "Usage: play-playlist <playlist-id|name> [start-number] [--source <provider>]");
+            }
+
+            requiredSourceProviderId = arguments[argumentIndex + 1];
+        }
+
+        return (startNumber - 1, requiredSourceProviderId);
+    }
+
+    private static PlaybackMode ParsePlaybackMode(string value) => value.ToLowerInvariant() switch
+    {
+        "sequential" or "sequence" => PlaybackMode.Sequential,
+        "repeat" or "loop" => PlaybackMode.RepeatAll,
+        "shuffle" or "random" => PlaybackMode.Shuffle,
+        _ => throw new ArgumentException("Playback mode must be sequential, repeat, or shuffle.")
+    };
+
+    private static string FormatPlaybackMode(PlaybackMode mode) => mode switch
+    {
+        PlaybackMode.Sequential => "sequential",
+        PlaybackMode.RepeatAll => "repeat",
+        PlaybackMode.Shuffle => "shuffle",
+        _ => mode.ToString()
+    };
+
     private void PrintQueue()
     {
-        if (queue.Items.Count == 0)
+        var queue = playback.Queue;
+        var items = queue.Items;
+        if (items.Count == 0)
         {
             _output.WriteLine("Queue is empty.");
             return;
         }
 
-        for (var index = 0; index < queue.Items.Count; index++)
+        _output.WriteLine($"Mode: {FormatPlaybackMode(queue.Mode)}");
+        for (var index = 0; index < items.Count; index++)
         {
-            var track = queue.Items[index];
-            _output.WriteLine($"{index + 1}. {track.Title ?? track.Id.RemoteId} ({track.Id})");
+            var item = items[index];
+            var marker = item.Id == queue.CurrentItem?.Id ? ">" : " ";
+            var track = item.Track;
+            _output.WriteLine($"{marker} {index + 1}. {track.Title ?? track.Id.RemoteId} ({track.Id})");
         }
     }
+
+    private void PrintNowPlaying()
+    {
+        var snapshot = playback.Snapshot;
+        _output.WriteLine($"State: {snapshot.State}");
+        _output.WriteLine($"Mode: {FormatPlaybackMode(snapshot.Mode)}");
+        if (snapshot.CurrentTrack is not { } track)
+        {
+            _output.WriteLine("No track is selected.");
+            return;
+        }
+
+        _output.WriteLine($"Track: {track.Title ?? track.Id.RemoteId} ({track.Id})");
+        _output.WriteLine(
+            $"Timeline: {FormatTime(snapshot.Timeline.Position)} / " +
+            (snapshot.Timeline.Duration is { } duration ? FormatTime(duration) : "unknown"));
+        _output.WriteLine(
+            $"Queue: {snapshot.CurrentIndex + 1}/{snapshot.QueueCount} | " +
+            $"Player: {snapshot.PlayerId ?? "none"} | " +
+            $"Source: {snapshot.RequiredSourceProviderId ?? "automatic"}");
+    }
+
+    private static string FormatTime(TimeSpan value) => value.TotalHours >= 1
+        ? $"{(int)value.TotalHours}:{value.Minutes:00}:{value.Seconds:00}"
+        : $"{(int)value.TotalMinutes}:{value.Seconds:00}";
 
     private async Task SyncAsync(string action, CancellationToken cancellationToken)
     {

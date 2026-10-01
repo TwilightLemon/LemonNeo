@@ -46,6 +46,32 @@ resume
 stop
 ```
 
+Load an entire library playlist into the playback queue and control navigation
+and playback order:
+
+```text
+play-playlist "Instrumental" 1
+previous
+next
+mode sequential
+mode repeat
+mode shuffle
+now-playing
+queue
+queue clear
+```
+
+The playback queue, selected item, required source, playback mode, and shuffle
+cursor are stored in `playback.json` beside the library. After restarting, use
+`play-current` to play the restored selection. Audio is not resumed automatically.
+
+`PlaybackSessionService` is the application-level playback authority. It exposes
+the current track, player state, timeline progress, state/timeline events, and a
+natural-completion event. Because BASS does not provide a completion callback to
+the application contract, this service polls its read-only timeline and advances
+the queue when the channel ends. The same event surface is intended for a future
+SMTC integration plugin.
+
 Match an imported track to one or more online catalogues, persist reliable
 metadata, retrieve lyrics, and inspect all currently playable sources:
 

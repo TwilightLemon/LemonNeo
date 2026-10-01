@@ -72,6 +72,13 @@ public sealed record Track
     public TimeSpan? Duration { get; init; }
     public Uri? ArtworkUri { get; init; }
     public IReadOnlyList<ExternalMusicId> ExternalIds { get; init; } = [];
+
+    /// <summary>
+    /// Indicates whether the track's originating provider declares a native playback path.
+    /// This is a provider-supplied availability hint, not a global playback permission:
+    /// tracks marked <see langword="false"/> may still be played through another provider
+    /// after metadata matching and playback-source discovery.
+    /// </summary>
     public bool IsPlayable { get; init; }
 
     public TrackReference ToReference() => new()
@@ -120,6 +127,32 @@ public enum AudioQuality
 public sealed record PlaybackRequest(
     AudioQuality Quality = AudioQuality.Automatic,
     string? RequiredSourceProviderId = null);
+
+public enum PlaybackMode
+{
+    Sequential,
+    RepeatAll,
+    Shuffle
+}
+
+public sealed record PlaybackQueueItem
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public required TrackReference Track { get; init; }
+    public DateTimeOffset AddedAt { get; init; } = DateTimeOffset.UtcNow;
+}
+
+public sealed class PlaybackQueueState
+{
+    public int FormatVersion { get; init; } = 1;
+    public List<PlaybackQueueItem> Items { get; init; } = [];
+    public Guid? CurrentItemId { get; init; }
+    public PlaybackMode Mode { get; init; }
+    public List<Guid> ShuffleOrder { get; init; } = [];
+    public int ShuffleCursor { get; init; } = -1;
+    public PlaybackRequest Request { get; init; } = new();
+    public DateTimeOffset UpdatedAt { get; init; } = DateTimeOffset.UtcNow;
+}
 
 public sealed class Playlist
 {
