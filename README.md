@@ -15,7 +15,7 @@ The build deploys the default plugins beside the console under `plugins/`:
 
 - `LemonNeo.Plugin.LocalMusic` scans folders and resolves local files.
 - `LemonNeo.Plugin.Bass` decodes and plays local files and direct HTTP audio
-  streams through BASS/BASS.NET.
+  streams through BASS/BASS.NET on Windows, Linux, and macOS.
 - `LemonNeo.Plugin.GdStudioNetease` resolves Netease song IDs from any metadata
   provider to direct audio URLs through GDStudio.
 - `LemonNeo.Plugin.Lyricify` matches metadata across supported online services and
@@ -246,9 +246,10 @@ its complete `Track` snapshot (including artwork and external IDs); there is no
 separate global track catalogue or `metadata/tracks.json` file. Temporary search
 results therefore cannot make the in-memory library grow.
 
-The BASS plugin carries the BASS.NET 2.4.14.1 wrapper, BASS 2.4.16, and the FLAC
-2.4.5 decoder copied from the referenced Lemon-App resources. Applications that
-redistribute these binaries must comply with the applicable BASS/BASS.NET license.
+The BASS plugin carries the BASS.NET 2.4.14.1 wrapper and platform-specific BASS
+2.4/FLAC 2.4 native binaries for Windows x86/x64, Linux x86/x64/ARM/ARM64, and
+macOS x64/ARM64. Applications that redistribute these binaries must comply with
+the applicable BASS/BASS.NET license.
 
 The Lyricify plugin uses the Apache-2.0-licensed
 [Lyricify Lyrics Helper](https://github.com/WXRIW/Lyricify-Lyrics-Helper). Its

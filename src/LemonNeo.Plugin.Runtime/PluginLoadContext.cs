@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Runtime.Loader;
 
 namespace LemonNeo.Plugin.Runtime;
@@ -30,19 +31,70 @@ internal sealed class PluginLoadContext(string entryAssemblyPath) : AssemblyLoad
         var path = _resolver.ResolveUnmanagedDllToPath(unmanagedDllName);
         if (path is null)
         {
-            var fileName = Path.HasExtension(unmanagedDllName)
-                ? unmanagedDllName
-                : unmanagedDllName + ".dll";
-            var architecture = Environment.Is64BitProcess ? "win-x64" : "win-x86";
-            var candidates = new[]
+            var fileName = GetNativeLibraryFileName(unmanagedDllName);
+            var candidates = new List<string>
             {
-                Path.Combine(_pluginDirectory, fileName),
-                Path.Combine(_pluginDirectory, "runtimes", architecture, "native", fileName)
+                Path.Combine(_pluginDirectory, fileName)
             };
+            var runtimeIdentifier = GetCurrentRuntimeIdentifier();
+            if (runtimeIdentifier is not null)
+            {
+                candidates.Add(Path.Combine(
+                    _pluginDirectory,
+                    "runtimes",
+                    runtimeIdentifier,
+                    "native",
+                    fileName));
+            }
+
             path = candidates.FirstOrDefault(File.Exists);
         }
 
         return path is null ? nint.Zero : LoadUnmanagedDllFromPath(path);
+    }
+
+    private static string GetNativeLibraryFileName(string unmanagedDllName)
+    {
+        if (Path.HasExtension(unmanagedDllName))
+        {
+            return unmanagedDllName;
+        }
+
+        if (OperatingSystem.IsWindows())
+        {
+            return unmanagedDllName + ".dll";
+        }
+
+        if (OperatingSystem.IsLinux())
+        {
+            return "lib" + unmanagedDllName + ".so";
+        }
+
+        return OperatingSystem.IsMacOS()
+            ? "lib" + unmanagedDllName + ".dylib"
+            : unmanagedDllName;
+    }
+
+    private static string? GetCurrentRuntimeIdentifier()
+    {
+        var operatingSystem = OperatingSystem.IsWindows()
+            ? "win"
+            : OperatingSystem.IsLinux()
+                ? "linux"
+                : OperatingSystem.IsMacOS()
+                    ? "osx"
+                    : null;
+        var architecture = RuntimeInformation.ProcessArchitecture switch
+        {
+            Architecture.X86 => "x86",
+            Architecture.X64 => "x64",
+            Architecture.Arm => "arm",
+            Architecture.Arm64 => "arm64",
+            _ => null
+        };
+        return operatingSystem is null || architecture is null
+            ? null
+            : $"{operatingSystem}-{architecture}";
     }
 
     private static bool IsSharedContract(string? assemblyName) =>

@@ -9,35 +9,55 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <None Include="plugin.json" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="lib/win-x64/bass.dll"
-          Link="runtimes/win-x64/native/bass.dll"
-          CopyToOutputDirectory="PreserveNewest" />
-    <None Include="lib/win-x64/bassflac.dll"
-          Link="runtimes/win-x64/native/bassflac.dll"
-          CopyToOutputDirectory="PreserveNewest" />
-    <None Include="lib/win-x86/bass.dll"
-          Link="runtimes/win-x86/native/bass.dll"
-          CopyToOutputDirectory="PreserveNewest" />
-    <None Include="lib/win-x86/bassflac.dll"
-          Link="runtimes/win-x86/native/bassflac.dll"
-          CopyToOutputDirectory="PreserveNewest" />
+    <None Update="plugin.json"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+    <None Update="lib/win-x64/*.dll"
+          Link="runtimes/win-x64/native/%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+    <None Update="lib/win-x86/*.dll"
+          Link="runtimes/win-x86/native/%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+    <None Update="lib/linux-x64/*.so"
+          Link="runtimes/linux-x64/native/%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+    <None Update="lib/linux-x86/*.so"
+          Link="runtimes/linux-x86/native/%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+    <None Update="lib/linux-arm/*.so"
+          Link="runtimes/linux-arm/native/%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+    <None Update="lib/linux-arm64/*.so"
+          Link="runtimes/linux-arm64/native/%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+    <None Update="lib/osx-x64/*.dylib"
+          Link="runtimes/osx-x64/native/%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+    <None Update="lib/osx-arm64/*.dylib"
+          Link="runtimes/osx-arm64/native/%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <Target Name="DeployToPrototypeHost" AfterTargets="Build">
     <PropertyGroup>
       <PrototypePluginDirectory>$(MSBuildProjectDirectory)\..\..\src\LemonNeo.Console\bin\$(Configuration)\$(TargetFramework)\plugins\LemonNeo.Plugin.Bass\</PrototypePluginDirectory>
     </PropertyGroup>
+    <ItemGroup>
+      <BassRuntimeAsset Include="$(TargetDir)runtimes/**/*" />
+    </ItemGroup>
     <MakeDir Directories="$(PrototypePluginDirectory)" />
-    <MakeDir Directories="$(PrototypePluginDirectory)runtimes\win-x64\native" />
-    <MakeDir Directories="$(PrototypePluginDirectory)runtimes\win-x86\native" />
     <Copy SourceFiles="$(TargetPath);$(TargetDir)plugin.json;$(TargetDir)Bass.Net.dll"
           DestinationFolder="$(PrototypePluginDirectory)"
           SkipUnchangedFiles="true" />
-    <Copy SourceFiles="$(TargetDir)runtimes\win-x64\native\bass.dll;$(TargetDir)runtimes\win-x64\native\bassflac.dll"
-          DestinationFolder="$(PrototypePluginDirectory)runtimes\win-x64\native"
-          SkipUnchangedFiles="true" />
-    <Copy SourceFiles="$(TargetDir)runtimes\win-x86\native\bass.dll;$(TargetDir)runtimes\win-x86\native\bassflac.dll"
-          DestinationFolder="$(PrototypePluginDirectory)runtimes\win-x86\native"
+    <Copy SourceFiles="@(BassRuntimeAsset)"
+          DestinationFiles="@(BassRuntimeAsset->'$(PrototypePluginDirectory)runtimes/%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
   </Target>
 </Project>

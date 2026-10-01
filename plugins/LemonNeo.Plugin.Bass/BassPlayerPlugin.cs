@@ -1,6 +1,7 @@
 using LemonNeo.Core;
 using LemonNeo.Plugin.Abstractions;
 using Microsoft.Extensions.Logging;
+using System.Runtime.InteropServices;
 using Un4seen.Bass;
 using BassApi = Un4seen.Bass.Bass;
 
@@ -13,7 +14,7 @@ public sealed class BassPlayerPlugin : ILemonPlugin, IPlayerProvider
     public PluginDescriptor Descriptor { get; } = new(
         "org.lemonneo.bass",
         "BASS Player",
-        "1.0.0");
+        "1.1.0");
 
     public string Id => "bass";
     PlayerDescriptor IPlayerProvider.Descriptor { get; } = new(
@@ -55,15 +56,23 @@ internal sealed class BassPlayer : IPlayer, IAsyncDisposable
     public BassPlayer(ILogger<BassPlayer> logger)
     {
         _logger = logger;
+        var nativeAsset = GetNativeAsset();
         BassNet.Registration("lemon.app@qq.com", "2X52325160022");
-        if (!BassApi.BASS_Init(-1, 44100, BASSInit.BASS_DEVICE_CPSPEAKERS, IntPtr.Zero))
+        var initFlags = OperatingSystem.IsWindows()
+            ? BASSInit.BASS_DEVICE_CPSPEAKERS
+            : BASSInit.BASS_DEVICE_DEFAULT;
+        if (!BassApi.BASS_Init(-1, 44100, initFlags, IntPtr.Zero))
         {
             throw BassFailure("initialize the default audio device");
         }
 
         var pluginDirectory = Path.GetDirectoryName(typeof(BassPlayerPlugin).Assembly.Location)!;
-        var architecture = Environment.Is64BitProcess ? "win-x64" : "win-x86";
-        var flacPath = Path.Combine(pluginDirectory, "runtimes", architecture, "native", "bassflac.dll");
+        var flacPath = Path.Combine(
+            pluginDirectory,
+            "runtimes",
+            nativeAsset.RuntimeIdentifier,
+            "native",
+            nativeAsset.FlacFileName);
         _flacPlugin = BassApi.BASS_PluginLoad(flacPath);
         if (_flacPlugin == 0)
         {
@@ -71,7 +80,7 @@ internal sealed class BassPlayer : IPlayer, IAsyncDisposable
             throw BassFailure($"load the FLAC decoder '{flacPath}'");
         }
 
-        _logger.LogInformation("BASS audio player initialized ({Architecture}).", architecture);
+        _logger.LogInformation("BASS audio player initialized ({RuntimeIdentifier}).", nativeAsset.RuntimeIdentifier);
     }
 
     public PlayerState State { get; private set; } = PlayerState.Stopped;
@@ -261,6 +270,40 @@ internal sealed class BassPlayer : IPlayer, IAsyncDisposable
     private static InvalidOperationException BassFailure(string operation) =>
         new($"BASS could not {operation}. Error: {BassApi.BASS_ErrorGetCode()}.");
 
+    private static NativeAsset GetNativeAsset()
+    {
+        var operatingSystem = OperatingSystem.IsWindows()
+            ? "win"
+            : OperatingSystem.IsLinux()
+                ? "linux"
+                : OperatingSystem.IsMacOS()
+                    ? "osx"
+                    : null;
+        var architecture = RuntimeInformation.ProcessArchitecture switch
+        {
+            Architecture.X86 => "x86",
+            Architecture.X64 => "x64",
+            Architecture.Arm when OperatingSystem.IsLinux() => "arm",
+            Architecture.Arm64 => "arm64",
+            _ => null
+        };
+        if (operatingSystem is null || architecture is null)
+        {
+            throw new PlatformNotSupportedException(
+                $"BASS is not bundled for {RuntimeInformation.OSDescription} " +
+                $"({RuntimeInformation.ProcessArchitecture}).");
+        }
+
+        var flacFileName = operatingSystem switch
+        {
+            "win" => "bassflac.dll",
+            "linux" => "libbassflac.so",
+            "osx" => "libbassflac.dylib",
+            _ => throw new PlatformNotSupportedException()
+        };
+        return new NativeAsset($"{operatingSystem}-{architecture}", flacFileName);
+    }
+
     private TimeSpan? ChannelTime(long bytePosition)
     {
         if (bytePosition < 0)
@@ -275,4 +318,6 @@ internal sealed class BassPlayer : IPlayer, IAsyncDisposable
     }
 
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
+
+    private readonly record struct NativeAsset(string RuntimeIdentifier, string FlacFileName);
 }
