@@ -23,8 +23,10 @@ The build deploys the default plugins beside the console under `plugins/`:
 - `LemonNeo.Plugin.MockMusic` supplies deterministic prototype data.
 - `LemonNeo.Plugin.Netease` authenticates with a Netease Music browser cookie and
   imports the user's online playlists.
+- `LemonNeo.Plugin.QqMusic` derives `g_tk` from an authenticated QQ Music cookie
+  and imports created playlists, followed playlists, and purchased albums.
 
-The console discovers all six dynamically and has no runtime assembly reference
+The console discovers all seven dynamically and has no runtime assembly reference
 to the music/player plugin implementations.
 
 Run the automated phase-one walkthrough with an isolated library directory:
@@ -81,6 +83,27 @@ Login validates the cookie against the Netease account endpoint before storing
 it. The imported tracks retain Netease `song-id` identifiers, allowing the
 GDStudio provider to resolve playback even though this user-library provider does
 not supply audio URLs itself.
+
+## QQ Music user library
+
+Sign in to `y.qq.com`, copy the complete site Cookie request header, and run
+`login qqmusic`. The cookie must contain `qqmusic_key` and either `uin` or
+`wxuin`. Lemon Neo derives `g_tk` from `qqmusic_key`; both the original cookie and
+derived token are stored in the encrypted plugin credential store.
+
+```text
+login qqmusic
+auth qqmusic
+remote-playlists qqmusic
+import qqmusic playlist:<diss-id>
+import qqmusic album:<album-mid>
+logout qqmusic
+```
+
+`remote-playlists qqmusic` groups results into `我创建的歌单`, `我收藏的歌单`,
+and `我购买的专辑`. QQ Music playlist tracks retain both numeric `song-id` and
+string `song-mid` identifiers when the API supplies them. This plugin imports
+metadata only; another playback-source provider is required to play those tracks.
 
 Import a folder as a Lemon Neo playlist, then inspect and play its tracks:
 

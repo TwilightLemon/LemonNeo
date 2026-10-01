@@ -297,6 +297,7 @@ internal sealed class CommandProcessor(
         var capabilities = new List<string>();
         if (provider is ISearchProvider) capabilities.Add("Search");
         if (provider is IPlaylistProvider) capabilities.Add("Playlist");
+        if (provider is IPlaylistCollectionProvider) capabilities.Add("Playlist Collections");
         if (provider is IPlaybackProvider) capabilities.Add("Playback");
         if (provider is IMetadataProvider) capabilities.Add("Metadata");
         if (provider is ILyricsProvider) capabilities.Add("Lyrics");
@@ -389,10 +390,19 @@ internal sealed class CommandProcessor(
     private void PrintAuthentication(string providerId)
     {
         var provider = GetAuthenticationProvider(providerId);
-        _output.WriteLine(provider.State.IsAuthenticated
-            ? $"Authenticated: {provider.State.AccountName ?? provider.State.UserId ?? providerId} " +
-              $"({provider.State.UserId ?? "unknown id"})"
-            : "Not authenticated.");
+        if (!provider.State.IsAuthenticated)
+        {
+            _output.WriteLine("Not authenticated.");
+            return;
+        }
+
+        _output.WriteLine(
+            $"Authenticated: {provider.State.AccountName ?? provider.State.UserId ?? providerId} " +
+            $"({provider.State.UserId ?? "unknown id"})");
+        if (provider.State.AvatarUri is not null)
+        {
+            _output.WriteLine($"Avatar: {provider.State.AvatarUri}");
+        }
     }
 
     private async Task LoginAsync(
@@ -695,10 +705,35 @@ internal sealed class CommandProcessor(
             throw new ProviderException($"Provider '{providerId}' does not support playlists.");
         }
 
-        var index = 1;
+        if (provider is IPlaylistCollectionProvider collectionProvider)
+        {
+            await foreach (var collection in collectionProvider.GetUserPlaylistCollectionsAsync(cancellationToken))
+            {
+                _output.WriteLine($"[{collection.Name}] ({collection.Id})");
+                if (collection.Playlists.Count == 0)
+                {
+                    _output.WriteLine("  (empty)");
+                    continue;
+                }
+
+                for (var index = 0; index < collection.Playlists.Count; index++)
+                {
+                    var playlist = collection.Playlists[index];
+                    _output.WriteLine(
+                        $"  {index + 1}. {playlist.Name} ({playlist.Id}) " +
+                        $"[{playlist.TrackCount?.ToString() ?? "unknown"} tracks]");
+                }
+            }
+
+            return;
+        }
+
+        var flatIndex = 1;
         await foreach (var playlist in playlistProvider.GetUserPlaylistsAsync(cancellationToken))
         {
-            _output.WriteLine($"{index++}. {playlist.Name} ({playlist.Id}) [{playlist.TrackCount ?? 0} tracks]");
+            _output.WriteLine(
+                $"{flatIndex++}. {playlist.Name} ({playlist.Id}) " +
+                $"[{playlist.TrackCount?.ToString() ?? "unknown"} tracks]");
         }
     }
 

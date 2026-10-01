@@ -8,6 +8,11 @@ public sealed record SearchResult(string ProviderId, IReadOnlyList<Track> Tracks
 
 public sealed record RemotePlaylistSummary(string Id, string Name, int? TrackCount = null);
 
+public sealed record RemotePlaylistCollection(
+    string Id,
+    string Name,
+    IReadOnlyList<RemotePlaylistSummary> Playlists);
+
 public sealed record RemotePlaylist
 {
     public required string Id { get; init; }
@@ -85,7 +90,8 @@ public enum AuthMethod
 public sealed record AuthenticationState(
     bool IsAuthenticated,
     string? AccountName = null,
-    string? UserId = null);
+    string? UserId = null,
+    Uri? AvatarUri = null);
 
 public sealed record AuthenticationRequest(
     AuthMethod Method,
@@ -105,6 +111,16 @@ public interface IPlaylistProvider
         CancellationToken cancellationToken = default);
 
     IAsyncEnumerable<RemotePlaylistSummary> GetUserPlaylistsAsync(
+        CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Provides named groups of user playlists when a service distinguishes between
+/// owned, followed, purchased, or other playlist-like collections.
+/// </summary>
+public interface IPlaylistCollectionProvider
+{
+    IAsyncEnumerable<RemotePlaylistCollection> GetUserPlaylistCollectionsAsync(
         CancellationToken cancellationToken = default);
 }
 

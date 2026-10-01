@@ -17,6 +17,7 @@
     <Project Path="plugins/LemonNeo.Plugin.Lyricify/LemonNeo.Plugin.Lyricify.csproj" />
     <Project Path="plugins/LemonNeo.Plugin.MockMusic/LemonNeo.Plugin.MockMusic.csproj" />
     <Project Path="plugins/LemonNeo.Plugin.Netease/LemonNeo.Plugin.Netease.csproj" />
+    <Project Path="plugins/LemonNeo.Plugin.QqMusic/LemonNeo.Plugin.QqMusic.csproj" />
     <Project Path="plugins/LemonNeo.Sync.MockGit/LemonNeo.Sync.MockGit.csproj" />
   </Folder>
 </Solution>
