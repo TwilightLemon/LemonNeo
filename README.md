@@ -23,8 +23,8 @@ The build deploys the default plugins beside the console under `plugins/`:
 - `LemonNeo.Plugin.MockMusic` supplies deterministic prototype data.
 - `LemonNeo.Plugin.Netease` authenticates with a Netease Music browser cookie and
   imports the user's online playlists.
-- `LemonNeo.Plugin.QqMusic` derives `g_tk` from an authenticated QQ Music cookie
-  and imports created playlists, followed playlists, and purchased albums.
+- `LemonNeo.Plugin.QqMusic` derives `g_tk` from an authenticated QQ Music cookie,
+  imports the user's collections, and resolves QQ Music vkey playback URLs.
 
 The console discovers all seven dynamically and has no runtime assembly reference
 to the music/player plugin implementations.
@@ -97,13 +97,24 @@ auth qqmusic
 remote-playlists qqmusic
 import qqmusic playlist:<diss-id>
 import qqmusic album:<album-mid>
+play-playlist "<playlist-name>" --source qqmusic-playback
 logout qqmusic
 ```
 
 `remote-playlists qqmusic` groups results into `我创建的歌单`, `我收藏的歌单`,
 and `我购买的专辑`. QQ Music playlist tracks retain both numeric `song-id` and
 string `song-mid` identifiers when the API supplies them. This plugin imports
-metadata only; another playback-source provider is required to play those tracks.
+metadata through `qqmusic` and registers a separate `qqmusic-playback` source
+provider. Playback requires the QQ Music login Cookie, tries lossless, high, then
+standard quality as appropriate, and never forwards the account Cookie to the
+resolved audio URL.
+
+The playback source accepts `song-mid` values produced by any metadata provider,
+so it can also be explicitly selected for a Lyricify QQ Music result:
+
+```text
+play lyricify qqmusic:song-mid:<song-mid> --source qqmusic-playback
+```
 
 Import a folder as a Lemon Neo playlist, then inspect and play its tracks:
 

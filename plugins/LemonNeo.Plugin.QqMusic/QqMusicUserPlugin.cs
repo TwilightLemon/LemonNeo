@@ -23,6 +23,7 @@ public sealed class QqMusicUserPlugin :
     private IPluginStorage? _storage;
     private ICredentialVault? _credentials;
     private QqMusicApiClient? _api;
+    private QqMusicPlaybackProvider? _playbackProvider;
     private ILogger<QqMusicUserPlugin>? _logger;
     private QqMusicCredentials? _authentication;
     private AuthenticationState _state = new(false);
@@ -64,7 +65,14 @@ public sealed class QqMusicUserPlugin :
                 TryCreateUri(avatarValue));
         }
 
+        var playbackClient = context.HttpClientFactory.CreateClient("org.lemonneo.qqmusic.playback");
+        playbackClient.Timeout = TimeSpan.FromSeconds(20);
+        _playbackProvider = new QqMusicPlaybackProvider(
+            playbackClient,
+            () => _authentication,
+            context.LoggerFactory.CreateLogger<QqMusicPlaybackProvider>());
         context.RegisterProvider(this);
+        context.RegisterProvider(_playbackProvider);
     }
 
     public ValueTask ShutdownAsync(CancellationToken cancellationToken)
@@ -73,6 +81,7 @@ public sealed class QqMusicUserPlugin :
         _authentication = null;
         _state = new AuthenticationState(false);
         _api = null;
+        _playbackProvider = null;
         _storage = null;
         _credentials = null;
         _logger = null;
