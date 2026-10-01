@@ -1,5 +1,6 @@
 using System.Text;
 using LemonNeo.Application;
+using LemonNeo.Configuration;
 using LemonNeo.Core;
 using LemonNeo.Playback;
 using LemonNeo.Plugin.Abstractions;
@@ -11,6 +12,8 @@ internal sealed class CommandProcessor(
     PluginLoader plugins,
     IProviderRegistry providers,
     IPlayerRegistry playersRegistry,
+    IAppPathProvider appPaths,
+    ConsoleOptions options,
     LibraryService library,
     SearchService search,
     MetadataService metadata,
@@ -113,6 +116,21 @@ internal sealed class CommandProcessor(
                 break;
             case "players":
                 PrintPlayers();
+                break;
+            case "paths":
+                PrintPaths();
+                break;
+            case "auth":
+                Require(arguments, 2, "auth <provider>");
+                PrintAuthentication(arguments[1]);
+                break;
+            case "login":
+                Require(arguments, 2, "login <provider> [cookie]");
+                await LoginAsync(arguments, cancellationToken);
+                break;
+            case "logout":
+                Require(arguments, 2, "logout <provider>");
+                await LogoutAsync(arguments[1], cancellationToken);
                 break;
             case "search":
                 Require(arguments, 2, "search <keyword>");
@@ -295,6 +313,10 @@ internal sealed class CommandProcessor(
             plugins
             providers
             players
+            paths
+            auth <provider>
+            login <provider> [cookie]
+            logout <provider>
             search <keyword>
             metadata <provider> <track-id> [namespace ...]
             enrich <provider> <track-id>
@@ -352,6 +374,80 @@ internal sealed class CommandProcessor(
             _output.WriteLine($"{player.Id} | {player.Descriptor.Name} | priority {player.Priority}");
             _output.WriteLine($"  {player.Descriptor.Description}");
         }
+    }
+
+    private void PrintPaths()
+    {
+        _output.WriteLine($"Configuration: {appPaths.ConfigurationDirectory}");
+        _output.WriteLine($"App settings: {appPaths.AppConfigurationFile}");
+        _output.WriteLine($"Data: {appPaths.DataDirectory}");
+        _output.WriteLine($"Cache: {appPaths.CacheDirectory}");
+        _output.WriteLine($"Music library: {options.LibraryDirectory}");
+        _output.WriteLine($"Plugins: {options.PluginDirectory}");
+    }
+
+    private void PrintAuthentication(string providerId)
+    {
+        var provider = GetAuthenticationProvider(providerId);
+        _output.WriteLine(provider.State.IsAuthenticated
+            ? $"Authenticated: {provider.State.AccountName ?? provider.State.UserId ?? providerId} " +
+              $"({provider.State.UserId ?? "unknown id"})"
+            : "Not authenticated.");
+    }
+
+    private async Task LoginAsync(
+        IReadOnlyList<string> arguments,
+        CancellationToken cancellationToken)
+    {
+        var provider = GetAuthenticationProvider(arguments[1]);
+        var methods = await provider.GetAvailableMethodsAsync(cancellationToken);
+        if (!methods.Contains(AuthMethod.Cookie))
+        {
+            throw new ProviderException($"Provider '{arguments[1]}' does not support cookie login.");
+        }
+
+        string? cookie;
+        if (arguments.Count > 2)
+        {
+            cookie = string.Join(' ', arguments.Skip(2));
+        }
+        else
+        {
+            _output.Write("Paste the complete site cookie: ");
+            cookie = await global::System.Console.In.ReadLineAsync(cancellationToken);
+        }
+
+        if (string.IsNullOrWhiteSpace(cookie))
+        {
+            throw new ArgumentException("A cookie value is required.");
+        }
+
+        var state = await provider.AuthenticateAsync(
+            new AuthenticationRequest(
+                AuthMethod.Cookie,
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["cookie"] = cookie
+                }),
+            cancellationToken);
+        _output.WriteLine(
+            $"Authenticated as {state.AccountName ?? state.UserId ?? arguments[1]} " +
+            $"({state.UserId ?? "unknown id"}).");
+    }
+
+    private async Task LogoutAsync(string providerId, CancellationToken cancellationToken)
+    {
+        var provider = GetAuthenticationProvider(providerId);
+        await provider.SignOutAsync(cancellationToken);
+        _output.WriteLine($"Signed out from {providerId}.");
+    }
+
+    private IAuthenticationProvider GetAuthenticationProvider(string providerId)
+    {
+        var provider = providers.Get(providerId)
+            ?? throw new ProviderException($"Provider '{providerId}' was not found.");
+        return provider as IAuthenticationProvider
+               ?? throw new ProviderException($"Provider '{providerId}' does not support authentication.");
     }
 
     private async Task SearchAsync(string keyword, CancellationToken cancellationToken)

@@ -21,8 +21,10 @@ The build deploys the default plugins beside the console under `plugins/`:
 - `LemonNeo.Plugin.Lyricify` matches metadata across supported online services and
   retrieves synchronized lyrics through Lyricify Lyrics Helper.
 - `LemonNeo.Plugin.MockMusic` supplies deterministic prototype data.
+- `LemonNeo.Plugin.Netease` authenticates with a Netease Music browser cookie and
+  imports the user's online playlists.
 
-The console discovers all five dynamically and has no runtime assembly reference
+The console discovers all six dynamically and has no runtime assembly reference
 to the music/player plugin implementations.
 
 Run the automated phase-one walkthrough with an isolated library directory:
@@ -31,8 +33,54 @@ Run the automated phase-one walkthrough with an isolated library directory:
 dotnet run --project src/LemonNeo.Console -- --demo --library .demo-library
 ```
 
-The default library is `LemonLibrary/` under the current working directory.
-Use `--plugins <path>` or `--library <path>` to override either location.
+The default library uses the platform's per-user application-data directory. Run
+`paths` to inspect every resolved location. Use `--plugins <path>` or
+`--library <path>` to override either runtime location.
+
+## Application data and settings
+
+`LemonNeo.Configuration` owns paths and persistent JSON stores shared by the host
+and plugins. Defaults follow each operating system's conventions:
+
+- Windows: roaming AppData for settings; local AppData for library data and cache.
+- macOS: `~/Library/Application Support/LemonNeo` for settings and data, and
+  `~/Library/Caches/LemonNeo/Cache` for cache.
+- Linux: `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, and `XDG_CACHE_HOME`, with their
+  standard home-directory fallbacks.
+
+The roots can be overridden with `LEMONNEO_CONFIG_HOME`, `LEMONNEO_DATA_HOME`,
+`LEMONNEO_CACHE_HOME`, and `LEMONNEO_LIBRARY_HOME`. Application settings are in
+`appsettings.json`; each plugin gets an isolated `Plugins/<plugin-id>/settings.json`
+store and `Cache/Plugins/<plugin-id>` cache directory. Cache contents are
+disposable and must not contain durable state.
+
+Plugin credentials are kept separately under `Credentials/<plugin-id>` and are
+encrypted with an application-scoped ASP.NET Core Data Protection key ring. On
+Unix-like systems the credential/key directories and credential files are also
+restricted to the current user. This prevents accidental plaintext disclosure;
+it is not an operating-system keychain and cannot protect against another process
+already running with the same user account.
+
+## Netease user library
+
+Sign in to `music.163.com` in a browser, copy the site's complete Cookie request
+header, then run `login netease`. Omitting the cookie argument opens a prompt so
+the value is not included in shell history:
+
+```text
+login netease
+auth netease
+remote-playlists netease
+import netease <playlist-id>
+playlists
+play-playlist "<playlist-name>" --source gdstudio-netease
+logout netease
+```
+
+Login validates the cookie against the Netease account endpoint before storing
+it. The imported tracks retain Netease `song-id` identifiers, allowing the
+GDStudio provider to resolve playback even though this user-library provider does
+not supply audio URLs itself.
 
 Import a folder as a Lemon Neo playlist, then inspect and play its tracks:
 

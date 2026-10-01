@@ -52,6 +52,11 @@ public interface IPluginContext
     IHttpClientFactory HttpClientFactory { get; }
     IPluginStorage Storage { get; }
     ICredentialVault Credentials { get; }
+    /// <summary>
+    /// Gets the plugin's private cache directory. Its contents are disposable and
+    /// must not be used for settings, credentials, or other durable user data.
+    /// </summary>
+    string CacheDirectory { get; }
     void RegisterProvider(IMusicProvider provider);
     void RegisterPlayer(IPlayerProvider player);
 }
@@ -68,4 +73,11 @@ public interface ICredentialVault
     Task<string?> GetSecretAsync(string key, CancellationToken cancellationToken = default);
     Task SetSecretAsync(string key, string value, CancellationToken cancellationToken = default);
     Task DeleteSecretAsync(string key, CancellationToken cancellationToken = default);
+}
+
+public interface IPluginDataStoreFactory
+{
+    IPluginStorage CreateStorage(string pluginId);
+    ICredentialVault CreateCredentialVault(string pluginId);
+    string GetCacheDirectory(string pluginId);
 }

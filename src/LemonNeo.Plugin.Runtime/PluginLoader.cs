@@ -61,6 +61,7 @@ public sealed class PluginLoader(
     PlayerRegistry playerRegistry,
     ILoggerFactory loggerFactory,
     IHttpClientFactory httpClientFactory,
+    IPluginDataStoreFactory dataStoreFactory,
     ILogger<PluginLoader> logger) : IAsyncDisposable
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
@@ -147,7 +148,14 @@ public sealed class PluginLoader(
                     $"Manifest id '{manifest.Id}' does not match descriptor id '{instance.Descriptor.Id}'.");
             }
 
-            var context = new PluginContext(loggerFactory, httpClientFactory, registry, playerRegistry);
+            var context = new PluginContext(
+                loggerFactory,
+                httpClientFactory,
+                registry,
+                playerRegistry,
+                dataStoreFactory.CreateStorage(manifest.Id),
+                dataStoreFactory.CreateCredentialVault(manifest.Id),
+                dataStoreFactory.GetCacheDirectory(manifest.Id));
             try
             {
                 await instance.InitializeAsync(context, cancellationToken);

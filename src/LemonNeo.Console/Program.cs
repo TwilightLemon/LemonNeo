@@ -1,4 +1,5 @@
 using LemonNeo.Application;
+using LemonNeo.Configuration;
 using LemonNeo.Core;
 using LemonNeo.Persistence;
 using LemonNeo.Playback;
@@ -15,7 +16,8 @@ internal static class Program
 {
     public static async Task<int> Main(string[] args)
     {
-        var options = ConsoleOptions.Parse(args);
+        var appPaths = AppPathProvider.CreateDefault();
+        var options = ConsoleOptions.Parse(args, appPaths);
         using var cancellation = new CancellationTokenSource();
         global::System.Console.CancelKeyPress += (_, eventArgs) =>
         {
@@ -32,6 +34,10 @@ internal static class Program
                 console.TimestampFormat = "HH:mm:ss ";
             }));
         collection.AddHttpClient();
+        collection.AddSingleton(options);
+        collection.AddSingleton<IAppPathProvider>(appPaths);
+        collection.AddSingleton<IAppConfigurationStore, JsonAppConfigurationStore>();
+        collection.AddSingleton<IPluginDataStoreFactory, PluginDataStoreFactory>();
         collection.AddSingleton<ProviderRegistry>();
         collection.AddSingleton<IProviderRegistry>(services => services.GetRequiredService<ProviderRegistry>());
         collection.AddSingleton<IPlayerProvider>(_ => new ConsolePlayerProvider(global::System.Console.Out));
@@ -137,10 +143,10 @@ internal static class Program
 
 internal sealed record ConsoleOptions(string PluginDirectory, string LibraryDirectory, bool Demo)
 {
-    public static ConsoleOptions Parse(string[] args)
+    public static ConsoleOptions Parse(string[] args, IAppPathProvider appPaths)
     {
         var pluginDirectory = Path.Combine(AppContext.BaseDirectory, "plugins");
-        var libraryDirectory = Path.Combine(Environment.CurrentDirectory, "LemonLibrary");
+        var libraryDirectory = appPaths.MusicLibraryDirectory;
         var demo = false;
 
         for (var index = 0; index < args.Length; index++)

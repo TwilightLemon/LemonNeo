@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/LemonNeo.Application/LemonNeo.Application.csproj" />
+    <Project Path="src/LemonNeo.Configuration/LemonNeo.Configuration.csproj" />
     <Project Path="src/LemonNeo.Console/LemonNeo.Console.csproj" />
     <Project Path="src/LemonNeo.Core/LemonNeo.Core.csproj" />
     <Project Path="src/LemonNeo.Persistence/LemonNeo.Persistence.csproj" />
@@ -15,6 +16,7 @@
     <Project Path="plugins/LemonNeo.Plugin.LocalMusic/LemonNeo.Plugin.LocalMusic.csproj" />
     <Project Path="plugins/LemonNeo.Plugin.Lyricify/LemonNeo.Plugin.Lyricify.csproj" />
     <Project Path="plugins/LemonNeo.Plugin.MockMusic/LemonNeo.Plugin.MockMusic.csproj" />
+    <Project Path="plugins/LemonNeo.Plugin.Netease/LemonNeo.Plugin.Netease.csproj" />
     <Project Path="plugins/LemonNeo.Sync.MockGit/LemonNeo.Sync.MockGit.csproj" />
   </Folder>
 </Solution>

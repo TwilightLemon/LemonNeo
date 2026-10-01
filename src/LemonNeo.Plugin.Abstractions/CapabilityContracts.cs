@@ -75,13 +75,21 @@ public sealed record MetadataLookupResult(
 
 public enum AuthMethod
 {
+    Cookie,
     Browser,
     DeviceCode,
     Password,
     QrCode
 }
 
-public sealed record AuthenticationState(bool IsAuthenticated, string? AccountName = null);
+public sealed record AuthenticationState(
+    bool IsAuthenticated,
+    string? AccountName = null,
+    string? UserId = null);
+
+public sealed record AuthenticationRequest(
+    AuthMethod Method,
+    IReadOnlyDictionary<string, string> Parameters);
 
 public interface ISearchProvider
 {
@@ -155,6 +163,12 @@ public interface IAuthenticationProvider
 
     Task<IReadOnlyList<AuthMethod>> GetAvailableMethodsAsync(
         CancellationToken cancellationToken = default);
+
+    Task<AuthenticationState> AuthenticateAsync(
+        AuthenticationRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task SignOutAsync(CancellationToken cancellationToken = default);
 }
 
 public enum PlayerState
