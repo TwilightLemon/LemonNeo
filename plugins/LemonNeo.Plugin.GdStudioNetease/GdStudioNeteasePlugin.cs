@@ -15,7 +15,6 @@ public sealed class GdStudioNeteasePlugin :
 {
     private const string ProviderId = "gdstudio-netease";
     private const string OwnAuthority = "org.lemonneo.gdstudio.netease";
-    private const string LyricifyAuthority = "org.lyricify.helper/netease";
     private const string UserAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
         "AppleWebKit/537.36 (KHTML, like Gecko) " +
@@ -38,8 +37,11 @@ public sealed class GdStudioNeteasePlugin :
 
     public IReadOnlyCollection<MusicIdScheme> AcceptedIdSchemes { get; } =
     [
-        new(MusicIdNamespaces.NeteaseMusic, LyricifyAuthority, "song-id"),
-        new(MusicIdNamespaces.NeteaseMusic, OwnAuthority, "song-id")
+        new(
+            MusicIdNamespaces.NeteaseMusic,
+            Authority: null,
+            Kind: "song-id",
+            MatchAnyAuthority: true)
     ];
 
     public ValueTask InitializeAsync(IPluginContext context, CancellationToken cancellationToken)

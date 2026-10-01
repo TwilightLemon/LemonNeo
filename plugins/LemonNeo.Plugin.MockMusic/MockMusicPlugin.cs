@@ -17,32 +17,50 @@ public sealed class MockMusicPlugin :
         new Track
         {
             Id = new MusicItemId("mock", "track-001"),
-            Title = "Neo Sunrise",
-            Artists = [new ArtistRef { Name = "Lemon Band" }],
-            Album = new AlbumRef { Title = "Freshly Squeezed" },
-            Duration = TimeSpan.FromMinutes(3.42),
-            ExternalIds = [new ExternalMusicId("isrc", "MOCK00000001")],
-            IsPlayable = true
+            Title = "Blinding Lights",
+            Artists = [new ArtistRef { Name = "The Weeknd" }],
+            Album = new AlbumRef { Title = "After Hours" },
+            IsPlayable = false
         },
         new Track
         {
             Id = new MusicItemId("mock", "track-002"),
-            Title = "Glass Horizon",
-            Artists = [new ArtistRef { Name = "Lemon Band" }],
-            Album = new AlbumRef { Title = "Freshly Squeezed" },
-            Duration = TimeSpan.FromMinutes(4.05),
-            ExternalIds = [new ExternalMusicId("isrc", "MOCK00000002")],
-            IsPlayable = true
+            Title = "Save Your Tears",
+            Artists = [new ArtistRef { Name = "The Weeknd" }],
+            Album = new AlbumRef { Title = "After Hours" },
+            IsPlayable = false
         },
         new Track
         {
             Id = new MusicItemId("mock", "track-003"),
-            Title = "Midnight Compile",
-            Artists = [new ArtistRef { Name = "Digital Cat" }],
-            Album = new AlbumRef { Title = "Nightly Builds" },
-            Duration = TimeSpan.FromMinutes(2.95),
-            ExternalIds = [new ExternalMusicId("isrc", "MOCK00000003")],
-            IsPlayable = true
+            Title = "Starboy",
+            Artists = [new ArtistRef { Name = "The Weeknd" }],
+            Album = new AlbumRef { Title = "Starboy" },
+            IsPlayable = false
+        },
+        new Track
+        {
+            Id = new MusicItemId("mock", "track-004"),
+            Title = "The Hills",
+            Artists = [new ArtistRef { Name = "The Weeknd" }],
+            Album = new AlbumRef { Title = "Beauty Behind the Madness" },
+            IsPlayable = false
+        },
+        new Track
+        {
+            Id = new MusicItemId("mock", "track-005"),
+            Title = "Can't Feel My Face",
+            Artists = [new ArtistRef { Name = "The Weeknd" }],
+            Album = new AlbumRef { Title = "Beauty Behind the Madness" },
+            IsPlayable = false
+        },
+        new Track
+        {
+            Id = new MusicItemId("mock", "track-006"),
+            Title = "Die For You",
+            Artists = [new ArtistRef { Name = "The Weeknd" }],
+            Album = new AlbumRef { Title = "Starboy" },
+            IsPlayable = false
         }
     ];
 
@@ -55,7 +73,7 @@ public sealed class MockMusicPlugin :
                 ProviderId = "mock",
                 Name = "Mock Favorites",
                 Description = "A small remote playlist exposed by the mock provider.",
-                Tracks = [Tracks[0], Tracks[2]]
+                Tracks = [Tracks[0], Tracks[1], Tracks[2]]
             },
             ["coding"] = new()
             {
@@ -63,6 +81,14 @@ public sealed class MockMusicPlugin :
                 ProviderId = "mock",
                 Name = "Coding Mix",
                 Description = "Music for compiling ideas.",
+                Tracks = Tracks
+            },
+            ["weeknd"] = new()
+            {
+                Id = "weeknd",
+                ProviderId = "mock",
+                Name = "The Weeknd Essentials",
+                Description = "Popular The Weeknd tracks with metadata only and no mock playback source.",
                 Tracks = Tracks
             }
         };
@@ -132,18 +158,7 @@ public sealed class MockMusicPlugin :
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (!Tracks.Any(candidate => candidate.Id == track.Id))
-        {
-            return Task.FromResult<PlaybackSource?>(null);
-        }
-
-        return Task.FromResult<PlaybackSource?>(new HttpPlaybackSource
-        {
-            Uri = new Uri($"https://example.invalid/audio/{track.Id.RemoteId}.flac"),
-            Headers = new Dictionary<string, string> { ["X-Lemon-Demo"] = "true" },
-            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(15),
-            IsDirectAudio = false
-        });
+        return Task.FromResult<PlaybackSource?>(null);
     }
 
     public Task<Lyrics?> GetLyricsAsync(

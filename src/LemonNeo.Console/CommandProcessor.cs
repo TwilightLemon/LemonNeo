@@ -55,7 +55,7 @@ internal sealed class CommandProcessor(
     public async Task RunDemoAsync(CancellationToken cancellationToken)
     {
         _output.WriteLine("Running phase-one demonstration...");
-        await ExecuteAsync("search neo", cancellationToken);
+        await ExecuteAsync("search Blinding Lights", cancellationToken);
         await ExecuteAsync("remote-playlists mock", cancellationToken);
         var imported = await importer.ImportAsync("mock", "coding", cancellationToken);
         await library.SaveAsync(cancellationToken);
@@ -74,7 +74,17 @@ internal sealed class CommandProcessor(
         var persistedPlaylistCount = library.Current.Playlists.Count;
         await library.LoadAsync(cancellationToken);
         _output.WriteLine($"Reloaded {library.Current.Playlists.Count} playlists from JSON (expected {persistedPlaylistCount}).");
-        await playback.PlayAsync(track.ToReference(), cancellationToken: cancellationToken);
+        try
+        {
+            await playback.PlayAsync(
+                track.ToReference(),
+                new PlaybackRequest(RequiredSourceProviderId: "mock"),
+                cancellationToken);
+        }
+        catch (PlaybackResolutionException exception)
+        {
+            _output.WriteLine($"Expected unavailable mock source: {exception.Message}");
+        }
         await ExecuteAsync("sync status", cancellationToken);
         await ExecuteAsync("sync pull", cancellationToken);
         await ExecuteAsync("sync push", cancellationToken);
@@ -119,6 +129,13 @@ internal sealed class CommandProcessor(
             case "enrich":
                 Require(arguments, 3, "enrich <provider> <track-id>");
                 await EnrichAsync(arguments[1], arguments[2], cancellationToken);
+                break;
+            case "match-playlist":
+                Require(arguments, 2, "match-playlist <playlist-id|name> [namespace ...]");
+                await MatchPlaylistAsync(
+                    ResolvePlaylist(arguments[1]),
+                    arguments.Skip(2).ToArray(),
+                    cancellationToken);
                 break;
             case "lyrics":
                 Require(arguments, 3, "lyrics <provider> <track-id>");
@@ -229,6 +246,7 @@ internal sealed class CommandProcessor(
             search <keyword>
             metadata <provider> <track-id> [namespace ...]
             enrich <provider> <track-id>
+            match-playlist <playlist-id|name> [namespace ...]
             lyrics <provider> <track-id>
             sources <provider> <track-id>
             remote-playlists <provider>
@@ -364,6 +382,64 @@ internal sealed class CommandProcessor(
         }
 
         PrintErrors("Metadata source errors", lookup.SourceErrors);
+    }
+
+    private async Task MatchPlaylistAsync(
+        Playlist playlist,
+        IReadOnlyList<string> targetNamespaces,
+        CancellationToken cancellationToken)
+    {
+        var tracks = playlist.Items
+            .Select(item => library.FindTrack(item.Track.Id))
+            .OfType<Track>()
+            .DistinctBy(track => track.Id)
+            .ToArray();
+        if (tracks.Length == 0)
+        {
+            _output.WriteLine($"Playlist \"{playlist.Name}\" has no tracks to match.");
+            return;
+        }
+
+        using var concurrency = new SemaphoreSlim(3, 3);
+        var tasks = tracks.Select(async track =>
+        {
+            await concurrency.WaitAsync(cancellationToken);
+            try
+            {
+                var result = await metadata.EnrichAsync(track, targetNamespaces, cancellationToken);
+                return (Original: track, Track: result.Track, Lookup: result.Lookup);
+            }
+            finally
+            {
+                concurrency.Release();
+            }
+        });
+        var results = await Task.WhenAll(tasks);
+        var matched = 0;
+
+        foreach (var result in results)
+        {
+            if (ReferenceEquals(result.Original, result.Track))
+            {
+                _output.WriteLine($"No reliable match: {result.Original.Title}");
+                PrintErrors("  Metadata source errors", result.Lookup.SourceErrors);
+                continue;
+            }
+
+            library.UpsertTrack(result.Track);
+            matched++;
+            var namespaces = result.Track.ExternalIds
+                .Select(id => id.Namespace)
+                .Distinct(StringComparer.OrdinalIgnoreCase);
+            _output.WriteLine($"Matched: {result.Track.Title} [{string.Join(", ", namespaces)}]");
+        }
+
+        await library.SaveAsync(cancellationToken);
+        _output.WriteLine(
+            $"Matched {matched}/{tracks.Length} tracks in \"{playlist.Name}\"" +
+            (targetNamespaces.Count == 0
+                ? "."
+                : $" for {string.Join(", ", targetNamespaces)}."));
     }
 
     private async Task PrintLyricsAsync(string providerId, string trackId, CancellationToken cancellationToken)

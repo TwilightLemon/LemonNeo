@@ -29,6 +29,13 @@ public sealed class PlaybackResolver(
                 registry.Get(track.Id.ProviderId) is IPlaybackProvider playbackProvider)
             {
                 source = await playbackProvider.ResolvePlaybackAsync(track, playbackRequest, cancellationToken);
+
+                if (source is null && playbackRequest.RequiredSourceProviderId is not null)
+                {
+                    throw new PlaybackResolutionException(
+                        $"Required source provider '{playbackRequest.RequiredSourceProviderId}' reported that " +
+                        $"'{track.Title ?? track.Id.ToString()}' is unavailable.");
+                }
             }
 
             if (source is null)

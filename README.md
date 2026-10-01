@@ -16,8 +16,8 @@ The build deploys the default plugins beside the console under `plugins/`:
 - `LemonNeo.Plugin.LocalMusic` scans folders and resolves local files.
 - `LemonNeo.Plugin.Bass` decodes and plays local files and direct HTTP audio
   streams through BASS/BASS.NET.
-- `LemonNeo.Plugin.GdStudioNetease` resolves Lyricify Netease song IDs to direct
-  audio URLs through GDStudio.
+- `LemonNeo.Plugin.GdStudioNetease` resolves Netease song IDs from any metadata
+  provider to direct audio URLs through GDStudio.
 - `LemonNeo.Plugin.Lyricify` matches metadata across supported online services and
   retrieves synchronized lyrics through Lyricify Lyrics Helper.
 - `LemonNeo.Plugin.MockMusic` supplies deterministic prototype data.
@@ -88,15 +88,28 @@ local files and direct HTTP audio streams; the console player remains the fallba
 for non-audio prototype sources.
 
 GDStudio playback is resolved across plugins: Lyricify searches Netease and emits
-an authority-qualified `song-id`, the GDStudio provider explicitly accepts that
-ID scheme, and BASS plays the returned direct HTTP audio stream. The API request
-and audio stream both carry the recommended browser user agent.
+an authority-qualified `song-id`, the GDStudio provider accepts Netease `song-id`
+values issued by any metadata provider, and BASS plays the returned direct HTTP
+audio stream. The API request and audio stream both carry the recommended browser
+user agent.
 
 Use `--source` to require a specific playback-source provider. A required source
 does not fall back to another provider if resolution fails:
 
 ```text
 play lyricify netease:song-id:29572502 --source gdstudio-netease
+```
+
+The mock provider includes a metadata-only playlist of popular The Weeknd songs.
+The following commands demonstrate importing unavailable tracks, explicitly
+observing the failed mock source, batch-matching Netease IDs, and then playing the
+same library track through GDStudio:
+
+```text
+import mock weeknd
+play mock track-001 --source mock
+match-playlist "The Weeknd Essentials" netease
+play mock track-001 --source gdstudio-netease
 ```
 
 The BASS plugin carries the BASS.NET 2.4.14.1 wrapper, BASS 2.4.16, and the FLAC

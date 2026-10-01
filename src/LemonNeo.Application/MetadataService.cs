@@ -48,11 +48,20 @@ public sealed class MetadataService(IProviderRegistry registry)
             errors);
     }
 
+    public Task<(Track Track, MetadataLookupResult Lookup)> EnrichAsync(
+        Track track,
+        CancellationToken cancellationToken = default) =>
+        EnrichAsync(track, null, cancellationToken);
+
     public async Task<(Track Track, MetadataLookupResult Lookup)> EnrichAsync(
         Track track,
+        IReadOnlyList<string>? targetNamespaces,
         CancellationToken cancellationToken = default)
     {
-        var lookup = await LookupAsync(track.ToReference(), cancellationToken: cancellationToken);
+        var lookup = await LookupAsync(
+            track.ToReference(),
+            targetNamespaces,
+            cancellationToken: cancellationToken);
         var reliable = lookup.Matches.Where(match => match.Confidence >= 0.9).ToArray();
         if (reliable.Length == 0)
         {

@@ -11,11 +11,15 @@ public sealed record ExternalMusicId(
     string? Authority = null,
     string? Kind = null);
 
-public sealed record MusicIdScheme(string Namespace, string? Authority, string? Kind)
+public sealed record MusicIdScheme(
+    string Namespace,
+    string? Authority,
+    string? Kind,
+    bool MatchAnyAuthority = false)
 {
     public bool Accepts(ExternalMusicId id) =>
         string.Equals(Namespace, id.Namespace, StringComparison.OrdinalIgnoreCase) &&
-        string.Equals(Authority, id.Authority, StringComparison.OrdinalIgnoreCase) &&
+        (MatchAnyAuthority || string.Equals(Authority, id.Authority, StringComparison.OrdinalIgnoreCase)) &&
         string.Equals(Kind, id.Kind, StringComparison.OrdinalIgnoreCase);
 }
 
