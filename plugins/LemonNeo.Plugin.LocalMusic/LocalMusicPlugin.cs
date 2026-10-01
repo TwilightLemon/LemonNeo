@@ -11,7 +11,8 @@ public sealed class LocalMusicPlugin :
     IMusicProvider,
     ISearchProvider,
     IPlaybackProvider,
-    IFolderImportProvider
+    IFolderImportProvider,
+    ITrackIdResolverProvider
 {
     private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -30,6 +31,11 @@ public sealed class LocalMusicPlugin :
     ProviderDescriptor IMusicProvider.Descriptor { get; } = new(
         "Local Music",
         "Scans local folders and resolves local audio files for playback.");
+
+    public IReadOnlyCollection<MusicIdScheme> AcceptedIdSchemes { get; } =
+    [
+        new(MusicIdNamespaces.File, "org.lemonneo.localmusic", "path")
+    ];
 
     public ValueTask InitializeAsync(IPluginContext context, CancellationToken cancellationToken)
     {
@@ -139,6 +145,20 @@ public sealed class LocalMusicPlugin :
             : null);
     }
 
+    public Task<TrackReference?> ResolveTrackIdAsync(
+        ExternalMusicId identifier,
+        TrackMetadata metadata,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!AcceptedIdSchemes.Any(scheme => scheme.Accepts(identifier)) || !File.Exists(identifier.Value))
+        {
+            return Task.FromResult<TrackReference?>(null);
+        }
+
+        return Task.FromResult<TrackReference?>(CreateTrack(identifier.Value).ToReference());
+    }
+
     private static Track CreateTrack(string path)
     {
         var fullPath = Path.GetFullPath(path);
@@ -154,7 +174,14 @@ public sealed class LocalMusicPlugin :
             Id = new MusicItemId("local", id),
             Title = title,
             Artists = string.IsNullOrWhiteSpace(artist) ? [] : [new ArtistRef { Name = artist }],
-            ExternalIds = [new ExternalMusicId("file", fullPath)],
+            ExternalIds =
+            [
+                new ExternalMusicId(
+                    MusicIdNamespaces.File,
+                    fullPath,
+                    "org.lemonneo.localmusic",
+                    "path")
+            ],
             IsPlayable = true
         };
     }

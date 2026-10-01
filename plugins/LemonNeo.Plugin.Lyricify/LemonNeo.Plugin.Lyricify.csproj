@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/LemonNeo.Core/LemonNeo.Core.csproj" />
+    <ProjectReference Include="../../src/LemonNeo.Plugin.Abstractions/LemonNeo.Plugin.Abstractions.csproj" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Lyricify.Lyrics.Helper" Version="0.2.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="plugin.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="DeployToPrototypeHost" AfterTargets="Build">
+    <PropertyGroup>
+      <PrototypePluginDirectory>$(MSBuildProjectDirectory)\..\..\src\LemonNeo.Console\bin\$(Configuration)\$(TargetFramework)\plugins\LemonNeo.Plugin.Lyricify\</PrototypePluginDirectory>
+    </PropertyGroup>
+    <MakeDir Directories="$(PrototypePluginDirectory)" />
+    <ItemGroup>
+      <PrivatePluginDependency Include="@(ReferenceCopyLocalPaths)"
+                               Condition="'%(Filename)' != 'LemonNeo.Core' and '%(Filename)' != 'LemonNeo.Plugin.Abstractions'" />
+    </ItemGroup>
+    <Copy SourceFiles="$(TargetPath);$(TargetDir)plugin.json;@(PrivatePluginDependency)"
+          DestinationFolder="$(PrototypePluginDirectory)"
+          SkipUnchangedFiles="true" />
+  </Target>
+</Project>

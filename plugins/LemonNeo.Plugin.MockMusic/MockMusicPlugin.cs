@@ -141,7 +141,8 @@ public sealed class MockMusicPlugin :
         {
             Uri = new Uri($"https://example.invalid/audio/{track.Id.RemoteId}.flac"),
             Headers = new Dictionary<string, string> { ["X-Lemon-Demo"] = "true" },
-            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(15)
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(15),
+            IsDirectAudio = false
         });
     }
 

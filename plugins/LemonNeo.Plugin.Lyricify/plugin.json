@@ -1,0 +1,10 @@
+{
+  "id": "org.lemonneo.lyricify",
+  "name": "Lyricify Metadata & Lyrics",
+  "version": "1.0.0",
+  "entryAssembly": "LemonNeo.Plugin.Lyricify.dll",
+  "minimumHostVersion": "0.1.0",
+  "permissions": [
+    "network"
+  ]
+}

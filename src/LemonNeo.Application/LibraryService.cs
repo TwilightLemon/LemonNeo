@@ -51,6 +51,12 @@ public sealed class LibraryService(ILibraryRepository repository)
             Current.Tracks[index] = track;
         }
 
+        foreach (var item in Current.Playlists.SelectMany(playlist => playlist.Items)
+                     .Where(item => item.Track.Id == track.Id))
+        {
+            item.Track = track.ToReference();
+        }
+
         Touch();
     }
 

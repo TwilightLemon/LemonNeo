@@ -11,7 +11,9 @@
   </Folder>
   <Folder Name="/plugins/">
     <Project Path="plugins/LemonNeo.Plugin.Bass/LemonNeo.Plugin.Bass.csproj" />
+    <Project Path="plugins/LemonNeo.Plugin.GdStudioNetease/LemonNeo.Plugin.GdStudioNetease.csproj" />
     <Project Path="plugins/LemonNeo.Plugin.LocalMusic/LemonNeo.Plugin.LocalMusic.csproj" />
+    <Project Path="plugins/LemonNeo.Plugin.Lyricify/LemonNeo.Plugin.Lyricify.csproj" />
     <Project Path="plugins/LemonNeo.Plugin.MockMusic/LemonNeo.Plugin.MockMusic.csproj" />
     <Project Path="plugins/LemonNeo.Sync.MockGit/LemonNeo.Sync.MockGit.csproj" />
   </Folder>

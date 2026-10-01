@@ -43,9 +43,12 @@ internal static class Program
         collection.AddSingleton<IPlaylistOrderingService, FractionalPlaylistOrderingService>();
         collection.AddSingleton<PlaylistService>();
         collection.AddSingleton<SearchService>();
+        collection.AddSingleton<MetadataService>();
+        collection.AddSingleton<LyricsService>();
         collection.AddSingleton<ImportService>();
         collection.AddSingleton<FolderImportService>();
         collection.AddSingleton<IPlaybackQueue, PlaybackQueue>();
+        collection.AddSingleton<PlaybackSourceDiscoveryService>();
         collection.AddSingleton<PlaybackResolver>();
         collection.AddSingleton<ILibraryMergeService, LibraryMergeService>();
         collection.AddSingleton<IGitBackend, MockGitBackend>();

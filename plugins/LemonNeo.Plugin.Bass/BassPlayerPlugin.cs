@@ -18,10 +18,11 @@ public sealed class BassPlayerPlugin : ILemonPlugin, IPlayerProvider
     public string Id => "bass";
     PlayerDescriptor IPlayerProvider.Descriptor { get; } = new(
         "BASS Player",
-        "Native BASS decoder and audio output for local files.");
+        "Native BASS decoder and audio output for local files and direct HTTP streams.");
     public int Priority => 100;
     public IPlayer Player => _player ?? throw new InvalidOperationException("The BASS player is not initialized.");
-    public bool CanPlay(PlaybackSource source) => source is FilePlaybackSource;
+    public bool CanPlay(PlaybackSource source) =>
+        source is FilePlaybackSource or HttpPlaybackSource { IsDirectAudio: true };
 
     public ValueTask InitializeAsync(IPluginContext context, CancellationToken cancellationToken)
     {
@@ -82,39 +83,69 @@ internal sealed class BassPlayer : IPlayer, IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (source is not FilePlaybackSource fileSource)
-        {
-            throw new NotSupportedException($"BASS Player does not support '{source.GetType().Name}'.");
-        }
-
-        var path = Path.GetFullPath(fileSource.Path);
-        if (!File.Exists(path))
-        {
-            throw new FileNotFoundException("The local audio file no longer exists.", path);
-        }
-
         lock (_gate)
         {
             ThrowIfDisposed();
             FreeCurrentStream();
-            _stream = BassApi.BASS_StreamCreateFile(path, 0, 0, BASSFlag.BASS_SAMPLE_FLOAT);
+            var sourceDescription = source switch
+            {
+                FilePlaybackSource fileSource => CreateFileStream(fileSource),
+                HttpPlaybackSource { IsDirectAudio: true } httpSource => CreateHttpStream(httpSource),
+                _ => throw new NotSupportedException($"BASS Player does not support '{source.GetType().Name}'.")
+            };
             if (_stream == InvalidStream)
             {
-                throw BassFailure($"decode '{path}'");
+                throw BassFailure($"open '{sourceDescription}'");
             }
 
             if (!BassApi.BASS_ChannelPlay(_stream, false))
             {
                 FreeCurrentStream();
-                throw BassFailure($"play '{path}'");
+                throw BassFailure($"play '{sourceDescription}'");
             }
 
             CurrentTrack = track;
             State = PlayerState.Playing;
-            _logger.LogInformation("Now playing {Title} from {Path}", track.Title ?? track.Id.RemoteId, path);
+            _logger.LogInformation(
+                "Now playing {Title} from {Source}",
+                track.Title ?? track.Id.RemoteId,
+                sourceDescription);
         }
 
         return Task.CompletedTask;
+    }
+
+    private string CreateFileStream(FilePlaybackSource source)
+    {
+        var path = Path.GetFullPath(source.Path);
+        if (!File.Exists(path))
+        {
+            throw new FileNotFoundException("The local audio file no longer exists.", path);
+        }
+
+        _stream = BassApi.BASS_StreamCreateFile(path, 0, 0, BASSFlag.BASS_SAMPLE_FLOAT);
+        return path;
+    }
+
+    private string CreateHttpStream(HttpPlaybackSource source)
+    {
+        var headers = source.Headers.Select(header =>
+        {
+            if (header.Key.IndexOfAny(['\r', '\n']) >= 0 || header.Value.IndexOfAny(['\r', '\n']) >= 0)
+            {
+                throw new ArgumentException("HTTP playback headers cannot contain line breaks.");
+            }
+
+            return $"{header.Key}: {header.Value}";
+        });
+        var sourceWithHeaders = string.Join("\r\n", new[] { source.Uri.ToString() }.Concat(headers));
+        _stream = BassApi.BASS_StreamCreateURL(
+            sourceWithHeaders,
+            0,
+            BASSFlag.BASS_SAMPLE_FLOAT,
+            null,
+            IntPtr.Zero);
+        return source.Uri.ToString();
     }
 
     public Task PauseAsync(CancellationToken cancellationToken = default)

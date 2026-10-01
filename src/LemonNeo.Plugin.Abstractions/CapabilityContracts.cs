@@ -25,7 +25,53 @@ public sealed record FolderScanResult(
     IReadOnlyList<Track> Tracks,
     IReadOnlyList<string> SkippedFiles);
 
-public sealed record Lyrics(string Text, string? Language = null, bool IsSynchronized = false);
+public sealed record LyricsLine(
+    string Text,
+    int? StartTimeMs = null,
+    int? EndTimeMs = null,
+    IReadOnlyDictionary<string, string>? Translations = null,
+    string? Romanization = null,
+    string? BackgroundText = null);
+
+public sealed record Lyrics(
+    string Text,
+    string? Language = null,
+    bool IsSynchronized = false,
+    IReadOnlyList<LyricsLine>? Lines = null,
+    string? Source = null,
+    ExternalMusicId? SourceId = null,
+    string? Translation = null);
+
+public sealed record TrackMetadata
+{
+    public required string Title { get; init; }
+    public IReadOnlyList<string> Artists { get; init; } = [];
+    public string? Album { get; init; }
+    public TimeSpan? Duration { get; init; }
+    public Uri? ArtworkUri { get; init; }
+    public IReadOnlyList<ExternalMusicId> ExternalIds { get; init; } = [];
+}
+
+public sealed record MetadataLookupRequest
+{
+    public required TrackReference Track { get; init; }
+    public IReadOnlyList<string> TargetNamespaces { get; init; } = [];
+    public int LimitPerSource { get; init; } = 3;
+    public double MinimumConfidence { get; init; } = 0.7;
+}
+
+public sealed record MetadataMatch
+{
+    public required string MetadataProviderId { get; init; }
+    public required string SourceNamespace { get; init; }
+    public required TrackMetadata Metadata { get; init; }
+    public required double Confidence { get; init; }
+    public required string MatchLevel { get; init; }
+}
+
+public sealed record MetadataLookupResult(
+    IReadOnlyList<MetadataMatch> Matches,
+    IReadOnlyDictionary<string, string> SourceErrors);
 
 public enum AuthMethod
 {
@@ -81,6 +127,25 @@ public interface ILyricsProvider
 {
     Task<Lyrics?> GetLyricsAsync(
         TrackReference track,
+        CancellationToken cancellationToken = default);
+}
+
+public interface IMetadataProvider
+{
+    IReadOnlyCollection<string> MetadataNamespaces { get; }
+
+    Task<MetadataLookupResult> LookupMetadataAsync(
+        MetadataLookupRequest request,
+        CancellationToken cancellationToken = default);
+}
+
+public interface ITrackIdResolverProvider
+{
+    IReadOnlyCollection<MusicIdScheme> AcceptedIdSchemes { get; }
+
+    Task<TrackReference?> ResolveTrackIdAsync(
+        ExternalMusicId identifier,
+        TrackMetadata metadata,
         CancellationToken cancellationToken = default);
 }
 

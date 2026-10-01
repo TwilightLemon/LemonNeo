@@ -1,0 +1,3 @@
+[submodule "Lyricify-Lyrics-Helper"]
+	path = external/Lyricify-Lyrics-Helper
+	url = https://github.com/WXRIW/Lyricify-Lyrics-Helper.git

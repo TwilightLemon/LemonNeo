@@ -5,7 +5,33 @@ public readonly record struct MusicItemId(string ProviderId, string RemoteId)
     public override string ToString() => $"{ProviderId}:{RemoteId}";
 }
 
-public sealed record ExternalMusicId(string Namespace, string Value);
+public sealed record ExternalMusicId(
+    string Namespace,
+    string Value,
+    string? Authority = null,
+    string? Kind = null);
+
+public sealed record MusicIdScheme(string Namespace, string? Authority, string? Kind)
+{
+    public bool Accepts(ExternalMusicId id) =>
+        string.Equals(Namespace, id.Namespace, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(Authority, id.Authority, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(Kind, id.Kind, StringComparison.OrdinalIgnoreCase);
+}
+
+public static class MusicIdNamespaces
+{
+    public const string Isrc = "isrc";
+    public const string File = "file";
+    public const string QQMusic = "qqmusic";
+    public const string NeteaseMusic = "netease";
+    public const string KugouMusic = "kugou";
+    public const string AppleMusic = "applemusic";
+    public const string Spotify = "spotify";
+    public const string Musixmatch = "musixmatch";
+    public const string SodaMusic = "sodamusic";
+    public const string LrcLib = "lrclib";
+}
 
 public sealed record ArtistRef
 {
@@ -49,6 +75,8 @@ public sealed record Track
         Id = Id,
         Title = Title,
         Artists = Artists,
+        Album = Album,
+        Duration = Duration,
         ExternalIds = ExternalIds
     };
 }
@@ -58,6 +86,8 @@ public sealed record TrackReference
     public required MusicItemId Id { get; init; }
     public string? Title { get; init; }
     public IReadOnlyList<ArtistRef> Artists { get; init; } = [];
+    public AlbumRef? Album { get; init; }
+    public TimeSpan? Duration { get; init; }
     public IReadOnlyList<ExternalMusicId> ExternalIds { get; init; } = [];
 }
 
@@ -69,6 +99,7 @@ public sealed record HttpPlaybackSource : PlaybackSource
     public IReadOnlyDictionary<string, string> Headers { get; init; }
         = new Dictionary<string, string>();
     public DateTimeOffset? ExpiresAt { get; init; }
+    public bool IsDirectAudio { get; init; } = true;
 }
 
 public sealed record FilePlaybackSource(string Path) : PlaybackSource;
@@ -82,7 +113,9 @@ public enum AudioQuality
     Lossless
 }
 
-public sealed record PlaybackRequest(AudioQuality Quality = AudioQuality.Automatic);
+public sealed record PlaybackRequest(
+    AudioQuality Quality = AudioQuality.Automatic,
+    string? RequiredSourceProviderId = null);
 
 public sealed class Playlist
 {
@@ -97,7 +130,7 @@ public sealed class Playlist
 public sealed class PlaylistItem
 {
     public Guid Id { get; init; } = Guid.NewGuid();
-    public required TrackReference Track { get; init; }
+    public required TrackReference Track { get; set; }
     public required string SortKey { get; set; }
     public DateTimeOffset AddedAt { get; init; } = DateTimeOffset.UtcNow;
 }

@@ -13,10 +13,13 @@ internal sealed class CommandProcessor(
     IPlayerRegistry playersRegistry,
     LibraryService library,
     SearchService search,
+    MetadataService metadata,
+    LyricsService lyrics,
     PlaylistService playlists,
     ImportService importer,
     FolderImportService folderImporter,
     PlaybackResolver playback,
+    PlaybackSourceDiscoveryService sourceDiscovery,
     IPlaybackQueue queue,
     SyncService sync)
 {
@@ -105,6 +108,26 @@ internal sealed class CommandProcessor(
                 Require(arguments, 2, "search <keyword>");
                 await SearchAsync(string.Join(' ', arguments.Skip(1)), cancellationToken);
                 break;
+            case "metadata":
+                Require(arguments, 3, "metadata <provider> <track-id> [namespace ...]");
+                await PrintMetadataAsync(
+                    arguments[1],
+                    arguments[2],
+                    arguments.Skip(3).ToArray(),
+                    cancellationToken);
+                break;
+            case "enrich":
+                Require(arguments, 3, "enrich <provider> <track-id>");
+                await EnrichAsync(arguments[1], arguments[2], cancellationToken);
+                break;
+            case "lyrics":
+                Require(arguments, 3, "lyrics <provider> <track-id>");
+                await PrintLyricsAsync(arguments[1], arguments[2], cancellationToken);
+                break;
+            case "sources":
+                Require(arguments, 3, "sources <provider> <track-id>");
+                await PrintSourcesAsync(arguments[1], arguments[2], cancellationToken);
+                break;
             case "remote-playlists":
                 Require(arguments, 2, "remote-playlists <provider>");
                 await PrintRemotePlaylistsAsync(arguments[1], cancellationToken);
@@ -140,8 +163,12 @@ internal sealed class CommandProcessor(
                 await RemoveAsync(arguments[1], arguments[2], cancellationToken);
                 break;
             case "play":
-                Require(arguments, 3, "play <provider> <track-id>");
-                await PlayAsync(arguments[1], arguments[2], cancellationToken);
+                Require(arguments, 3, "play <provider> <track-id> [--source <provider>]");
+                await PlayAsync(
+                    arguments[1],
+                    arguments[2],
+                    ParseRequiredSource(arguments),
+                    cancellationToken);
                 break;
             case "pause":
                 await playback.PauseAsync(cancellationToken);
@@ -184,6 +211,7 @@ internal sealed class CommandProcessor(
         if (provider is ISearchProvider) capabilities.Add("Search");
         if (provider is IPlaylistProvider) capabilities.Add("Playlist");
         if (provider is IPlaybackProvider) capabilities.Add("Playback");
+        if (provider is IMetadataProvider) capabilities.Add("Metadata");
         if (provider is ILyricsProvider) capabilities.Add("Lyrics");
         if (provider is IAuthenticationProvider) capabilities.Add("Authentication");
         if (provider is IFolderImportProvider) capabilities.Add("Folder Import");
@@ -199,6 +227,10 @@ internal sealed class CommandProcessor(
             providers
             players
             search <keyword>
+            metadata <provider> <track-id> [namespace ...]
+            enrich <provider> <track-id>
+            lyrics <provider> <track-id>
+            sources <provider> <track-id>
             remote-playlists <provider>
             import <provider> <playlist-id>
             import-folder <path> [playlist-name]
@@ -207,7 +239,7 @@ internal sealed class CommandProcessor(
             create-playlist <name>
             add <playlist-id> <provider> <track-id>
             remove <playlist-id> <item-id>
-            play <provider> <track-id>
+            play <provider> <track-id> [--source <provider>]
             pause
             resume
             stop
@@ -267,6 +299,160 @@ internal sealed class CommandProcessor(
                 _output.WriteLine($"   {string.Join(", ", track.Artists.Select(artist => artist.Name))}");
                 _output.WriteLine($"   {track.Id}");
             }
+        }
+    }
+
+    private async Task PrintMetadataAsync(
+        string providerId,
+        string trackId,
+        IReadOnlyList<string> targetNamespaces,
+        CancellationToken cancellationToken)
+    {
+        var track = await GetTrackAsync(providerId, trackId, cancellationToken);
+        var result = await metadata.LookupAsync(
+            track.ToReference(),
+            targetNamespaces,
+            cancellationToken: cancellationToken);
+        if (result.Matches.Count == 0)
+        {
+            _output.WriteLine("No metadata matches found.");
+        }
+
+        foreach (var match in result.Matches)
+        {
+            var value = match.Metadata;
+            _output.WriteLine(
+                $"{match.SourceNamespace} | {match.Confidence:P0} | {match.MatchLevel} | " +
+                $"{value.Title} - {string.Join(", ", value.Artists)}");
+            if (!string.IsNullOrWhiteSpace(value.Album))
+            {
+                _output.WriteLine($"  Album: {value.Album}");
+            }
+
+            if (value.Duration is { } duration)
+            {
+                _output.WriteLine($"  Duration: {duration:mm\\:ss}");
+            }
+
+            foreach (var id in value.ExternalIds)
+            {
+                PrintExternalId(id);
+            }
+        }
+
+        PrintErrors("Metadata source errors", result.SourceErrors);
+    }
+
+    private async Task EnrichAsync(string providerId, string trackId, CancellationToken cancellationToken)
+    {
+        var track = await GetTrackAsync(providerId, trackId, cancellationToken);
+        var (enriched, lookup) = await metadata.EnrichAsync(track, cancellationToken);
+        if (ReferenceEquals(enriched, track))
+        {
+            _output.WriteLine("No high-confidence metadata match was found; the track was not changed.");
+            PrintErrors("Metadata source errors", lookup.SourceErrors);
+            return;
+        }
+
+        library.UpsertTrack(enriched);
+        await library.SaveAsync(cancellationToken);
+        _output.WriteLine($"Enriched: {enriched.Title} - {string.Join(", ", enriched.Artists.Select(artist => artist.Name))}");
+        _output.WriteLine($"External IDs: {enriched.ExternalIds.Count}");
+        foreach (var id in enriched.ExternalIds)
+        {
+            PrintExternalId(id);
+        }
+
+        PrintErrors("Metadata source errors", lookup.SourceErrors);
+    }
+
+    private async Task PrintLyricsAsync(string providerId, string trackId, CancellationToken cancellationToken)
+    {
+        var track = await GetTrackAsync(providerId, trackId, cancellationToken);
+        var result = await lyrics.GetLyricsAsync(track.ToReference(), cancellationToken);
+        if (result.Lyrics is null)
+        {
+            _output.WriteLine("No lyrics found.");
+            PrintErrors("Lyrics provider errors", result.ProviderErrors);
+            return;
+        }
+
+        var value = result.Lyrics;
+        _output.WriteLine(
+            $"Lyrics: provider={result.ProviderId}, source={value.Source ?? "unknown"}, " +
+            $"synchronized={value.IsSynchronized}");
+        if (value.SourceId is { } sourceId)
+        {
+            PrintExternalId(sourceId);
+        }
+
+        if (value.Lines is { Count: > 0 } lines)
+        {
+            foreach (var line in lines)
+            {
+                var timestamp = line.StartTimeMs is { } milliseconds
+                    ? $"[{TimeSpan.FromMilliseconds(milliseconds):mm\\:ss\\.fff}] "
+                    : string.Empty;
+                _output.WriteLine($"{timestamp}{line.Text}");
+                if (line.Translations is { Count: > 0 })
+                {
+                    _output.WriteLine($"  {string.Join(" / ", line.Translations.Values)}");
+                }
+                else if (!string.IsNullOrWhiteSpace(line.Romanization))
+                {
+                    _output.WriteLine($"  {line.Romanization}");
+                }
+            }
+        }
+        else
+        {
+            _output.WriteLine(value.Text);
+        }
+
+        PrintErrors("Lyrics provider errors", result.ProviderErrors);
+    }
+
+    private async Task PrintSourcesAsync(string providerId, string trackId, CancellationToken cancellationToken)
+    {
+        var track = await GetTrackAsync(providerId, trackId, cancellationToken);
+        var result = await sourceDiscovery.FindAsync(track.ToReference(), cancellationToken: cancellationToken);
+        if (result.Candidates.Count == 0)
+        {
+            _output.WriteLine("No playable source found.");
+        }
+
+        foreach (var candidate in result.Candidates)
+        {
+            var source = candidate.Source switch
+            {
+                FilePlaybackSource file => $"file:{file.Path}",
+                HttpPlaybackSource http => http.Uri.ToString(),
+                _ => candidate.Source.GetType().Name
+            };
+            _output.WriteLine(
+                $"{candidate.ProviderId} | {candidate.Confidence:P0} | {candidate.ResolutionMethod} | " +
+                $"{candidate.Track.Id} | {source}");
+        }
+
+        PrintErrors("Source discovery errors", result.ProviderErrors);
+    }
+
+    private void PrintExternalId(ExternalMusicId id) =>
+        _output.WriteLine(
+            $"  ID: namespace={id.Namespace}, authority={id.Authority ?? "-"}, " +
+            $"kind={id.Kind ?? "-"}, value={id.Value}");
+
+    private void PrintErrors(string heading, IReadOnlyDictionary<string, string> errors)
+    {
+        if (errors.Count == 0)
+        {
+            return;
+        }
+
+        _output.WriteLine($"{heading}:");
+        foreach (var error in errors)
+        {
+            _output.WriteLine($"  {error.Key}: {error.Value}");
         }
     }
 
@@ -372,11 +558,35 @@ internal sealed class CommandProcessor(
         _output.WriteLine("Playlist item removed.");
     }
 
-    private async Task PlayAsync(string providerId, string trackId, CancellationToken cancellationToken)
+    private async Task PlayAsync(
+        string providerId,
+        string trackId,
+        string? requiredSourceProviderId,
+        CancellationToken cancellationToken)
     {
         var track = library.FindTrack(new MusicItemId(providerId, trackId))
             ?? await GetTrackAsync(providerId, trackId, cancellationToken);
-        await playback.PlayAsync(track.ToReference(), cancellationToken: cancellationToken);
+        await playback.PlayAsync(
+            track.ToReference(),
+            new PlaybackRequest(RequiredSourceProviderId: requiredSourceProviderId),
+            cancellationToken);
+    }
+
+    private static string? ParseRequiredSource(IReadOnlyList<string> arguments)
+    {
+        if (arguments.Count == 3)
+        {
+            return null;
+        }
+
+        if (arguments.Count == 5 &&
+            string.Equals(arguments[3], "--source", StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(arguments[4]))
+        {
+            return arguments[4];
+        }
+
+        throw new ArgumentException("Usage: play <provider> <track-id> [--source <provider>]");
     }
 
     private void PrintQueue()
