@@ -2,6 +2,7 @@ using LemonNeo.Core;
 using LemonNeo.Plugin.Abstractions;
 using Microsoft.Extensions.Logging;
 using System.Runtime.InteropServices;
+using System.Diagnostics;
 using Un4seen.Bass;
 using BassApi = Un4seen.Bass.Bass;
 
@@ -19,7 +20,7 @@ public sealed class BassPlayerPlugin : ILemonPlugin, IPlayerProvider
     public string Id => "bass";
     PlayerDescriptor IPlayerProvider.Descriptor { get; } = new(
         "BASS Player",
-        "Native BASS decoder and audio output for local files and direct HTTP streams.");
+        "Native BASS decoder and audio output for local files and direct HTTP streams with a local audio cache.");
     public int Priority => 100;
     public IPlayer Player => _player ?? throw new InvalidOperationException("The BASS player is not initialized.");
     public bool CanPlay(PlaybackSource source) =>
@@ -28,7 +29,7 @@ public sealed class BassPlayerPlugin : ILemonPlugin, IPlayerProvider
     public ValueTask InitializeAsync(IPluginContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        _player = new BassPlayer(context.LoggerFactory.CreateLogger<BassPlayer>());
+        _player = new BassPlayer(context.LoggerFactory.CreateLogger<BassPlayer>(), context.CacheDirectory);
         context.RegisterPlayer(this);
         return ValueTask.CompletedTask;
     }
@@ -44,7 +45,7 @@ public sealed class BassPlayerPlugin : ILemonPlugin, IPlayerProvider
     }
 }
 
-internal sealed class BassPlayer : IPlayer, IAsyncDisposable
+internal sealed class BassPlayer : ISeekablePlayer, IAsyncDisposable
 {
     private const int InvalidStream = 0;
     private readonly object _gate = new();
@@ -52,10 +53,14 @@ internal sealed class BassPlayer : IPlayer, IAsyncDisposable
     private int _stream;
     private int _flacPlugin;
     private bool _disposed;
+    private bool _isHttpStream;
+    private readonly NetworkAudioCache _cache;
+    private BassDownloadCache? _downloadCache;
 
-    public BassPlayer(ILogger<BassPlayer> logger)
+    public BassPlayer(ILogger<BassPlayer> logger, string cacheDirectory)
     {
         _logger = logger;
+        _cache = new NetworkAudioCache(cacheDirectory, logger);
         var nativeAsset = GetNativeAsset();
         BassNet.Registration("lemon.app@qq.com", "2X52325160022");
         var initFlags = OperatingSystem.IsWindows()
@@ -118,7 +123,7 @@ internal sealed class BassPlayer : IPlayer, IAsyncDisposable
             var sourceDescription = source switch
             {
                 FilePlaybackSource fileSource => CreateFileStream(fileSource),
-                HttpPlaybackSource { IsDirectAudio: true } httpSource => CreateHttpStream(httpSource),
+                HttpPlaybackSource { IsDirectAudio: true } httpSource => CreateHttpStream(track, httpSource),
                 _ => throw new NotSupportedException($"BASS Player does not support '{source.GetType().Name}'.")
             };
             if (_stream == InvalidStream)
@@ -128,8 +133,9 @@ internal sealed class BassPlayer : IPlayer, IAsyncDisposable
 
             if (!BassApi.BASS_ChannelPlay(_stream, false))
             {
+                var error = BassApi.BASS_ErrorGetCode();
                 FreeCurrentStream();
-                throw BassFailure($"play '{sourceDescription}'");
+                throw BassFailure($"play '{sourceDescription}'", error);
             }
 
             CurrentTrack = track;
@@ -155,7 +161,7 @@ internal sealed class BassPlayer : IPlayer, IAsyncDisposable
         return path;
     }
 
-    private string CreateHttpStream(HttpPlaybackSource source)
+    private string CreateHttpStream(Track track, HttpPlaybackSource source)
     {
         var headers = source.Headers.Select(header =>
         {
@@ -165,14 +171,41 @@ internal sealed class BassPlayer : IPlayer, IAsyncDisposable
             }
 
             return $"{header.Key}: {header.Value}";
-        });
-        var sourceWithHeaders = string.Join("\r\n", new[] { source.Uri.ToString() }.Concat(headers));
+        }).ToArray();
+        var cachePath = _cache.GetPath(track, source);
+        if (File.Exists(cachePath))
+        {
+            _stream = BassApi.BASS_StreamCreateFile(cachePath, 0, 0, BASSFlag.BASS_SAMPLE_FLOAT);
+            if (_stream != InvalidStream)
+            {
+                _logger.LogInformation("Playing cached audio from {Path}.", cachePath);
+                return cachePath;
+            }
+            _cache.RemoveInvalid(cachePath);
+        }
+
+        _downloadCache = _cache.Start(cachePath);
+        // Keep the callback rooted before BASS begins receiving bytes, which
+        // may happen before StreamCreateURL returns. Terminate every header.
+        var downloadHeaders = source.Headers.Keys.Contains("Accept-Encoding", StringComparer.OrdinalIgnoreCase)
+            ? headers
+            : [.. headers, "Accept-Encoding: identity"];
+        var sourceWithHeaders = string.Join("\r\n", new[] { source.Uri.ToString() }.Concat(downloadHeaders)) + "\r\n";
         _stream = BassApi.BASS_StreamCreateURL(
             sourceWithHeaders,
             0,
             BASSFlag.BASS_SAMPLE_FLOAT,
-            null,
+            _downloadCache?.DownloadCallback,
             IntPtr.Zero);
+        if (_stream == InvalidStream)
+        {
+            var error = BassApi.BASS_ErrorGetCode();
+            _downloadCache?.Dispose();
+            _downloadCache = null;
+            throw BassFailure("open the network audio stream", error);
+        }
+        _isHttpStream = true;
+        _downloadCache?.SetStream(_stream);
         return source.Uri.ToString();
     }
 
@@ -216,6 +249,84 @@ internal sealed class BassPlayer : IPlayer, IAsyncDisposable
         return Task.CompletedTask;
     }
 
+    public async Task SeekAsync(TimeSpan position, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (position < TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(position));
+        int stream;
+        long bytes;
+        bool resumeAfterSeeking;
+        lock (_gate)
+        {
+            ThrowIfDisposed();
+            if (_stream == InvalidStream) throw new InvalidOperationException("No audio stream is loaded.");
+            stream = _stream;
+            var duration = ChannelTime(BassApi.BASS_ChannelGetLength(_stream));
+            if (duration is { } length && position > length) position = length;
+            bytes = BassApi.BASS_ChannelSeconds2Bytes(stream, position.TotalSeconds);
+            if (bytes < 0)
+            {
+                throw BassFailure("convert the playback position", BassApi.BASS_ErrorGetCode());
+            }
+
+            resumeAfterSeeking = State == PlayerState.Playing;
+            if (resumeAfterSeeking)
+            {
+                if (!BassApi.BASS_ChannelPause(stream))
+                    throw BassFailure("pause while restoring the playback position", BassApi.BASS_ErrorGetCode());
+                State = PlayerState.Paused;
+            }
+        }
+
+        var wait = Stopwatch.StartNew();
+        var waitingForDownload = false;
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (_gate)
+            {
+                ThrowIfDisposed();
+                if (_stream != stream)
+                    throw new InvalidOperationException("The audio stream changed while restoring the playback position.");
+
+                if (BassApi.BASS_ChannelSetPosition(stream, bytes, BASSMode.BASS_POS_BYTE))
+                {
+                    if (resumeAfterSeeking)
+                    {
+                        if (!BassApi.BASS_ChannelPlay(stream, false))
+                            throw BassFailure("resume after restoring the playback position", BassApi.BASS_ErrorGetCode());
+                        State = PlayerState.Playing;
+                    }
+                    return;
+                }
+
+                // Capture the failing call's error before querying download state:
+                // subsequent BASS calls overwrite the thread-local error code.
+                var error = BassApi.BASS_ErrorGetCode();
+                var connected = _isHttpStream &&
+                    BassApi.BASS_StreamGetFilePosition(stream, BASSStreamFilePosition.BASS_FILEPOS_CONNECTED) > 0;
+                var blocked = _isHttpStream &&
+                    (BassApi.BASS_ChannelGetInfo(stream)?.flags & BASSFlag.BASS_STREAM_BLOCK) != 0;
+                // A reported BASS_OK alongside a failed network seek is not
+                // grounds to lose the restore attempt while data is arriving.
+                if (!connected || blocked || error is not (BASSError.BASS_ERROR_POSITION or BASSError.BASS_OK))
+                    throw BassFailure("restore the playback position", error);
+
+                if (wait.Elapsed >= TimeSpan.FromSeconds(30))
+                    throw new InvalidOperationException(
+                        $"Timed out waiting for audio to buffer at {position:c}. The saved playback position is retained; try resume again.");
+
+                if (!waitingForDownload)
+                {
+                    waitingForDownload = true;
+                    _logger.LogInformation("Buffering audio to restore playback at {Position}.", position);
+                }
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
+        }
+    }
+
     public Task StopAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -257,18 +368,27 @@ internal sealed class BassPlayer : IPlayer, IAsyncDisposable
 
     private void FreeCurrentStream()
     {
-        if (_stream == InvalidStream)
+        if (_stream != InvalidStream)
         {
-            return;
+            BassApi.BASS_ChannelStop(_stream);
+            BassApi.BASS_StreamFree(_stream);
         }
-
-        BassApi.BASS_ChannelStop(_stream);
-        BassApi.BASS_StreamFree(_stream);
+        // StreamFree waits for native callbacks. Only release the delegate
+        // and temporary file after those callbacks have stopped.
+        GC.KeepAlive(_downloadCache);
+        _downloadCache?.Dispose();
+        _downloadCache = null;
         _stream = InvalidStream;
+        _isHttpStream = false;
     }
 
     private static InvalidOperationException BassFailure(string operation) =>
         new($"BASS could not {operation}. Error: {BassApi.BASS_ErrorGetCode()}.");
+
+    private static InvalidOperationException BassFailure(string operation, BASSError error) =>
+        error == BASSError.BASS_OK
+            ? new($"BASS could not {operation}. The native call failed without an error code.")
+            : new($"BASS could not {operation}. Error: {error}.");
 
     private static NativeAsset GetNativeAsset()
     {

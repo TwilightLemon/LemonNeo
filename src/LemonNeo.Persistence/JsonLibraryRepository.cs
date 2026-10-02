@@ -85,6 +85,17 @@ public sealed class JsonLibraryRepository(string libraryDirectory) : ILibraryRep
                 Mirrors = library.Mirrors.OrderBy(mirror => mirror.PlaylistId).ToArray()
             };
             await WriteAtomicAsync(Path.Combine(_root, IndexFileName), index, cancellationToken);
+
+            // Publish the new index before removing playlist files it no longer references.
+            var retainedIds = library.Playlists.Select(playlist => playlist.Id).ToHashSet();
+            foreach (var path in Directory.EnumerateFiles(playlistsDirectory, "*.json"))
+            {
+                if (Guid.TryParseExact(Path.GetFileNameWithoutExtension(path), "N", out var id) &&
+                    !retainedIds.Contains(id))
+                {
+                    File.Delete(path);
+                }
+            }
         }
         catch (Exception exception) when (exception is IOException or JsonException or UnauthorizedAccessException)
         {

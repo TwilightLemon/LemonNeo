@@ -57,6 +57,7 @@ public sealed class PlaylistService(
 
     public PlaylistItem Add(Guid playlistId, Track track)
     {
+        ValidateTrack(track);
         var playlist = GetRequired(playlistId);
         var item = new PlaylistItem
         {
@@ -80,6 +81,143 @@ public sealed class PlaylistService(
         }
 
         return removed;
+    }
+
+    public Playlist Update(Guid playlistId, string name, string? description)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var playlist = GetRequired(playlistId);
+        playlist.Name = name.Trim();
+        playlist.Description = description;
+        Touch(playlist);
+        return playlist;
+    }
+
+    public bool Delete(Guid playlistId)
+    {
+        if (library.Current.Playlists.RemoveAll(playlist => playlist.Id == playlistId) == 0)
+        {
+            return false;
+        }
+
+        library.Current.Mirrors.RemoveAll(mirror => mirror.PlaylistId == playlistId);
+        library.Touch();
+        return true;
+    }
+
+    public PlaylistItem GetItemRequired(Guid playlistId, Guid itemId) =>
+        GetRequired(playlistId).Items.FirstOrDefault(item => item.Id == itemId)
+        ?? throw new ArgumentException($"Playlist item '{itemId}' was not found.");
+
+    public PlaylistItem UpdateTrack(Guid playlistId, Guid itemId, Track track)
+    {
+        ValidateTrack(track);
+        var playlist = GetRequired(playlistId);
+        var item = GetItemRequired(playlistId, itemId);
+        item.Track = track;
+        Touch(playlist);
+        return item;
+    }
+
+    public void Move(Guid playlistId, Guid itemId, int position)
+    {
+        var playlist = GetRequired(playlistId);
+        var item = GetItemRequired(playlistId, itemId);
+        if (position < 1 || position > playlist.Items.Count)
+        {
+            throw new ArgumentOutOfRangeException(nameof(position),
+                $"Position must be between 1 and {playlist.Items.Count}.");
+        }
+
+        var items = playlist.Items.OrderBy(value => FractionalPlaylistOrderingService.Parse(value.SortKey))
+            .ThenBy(value => value.Id).ToList();
+        items.Remove(item);
+        items.Insert(position - 1, item);
+        // Assign temporary distinct keys in the requested order before normalizing.
+        for (var index = 0; index < items.Count; index++)
+        {
+            items[index].SortKey = (index + 1).ToString(CultureInfo.InvariantCulture);
+        }
+
+        ordering.Normalize(playlist);
+        Touch(playlist);
+    }
+
+    public IReadOnlyList<ExternalMusicId> GetExternalIds(Guid playlistId, Guid itemId) =>
+        GetItemRequired(playlistId, itemId).Track.ExternalIds;
+
+    public void AddExternalId(Guid playlistId, Guid itemId, ExternalMusicId id)
+    {
+        ValidateExternalId(id);
+        var item = GetItemRequired(playlistId, itemId);
+        if (item.Track.ExternalIds.Any(value => SameScheme(value, id)))
+        {
+            throw new ArgumentException($"External ID scheme '{id.Namespace}:{id.Kind ?? "-"}' already exists. Use update.");
+        }
+
+        UpdateTrack(playlistId, itemId, item.Track with { ExternalIds = [.. item.Track.ExternalIds, id] });
+    }
+
+    public void UpdateExternalId(Guid playlistId, Guid itemId, ExternalMusicId id)
+    {
+        ValidateExternalId(id);
+        var item = GetItemRequired(playlistId, itemId);
+        if (!item.Track.ExternalIds.Any(value => SameScheme(value, id)))
+        {
+            throw new ArgumentException($"External ID scheme '{id.Namespace}:{id.Kind ?? "-"}' was not found.");
+        }
+
+        UpdateTrack(playlistId, itemId, item.Track with
+        {
+            ExternalIds = item.Track.ExternalIds.Select(value => SameScheme(value, id) ? id : value).ToArray()
+        });
+    }
+
+    public bool RemoveExternalId(Guid playlistId, Guid itemId, string namespaceName, string? kind)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(namespaceName);
+        var item = GetItemRequired(playlistId, itemId);
+        var scheme = new MusicIdScheme(namespaceName, kind);
+        var ids = item.Track.ExternalIds.Where(id => !scheme.Accepts(id)).ToArray();
+        if (ids.Length == item.Track.ExternalIds.Count)
+        {
+            return false;
+        }
+
+        UpdateTrack(playlistId, itemId, item.Track with { ExternalIds = ids });
+        return true;
+    }
+
+    private static bool SameScheme(ExternalMusicId left, ExternalMusicId right) =>
+        new MusicIdScheme(left.Namespace, left.Kind).Accepts(right);
+
+    private static void ValidateExternalId(ExternalMusicId id)
+    {
+        ArgumentNullException.ThrowIfNull(id);
+        ArgumentException.ThrowIfNullOrWhiteSpace(id.Namespace);
+        ArgumentException.ThrowIfNullOrWhiteSpace(id.Value);
+        if (id.Kind is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(id.Kind);
+        }
+    }
+
+    private static void ValidateTrack(Track track)
+    {
+        ArgumentNullException.ThrowIfNull(track);
+        ArgumentException.ThrowIfNullOrWhiteSpace(track.Title);
+        ArgumentException.ThrowIfNullOrWhiteSpace(track.Id.ProviderId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(track.Id.RemoteId);
+        if (track.Duration < TimeSpan.Zero)
+        {
+            throw new ArgumentException("Track duration cannot be negative.");
+        }
+    }
+
+    private void Touch(Playlist playlist)
+    {
+        playlist.UpdatedAt = DateTimeOffset.UtcNow;
+        library.Touch();
     }
 
     public Playlist GetRequired(Guid playlistId) =>

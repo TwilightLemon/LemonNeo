@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <Version>0.1.0</Version>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../LemonNeo.Application/LemonNeo.Application.csproj" />

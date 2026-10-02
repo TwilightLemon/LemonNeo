@@ -8,7 +8,7 @@ using LemonNeo.Plugin.Runtime;
 
 namespace LemonNeo.ConsoleApp;
 
-internal sealed class CommandProcessor(
+internal sealed partial class CommandProcessor(
     PluginLoader plugins,
     IProviderRegistry providers,
     IPlaybackSourceProviderRegistry playbackSources,
@@ -26,9 +26,32 @@ internal sealed class CommandProcessor(
     PlaybackSessionService playback,
     PlaybackSourceDiscoveryService sourceDiscovery,
     SyncService sync,
+    StartupCommands startup,
     CommandCompletionService completions)
 {
     private readonly TextWriter _output = global::System.Console.Out;
+
+    public async Task<bool> RunStartupAsync(CancellationToken cancellationToken)
+    {
+        var lines = await startup.LoadAsync(cancellationToken);
+        for (var index = 0; index < lines.Length; index++)
+        {
+            try
+            {
+                if (!await ExecuteAsync(lines[index], cancellationToken))
+                {
+                    return false;
+                }
+            }
+            catch (Exception exception) when (exception is LemonNeoException or ArgumentException or
+                                             InvalidOperationException or IOException or UnauthorizedAccessException)
+            {
+                _output.WriteLine($"Startup error ({startup.FilePath}:{index + 1}): {exception.Message}");
+            }
+        }
+
+        return true;
+    }
 
     public async Task RunInteractiveAsync(CancellationToken cancellationToken)
     {
@@ -63,7 +86,8 @@ internal sealed class CommandProcessor(
                     return;
                 }
             }
-            catch (Exception exception) when (exception is LemonNeoException or ArgumentException or InvalidOperationException)
+            catch (Exception exception) when (exception is LemonNeoException or ArgumentException or
+                                             InvalidOperationException or IOException or UnauthorizedAccessException)
             {
                 _output.WriteLine($"Error: {exception.Message}");
             }
@@ -72,6 +96,11 @@ internal sealed class CommandProcessor(
 
     public async Task<bool> ExecuteAsync(string line, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(line) || line.TrimStart().StartsWith('#'))
+        {
+            return true;
+        }
+
         var arguments = Tokenize(line);
         if (arguments.Count == 0)
         {
@@ -86,6 +115,16 @@ internal sealed class CommandProcessor(
                 break;
             case "plugins":
                 PrintPlugins();
+                break;
+            case "version":
+                var version = typeof(Program).Assembly.GetName().Version;
+                _output.WriteLine($"Lemon Neo {version?.ToString(3) ?? "unknown"}");
+                break;
+            case "library":
+                PrintLibrary();
+                break;
+            case "startup":
+                await ConfigureStartupAsync(arguments, cancellationToken);
                 break;
             case "providers":
                 PrintProviders();
@@ -176,15 +215,50 @@ internal sealed class CommandProcessor(
                 PrintPlaylist(ResolvePlaylist(arguments[1]));
                 break;
             case "create-playlist":
-                Require(arguments, 2, "create-playlist <name>");
-                await CreatePlaylistAsync(string.Join(' ', arguments.Skip(1)), cancellationToken);
+                Require(arguments, 2, "create-playlist <name> [--description <text>]");
+                await CreatePlaylistAsync(arguments, cancellationToken);
+                break;
+            case "update-playlist":
+                await UpdatePlaylistAsync(arguments, cancellationToken);
+                break;
+            case "delete-playlist":
+                RequireExact(arguments, 2, "delete-playlist <playlist>");
+                var deletedPlaylist = ResolvePlaylist(arguments[1]);
+                playlists.Delete(deletedPlaylist.Id);
+                await library.SaveAsync(cancellationToken);
+                _output.WriteLine($"Deleted \"{deletedPlaylist.Name}\" ({deletedPlaylist.Id}).");
+                break;
+            case "show-track":
+                RequireExact(arguments, 3, "show-track <playlist> <item>");
+                PrintTrack(ResolvePlaylistItem(ResolvePlaylist(arguments[1]), arguments[2]));
+                break;
+            case "create-track":
+                await CreateTrackAsync(arguments, cancellationToken);
+                break;
+            case "update-track":
+                await UpdateTrackAsync(arguments, cancellationToken);
+                break;
+            case "move-track":
+                RequireExact(arguments, 4, "move-track <playlist> <item> <position>");
+                var movedPlaylist = ResolvePlaylist(arguments[1]);
+                var movedItem = ResolvePlaylistItem(movedPlaylist, arguments[2]);
+                if (!int.TryParse(arguments[3], out var position))
+                {
+                    throw new ArgumentException("Position must be a positive integer.");
+                }
+                playlists.Move(movedPlaylist.Id, movedItem.Id, position);
+                await library.SaveAsync(cancellationToken);
+                _output.WriteLine($"Moved item {movedItem.Id} to position {position}.");
+                break;
+            case "external-ids":
+                await ManageExternalIdsAsync(arguments, cancellationToken);
                 break;
             case "add":
-                Require(arguments, 4, "add <playlist> <track-provider> <track-id>");
+                RequireExact(arguments, 4, "add <playlist> <track-provider> <track-id>");
                 await AddAsync(arguments[1], arguments[2], arguments[3], cancellationToken);
                 break;
             case "remove":
-                Require(arguments, 3, "remove <playlist-id> <item-id>");
+                RequireExact(arguments, 3, "remove <playlist> <item>");
                 await RemoveAsync(arguments[1], arguments[2], cancellationToken);
                 break;
             case "play":
@@ -287,6 +361,7 @@ internal sealed class CommandProcessor(
         var capabilities = new List<string>();
         if (provider is ISearchProvider) capabilities.Add("Search");
         if (provider is ITrackLookupProvider) capabilities.Add("Track Lookup");
+        if (provider is ITrackIdResolverProvider) capabilities.Add("External ID Resolution");
         if (provider is IPlaylistProvider) capabilities.Add("Playlist");
         if (provider is IPlaylistCollectionProvider) capabilities.Add("Playlist Collections");
         if (provider is IPlaybackProvider) capabilities.Add("Playback");
@@ -327,9 +402,42 @@ internal sealed class CommandProcessor(
 
     private void PrintPlugins()
     {
+        _output.WriteLine($"{plugins.Loaded.Count} plugins loaded; {plugins.LastReport.Failures.Count} failed.");
         foreach (var plugin in plugins.Loaded)
         {
-            _output.WriteLine($"{plugin.Manifest.Id} | {plugin.Manifest.Name} {plugin.Manifest.Version}");
+            var manifest = plugin.Manifest;
+            _output.WriteLine();
+            _output.WriteLine($"[Plugin] {manifest.Id} | {manifest.Name} {manifest.Version}");
+            _output.WriteLine($"  Entry assembly: {manifest.EntryAssembly}");
+            _output.WriteLine($"  Minimum host version: {manifest.MinimumHostVersion}");
+            _output.WriteLine($"  Permissions: {string.Join(", ", manifest.Permissions)}");
+            foreach (var provider in plugin.Providers)
+            {
+                _output.WriteLine($"  Provider: {provider.Id} | {provider.Descriptor.Name}");
+                _output.WriteLine($"    {provider.Descriptor.Description}");
+                _output.WriteLine($"    Capabilities: {string.Join(", ", GetCapabilities(provider))}");
+                if (provider is ISearchNamespaceProvider searchProvider)
+                {
+                    _output.WriteLine($"    Search namespaces: {string.Join(", ", searchProvider.SearchNamespaces)}");
+                }
+                if (provider is IMetadataProvider metadataProvider)
+                {
+                    _output.WriteLine($"    Metadata namespaces: {string.Join(", ", metadataProvider.MetadataNamespaces)}");
+                }
+                if (provider is ITrackIdResolverProvider sourceProvider)
+                {
+                    _output.WriteLine($"    Accepted IDs: {string.Join(", ", sourceProvider.AcceptedIdSchemes.Select(scheme => $"{scheme.Namespace}:{scheme.Kind ?? "-"}"))}");
+                }
+            }
+            foreach (var player in plugin.Players)
+            {
+                _output.WriteLine($"  Player: {player.Id} | {player.Descriptor.Name} | priority={player.Priority}");
+                _output.WriteLine($"    {player.Descriptor.Description}");
+            }
+        }
+        foreach (var failure in plugins.LastReport.Failures)
+        {
+            _output.WriteLine($"Plugin load failed ({failure.ManifestPath}): {failure.Error}");
         }
     }
 
@@ -359,6 +467,7 @@ internal sealed class CommandProcessor(
         _output.WriteLine($"Cache: {appPaths.CacheDirectory}");
         _output.WriteLine($"Music library: {options.LibraryDirectory}");
         _output.WriteLine($"Plugins: {options.PluginDirectory}");
+        _output.WriteLine($"Startup commands: {startup.FilePath}");
     }
 
     private void PrintAuthentication(string providerId)
@@ -506,6 +615,11 @@ internal sealed class CommandProcessor(
         CancellationToken cancellationToken)
     {
         var track = await GetTrackAsync(providerId, trackId, cancellationToken);
+        _output.WriteLine($"Track: {track.Title ?? track.Id.RemoteId} ({track.Id})");
+        _output.WriteLine($"Album: {track.Album?.Title}");
+        _output.WriteLine($"Artists: {string.Join(", ", track.Artists.Select(artist => artist.Name))}");
+        _output.WriteLine();
+
         var result = await metadata.LookupAsync(
             track,
             targetNamespaces,
@@ -813,13 +927,20 @@ internal sealed class CommandProcessor(
                      .OrderBy(item => FractionalPlaylistOrderingService.Parse(item.SortKey))
                      .ThenBy(item => item.Id))
         {
-            _output.WriteLine($"{index++} | {item.SortKey} | {item.Track.Title ?? item.Track.Id.RemoteId} | {item.Track.Id}");
+            _output.WriteLine($"{index++} | {item.Id} | {item.Track.Title ?? item.Track.Id.RemoteId} | {item.Track.Id}");
         }
     }
 
-    private async Task CreatePlaylistAsync(string name, CancellationToken cancellationToken)
+    private async Task CreatePlaylistAsync(IReadOnlyList<string> arguments, CancellationToken cancellationToken)
     {
-        var playlist = playlists.Create(name);
+        var fieldStart = 1;
+        while (fieldStart < arguments.Count && !arguments[fieldStart].StartsWith("--", StringComparison.Ordinal))
+        {
+            fieldStart++;
+        }
+        var name = string.Join(' ', arguments.Skip(1).Take(fieldStart - 1));
+        var fields = ParseFields(arguments, fieldStart, "description");
+        var playlist = playlists.Create(name, fields.TryGetValue("description", out var description) ? NullIfEmpty(description) : null);
         await library.SaveAsync(cancellationToken);
         _output.WriteLine($"Created \"{playlist.Name}\" ({playlist.Id}).");
     }
@@ -840,10 +961,7 @@ internal sealed class CommandProcessor(
     private async Task RemoveAsync(string playlistId, string itemId, CancellationToken cancellationToken)
     {
         var playlist = ResolvePlaylist(playlistId);
-        if (!Guid.TryParse(itemId, out var parsedItemId))
-        {
-            throw new ArgumentException($"'{itemId}' is not a valid item id.");
-        }
+        var parsedItemId = ResolvePlaylistItem(playlist, itemId).Id;
 
         if (!playlists.Remove(playlist.Id, parsedItemId))
         {
@@ -981,6 +1099,10 @@ internal sealed class CommandProcessor(
     {
         var snapshot = playback.Snapshot;
         _output.WriteLine($"State: {snapshot.State}");
+        if (snapshot.RestoredStatus is { } restoredStatus)
+        {
+            _output.WriteLine($"Saved state: {restoredStatus} (use resume or play-current to continue)");
+        }
         _output.WriteLine($"Mode: {FormatPlaybackMode(snapshot.Mode)}");
         if (snapshot.CurrentTrack is not { } track)
         {
@@ -1051,6 +1173,7 @@ internal sealed class CommandProcessor(
 
     private Playlist ResolvePlaylist(string value)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
         if (Guid.TryParse(value, out var id))
         {
             return playlists.GetRequired(id);
@@ -1106,24 +1229,28 @@ internal sealed class CommandProcessor(
         var result = new List<string>();
         var current = new StringBuilder();
         var quoted = false;
+        var tokenStarted = false;
 
         foreach (var character in input)
         {
             if (character == '"')
             {
                 quoted = !quoted;
+                tokenStarted = true;
             }
             else if (char.IsWhiteSpace(character) && !quoted)
             {
-                if (current.Length > 0)
+                if (tokenStarted)
                 {
                     result.Add(current.ToString());
                     current.Clear();
+                    tokenStarted = false;
                 }
             }
             else
             {
                 current.Append(character);
+                tokenStarted = true;
             }
         }
 
@@ -1132,7 +1259,7 @@ internal sealed class CommandProcessor(
             throw new ArgumentException("Unterminated quoted argument.");
         }
 
-        if (current.Length > 0)
+        if (tokenStarted)
         {
             result.Add(current.ToString());
         }

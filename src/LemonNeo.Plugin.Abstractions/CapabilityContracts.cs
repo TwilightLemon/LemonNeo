@@ -253,3 +253,9 @@ public interface IPlayer
     Task ResumeAsync(CancellationToken cancellationToken = default);
     Task StopAsync(CancellationToken cancellationToken = default);
 }
+
+/// <summary>Optional capability for restoring a saved playback position.</summary>
+public interface ISeekablePlayer : IPlayer
+{
+    Task SeekAsync(TimeSpan position, CancellationToken cancellationToken = default);
+}

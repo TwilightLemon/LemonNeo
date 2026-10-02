@@ -72,6 +72,7 @@ public sealed class PluginLoader(
     private readonly List<LoadedPlugin> _loaded = [];
 
     public IReadOnlyList<LoadedPlugin> Loaded => _loaded;
+    public PluginLoadReport LastReport { get; private set; } = new([], []);
 
     public async Task<PluginLoadReport> LoadFromDirectoryAsync(
         string rootDirectory,
@@ -81,7 +82,7 @@ public sealed class PluginLoader(
         if (!Directory.Exists(rootDirectory))
         {
             Directory.CreateDirectory(rootDirectory);
-            return new PluginLoadReport([], []);
+            return LastReport = new PluginLoadReport([], []);
         }
 
         var manifests = Directory
@@ -103,7 +104,7 @@ public sealed class PluginLoader(
             }
         }
 
-        return new PluginLoadReport(_loaded.ToArray(), failures);
+        return LastReport = new PluginLoadReport(_loaded.ToArray(), failures);
     }
 
     private async Task<LoadedPlugin> LoadOneAsync(

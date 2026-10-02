@@ -84,6 +84,11 @@ public sealed record HttpPlaybackSource : PlaybackSource
         = new Dictionary<string, string>();
     public DateTimeOffset? ExpiresAt { get; init; }
     public bool IsDirectAudio { get; init; } = true;
+    /// <summary>
+    /// Optional provider-qualified identity for this exact audio variant (track,
+    /// quality, and format). It stays stable when a signed playback URL changes.
+    /// </summary>
+    public string? CacheKey { get; init; }
 }
 
 public sealed record FilePlaybackSource(string Path) : PlaybackSource;
@@ -115,7 +120,14 @@ public sealed record PlaybackQueueItem
     public DateTimeOffset AddedAt { get; init; } = DateTimeOffset.UtcNow;
 }
 
-public sealed class PlaybackQueueState
+public enum PlaybackStatus
+{
+    Stopped,
+    Playing,
+    Paused
+}
+
+public sealed record PlaybackQueueState
 {
     public int FormatVersion { get; init; } = 1;
     public List<PlaybackQueueItem> Items { get; init; } = [];
@@ -124,6 +136,8 @@ public sealed class PlaybackQueueState
     public List<Guid> ShuffleOrder { get; init; } = [];
     public int ShuffleCursor { get; init; } = -1;
     public PlaybackRequest Request { get; init; } = new();
+    public TimeSpan Position { get; init; }
+    public PlaybackStatus Status { get; init; }
     public DateTimeOffset UpdatedAt { get; init; } = DateTimeOffset.UtcNow;
 }
 

@@ -40,6 +40,7 @@ internal static class Program
             }));
         collection.AddHttpClient();
         collection.AddSingleton(options);
+        collection.AddSingleton(new StartupCommands(options.StartupFile));
         collection.AddSingleton<IAppPathProvider>(appPaths);
         collection.AddSingleton<IAppConfigurationStore, JsonAppConfigurationStore>();
         collection.AddSingleton<IPluginDataStoreFactory, PluginDataStoreFactory>();
@@ -76,34 +77,20 @@ internal static class Program
 
         await using var services = collection.BuildServiceProvider();
         var output = global::System.Console.Out;
-        output.WriteLine("Lemon Neo Prototype");
-        output.WriteLine("===================");
-        output.WriteLine();
-        output.WriteLine("Loading plugins...");
-
         try
         {
             var loader = services.GetRequiredService<PluginLoader>();
-            var report = await loader.LoadFromDirectoryAsync(options.PluginDirectory, cancellation.Token);
-            PrintPluginReport(report, output);
+            await loader.LoadFromDirectoryAsync(options.PluginDirectory, cancellation.Token);
 
             var library = services.GetRequiredService<LibraryService>();
             await library.LoadAsync(cancellation.Token);
             var playbackSession = services.GetRequiredService<PlaybackSessionService>();
             await playbackSession.InitializeAsync(cancellation.Token);
-            output.WriteLine();
-            output.WriteLine("Library loaded.");
-            output.WriteLine($"{library.Current.Playlists.Count} playlists.");
-            var trackCount = library.Current.Playlists
-                .SelectMany(playlist => playlist.Items)
-                .Select(item => item.Track.Id)
-                .Distinct()
-                .Count();
-            output.WriteLine($"{trackCount} playlist tracks.");
-            output.WriteLine();
-
             var commands = services.GetRequiredService<CommandProcessor>();
-            await commands.RunInteractiveAsync(cancellation.Token);
+            if (await commands.RunStartupAsync(cancellation.Token))
+            {
+                await commands.RunInteractiveAsync(cancellation.Token);
+            }
             return 0;
         }
         catch (OperationCanceledException)
@@ -118,43 +105,15 @@ internal static class Program
         }
     }
 
-    private static void PrintPluginReport(PluginLoadReport report, TextWriter output)
-    {
-        foreach (var plugin in report.Loaded)
-        {
-            output.WriteLine();
-            output.WriteLine("[Plugin]");
-            output.WriteLine($"{plugin.Manifest.Name} {plugin.Manifest.Version}");
-            foreach (var provider in plugin.Providers)
-            {
-                output.WriteLine($"Provider: {provider.Id}");
-                output.WriteLine();
-                output.WriteLine("Capabilities:");
-                foreach (var capability in CommandProcessor.GetCapabilities(provider))
-                {
-                    output.WriteLine(capability);
-                }
-            }
-
-            foreach (var player in plugin.Players)
-            {
-                output.WriteLine($"Player: {player.Id}");
-            }
-        }
-
-        foreach (var failure in report.Failures)
-        {
-            output.WriteLine($"Plugin load failed ({failure.ManifestPath}): {failure.Error}");
-        }
-    }
 }
 
-internal sealed record ConsoleOptions(string PluginDirectory, string LibraryDirectory)
+internal sealed record ConsoleOptions(string PluginDirectory, string LibraryDirectory, string StartupFile)
 {
     public static ConsoleOptions Parse(string[] args, IAppPathProvider appPaths)
     {
         var pluginDirectory = Path.Combine(AppContext.BaseDirectory, "plugins");
         var libraryDirectory = appPaths.MusicLibraryDirectory;
+        var startupFile = Path.Combine(appPaths.ConfigurationDirectory, "startup.txt");
         for (var index = 0; index < args.Length; index++)
         {
             switch (args[index])
@@ -165,11 +124,14 @@ internal sealed record ConsoleOptions(string PluginDirectory, string LibraryDire
                 case "--library" when index + 1 < args.Length:
                     libraryDirectory = Path.GetFullPath(args[++index]);
                     break;
+                case "--startup" when index + 1 < args.Length:
+                    startupFile = Path.GetFullPath(args[++index]);
+                    break;
                 default:
                     throw new ArgumentException($"Unknown or incomplete option '{args[index]}'.");
             }
         }
 
-        return new ConsoleOptions(pluginDirectory, libraryDirectory);
+        return new ConsoleOptions(pluginDirectory, libraryDirectory, startupFile);
     }
 }

@@ -442,7 +442,7 @@ public sealed class PlaybackQueue : IPlaybackQueue
     }
 }
 
-public sealed class ConsolePlayer(TextWriter output) : IPlayer
+public sealed class ConsolePlayer(TextWriter output) : ISeekablePlayer
 {
     private readonly object _gate = new();
     private readonly Stopwatch _clock = new();
@@ -552,6 +552,19 @@ public sealed class ConsolePlayer(TextWriter output) : IPlayer
             }
         }
 
+        return Task.CompletedTask;
+    }
+
+    public Task SeekAsync(TimeSpan position, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (position < TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(position));
+        lock (_gate)
+        {
+            _elapsed = _currentTrack?.Duration is { } duration && position > duration ? duration : position;
+            if (_state == PlayerState.Playing) _clock.Restart();
+            else _clock.Reset();
+        }
         return Task.CompletedTask;
     }
 

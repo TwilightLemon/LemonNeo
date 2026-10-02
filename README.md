@@ -39,6 +39,72 @@ selection box; type `playlist` to choose and inspect a local playlist directly.
 Use the arrow keys to select a candidate, then Tab or Enter to insert it. Set the
 standard `NO_COLOR` environment variable to disable output colors.
 
+## Startup commands and local library editing
+
+After loading plugins, the library, and playback state, the console runs
+`startup.txt` from the configuration directory. The file is created on first
+launch with these defaults:
+
+```text
+#显示版本号
+version
+#显示加载的插件
+plugins
+#显示library统计
+library
+```
+
+Edit this file to customize the commands and their order. Blank lines and lines
+whose first non-whitespace character is `#` are ignored. Each line uses the same
+commands as the interactive console. A failed command is reported with its file
+and line number, and subsequent commands still run. `exit` ends the application.
+An empty script disables startup commands.
+
+`startup` shows the script and its path; `startup set <file>` copies a custom
+script into it, and `startup reset` restores the defaults. Changes take effect
+on the next launch. `--startup <file>` selects an alternative script, and `paths`
+also displays its resolved location. `plugins` includes manifest details,
+provider descriptions and capabilities, accepted external ID schemes, players,
+and plugin load failures. `library` reports playlist count, unique tracks by
+provider/native ID, and the total number of playlist items.
+
+Local playlists, their track snapshots, and external IDs support full editing:
+
+```text
+create-playlist "Favorites" --description "My favorites"
+update-playlist "Favorites" --name "Daily Mix" --description "Updated description"
+add "Daily Mix" mock track-001
+create-track "Daily Mix" "My Song" --artists "Artist A; Artist B" --album "My Album" --duration 180
+show-playlist "Daily Mix"
+show-track "Daily Mix" 2
+update-track "Daily Mix" 2 --title "New Title" --album "" --artwork "https://example.com/cover.jpg"
+move-track "Daily Mix" 2 1
+external-ids "Daily Mix" 1 add netease song-id 29572502
+external-ids "Daily Mix" 1
+external-ids "Daily Mix" 1 update netease song-id 12345
+external-ids "Daily Mix" 1 remove netease song-id
+remove "Daily Mix" 1
+delete-playlist "Daily Mix"
+```
+
+The `<playlist>` argument accepts a name, UUID, or unique UUID prefix. The
+`<item>` argument accepts a one-based position in the displayed playlist order,
+item UUID, or unique item UUID prefix. `show-playlist` displays the item UUIDs.
+`move-track` uses a one-based destination position.
+
+Track fields are `--title`, `--artists` (semicolon-separated), `--album`,
+`--duration` (seconds), `--artwork` (absolute URI), `--provider`, and `--track-id`.
+Quote values containing spaces. Use `""` to clear optional track fields or a
+playlist description. Manually created tracks receive a generated `library`
+ID; add external IDs to let playback providers find their sources. Edits apply
+to the selected playlist item, and every mutation is saved immediately.
+
+External IDs are keyed by `(namespace, kind)`, compared case-insensitively.
+Use `-` for an ID without a kind, for example
+`external-ids "Daily Mix" 1 add isrc - US1234567890`. `add` rejects duplicate
+schemes, `update` changes the existing value, and `remove` deletes the scheme.
+Deleting a playlist also removes its mirror references and persisted file.
+
 Provider parameters are capability-scoped. `<track-provider>` accepts only
 providers that can retrieve a track by native ID, while `<source-provider>`
 accepts playback source resolvers; playlist and authentication providers have
@@ -151,9 +217,40 @@ queue
 queue clear
 ```
 
-The playback queue, selected item, required source, playback mode, and shuffle
-cursor are stored in `playback.json` beside the library. After restarting, use
-`play-current` to play the restored selection. Audio is not resumed automatically.
+The playback queue, selected track snapshot, required source, playback mode,
+shuffle order/cursor, position, and playing/paused/stopped status are stored in
+`playback.json` beside the library. Queue and player changes are saved immediately;
+playing progress is saved every five seconds and again on a normal exit. These
+values are loaded automatically on startup. `now-playing` shows the restored
+selection, position, and saved status. Use `resume` or `play-current` to continue
+from the saved position with a player supporting seeking (BASS and the console
+player do); audio is not resumed automatically. A player without seeking starts
+at the beginning. Explicit `stop` resets the position, and `queue clear` removes
+the saved selection. Playback files from earlier versions remain readable.
+
+When restoring HTTP audio, BASS pauses the stream while waiting for the download
+to reach the saved position, then seeks and resumes playback. Buffering waits are
+cancellable and limited to 30 seconds. If restoration fails, the saved position
+is retained and `resume` can be retried without issuing `stop`.
+
+BASS also caches finite HTTP audio files while streaming them, using its native
+download callback. Cached audio lives under
+`<cache-root>/Plugins/org.lemonneo.bass/Music`, following the host's resolved
+cache directory (including `LEMONNEO_CACHE_HOME`). Run `paths` to see that root.
+Each download writes a unique `.part` file; only a download whose byte count
+matches the reported full file size is atomically published as a reusable
+audio file. Known audio extensions are retained; other URLs use `.audio`.
+Interrupted downloads are removed when the stream stops; live
+or unknown-size streams are played without publishing a completed cache.
+Cache write failures are reported and streaming playback continues.
+
+Completed cache entries are decoded from local files on later plays and survive
+restarting the application. QQ Music and GDStudio provide stable cache identities
+for each song/audio variant so rotating signed URLs reuse the same cache;
+other sources use the exact URL, request headers, and track identity. Playback
+providers still resolve the source before the BASS player checks its cache.
+Different variants are cached separately. Cache files contain disposable audio
+data and can be cleared without changing playlists or playback state.
 
 `PlaybackSessionService` is the application-level playback authority. It exposes
 the current track, player state, timeline progress, state/timeline events, and a
@@ -245,6 +342,18 @@ The library index contains playlists and mirrors only. Each playlist item embeds
 its complete `Track` snapshot (including artwork and external IDs); there is no
 separate global track catalogue or `metadata/tracks.json` file. Temporary search
 results therefore cannot make the in-memory library grow.
+
+Run the native BASS resume regression checks (requires an audio output device):
+
+```powershell
+dotnet run --project tests/LemonNeo.Bass.Tests -c Release
+```
+
+The checks use silent audio and a local HTTP fixture that stalls the download
+before the saved position. They verify the complete cached bytes, cache reuse
+after restarting and rotating URLs, temporary-file cleanup, buffered restoration,
+cancellation with retained progress, retrying `resume`, and local/paused seeking.
+They do not use the user's library or credentials.
 
 The BASS plugin carries the BASS.NET 2.4.14.1 wrapper and platform-specific BASS
 2.4/FLAC 2.4 native binaries for Windows x86/x64, Linux x86/x64/ARM/ARM64, and

@@ -5,7 +5,7 @@ namespace LemonNeo.ConsoleApp;
 internal sealed class InteractiveLineEditor(
     Func<string, int, CommandCompletion> completionSource)
 {
-    private const string PromptText = "lemon › ";
+    private const string PromptText = "lemon > ";
     private const int MaximumSuggestions = 5;
 
     private readonly List<string> _history = [];
@@ -349,7 +349,7 @@ internal sealed class InteractiveLineEditor(
         SetColor(ConsoleColor.Yellow);
         global::System.Console.Write("lemon");
         SetColor(ConsoleColor.DarkGray);
-        global::System.Console.Write(" › ");
+        global::System.Console.Write(" > ");
         if (viewport.LeftHidden)
         {
             global::System.Console.Write('…');

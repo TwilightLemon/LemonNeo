@@ -109,6 +109,7 @@ internal sealed class QqMusicPlaybackProvider(
                 quality.Label);
             return new HttpPlaybackSource
             {
+                CacheKey = $"{Id}:{track.Id.RemoteId}:{quality.Prefix}:{quality.Extension}",
                 Uri = playbackUri,
                 Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {

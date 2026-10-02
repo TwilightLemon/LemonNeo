@@ -151,6 +151,7 @@ public sealed class GdStudioNeteasePlugin :
             return new HttpPlaybackSource
             {
                 Uri = playbackUri,
+                CacheKey = $"{ProviderId}:{track.Id.RemoteId}:{payload.Bitrate}:{payload.Size}:{Path.GetExtension(playbackUri.AbsolutePath).ToLowerInvariant()}",
                 Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
                     ["User-Agent"] = UserAgent,

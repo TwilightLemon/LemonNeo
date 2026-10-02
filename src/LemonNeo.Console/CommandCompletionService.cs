@@ -75,9 +75,43 @@ internal sealed class CommandCompletionService(
             return CompletePlaylists(target, hint);
         }
 
-        if (string.Equals(commandName, "remove", StringComparison.OrdinalIgnoreCase) && argumentIndex == 2)
+        if (argumentIndex == 2 && commandName.ToLowerInvariant() is
+            "remove" or "show-track" or "update-track" or "move-track" or "external-ids")
         {
             return CompletePlaylistItems(target, hint);
+        }
+
+        if (commandName.Equals("external-ids", StringComparison.OrdinalIgnoreCase) && argumentIndex == 3)
+        {
+            return CompleteValues(target, hint, "External ID actions",
+                ("add", "Add a new ID scheme"), ("update", "Change an existing ID value"), ("remove", "Delete an ID scheme"));
+        }
+
+        if (commandName.Equals("startup", StringComparison.OrdinalIgnoreCase) && argumentIndex == 1)
+        {
+            return CompleteValues(target, hint, "Startup commands",
+                ("show", "Show the startup script"), ("set", "Copy a script from a file"), ("reset", "Restore the default script"));
+        }
+
+        var fieldStart = commandName.ToLowerInvariant() switch
+        {
+            "update-playlist" => 2,
+            "create-track" or "update-track" => 3,
+            _ => -1
+        };
+        if (commandName.Equals("create-playlist", StringComparison.OrdinalIgnoreCase) && argumentIndex >= 2 &&
+            !target.Tokens.Contains("--description", StringComparer.OrdinalIgnoreCase))
+        {
+            return CompleteValues(target, hint, "Fields", ("--description", "Set the playlist description"));
+        }
+        if (fieldStart >= 0 && argumentIndex >= fieldStart && (argumentIndex - fieldStart) % 2 == 0)
+        {
+            var fields = fieldStart == 2
+                ? new[] { "name", "description" }
+                : new[] { "title", "artists", "album", "duration", "artwork", "provider", "track-id" };
+            return CompleteValues(target, hint, "Fields",
+                fields.Where(field => !target.Tokens.Contains($"--{field}", StringComparer.OrdinalIgnoreCase))
+                    .Select(field => ($"--{field}", $"Set {field}")).ToArray());
         }
 
         if (IsSearchSourceArgument(commandName, target))
@@ -300,7 +334,8 @@ internal sealed class CommandCompletionService(
 
     private static bool IsPlaylistArgument(string command, int argumentIndex) =>
         argumentIndex == 1 && command.ToLowerInvariant() is
-            "playlist" or "show-playlist" or "match-playlist" or "add" or "remove" or "play-playlist";
+            "playlist" or "show-playlist" or "match-playlist" or "add" or "remove" or "play-playlist" or
+            "update-playlist" or "delete-playlist" or "show-track" or "create-track" or "update-track" or "move-track" or "external-ids";
 
     private static bool IsNamespaceArgument(string command, int argumentIndex) =>
         (string.Equals(command, "metadata", StringComparison.OrdinalIgnoreCase) && argumentIndex >= 3) ||
