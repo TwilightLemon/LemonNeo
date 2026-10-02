@@ -4,41 +4,69 @@ using System.Text;
 
 namespace LemonNeo.ConsoleApp;
 
+internal enum LyricsAnsiColor { None, TrueColor, Indexed }
+
 internal static class LyricsRowRenderer
 {
     internal const string Orange = "\u001b[38;2;255;165;0m";
-    private static readonly bool SupportsAnsi = EnableAnsi();
+    internal const string IndexedOrange = "\u001b[38;5;208m";
+    private static readonly Lazy<bool> SupportsAnsi = new(EnableAnsi);
 
     public static void Render(LyricsRow frame, int maximumWidth)
     {
         if (frame.Segments.Count == 0) return;
-        var original = global::System.Console.ForegroundColor;
         var color = HighlightingTextWriter.CanUseColor;
+        var ansiColor = color && SupportsAnsi.Value
+            ? SelectAnsiColor(OperatingSystem.IsWindows(), Environment.GetEnvironmentVariable("TERM"),
+                Environment.GetEnvironmentVariable("COLORTERM"))
+            : LyricsAnsiColor.None;
+        if (!color || ansiColor != LyricsAnsiColor.None)
+        {
+            Render(frame, maximumWidth, global::System.Console.Out, ansiColor);
+            return;
+        }
+
+        var original = global::System.Console.ForegroundColor;
         try
         {
             foreach (var segment in CreateViewport(frame, maximumWidth))
             {
-                if (color)
-                {
-                    if (SupportsAnsi)
-                    {
-                        global::System.Console.Write(segment.Reached ? Orange : "\u001b[90m");
-                    }
-                    else
-                    {
-                        global::System.Console.ForegroundColor = segment.Reached ? ConsoleColor.DarkYellow : ConsoleColor.DarkGray;
-                    }
-                }
+                global::System.Console.ForegroundColor = segment.Reached ? ConsoleColor.DarkYellow : ConsoleColor.DarkGray;
                 global::System.Console.Write(segment.Text);
             }
         }
         finally
         {
-            if (color)
+            global::System.Console.ForegroundColor = original;
+        }
+    }
+
+    internal static LyricsAnsiColor SelectAnsiColor(bool isWindows, string? term, string? colorTerm)
+    {
+        if (string.Equals(term, "dumb", StringComparison.OrdinalIgnoreCase)) return LyricsAnsiColor.None;
+        if (isWindows || string.Equals(colorTerm, "truecolor", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(colorTerm, "24bit", StringComparison.OrdinalIgnoreCase)) return LyricsAnsiColor.TrueColor;
+        // Terminal.app and other 256-color terminals need an indexed orange instead of RGB.
+        return term?.Contains("256color", StringComparison.OrdinalIgnoreCase) == true
+            ? LyricsAnsiColor.Indexed : LyricsAnsiColor.None;
+    }
+
+    internal static void Render(LyricsRow frame, int maximumWidth, TextWriter output, LyricsAnsiColor color)
+    {
+        try
+        {
+            foreach (var segment in CreateViewport(frame, maximumWidth))
             {
-                if (SupportsAnsi) global::System.Console.Write("\u001b[39m");
-                global::System.Console.ForegroundColor = original;
+                if (color != LyricsAnsiColor.None)
+                    output.Write(segment.Reached
+                        ? color == LyricsAnsiColor.TrueColor ? Orange : IndexedOrange
+                        : "\u001b[90m");
+                output.Write(segment.Text);
             }
+        }
+        finally
+        {
+            if (color != LyricsAnsiColor.None) output.Write("\u001b[39m");
         }
     }
 

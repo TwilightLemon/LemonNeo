@@ -18,6 +18,7 @@ internal sealed class HighlightingTextWriter(TextWriter inner) : TextWriter
 
     public static bool CanUseColor =>
         !global::System.Console.IsOutputRedirected &&
+        !string.Equals(Environment.GetEnvironmentVariable("TERM"), "dumb", StringComparison.OrdinalIgnoreCase) &&
         string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NO_COLOR"));
 
     public override void Write(char value)

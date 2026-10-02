@@ -1,3 +1,4 @@
+using System.Text;
 using LemonNeo.Application;
 using LemonNeo.Configuration;
 using LemonNeo.Core;
@@ -16,6 +17,7 @@ internal static class Program
 {
     public static async Task<int> Main(string[] args)
     {
+        global::System.Console.OutputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
         if (HighlightingTextWriter.CanUseColor)
         {
             global::System.Console.SetOut(new HighlightingTextWriter(global::System.Console.Out));

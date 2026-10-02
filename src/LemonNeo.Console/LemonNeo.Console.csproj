@@ -4,7 +4,6 @@
     <Version>0.1.0</Version>
   </PropertyGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="LemonNeo.Lyrics.Tests" />
     <ProjectReference Include="../LemonNeo.Application/LemonNeo.Application.csproj" />
     <ProjectReference Include="../LemonNeo.Configuration/LemonNeo.Configuration.csproj" />
     <ProjectReference Include="../LemonNeo.Core/LemonNeo.Core.csproj" />

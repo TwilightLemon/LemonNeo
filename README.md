@@ -49,8 +49,21 @@ reached; translation follows its own line timeline. Missing auxiliary rows are
 omitted. Long lines scroll to keep the reached words visible. Pause keeps the
 current highlight; stop clears the row, and changing tracks cancels the previous
 lyrics request. Line-timed lyrics highlight the whole line; plain lyrics display
-without timing. ANSI terminals use RGB orange, with dark yellow as the fallback
-on consoles without ANSI support. Redirected input/output disables the live lyrics.
+without timing. Live drawing works in Windows, macOS, and Linux terminals and
+stays at the bottom of the visible window when resized. It restores the command
+caret without querying the terminal for its position. True-color terminals use
+RGB orange; 256-color terminals (including macOS Terminal.app) use indexed orange.
+Limited-color consoles fall back to dark yellow. `NO_COLOR` disables colors;
+`TERM=dumb` or redirected input/output disables live drawing and uses plain input.
+
+The console compatibility workflow builds and tests on Windows, macOS, and Linux.
+On macOS/Linux it also exercises live lyrics, window resizing, and command editing
+in a pseudo-terminal. To run these checks locally after building in Release:
+
+```sh
+dotnet test tests/LemonNeo.Lyrics.Tests/LemonNeo.Lyrics.Tests.csproj --configuration Release --no-build
+python3 tests/console_terminal_test.py
+```
 
 Command history is restored on startup and saved after each submitted command
 to `<data-directory>/command-history.json` (shown by `paths`). It retains the

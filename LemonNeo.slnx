@@ -23,7 +23,4 @@
     <Project Path="plugins/LemonNeo.Plugin.QqMusic/LemonNeo.Plugin.QqMusic.csproj" />
     <Project Path="plugins/LemonNeo.Sync.MockGit/LemonNeo.Sync.MockGit.csproj" />
   </Folder>
-  <Folder Name="/tests/">
-    <Project Path="tests/LemonNeo.Lyrics.Tests/LemonNeo.Lyrics.Tests.csproj" />
-  </Folder>
 </Solution>

@@ -22,13 +22,18 @@ internal sealed class InteractiveLineEditor(
     private int _lastLyricsWidth;
     private int _windowWidth;
     private int _windowHeight;
+    private int _inputColumn;
 
     private int LyricsLines => lyricsSource is null ? 0 : Math.Min(3, _reservedLines - 1);
     private int ContentLines => _reservedLines - LyricsLines;
 
     public static bool IsSupported =>
-        !global::System.Console.IsInputRedirected &&
-        !global::System.Console.IsOutputRedirected;
+        SupportsInteractiveInput(global::System.Console.IsInputRedirected,
+            global::System.Console.IsOutputRedirected, Environment.GetEnvironmentVariable("TERM"));
+
+    internal static bool SupportsInteractiveInput(bool inputRedirected, bool outputRedirected, string? term) =>
+        !inputRedirected && !outputRedirected &&
+        !string.Equals(term, "dumb", StringComparison.OrdinalIgnoreCase);
 
     public string? ReadLine(CancellationToken cancellationToken)
     {
@@ -315,26 +320,34 @@ internal sealed class InteractiveLineEditor(
 
     private void ReserveDrawingArea()
     {
-        var windowHeight = Math.Max(3, global::System.Console.WindowHeight);
-        _reservedLines = Math.Min(MaximumSuggestions + 3 + (lyricsSource is null ? 0 : 3), windowHeight - 1);
-        for (var index = 0; index < _reservedLines; index++)
+        var lines = GetReservedLines(global::System.Console.WindowHeight);
+        for (var index = 0; index < lines; index++)
         {
             global::System.Console.WriteLine();
         }
 
-        _top = Math.Max(0, global::System.Console.CursorTop - _reservedLines);
+        _reservedLines = 0;
+        _lastLyricsFrame = null;
     }
 
     private void Render(CommandCompletion completion)
     {
-        _windowWidth = global::System.Console.WindowWidth;
-        _windowHeight = global::System.Console.WindowHeight;
-        _reservedLines = Math.Min(MaximumSuggestions + 3 + (lyricsSource is null ? 0 : 3), Math.Max(2, _windowHeight - 1));
-        _top = Math.Clamp(_top, global::System.Console.WindowTop,
-            global::System.Console.WindowTop + Math.Max(0, _windowHeight - _reservedLines));
+        var width = global::System.Console.WindowWidth;
+        var height = global::System.Console.WindowHeight;
+        if (width < 2 || height < 2)
+            throw new PlatformNotSupportedException("The terminal has no usable drawing area.");
+
+        if (width != _windowWidth || height != _windowHeight) ClearDrawingArea();
+        _windowWidth = width;
+        _windowHeight = height;
+        _reservedLines = GetReservedLines(height);
+        // Unix cursor coordinates refer to the visible screen. Do not query CursorTop:
+        // that can wait for a terminal CPR response and consume command input.
+        _top = ViewportTop + height - _reservedLines;
         ClearDrawingArea();
         MoveCursor(0, _top);
         var viewport = CreateViewport(_buffer.ToString(), _cursor, GetInputWidth());
+        _inputColumn = Math.Min(PromptWidth + viewport.CursorOffset, width - 2);
         RenderPromptAndInput(viewport, includeGhostText: true, completion);
 
         var row = 1;
@@ -348,21 +361,17 @@ internal sealed class InteractiveLineEditor(
         }
 
         RenderLyrics(force: true);
-
-        var cursorColumn = CellWidth(PromptText) + viewport.CursorOffset;
-        var maximumColumn = Math.Max(0, global::System.Console.WindowWidth - 2);
-        MoveCursor(Math.Min(cursorColumn, maximumColumn), _top);
+        MoveCursor(_inputColumn, _top);
     }
 
     private void RenderLyrics(bool force = false)
     {
-        if (lyricsSource is null) return;
+        if (lyricsSource is null || LyricsLines == 0) return;
         var frame = lyricsSource();
-        var width = Math.Max(1, global::System.Console.WindowWidth - 2);
+        var width = Math.Max(0, _windowWidth - 2);
         if (!force && width == _lastLyricsWidth &&
             _lastLyricsFrame?.HasSameContent(frame) == true) return;
 
-        var cursor = global::System.Console.GetCursorPosition();
         try
         {
             for (var row = 0; row < LyricsLines; row++)
@@ -381,7 +390,7 @@ internal sealed class InteractiveLineEditor(
         }
         finally
         {
-            MoveCursor(Math.Min(cursor.Left, width), cursor.Top);
+            MoveCursor(_inputColumn, _top);
         }
     }
 
@@ -390,10 +399,17 @@ internal sealed class InteractiveLineEditor(
         bool includeGhostText,
         CommandCompletion? completion)
     {
-        SetColor(ConsoleColor.Yellow);
-        global::System.Console.Write("lemon");
-        SetColor(ConsoleColor.DarkGray);
-        global::System.Console.Write(" > ");
+        if (PromptWidth < CellWidth(PromptText))
+        {
+            global::System.Console.Write(Truncate(PromptText, PromptWidth));
+        }
+        else
+        {
+            SetColor(ConsoleColor.Yellow);
+            global::System.Console.Write("lemon");
+            SetColor(ConsoleColor.DarkGray);
+            global::System.Console.Write(" > ");
+        }
         if (viewport.LeftHidden)
         {
             global::System.Console.Write('…');
@@ -599,11 +615,13 @@ internal sealed class InteractiveLineEditor(
 
     private void ClearDrawingArea()
     {
-        var width = Math.Max(1, global::System.Console.WindowWidth - 1);
+        var width = Math.Max(0, global::System.Console.WindowWidth - 1);
         var blank = new string(' ', width);
-        for (var row = 0; row < _reservedLines; row++)
+        var viewportTop = ViewportTop;
+        var bottom = Math.Min(_top + _reservedLines, viewportTop + global::System.Console.WindowHeight);
+        for (var row = Math.Max(_top, viewportTop); row < bottom; row++)
         {
-            MoveCursor(0, _top + row);
+            MoveCursor(0, row);
             global::System.Console.Write(blank);
         }
     }
@@ -716,8 +734,14 @@ internal sealed class InteractiveLineEditor(
 
     private static int RuneWidth(Rune rune) => IsWide(rune.Value) ? 2 : 1;
 
-    private static int GetInputWidth() =>
-        Math.Max(1, global::System.Console.WindowWidth - CellWidth(PromptText) - 2);
+    private int PromptWidth => Math.Min(CellWidth(PromptText), Math.Max(0, _windowWidth - 3));
+
+    private int GetInputWidth() => Math.Max(1, _windowWidth - PromptWidth - 2);
+
+    private int GetReservedLines(int height) =>
+        Math.Min(MaximumSuggestions + 3 + (lyricsSource is null ? 0 : 3), Math.Max(2, height - 1));
+
+    private static int ViewportTop => OperatingSystem.IsWindows() ? global::System.Console.WindowTop : 0;
 
     private sealed record InputViewport(
         int Start,
