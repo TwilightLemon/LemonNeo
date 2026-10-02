@@ -3,12 +3,13 @@ using System.Text;
 namespace LemonNeo.ConsoleApp;
 
 internal sealed class InteractiveLineEditor(
-    Func<string, int, CommandCompletion> completionSource)
+    Func<string, int, CommandCompletion> completionSource,
+    IReadOnlyList<string> history)
 {
     private const string PromptText = "lemon > ";
     private const int MaximumSuggestions = 5;
 
-    private readonly List<string> _history = [];
+    private readonly IReadOnlyList<string> _history = history;
     private readonly StringBuilder _buffer = new();
     private int _cursor;
     private int _selectedSuggestion;
@@ -287,43 +288,7 @@ internal sealed class InteractiveLineEditor(
             completion: null);
         global::System.Console.WriteLine();
 
-        if (!string.IsNullOrWhiteSpace(value) &&
-            ShouldStoreInHistory(value) &&
-            (_history.Count == 0 || !string.Equals(_history[^1], value, StringComparison.Ordinal)))
-        {
-            _history.Add(value);
-        }
-
         return value;
-    }
-
-    private static bool ShouldStoreInHistory(string value)
-    {
-        var trimmed = value.AsSpan().TrimStart();
-        const string login = "login";
-        if (!trimmed.StartsWith(login, StringComparison.OrdinalIgnoreCase) ||
-            (trimmed.Length > login.Length && !char.IsWhiteSpace(trimmed[login.Length])))
-        {
-            return true;
-        }
-
-        var index = login.Length;
-        while (index < trimmed.Length && char.IsWhiteSpace(trimmed[index]))
-        {
-            index++;
-        }
-
-        while (index < trimmed.Length && !char.IsWhiteSpace(trimmed[index]))
-        {
-            index++;
-        }
-
-        while (index < trimmed.Length && char.IsWhiteSpace(trimmed[index]))
-        {
-            index++;
-        }
-
-        return index >= trimmed.Length;
     }
 
     private void ReserveDrawingArea()

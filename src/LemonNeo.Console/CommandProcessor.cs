@@ -27,7 +27,8 @@ internal sealed partial class CommandProcessor(
     PlaybackSourceDiscoveryService sourceDiscovery,
     SyncService sync,
     StartupCommands startup,
-    CommandCompletionService completions)
+    CommandCompletionService completions,
+    CommandHistory history)
 {
     private readonly TextWriter _output = global::System.Console.Out;
 
@@ -55,9 +56,10 @@ internal sealed partial class CommandProcessor(
 
     public async Task RunInteractiveAsync(CancellationToken cancellationToken)
     {
+        await history.LoadAsync(cancellationToken);
         _output.WriteLine("Type a command below. ↑↓ browses history when empty and selects suggestions while typing.");
         var editor = InteractiveLineEditor.IsSupported
-            ? new InteractiveLineEditor(completions.Complete)
+            ? new InteractiveLineEditor(completions.Complete, history.Entries)
             : null;
         while (!cancellationToken.IsCancellationRequested)
         {
@@ -81,6 +83,7 @@ internal sealed partial class CommandProcessor(
 
             try
             {
+                await history.RecordAsync(line, cancellationToken);
                 if (!await ExecuteAsync(line, cancellationToken))
                 {
                     return;
@@ -464,6 +467,7 @@ internal sealed partial class CommandProcessor(
         _output.WriteLine($"Configuration: {appPaths.ConfigurationDirectory}");
         _output.WriteLine($"App settings: {appPaths.AppConfigurationFile}");
         _output.WriteLine($"Data: {appPaths.DataDirectory}");
+        _output.WriteLine($"Command history: {history.FilePath}");
         _output.WriteLine($"Cache: {appPaths.CacheDirectory}");
         _output.WriteLine($"Music library: {options.LibraryDirectory}");
         _output.WriteLine($"Plugins: {options.PluginDirectory}");
@@ -1227,7 +1231,7 @@ internal sealed partial class CommandProcessor(
         }
     }
 
-    private static IReadOnlyList<string> Tokenize(string input)
+    internal static IReadOnlyList<string> Tokenize(string input)
     {
         var result = new List<string>();
         var current = new StringBuilder();

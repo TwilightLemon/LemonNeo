@@ -42,6 +42,13 @@ it. After history browsing starts, Up/Down remains in history mode until you edi
 the recalled command. Set the standard `NO_COLOR` environment variable to
 disable output colors.
 
+Command history is restored on startup and saved after each submitted command
+to `<data-directory>/command-history.json` (shown by `paths`). It retains the
+latest 1,000 entries and skips consecutive duplicates, blank lines, comments,
+and login commands containing a cookie. Startup-script commands and the separate
+cookie prompt are not recorded. History read/write errors are reported without
+preventing command execution.
+
 ## Startup commands and local library editing
 
 After loading plugins, the library, and playback state, the console runs
@@ -248,9 +255,10 @@ play offline even when their source plugin is unavailable. Cross-provider
 discovery still indexes audio by the original playlist item.
 
 Players implement the optional `IStreamingPlayer` capability to send original
-encoded audio chunks as `MemoryStream` values to an `IPlaybackDownloadSink` owned
-by the host. The host copies each chunk synchronously; the player can then reuse
-or dispose it. Players report the full response length with `SetExpectedLength`,
+encoded audio chunks as `ReadOnlySpan<byte>` values to an `IPlaybackDownloadSink`
+owned by the host. The host consumes each chunk synchronously before `Write`
+returns without retaining its memory; the player can then reuse the underlying
+buffer. Players report the full response length with `SetExpectedLength`,
 then call `Complete` at download end or `Abort` on interruption. The length may
 arrive after chunks or completion. BASS forwards its native download callback,
 so playback and caching consume a single audio request and playback starts while

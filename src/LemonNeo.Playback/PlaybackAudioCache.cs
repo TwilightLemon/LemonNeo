@@ -159,7 +159,7 @@ public sealed class PlaybackAudioCache(string cacheDirectory, ILogger<PlaybackAu
             }
         }
 
-        public void Write(MemoryStream chunk)
+        public void Write(ReadOnlySpan<byte> chunk)
         {
             lock (_gate)
             {
@@ -167,23 +167,14 @@ public sealed class PlaybackAudioCache(string cacheDirectory, ILogger<PlaybackAu
                 if (_ended) { Close(); return; }
                 try
                 {
-                    var remaining = chunk.Length - chunk.Position;
-                    if (remaining < 0 || (_expectedLength is { } expected && remaining > expected - _written))
+                    if (_expectedLength is { } expected && chunk.Length > expected - _written)
                     {
                         Close();
                         return;
                     }
-                    // Consume only this chunk, with bounded memory regardless of
-                    // the size of the song. A plugin may provide a MemoryStream
-                    // whose underlying array is private.
-                    Span<byte> buffer = stackalloc byte[8192];
-                    int read;
-                    while ((read = chunk.Read(buffer)) > 0)
-                    {
-                        _file!.Write(buffer[..read]);
-                        _hash.AppendData(buffer[..read]);
-                        _written += read;
-                    }
+                    _file!.Write(chunk);
+                    _hash.AppendData(chunk);
+                    _written += chunk.Length;
                 }
                 catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ObjectDisposedException)
                 {

@@ -49,8 +49,7 @@ internal sealed class BassDownloadForwarder : IDisposable
                 {
                     if (_buffer.Length < length) _buffer = new byte[length];
                     Marshal.Copy(buffer, _buffer, 0, length);
-                    using var chunk = new MemoryStream(_buffer, 0, length, writable: false);
-                    _sink.Write(chunk);
+                    _sink.Write(_buffer.AsSpan(0, length));
                 }
                 // Non-null status/metadata callbacks with length zero are not audio.
             }

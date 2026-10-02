@@ -75,6 +75,7 @@ internal static class Program
         collection.AddSingleton<ILibrarySyncProvider, MockGitSyncProvider>();
         collection.AddSingleton<SyncService>();
         collection.AddSingleton<CommandCompletionService>();
+        collection.AddSingleton<CommandHistory>();
         collection.AddSingleton<CommandProcessor>();
 
         await using var services = collection.BuildServiceProvider();

@@ -267,11 +267,11 @@ public interface IPlaybackDownloadSink : IDisposable
     void SetExpectedLength(long? length);
 
     /// <summary>
-    /// Copies bytes from the current position through the end of a chunk.
-    /// The player retains ownership and may reuse/dispose it after this returns.
+    /// Consumes all bytes in the chunk synchronously without retaining its memory.
+    /// The player owns the underlying buffer and may reuse it after this returns.
     /// Chunks must be ordered, contiguous bytes of the same playback download.
     /// </summary>
-    void Write(MemoryStream chunk);
+    void Write(ReadOnlySpan<byte> chunk);
 
     /// <summary>
     /// Signals the end of the download. The host publishes only when the received
