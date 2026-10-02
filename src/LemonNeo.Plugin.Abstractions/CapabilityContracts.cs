@@ -33,23 +33,6 @@ public sealed record FolderScanResult(
     IReadOnlyList<Track> Tracks,
     IReadOnlyList<string> SkippedFiles);
 
-public sealed record LyricsLine(
-    string Text,
-    int? StartTimeMs = null,
-    int? EndTimeMs = null,
-    IReadOnlyDictionary<string, string>? Translations = null,
-    string? Romanization = null,
-    string? BackgroundText = null);
-
-public sealed record Lyrics(
-    string Text,
-    string? Language = null,
-    bool IsSynchronized = false,
-    IReadOnlyList<LyricsLine>? Lines = null,
-    string? Source = null,
-    ExternalMusicId? SourceId = null,
-    string? Translation = null);
-
 public sealed record TrackMetadata
 {
     public required string Title { get; init; }

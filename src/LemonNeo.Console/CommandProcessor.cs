@@ -58,8 +58,9 @@ internal sealed partial class CommandProcessor(
     {
         await history.LoadAsync(cancellationToken);
         _output.WriteLine("Type a command below. ↑↓ browses history when empty and selects suggestions while typing.");
+        await using var lyricDisplay = new ConsoleLyricsDisplay(() => playback.Snapshot, lyrics, cancellationToken);
         var editor = InteractiveLineEditor.IsSupported
-            ? new InteractiveLineEditor(completions.Complete, history.Entries)
+            ? new InteractiveLineEditor(completions.Complete, history.Entries, lyricDisplay.GetFrame)
             : null;
         while (!cancellationToken.IsCancellationRequested)
         {
@@ -761,7 +762,7 @@ internal sealed partial class CommandProcessor(
         var value = result.Lyrics;
         _output.WriteLine(
             $"Lyrics: provider={result.ProviderId}, source={value.Source ?? "unknown"}, " +
-            $"synchronized={value.IsSynchronized}");
+            $"synchronized={value.IsSynchronized}, word-synchronized={value.IsWordSynchronized}");
         if (value.SourceId is { } sourceId)
         {
             PrintExternalId(sourceId);
@@ -779,7 +780,7 @@ internal sealed partial class CommandProcessor(
                 {
                     _output.WriteLine($"  {string.Join(" / ", line.Translations.Values)}");
                 }
-                else if (!string.IsNullOrWhiteSpace(line.Romanization))
+                if (!string.IsNullOrWhiteSpace(line.Romanization))
                 {
                     _output.WriteLine($"  {line.Romanization}");
                 }
@@ -788,6 +789,34 @@ internal sealed partial class CommandProcessor(
         else
         {
             _output.WriteLine(value.Text);
+        }
+
+        if (value.TranslationLines is { Count: > 0 })
+        {
+            _output.WriteLine("Translation:");
+            foreach (var line in value.TranslationLines)
+            {
+                var timestamp = line.EffectiveStartTimeMs is { } start
+                    ? $"[{TimeSpan.FromMilliseconds(start):mm\\:ss\\.fff}] " : string.Empty;
+                _output.WriteLine($"  {timestamp}{line.Text}");
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(value.Translation))
+        {
+            _output.WriteLine($"Translation:{Environment.NewLine}{value.Translation}");
+        }
+        if (value.RomanizationLines is { Count: > 0 })
+        {
+            _output.WriteLine(value.RomanizationLines.All(line => line.IsWordSynchronized)
+                ? "Romanization (word-synchronized):" : "Romanization:");
+            foreach (var line in value.RomanizationLines)
+            {
+                _output.WriteLine($"  [{TimeSpan.FromMilliseconds(line.StartTimeMs ?? 0):mm\\:ss\\.fff}] {line.Text}");
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(value.Romanization))
+        {
+            _output.WriteLine($"Romanization:{Environment.NewLine}{value.Romanization}");
         }
 
         PrintErrors("Lyrics provider errors", result.ProviderErrors);

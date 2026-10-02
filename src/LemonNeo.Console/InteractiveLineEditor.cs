@@ -4,7 +4,8 @@ namespace LemonNeo.ConsoleApp;
 
 internal sealed class InteractiveLineEditor(
     Func<string, int, CommandCompletion> completionSource,
-    IReadOnlyList<string> history)
+    IReadOnlyList<string> history,
+    Func<LyricsFrame>? lyricsSource = null)
 {
     private const string PromptText = "lemon > ";
     private const int MaximumSuggestions = 5;
@@ -17,6 +18,13 @@ internal sealed class InteractiveLineEditor(
     private bool _historyNavigationActive;
     private int _top;
     private int _reservedLines;
+    private LyricsFrame? _lastLyricsFrame;
+    private int _lastLyricsWidth;
+    private int _windowWidth;
+    private int _windowHeight;
+
+    private int LyricsLines => lyricsSource is null ? 0 : Math.Min(3, _reservedLines - 1);
+    private int ContentLines => _reservedLines - LyricsLines;
 
     public static bool IsSupported =>
         !global::System.Console.IsInputRedirected &&
@@ -44,6 +52,20 @@ internal sealed class InteractiveLineEditor(
                 var completion = GetCompletion();
                 Render(completion);
 
+                while (!global::System.Console.KeyAvailable)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    Thread.Sleep(50);
+                    if (_windowWidth != global::System.Console.WindowWidth ||
+                        _windowHeight != global::System.Console.WindowHeight)
+                    {
+                        Render(completion);
+                    }
+                    else
+                    {
+                        RenderLyrics();
+                    }
+                }
                 var key = global::System.Console.ReadKey(intercept: true);
                 var control = (key.Modifiers & ConsoleModifiers.Control) != 0;
 
@@ -294,7 +316,7 @@ internal sealed class InteractiveLineEditor(
     private void ReserveDrawingArea()
     {
         var windowHeight = Math.Max(3, global::System.Console.WindowHeight);
-        _reservedLines = Math.Min(MaximumSuggestions + 3, windowHeight - 1);
+        _reservedLines = Math.Min(MaximumSuggestions + 3 + (lyricsSource is null ? 0 : 3), windowHeight - 1);
         for (var index = 0; index < _reservedLines; index++)
         {
             global::System.Console.WriteLine();
@@ -305,24 +327,62 @@ internal sealed class InteractiveLineEditor(
 
     private void Render(CommandCompletion completion)
     {
+        _windowWidth = global::System.Console.WindowWidth;
+        _windowHeight = global::System.Console.WindowHeight;
+        _reservedLines = Math.Min(MaximumSuggestions + 3 + (lyricsSource is null ? 0 : 3), Math.Max(2, _windowHeight - 1));
+        _top = Math.Clamp(_top, global::System.Console.WindowTop,
+            global::System.Console.WindowTop + Math.Max(0, _windowHeight - _reservedLines));
         ClearDrawingArea();
         MoveCursor(0, _top);
         var viewport = CreateViewport(_buffer.ToString(), _cursor, GetInputWidth());
         RenderPromptAndInput(viewport, includeGhostText: true, completion);
 
         var row = 1;
-        if (completion.Suggestions.Count > 0 && row < _reservedLines)
+        if (completion.Suggestions.Count > 0 && row < ContentLines)
         {
             RenderSuggestionBox(completion, ref row);
         }
-        else if (!string.IsNullOrWhiteSpace(completion.Hint) && row < _reservedLines)
+        else if (!string.IsNullOrWhiteSpace(completion.Hint) && row < ContentLines)
         {
             WriteRow(row++, $"  ↳ {completion.Hint}", ConsoleColor.DarkGray);
         }
 
+        RenderLyrics(force: true);
+
         var cursorColumn = CellWidth(PromptText) + viewport.CursorOffset;
         var maximumColumn = Math.Max(0, global::System.Console.WindowWidth - 2);
         MoveCursor(Math.Min(cursorColumn, maximumColumn), _top);
+    }
+
+    private void RenderLyrics(bool force = false)
+    {
+        if (lyricsSource is null) return;
+        var frame = lyricsSource();
+        var width = Math.Max(1, global::System.Console.WindowWidth - 2);
+        if (!force && width == _lastLyricsWidth &&
+            _lastLyricsFrame?.HasSameContent(frame) == true) return;
+
+        var cursor = global::System.Console.GetCursorPosition();
+        try
+        {
+            for (var row = 0; row < LyricsLines; row++)
+            {
+                MoveCursor(0, _top + ContentLines + row);
+                global::System.Console.Write(new string(' ', width));
+            }
+            var rows = frame.GetVisibleRows(LyricsLines);
+            for (var row = 0; row < rows.Count; row++)
+            {
+                MoveCursor(0, _top + _reservedLines - rows.Count + row);
+                LyricsRowRenderer.Render(rows[row], width);
+            }
+            _lastLyricsFrame = frame;
+            _lastLyricsWidth = width;
+        }
+        finally
+        {
+            MoveCursor(Math.Min(cursor.Left, width), cursor.Top);
+        }
     }
 
     private void RenderPromptAndInput(
@@ -375,7 +435,7 @@ internal sealed class InteractiveLineEditor(
     {
         var visibleCount = Math.Min(
             MaximumSuggestions,
-            Math.Min(completion.Suggestions.Count, Math.Max(0, _reservedLines - 2)));
+            Math.Min(completion.Suggestions.Count, Math.Max(0, ContentLines - 2)));
         var first = Math.Clamp(
             _selectedSuggestion - visibleCount + 1,
             0,
@@ -386,14 +446,14 @@ internal sealed class InteractiveLineEditor(
             $"  ┌─ {completion.Title ?? "Suggestions"}  ({completion.Suggestions.Count})",
             ConsoleColor.DarkCyan);
 
-        for (var index = first; index < first + visibleCount && row < _reservedLines; index++)
+        for (var index = first; index < first + visibleCount && row < ContentLines; index++)
         {
             var suggestion = completion.Suggestions[index];
             var selected = index == _selectedSuggestion;
             WriteSuggestionRow(row++, suggestion, selected);
         }
 
-        if (row < _reservedLines)
+        if (row < ContentLines)
         {
             WriteRow(
                 row++,

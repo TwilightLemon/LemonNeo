@@ -615,8 +615,11 @@ public sealed class LyricifyMetadataPlugin :
         }
 
         if (string.IsNullOrWhiteSpace(raw)) return null;
-        var translation = result?.Ytlrc?.Lyric ?? result?.Tlyric?.Lyric;
-        return ParseLyrics(raw, type, MusicIdNamespaces.NeteaseMusic, id, translation);
+        var translation = FirstNonEmpty(
+            type == LyricsRawTypes.Yrc ? result?.Ytlrc?.Lyric : null, result?.Tlyric?.Lyric);
+        var romanization = FirstNonEmpty(
+            type == LyricsRawTypes.Yrc ? result?.Yromalrc?.Lyric : null, result?.Romalrc?.Lyric);
+        return ParseLyrics(raw, type, MusicIdNamespaces.NeteaseMusic, id, translation, romanization);
     }
 
     private static async Task<LemonLyrics?> FetchQqLyricsAsync(
@@ -635,7 +638,8 @@ public sealed class LyricifyMetadataPlugin :
                     LyricsRawTypes.Qrc,
                     MusicIdNamespaces.QQMusic,
                     numericId,
-                    qrc.Trans);
+                    qrc.Trans,
+                    qrc.Romaji);
             }
         }
 
@@ -737,30 +741,12 @@ public sealed class LyricifyMetadataPlugin :
         LyricsRawTypes type,
         string source,
         ExternalMusicId sourceId,
-        string? translation = null)
-    {
-        var data = ParseHelper.ParseLyrics(raw, type);
-        if (data?.Lines is not { Count: > 0 } helperLines)
-        {
-            return CreatePlainLyrics(raw, source, sourceId, translation);
-        }
+        string? translation = null,
+        string? romanization = null) =>
+        LyricsConverter.Parse(raw, type, source, sourceId, translation, romanization);
 
-        var lines = helperLines.Select(line => new LemonLyricsLine(
-                line.Text,
-                line.StartTime,
-                line.EndTime,
-                line is IFullLineInfo full ? full.Translations : null,
-                line is IFullLineInfo fullLine ? fullLine.Pronunciation : null,
-                line.SubLine?.Text))
-            .ToArray();
-        return new LemonLyrics(
-            string.Join(Environment.NewLine, lines.Select(line => line.Text)),
-            IsSynchronized: lines.Any(line => line.StartTimeMs is not null),
-            Lines: lines,
-            Source: source,
-            SourceId: sourceId,
-            Translation: translation);
-    }
+    private static string? FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 
     private static LemonLyrics CreatePlainLyrics(
         string text,

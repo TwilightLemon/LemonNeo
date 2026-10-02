@@ -42,6 +42,16 @@ it. After history browsing starts, Up/Down remains in history mode until you edi
 the recalled command. Set the standard `NO_COLOR` environment variable to
 disable output colors.
 
+During playback, lyrics appear beneath the command input and suggestions in this
+order: romanization (when available), main lyrics, and translation (when available).
+Romanization and main lyrics turn orange word by word when their start time is
+reached; translation follows its own line timeline. Missing auxiliary rows are
+omitted. Long lines scroll to keep the reached words visible. Pause keeps the
+current highlight; stop clears the row, and changing tracks cancels the previous
+lyrics request. Line-timed lyrics highlight the whole line; plain lyrics display
+without timing. ANSI terminals use RGB orange, with dark yellow as the fallback
+on consoles without ANSI support. Redirected input/output disables the live lyrics.
+
 Command history is restored on startup and saved after each submitted command
 to `<data-directory>/command-history.json` (shown by `paths`). It retains the
 latest 1,000 entries and skips consecutive duplicates, blank lines, comments,
@@ -294,6 +304,26 @@ lyrics local <track-id>
 sources local <track-id>
 ```
 
+The lyrics contract preserves word timing from YRC, QRC, KRC, and TTML.
+`LyricsLine.Words` contains `LyricsWord` items with absolute `StartTimeMs` and
+exclusive `EndTimeMs`, including spaces in each item's text. `TranslationLines`
+has a separate line timeline; `RomanizationLines` contains
+`LyricsRomanizationLine` items with word timing when available. Embedded translations, pronunciation, and timed
+background vocals are preserved. Netease auxiliary lyrics and KRC pronunciation
+are also imported. For line-timed romanization, original word times are reused
+only when the line timestamp is within 100 ms and the syllable counts match;
+otherwise the romanization keeps its original line timestamp and text in
+`LineStartTimeMs` and `LineText`, with `IsWordSynchronized` set to false.
+This allows songs that provide only LRC/Romalrc to refresh the romanization
+normally without inventing word timestamps. QQ Music's `contentroma` response
+is preserved through the Helper's `Romaji` field and converted with its own timing.
+
+Run the lyrics and console regression tests with:
+
+```powershell
+dotnet test tests/LemonNeo.Lyrics.Tests/LemonNeo.Lyrics.Tests.csproj
+```
+
 `enrich <track-provider> <track-id>` prints a transient enriched result. Persistent
 metadata belongs to playlist items, so use `match-playlist` when the result must
 survive a restart.
@@ -399,6 +429,6 @@ the applicable BASS/BASS.NET license.
 
 The Lyricify plugin uses the Apache-2.0-licensed
 [Lyricify Lyrics Helper](https://github.com/WXRIW/Lyricify-Lyrics-Helper). Its
-upstream source is retained under `external/Lyricify-Lyrics-Helper` as a git
-submodule; the runtime plugin references the published `Lyricify.Lyrics.Helper`
-NuGet package. See `plugins/LemonNeo.Plugin.Lyricify/THIRD-PARTY.md`.
+fork is retained under `external/Lyricify-Lyrics-Helper` as a git submodule;
+the runtime plugin builds and references this local source, including the
+QQ romanization fix. See `plugins/LemonNeo.Plugin.Lyricify/THIRD-PARTY.md`.
