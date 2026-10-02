@@ -65,6 +65,8 @@ internal static class Program
         collection.AddSingleton<ImportService>();
         collection.AddSingleton<FolderImportService>();
         collection.AddSingleton<IPlaybackQueue, PlaybackQueue>();
+        collection.AddSingleton(services => new PlaybackAudioCache(
+            appPaths.CacheDirectory, services.GetRequiredService<ILogger<PlaybackAudioCache>>()));
         collection.AddSingleton<PlaybackSourceDiscoveryService>();
         collection.AddSingleton<PlaybackResolver>();
         collection.AddSingleton<PlaybackSessionService>();

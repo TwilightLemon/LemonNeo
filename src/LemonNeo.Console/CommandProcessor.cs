@@ -55,7 +55,7 @@ internal sealed partial class CommandProcessor(
 
     public async Task RunInteractiveAsync(CancellationToken cancellationToken)
     {
-        _output.WriteLine("Type a command below. Tab completes; ↑↓ selects suggestions or history.");
+        _output.WriteLine("Type a command below. ↑↓ browses history when empty and selects suggestions while typing.");
         var editor = InteractiveLineEditor.IsSupported
             ? new InteractiveLineEditor(completions.Complete)
             : null;
@@ -394,7 +394,7 @@ internal sealed partial class CommandProcessor(
         _output.WriteLine();
         _output.WriteLine("KEYS");
         _output.WriteLine("  Tab           Complete the selected command or argument");
-        _output.WriteLine("  ↑ / ↓         Select a candidate; browse history when no candidates are open");
+        _output.WriteLine("  ↑ / ↓         Browse history when empty; select suggestions while typing");
         _output.WriteLine("  Esc           Close suggestions (Ctrl+Space reopens them)");
         _output.WriteLine("  Home / End    Move to the start or end of the input");
         _output.WriteLine("  Ctrl+U        Delete everything before the cursor");
@@ -927,7 +927,10 @@ internal sealed partial class CommandProcessor(
                      .OrderBy(item => FractionalPlaylistOrderingService.Parse(item.SortKey))
                      .ThenBy(item => item.Id))
         {
-            _output.WriteLine($"{index++} | {item.Id} | {item.Track.Title ?? item.Track.Id.RemoteId} | {item.Track.Id}");
+            var externalIdInitials = string.Concat(item.Track.ExternalIds
+                .Where(id => !string.IsNullOrEmpty(id.Namespace))
+                .Select(id => id.Namespace[0]));
+            _output.WriteLine($"{index++} | {item.Track.Title ?? item.Track.Id.RemoteId} | {item.Track.Id} | {externalIdInitials}");
         }
     }
 

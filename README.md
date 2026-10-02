@@ -36,8 +36,11 @@ The default library uses the platform's per-user application-data directory. Run
 The interactive console provides live command hints, syntax and output colors,
 history, and context-aware Tab completion. Playlist arguments open a searchable
 selection box; type `playlist` to choose and inspect a local playlist directly.
-Use the arrow keys to select a candidate, then Tab or Enter to insert it. Set the
-standard `NO_COLOR` environment variable to disable output colors.
+With an empty input, Up/Down browses command history. Once you start typing and
+candidates are available, the same keys select a candidate; Tab or Enter inserts
+it. After history browsing starts, Up/Down remains in history mode until you edit
+the recalled command. Set the standard `NO_COLOR` environment variable to
+disable output colors.
 
 ## Startup commands and local library editing
 
@@ -233,24 +236,37 @@ to reach the saved position, then seeks and resumes playback. Buffering waits ar
 cancellable and limited to 30 seconds. If restoration fails, the saved position
 is retained and `resume` can be retried without issuing `stop`.
 
-BASS also caches finite HTTP audio files while streaming them, using its native
-download callback. Cached audio lives under
-`<cache-root>/Plugins/org.lemonneo.bass/Music`, following the host's resolved
-cache directory (including `LEMONNEO_CACHE_HOME`). Run `paths` to see that root.
-Each download writes a unique `.part` file; only a download whose byte count
-matches the reported full file size is atomically published as a reusable
-audio file. Known audio extensions are retained; other URLs use `.audio`.
-Interrupted downloads are removed when the stream stops; live
-or unknown-size streams are played without publishing a completed cache.
-Cache write failures are reported and streaming playback continues.
+The host's `PlaybackAudioCache` owns finite HTTP audio caching for all players.
+Cached audio lives under `<cache-root>/Music`, following the resolved cache
+directory (including `LEMONNEO_CACHE_HOME`). Run `paths` to see that root.
+`PlaybackResolver` selects a completed cache before validating source plugins,
+discovering IDs, or requesting a playback URL. Its index uses the original
+playlist/queue track ID, requested quality, and required source provider; qualities
+and explicit source selections have separate entries. An entry survives URL
+expiration, a host restart, and changing the player. Cached playlist items can
+play offline even when their source plugin is unavailable. Cross-provider
+discovery still indexes audio by the original playlist item.
 
-Completed cache entries are decoded from local files on later plays and survive
-restarting the application. QQ Music and GDStudio provide stable cache identities
-for each song/audio variant so rotating signed URLs reuse the same cache;
-other sources use the exact URL, request headers, and track identity. Playback
-providers still resolve the source before the BASS player checks its cache.
-Different variants are cached separately. Cache files contain disposable audio
-data and can be cleared without changing playlists or playback state.
+Players implement the optional `IStreamingPlayer` capability to send original
+encoded audio chunks as `MemoryStream` values to an `IPlaybackDownloadSink` owned
+by the host. The host copies each chunk synchronously; the player can then reuse
+or dispose it. Players report the full response length with `SetExpectedLength`,
+then call `Complete` at download end or `Abort` on interruption. The length may
+arrive after chunks or completion. BASS forwards its native download callback,
+so playback and caching consume a single audio request and playback starts while
+the download is still in progress. Players need no cache files or lookup policy.
+Players without this capability continue to play without creating new cache entries.
+
+Each download writes a unique `.part` file. Only a completed download whose byte
+count matches the reported positive file size is published. Audio files use a
+SHA-256 content identity; a JSON index is atomically committed after the audio
+file, and byte length/hash are checked before reuse. Known audio extensions are
+retained; other URLs use `.audio`. Interrupted downloads are removed when playback
+stops or switches tracks. Live/unknown-size streams do not publish completed
+entries. Cache write failures are reported and streaming playback continues.
+Cache files contain disposable audio data and can be cleared without changing
+playlists or playback state. Old BASS-private cache files have no queue/request
+index and are not automatically migrated to the host cache.
 
 `PlaybackSessionService` is the application-level playback authority. It exposes
 the current track, player state, timeline progress, state/timeline events, and a
@@ -343,17 +359,30 @@ its complete `Track` snapshot (including artwork and external IDs); there is no
 separate global track catalogue or `metadata/tracks.json` file. Temporary search
 results therefore cannot make the in-memory library grow.
 
-Run the native BASS resume regression checks (requires an audio output device):
+Run the host cache regression checks (no audio output device required):
+
+```powershell
+dotnet run --project tests/LemonNeo.Playback.Tests -c Release
+```
+
+These cover playback during an incomplete download, offline cache selection
+without a source plugin, reuse by another player, quality/source isolation,
+cross-provider queue identities, early completion callbacks, corruption recovery,
+temporary-file cleanup, and cache write failures.
+
+Run the native BASS regression checks (requires an audio output device):
 
 ```powershell
 dotnet run --project tests/LemonNeo.Bass.Tests -c Release
 ```
 
 The checks use silent audio and a local HTTP fixture that stalls the download
-before the saved position. They verify the complete cached bytes, cache reuse
-after restarting and rotating URLs, temporary-file cleanup, buffered restoration,
-cancellation with retained progress, retrying `resume`, and local/paused seeking.
-They do not use the user's library or credentials.
+before the saved position. They verify that playback starts during the single
+audio request, the host saves the complete original bytes, and offline playback
+after restart bypasses URL resolution. They also cover temporary-file cleanup,
+buffered restoration, cancellation with retained progress, retrying `resume`,
+corruption recovery, cache write failures, and local/paused seeking. They do not
+use the user's library or credentials.
 
 The BASS plugin carries the BASS.NET 2.4.14.1 wrapper and platform-specific BASS
 2.4/FLAC 2.4 native binaries for Windows x86/x64, Linux x86/x64/ARM/ARM64, and

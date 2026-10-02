@@ -20,7 +20,7 @@ public sealed class BassPlayerPlugin : ILemonPlugin, IPlayerProvider
     public string Id => "bass";
     PlayerDescriptor IPlayerProvider.Descriptor { get; } = new(
         "BASS Player",
-        "Native BASS decoder and audio output for local files and direct HTTP streams with a local audio cache.");
+        "Native BASS decoder and audio output for local files and direct HTTP streams.");
     public int Priority => 100;
     public IPlayer Player => _player ?? throw new InvalidOperationException("The BASS player is not initialized.");
     public bool CanPlay(PlaybackSource source) =>
@@ -29,7 +29,7 @@ public sealed class BassPlayerPlugin : ILemonPlugin, IPlayerProvider
     public ValueTask InitializeAsync(IPluginContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        _player = new BassPlayer(context.LoggerFactory.CreateLogger<BassPlayer>(), context.CacheDirectory);
+        _player = new BassPlayer(context.LoggerFactory.CreateLogger<BassPlayer>());
         context.RegisterPlayer(this);
         return ValueTask.CompletedTask;
     }
@@ -45,7 +45,7 @@ public sealed class BassPlayerPlugin : ILemonPlugin, IPlayerProvider
     }
 }
 
-internal sealed class BassPlayer : ISeekablePlayer, IAsyncDisposable
+internal sealed class BassPlayer : ISeekablePlayer, IStreamingPlayer, IAsyncDisposable
 {
     private const int InvalidStream = 0;
     private readonly object _gate = new();
@@ -54,13 +54,11 @@ internal sealed class BassPlayer : ISeekablePlayer, IAsyncDisposable
     private int _flacPlugin;
     private bool _disposed;
     private bool _isHttpStream;
-    private readonly NetworkAudioCache _cache;
-    private BassDownloadCache? _downloadCache;
+    private BassDownloadForwarder? _downloadForwarder;
 
-    public BassPlayer(ILogger<BassPlayer> logger, string cacheDirectory)
+    public BassPlayer(ILogger<BassPlayer> logger)
     {
         _logger = logger;
-        _cache = new NetworkAudioCache(cacheDirectory, logger);
         var nativeAsset = GetNativeAsset();
         BassNet.Registration("lemon.app@qq.com", "2X52325160022");
         var initFlags = OperatingSystem.IsWindows()
@@ -113,7 +111,21 @@ internal sealed class BassPlayer : ISeekablePlayer, IAsyncDisposable
     public Task PlayAsync(
         Track track,
         PlaybackSource source,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        PlayCoreAsync(track, source, null, cancellationToken);
+
+    public Task PlayAsync(
+        Track track,
+        HttpPlaybackSource source,
+        IPlaybackDownloadSink downloadSink,
+        CancellationToken cancellationToken = default) =>
+        PlayCoreAsync(track, source, downloadSink, cancellationToken);
+
+    private Task PlayCoreAsync(
+        Track track,
+        PlaybackSource source,
+        IPlaybackDownloadSink? downloadSink,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         lock (_gate)
@@ -123,7 +135,7 @@ internal sealed class BassPlayer : ISeekablePlayer, IAsyncDisposable
             var sourceDescription = source switch
             {
                 FilePlaybackSource fileSource => CreateFileStream(fileSource),
-                HttpPlaybackSource { IsDirectAudio: true } httpSource => CreateHttpStream(track, httpSource),
+                HttpPlaybackSource { IsDirectAudio: true } httpSource => CreateHttpStream(httpSource, downloadSink),
                 _ => throw new NotSupportedException($"BASS Player does not support '{source.GetType().Name}'.")
             };
             if (_stream == InvalidStream)
@@ -161,7 +173,7 @@ internal sealed class BassPlayer : ISeekablePlayer, IAsyncDisposable
         return path;
     }
 
-    private string CreateHttpStream(Track track, HttpPlaybackSource source)
+    private string CreateHttpStream(HttpPlaybackSource source, IPlaybackDownloadSink? downloadSink)
     {
         var headers = source.Headers.Select(header =>
         {
@@ -172,19 +184,7 @@ internal sealed class BassPlayer : ISeekablePlayer, IAsyncDisposable
 
             return $"{header.Key}: {header.Value}";
         }).ToArray();
-        var cachePath = _cache.GetPath(track, source);
-        if (File.Exists(cachePath))
-        {
-            _stream = BassApi.BASS_StreamCreateFile(cachePath, 0, 0, BASSFlag.BASS_SAMPLE_FLOAT);
-            if (_stream != InvalidStream)
-            {
-                _logger.LogInformation("Playing cached audio from {Path}.", cachePath);
-                return cachePath;
-            }
-            _cache.RemoveInvalid(cachePath);
-        }
-
-        _downloadCache = _cache.Start(cachePath);
+        _downloadForwarder = downloadSink is null ? null : new BassDownloadForwarder(downloadSink);
         // Keep the callback rooted before BASS begins receiving bytes, which
         // may happen before StreamCreateURL returns. Terminate every header.
         var downloadHeaders = source.Headers.Keys.Contains("Accept-Encoding", StringComparer.OrdinalIgnoreCase)
@@ -195,17 +195,17 @@ internal sealed class BassPlayer : ISeekablePlayer, IAsyncDisposable
             sourceWithHeaders,
             0,
             BASSFlag.BASS_SAMPLE_FLOAT,
-            _downloadCache?.DownloadCallback,
+            _downloadForwarder?.DownloadCallback,
             IntPtr.Zero);
         if (_stream == InvalidStream)
         {
             var error = BassApi.BASS_ErrorGetCode();
-            _downloadCache?.Dispose();
-            _downloadCache = null;
+            _downloadForwarder?.Dispose();
+            _downloadForwarder = null;
             throw BassFailure("open the network audio stream", error);
         }
         _isHttpStream = true;
-        _downloadCache?.SetStream(_stream);
+        _downloadForwarder?.SetStream(_stream);
         return source.Uri.ToString();
     }
 
@@ -374,10 +374,10 @@ internal sealed class BassPlayer : ISeekablePlayer, IAsyncDisposable
             BassApi.BASS_StreamFree(_stream);
         }
         // StreamFree waits for native callbacks. Only release the delegate
-        // and temporary file after those callbacks have stopped.
-        GC.KeepAlive(_downloadCache);
-        _downloadCache?.Dispose();
-        _downloadCache = null;
+        // and host sink after those callbacks have stopped.
+        GC.KeepAlive(_downloadForwarder);
+        _downloadForwarder?.Dispose();
+        _downloadForwarder = null;
         _stream = InvalidStream;
         _isHttpStream = false;
     }

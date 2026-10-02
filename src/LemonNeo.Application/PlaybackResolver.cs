@@ -1,4 +1,5 @@
 using LemonNeo.Core;
+using LemonNeo.Playback;
 using LemonNeo.Plugin.Abstractions;
 
 namespace LemonNeo.Application;
@@ -7,8 +8,10 @@ public sealed class PlaybackResolver(
     IProviderRegistry registry,
     IPlaybackSourceProviderRegistry playbackSources,
     IPlayerRegistry players,
-    PlaybackSourceDiscoveryService sourceDiscovery)
+    PlaybackSourceDiscoveryService sourceDiscovery,
+    PlaybackAudioCache audioCache)
 {
+    private IPlaybackDownloadSink? _download;
     public IPlayerProvider? ActivePlayer { get; private set; }
 
     public async Task<PlaybackSource> PlayAsync(
@@ -19,6 +22,22 @@ public sealed class PlaybackResolver(
         try
         {
             var playbackRequest = request ?? new PlaybackRequest();
+            // A persisted queue snapshot is sufficient for offline playback.
+            // Check before provider validation, ID discovery, and URL resolution.
+            var cachedSource = await audioCache.TryGetAsync(track, playbackRequest, cancellationToken);
+            if (cachedSource is not null)
+            {
+                try
+                {
+                    await PlaySourceAsync(track, cachedSource, track, playbackRequest, cancellationToken);
+                    return cachedSource;
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    // A verified byte stream can still be rejected by a decoder.
+                    audioCache.Invalidate(track, playbackRequest);
+                }
+            }
             ValidateRequiredSourceProvider(playbackRequest);
             var resolvedTrack = track;
             PlaybackSource? source = null;
@@ -60,14 +79,7 @@ public sealed class PlaybackResolver(
                 resolvedTrack = candidate.Track;
             }
 
-            var player = players.GetRequiredPlayer(source);
-            if (ActivePlayer is { } active && !ReferenceEquals(active, player))
-            {
-                await active.Player.StopAsync(cancellationToken);
-            }
-
-            await player.Player.PlayAsync(resolvedTrack, source, cancellationToken);
-            ActivePlayer = player;
+            await PlaySourceAsync(resolvedTrack, source, track, playbackRequest, cancellationToken);
             return source;
         }
         catch (Exception exception) when (exception is not OperationCanceledException and not PlaybackResolutionException)
@@ -81,6 +93,46 @@ public sealed class PlaybackResolver(
 
     public Task ResumeAsync(CancellationToken cancellationToken = default) =>
         ActivePlayer?.Player.ResumeAsync(cancellationToken) ?? Task.CompletedTask;
+
+    private async Task PlaySourceAsync(
+        Track resolvedTrack,
+        PlaybackSource source,
+        Track queueTrack,
+        PlaybackRequest request,
+        CancellationToken cancellationToken)
+    {
+        var player = players.GetRequiredPlayer(source);
+        await StopAsync(cancellationToken);
+        try
+        {
+            if (source is HttpPlaybackSource { IsDirectAudio: true } http && player.Player is IStreamingPlayer streaming)
+            {
+                // The original queue ID is the lookup key even if discovery
+                // matched the track to another catalogue/provider.
+                _download = audioCache.Start(queueTrack, request, http);
+                if (_download is not null)
+                    await streaming.PlayAsync(resolvedTrack, http, _download, cancellationToken);
+                else
+                    await player.Player.PlayAsync(resolvedTrack, source, cancellationToken);
+            }
+            else
+            {
+                await player.Player.PlayAsync(resolvedTrack, source, cancellationToken);
+            }
+            ActivePlayer = player;
+        }
+        catch
+        {
+            try { await player.Player.StopAsync(CancellationToken.None); }
+            finally
+            {
+                if (_download is not null) audioCache.Invalidate(queueTrack, request);
+                _download?.Dispose();
+                _download = null;
+            }
+            throw;
+        }
+    }
 
     private void ValidateRequiredSourceProvider(PlaybackRequest request)
     {
@@ -106,12 +158,10 @@ public sealed class PlaybackResolver(
 
     public async Task StopAsync(CancellationToken cancellationToken = default)
     {
-        if (ActivePlayer is null)
-        {
-            return;
-        }
-
-        await ActivePlayer.Player.StopAsync(cancellationToken);
+        if (ActivePlayer is not null)
+            await ActivePlayer.Player.StopAsync(cancellationToken);
+        _download?.Dispose();
+        _download = null;
         ActivePlayer = null;
     }
 }

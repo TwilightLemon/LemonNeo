@@ -13,6 +13,7 @@ internal sealed class InteractiveLineEditor(
     private int _cursor;
     private int _selectedSuggestion;
     private bool _suggestionsHidden;
+    private bool _historyNavigationActive;
     private int _top;
     private int _reservedLines;
 
@@ -26,6 +27,7 @@ internal sealed class InteractiveLineEditor(
         _cursor = 0;
         _selectedSuggestion = 0;
         _suggestionsHidden = false;
+        _historyNavigationActive = false;
 
         var historyIndex = _history.Count;
         var historyDraft = string.Empty;
@@ -76,7 +78,9 @@ internal sealed class InteractiveLineEditor(
 
                 if (key.Key == ConsoleKey.UpArrow)
                 {
-                    if (completion.Suggestions.Count > 0)
+                    if (!_historyNavigationActive &&
+                        _buffer.Length > 0 &&
+                        completion.Suggestions.Count > 0)
                     {
                         _selectedSuggestion =
                             (_selectedSuggestion - 1 + completion.Suggestions.Count) %
@@ -90,7 +94,8 @@ internal sealed class InteractiveLineEditor(
                         }
 
                         historyIndex--;
-                        SetBuffer(_history[historyIndex]);
+                        SetHistoryBuffer(_history[historyIndex]);
+                        _historyNavigationActive = true;
                     }
 
                     continue;
@@ -98,14 +103,17 @@ internal sealed class InteractiveLineEditor(
 
                 if (key.Key == ConsoleKey.DownArrow)
                 {
-                    if (completion.Suggestions.Count > 0)
+                    if (!_historyNavigationActive &&
+                        _buffer.Length > 0 &&
+                        completion.Suggestions.Count > 0)
                     {
                         _selectedSuggestion = (_selectedSuggestion + 1) % completion.Suggestions.Count;
                     }
                     else if (historyIndex < _history.Count)
                     {
                         historyIndex++;
-                        SetBuffer(historyIndex == _history.Count ? historyDraft : _history[historyIndex]);
+                        SetHistoryBuffer(historyIndex == _history.Count ? historyDraft : _history[historyIndex]);
+                        _historyNavigationActive = historyIndex < _history.Count;
                     }
 
                     continue;
@@ -211,6 +219,15 @@ internal sealed class InteractiveLineEditor(
     private CommandCompletion GetCompletion()
     {
         var completion = completionSource(_buffer.ToString(), _cursor);
+        if (_historyNavigationActive)
+        {
+            return completion with
+            {
+                Suggestions = [],
+                Hint = "Browsing history · edit the command to enable suggestions"
+            };
+        }
+
         if (_suggestionsHidden)
         {
             return completion with { Suggestions = [] };
@@ -228,14 +245,16 @@ internal sealed class InteractiveLineEditor(
     {
         _selectedSuggestion = 0;
         _suggestionsHidden = false;
+        _historyNavigationActive = false;
     }
 
-    private void SetBuffer(string value)
+    private void SetHistoryBuffer(string value)
     {
         _buffer.Clear();
         _buffer.Append(value);
         _cursor = _buffer.Length;
-        Changed();
+        _selectedSuggestion = 0;
+        _suggestionsHidden = false;
     }
 
     private void ApplySuggestion(CommandCompletion completion)
@@ -414,15 +433,15 @@ internal sealed class InteractiveLineEditor(
             WriteRow(
                 row++,
                 completion.PreferSelection
-                    ? "  └─ ↑↓ choose  Tab/Enter insert  Esc close"
-                    : "  └─ ↑↓ choose  Tab complete  Esc close",
+                    ? "  └─ ↑↓ choose  Tab/Enter insert  clear input for history"
+                    : "  └─ ↑↓ choose  Tab complete  clear input for history",
                 ConsoleColor.DarkGray);
         }
     }
 
     private void WriteSuggestionRow(int relativeRow, CommandSuggestion suggestion, bool selected)
     {
-        var marker = selected ? "  │ › " : "  │   ";
+        var marker = selected ? "  │ > " : "  │   ";
         WriteRow(
             relativeRow,
             $"{marker}{suggestion.DisplayText}  {suggestion.Description}",

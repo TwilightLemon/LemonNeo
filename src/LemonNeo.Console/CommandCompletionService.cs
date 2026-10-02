@@ -177,7 +177,9 @@ internal sealed class CommandCompletionService(
     {
         if (string.IsNullOrEmpty(target.Value))
         {
-            return CommandCompletion.Empty(target.Start, "Start typing a command · Tab completes · ↑↓ selects");
+            return CommandCompletion.Empty(
+                target.Start,
+                "↑↓ history · start typing for suggestions · Tab completes");
         }
 
         var matches = Rank(
