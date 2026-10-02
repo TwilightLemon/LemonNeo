@@ -58,7 +58,7 @@ internal sealed partial class CommandProcessor(
     {
         await history.LoadAsync(cancellationToken);
         _output.WriteLine("Type a command below. ↑↓ browses history when empty and selects suggestions while typing.");
-        await using var lyricDisplay = new ConsoleLyricsDisplay(() => playback.Snapshot, lyrics, cancellationToken);
+        await using var lyricDisplay = new ConsoleLyricsDisplay(playback.GetCurrentSnapshot, lyrics, cancellationToken);
         var editor = InteractiveLineEditor.IsSupported
             ? new InteractiveLineEditor(completions.Complete, history.Entries, lyricDisplay.GetFrame)
             : null;
@@ -470,6 +470,7 @@ internal sealed partial class CommandProcessor(
         _output.WriteLine($"Data: {appPaths.DataDirectory}");
         _output.WriteLine($"Command history: {history.FilePath}");
         _output.WriteLine($"Cache: {appPaths.CacheDirectory}");
+        _output.WriteLine($"Lyrics cache: {Path.Combine(appPaths.CacheDirectory, "Lyrics")}");
         _output.WriteLine($"Music library: {options.LibraryDirectory}");
         _output.WriteLine($"Plugins: {options.PluginDirectory}");
         _output.WriteLine($"Startup commands: {startup.FilePath}");
@@ -1133,7 +1134,7 @@ internal sealed partial class CommandProcessor(
 
     private void PrintNowPlaying()
     {
-        var snapshot = playback.Snapshot;
+        var snapshot = playback.GetCurrentSnapshot();
         _output.WriteLine($"State: {snapshot.State}");
         if (snapshot.RestoredStatus is { } restoredStatus)
         {

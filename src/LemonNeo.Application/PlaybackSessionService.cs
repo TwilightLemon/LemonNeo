@@ -56,6 +56,8 @@ public sealed class PlaybackSessionService(
         null,
         null);
     private Task? _monitorTask;
+    private IPlayer? _snapshotPlayer;
+    private MusicItemId? _snapshotPlayerTrackId;
     private bool _completionHandled;
     private bool _initialized;
     private bool _disposed;
@@ -79,6 +81,46 @@ public sealed class PlaybackSessionService(
                 return _snapshot;
             }
         }
+    }
+
+    /// <summary>
+    /// Reads the player's current position for synchronized displays. The cached
+    /// Snapshot and monitor events remain suitable for session state notifications.
+    /// </summary>
+    public PlaybackSessionSnapshot GetCurrentSnapshot()
+    {
+        PlaybackSessionSnapshot snapshot;
+        IPlayer? player;
+        MusicItemId? playerTrackId;
+        lock (_snapshotGate)
+        {
+            snapshot = _snapshot;
+            player = _snapshotPlayer;
+            playerTrackId = _snapshotPlayerTrackId;
+        }
+        if (player is null) return snapshot;
+
+        // Do not wait for the monitor or its persistence/network operations, and
+        // do not extrapolate a wall clock: audio may be paused, stalled, or sought.
+        var before = player.CurrentTrack?.Id;
+        var state = player.State;
+        var timeline = player.Timeline;
+        var after = player.CurrentTrack?.Id;
+        lock (_snapshotGate)
+        {
+            if (!ReferenceEquals(snapshot, _snapshot)) return _snapshot;
+        }
+
+        // A provider can reuse its player while advancing to a different source
+        // track. Never combine that track's position with the previous lyrics.
+        if (before != playerTrackId || after != playerTrackId)
+            return snapshot with { State = PlayerState.Stopped };
+
+        return snapshot with
+        {
+            State = state,
+            Timeline = new PlaybackTimelineInfo(timeline.Position, timeline.Duration ?? snapshot.Timeline.Duration)
+        };
     }
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
@@ -556,6 +598,8 @@ public sealed class PlaybackSessionService(
         lock (_snapshotGate)
         {
             _snapshot = snapshot;
+            _snapshotPlayer = resolver.ActivePlayer?.Player;
+            _snapshotPlayerTrackId = _snapshotPlayer?.CurrentTrack?.Id;
         }
     }
 

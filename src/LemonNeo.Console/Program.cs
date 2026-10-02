@@ -63,6 +63,8 @@ internal static class Program
         collection.AddSingleton<SearchService>();
         collection.AddSingleton<TrackLookupService>();
         collection.AddSingleton<MetadataService>();
+        collection.AddSingleton(services => new LyricsCache(
+            appPaths.CacheDirectory, services.GetRequiredService<ILogger<LyricsCache>>()));
         collection.AddSingleton<LyricsService>();
         collection.AddSingleton<ImportService>();
         collection.AddSingleton<FolderImportService>();

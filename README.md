@@ -299,12 +299,30 @@ Cache files contain disposable audio data and can be cleared without changing
 playlists or playback state. Old BASS-private cache files have no queue/request
 index and are not automatically migrated to the host cache.
 
+The host's `LyricsCache` stores complete lyrics under `<cache-root>/Lyrics`,
+following the same resolved cache directory and `LEMONNEO_CACHE_HOME` override.
+`paths` shows the lyrics cache directory. `LyricsService` checks this cache before
+accessing providers, so saved lyrics remain available offline and after a restart,
+even if the original lyrics plugin is unavailable. JSON entries retain main lyrics,
+word timestamps, translations, romanization, background lines, and source metadata.
+Entries use the original track ID regardless of playback quality or audio source.
+Writes use unique temporary files and an atomic replacement. Missing, invalid, or
+incompatible entries fall back to providers; failures and empty lyrics are not
+cached, and cache write failures do not prevent displaying the fetched lyrics.
+Delete the cached entry to fetch updated lyrics on the next request.
+
 `PlaybackSessionService` is the application-level playback authority. It exposes
 the current track, player state, timeline progress, state/timeline events, and a
 natural-completion event. Because BASS does not provide a completion callback to
 the application contract, this service polls its read-only timeline and advances
 the queue when the channel ends. The same event surface is intended for a future
 SMTC integration plugin.
+
+Synchronized displays use `PlaybackSessionService.GetCurrentSnapshot()` to read
+the player's current audio position on each refresh. Lyrics and the `now` command
+use this live position instead of waiting for cached monitor snapshots or state
+persistence. Pauses, buffering, and seeking follow the decoder's clock directly;
+switching audio sources never applies the new track's position to old lyrics.
 
 Match an imported track to one or more online catalogues, persist reliable
 metadata, retrieve lyrics, and inspect all currently playable sources:

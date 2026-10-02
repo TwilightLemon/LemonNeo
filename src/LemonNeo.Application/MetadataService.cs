@@ -99,12 +99,15 @@ public sealed record LyricsLookupResult(
     string? ProviderId,
     IReadOnlyDictionary<string, string> ProviderErrors);
 
-public sealed class LyricsService(IProviderRegistry registry)
+public sealed class LyricsService(IProviderRegistry registry, LyricsCache? cache = null)
 {
     public async Task<LyricsLookupResult> GetLyricsAsync(
         Track track,
         CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (cache is not null && await cache.TryGetAsync(track, cancellationToken) is { } cached) return cached;
+
         var errors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var providers = registry.Providers
             .Where(provider => provider is ILyricsProvider)
@@ -119,6 +122,7 @@ public sealed class LyricsService(IProviderRegistry registry)
                 var lyrics = await ((ILyricsProvider)provider).GetLyricsAsync(track, cancellationToken);
                 if (lyrics is not null)
                 {
+                    if (cache is not null) await cache.StoreAsync(track, lyrics, provider.Id, cancellationToken);
                     return new LyricsLookupResult(lyrics, provider.Id, errors);
                 }
             }
