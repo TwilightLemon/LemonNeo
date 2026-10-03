@@ -74,6 +74,7 @@ internal static class Program
         collection.AddSingleton<PlaybackSourceDiscoveryService>();
         collection.AddSingleton<PlaybackResolver>();
         collection.AddSingleton<PlaybackSessionService>();
+        collection.AddSingleton<IPlaybackInteraction, PlaybackInteractionService>();
         collection.AddSingleton<ILibraryMergeService, LibraryMergeService>();
         collection.AddSingleton<IGitBackend, MockGitBackend>();
         collection.AddSingleton<ILibrarySyncProvider, MockGitSyncProvider>();
@@ -86,13 +87,15 @@ internal static class Program
         var output = global::System.Console.Out;
         try
         {
+            // Restore playback before Interactive plugins subscribe. The shared
+            // session also stays alive until the loader has shut its plugins down.
+            var playbackSession = services.GetRequiredService<PlaybackSessionService>();
+            await playbackSession.InitializeAsync(cancellation.Token);
             var loader = services.GetRequiredService<PluginLoader>();
             await loader.LoadFromDirectoryAsync(options.PluginDirectory, cancellation.Token);
 
             var library = services.GetRequiredService<LibraryService>();
             await library.LoadAsync(cancellation.Token);
-            var playbackSession = services.GetRequiredService<PlaybackSessionService>();
-            await playbackSession.InitializeAsync(cancellation.Token);
             var commands = services.GetRequiredService<CommandProcessor>();
             if (await commands.RunStartupAsync(cancellation.Token))
             {

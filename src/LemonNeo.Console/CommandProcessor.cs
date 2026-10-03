@@ -413,6 +413,8 @@ internal sealed partial class CommandProcessor(
             _output.WriteLine();
             _output.WriteLine($"[Plugin] {manifest.Id} | {manifest.Name} {manifest.Version}");
             _output.WriteLine($"  Entry assembly: {manifest.EntryAssembly}");
+            if (plugin.IsInteractive) _output.WriteLine("  Type: Interactive");
+            if (manifest.Platforms.Count > 0) _output.WriteLine($"  Platforms: {string.Join(", ", manifest.Platforms)}");
             _output.WriteLine($"  Minimum host version: {manifest.MinimumHostVersion}");
             _output.WriteLine($"  Permissions: {string.Join(", ", manifest.Permissions)}");
             foreach (var provider in plugin.Providers)
@@ -1147,7 +1149,8 @@ internal sealed partial class CommandProcessor(
             return;
         }
 
-        _output.WriteLine($"Track: {track.Title ?? track.Id.RemoteId} ({track.Id})");
+        _output.WriteLine($"Track: {track.Title} - {string.Join(", ", track.Artists.Select(a => a.Name))} ({track.Id})");
+        _output.WriteLine($"Album: {track.Album?.Title}");
         _output.WriteLine($"External IDs: {track.ExternalIds.Count}");
         foreach (var id in track.ExternalIds)
         {

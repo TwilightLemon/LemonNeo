@@ -1,0 +1,9 @@
+{
+  "id": "macos-now-playing",
+  "name": "macOS Now Playing",
+  "version": "0.1.0",
+  "entryAssembly": "LemonNeo.Plugin.MacNowPlaying.dll",
+  "minimumHostVersion": "0.1.0",
+  "platforms": ["macos"],
+  "permissions": ["playback.read", "playback.control", "system.media"]
+}

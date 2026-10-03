@@ -34,6 +34,7 @@ public sealed class LoadedPlugin : IAsyncDisposable
     public ILemonPlugin Instance { get; }
     public IReadOnlyList<IMusicProvider> Providers { get; }
     public IReadOnlyList<IPlayerProvider> Players { get; }
+    public bool IsInteractive => Instance is IInteractivePlugin;
 
     public async ValueTask DisposeAsync()
     {
@@ -62,7 +63,8 @@ public sealed class PluginLoader(
     ILoggerFactory loggerFactory,
     IHttpClientFactory httpClientFactory,
     IPluginDataStoreFactory dataStoreFactory,
-    ILogger<PluginLoader> logger) : IAsyncDisposable
+    ILogger<PluginLoader> logger,
+    IPlaybackInteraction? playback = null) : IAsyncDisposable
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -95,7 +97,7 @@ public sealed class PluginLoader(
             try
             {
                 var plugin = await LoadOneAsync(manifestPath, cancellationToken);
-                _loaded.Add(plugin);
+                if (plugin is not null) _loaded.Add(plugin);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -107,7 +109,7 @@ public sealed class PluginLoader(
         return LastReport = new PluginLoadReport(_loaded.ToArray(), failures);
     }
 
-    private async Task<LoadedPlugin> LoadOneAsync(
+    private async Task<LoadedPlugin?> LoadOneAsync(
         string manifestPath,
         CancellationToken cancellationToken)
     {
@@ -118,6 +120,11 @@ public sealed class PluginLoader(
             cancellationToken) ?? throw new PluginLoadException($"Invalid manifest: {manifestPath}");
 
         ValidateManifest(manifest, manifestPath);
+        if (manifest.Platforms.Count > 0 && !manifest.Platforms.Any(IsCurrentPlatform))
+        {
+            logger.LogInformation("Skipping plugin {PluginId}: unsupported operating system.", manifest.Id);
+            return null;
+        }
         var directory = Path.GetDirectoryName(Path.GetFullPath(manifestPath))!;
         var assemblyPath = Path.GetFullPath(Path.Combine(directory, manifest.EntryAssembly));
         if (!assemblyPath.StartsWith(directory + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
@@ -156,7 +163,8 @@ public sealed class PluginLoader(
                 playerRegistry,
                 dataStoreFactory.CreateStorage(manifest.Id),
                 dataStoreFactory.CreateCredentialVault(manifest.Id),
-                dataStoreFactory.GetCacheDirectory(manifest.Id));
+                dataStoreFactory.GetCacheDirectory(manifest.Id),
+                playback);
             try
             {
                 await instance.InitializeAsync(context, cancellationToken);
@@ -210,6 +218,9 @@ public sealed class PluginLoader(
             throw new PluginLoadException($"Plugin version '{manifest.Version}' is invalid.");
         }
 
+        if (manifest.Platforms.Any(platform => platform is not ("windows" or "macos" or "linux")))
+            throw new PluginLoadException($"Plugin '{manifest.Id}' has an invalid platform; use windows, macos, or linux.");
+
         if (!Version.TryParse(manifest.MinimumHostVersion, out var minimumHostVersion) ||
             minimumHostVersion > new Version(0, 1, 0))
         {
@@ -218,11 +229,23 @@ public sealed class PluginLoader(
         }
     }
 
+    private static bool IsCurrentPlatform(string platform) => platform switch
+    {
+        "windows" => OperatingSystem.IsWindows(),
+        "macos" => OperatingSystem.IsMacOS(),
+        "linux" => OperatingSystem.IsLinux(),
+        _ => false
+    };
+
     public async ValueTask DisposeAsync()
     {
         for (var index = _loaded.Count - 1; index >= 0; index--)
         {
-            await _loaded[index].DisposeAsync();
+            try { await _loaded[index].DisposeAsync(); }
+            catch (Exception exception)
+            {
+                logger.LogWarning(exception, "Plugin {PluginId} failed during shutdown.", _loaded[index].Manifest.Id);
+            }
         }
 
         _loaded.Clear();

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../src/LemonNeo.Plugin.Abstractions/LemonNeo.Plugin.Abstractions.csproj" />
+    <None Update="plugin.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="BuildNativeMediaControls" BeforeTargets="Build" Condition="$([MSBuild]::IsOSPlatform('OSX'))"
+          Inputs="$(MSBuildProjectDirectory)/native/MediaControls.m;$(MSBuildProjectDirectory)/native/Info.plist"
+          Outputs="$(TargetDir)LemonNeo.MediaControls.app/Contents/MacOS/LemonNeo.MediaControls;$(TargetDir)LemonNeo.MediaControls.app/Contents/Info.plist">
+    <MakeDir Directories="$(TargetDir)LemonNeo.MediaControls.app/Contents/MacOS" />
+    <Exec Command="xcrun clang -fobjc-arc -fblocks -mmacosx-version-min=10.15 -framework AppKit -framework MediaPlayer &quot;$(MSBuildProjectDirectory)/native/MediaControls.m&quot; -o &quot;$(TargetDir)LemonNeo.MediaControls.app/Contents/MacOS/LemonNeo.MediaControls&quot;" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)/native/Info.plist" DestinationFolder="$(TargetDir)LemonNeo.MediaControls.app/Contents" />
+  </Target>
+  <Target Name="PublishNativeMediaControls" AfterTargets="Publish" Condition="$([MSBuild]::IsOSPlatform('OSX'))" DependsOnTargets="BuildNativeMediaControls">
+    <ItemGroup>
+      <NativePublishAssets Include="$(TargetDir)LemonNeo.MediaControls.app/**/*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(NativePublishAssets)" DestinationFiles="@(NativePublishAssets->'$(PublishDir)LemonNeo.MediaControls.app/%(RecursiveDir)%(Filename)%(Extension)')" />
+  </Target>
+  <Target Name="DeployToPrototypeHost" AfterTargets="Build" Condition="$([MSBuild]::IsOSPlatform('OSX'))" DependsOnTargets="BuildNativeMediaControls">
+    <PropertyGroup>
+      <PrototypePluginDirectory>$(MSBuildProjectDirectory)/../../src/LemonNeo.Console/bin/$(Configuration)/net10.0/plugins/LemonNeo.Plugin.MacNowPlaying/</PrototypePluginDirectory>
+    </PropertyGroup>
+    <ItemGroup>
+      <NativeAssets Include="$(TargetDir)LemonNeo.MediaControls.app/**/*" />
+    </ItemGroup>
+    <MakeDir Directories="$(PrototypePluginDirectory)" />
+    <Copy SourceFiles="$(TargetPath);$(TargetDir)plugin.json" DestinationFolder="$(PrototypePluginDirectory)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(NativeAssets)" DestinationFiles="@(NativeAssets->'$(PrototypePluginDirectory)LemonNeo.MediaControls.app/%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

@@ -10,6 +10,7 @@ public sealed record PluginManifest
     public required string EntryAssembly { get; init; }
     public required string MinimumHostVersion { get; init; }
     public IReadOnlyList<string> Permissions { get; init; } = [];
+    public IReadOnlyList<string> Platforms { get; init; } = [];
 }
 
 public sealed record PluginLoadFailure(string ManifestPath, string Error);

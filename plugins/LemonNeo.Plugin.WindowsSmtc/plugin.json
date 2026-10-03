@@ -1,0 +1,9 @@
+{
+  "id": "windows-smtc",
+  "name": "Windows System Media Transport Controls",
+  "version": "0.1.0",
+  "entryAssembly": "LemonNeo.Plugin.WindowsSmtc.dll",
+  "minimumHostVersion": "0.1.0",
+  "platforms": ["windows"],
+  "permissions": ["playback.read", "playback.control", "system.media"]
+}

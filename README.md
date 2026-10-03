@@ -25,9 +25,11 @@ The build deploys the default plugins beside the console under `plugins/`:
   imports the user's online playlists.
 - `LemonNeo.Plugin.QqMusic` derives `g_tk` from an authenticated QQ Music cookie,
   imports the user's collections, and resolves QQ Music vkey playback URLs.
+- On Windows, `LemonNeo.Plugin.WindowsSmtc` exposes playback to system media controls.
+- On macOS, `LemonNeo.Plugin.MacNowPlaying` exposes playback to Now Playing and media keys.
 
-The console discovers all seven dynamically and has no runtime assembly reference
-to the music/player plugin implementations.
+The console discovers plugins dynamically and has no runtime assembly reference
+to the music, player, or Interactive plugin implementations.
 
 The default library uses the platform's per-user application-data directory. Run
 `paths` to inspect every resolved location. Use `--plugins <path>` or
@@ -315,8 +317,81 @@ Delete the cached entry to fetch updated lyrics on the next request.
 the current track, player state, timeline progress, state/timeline events, and a
 natural-completion event. Because BASS does not provide a completion callback to
 the application contract, this service polls its read-only timeline and advances
-the queue when the channel ends. The same event surface is intended for a future
-SMTC integration plugin.
+the queue when the channel ends. `PlaybackInteractionService` adapts this session
+to the shared Interactive plugin contract.
+
+## Interactive plugins and system media controls
+
+Interactive plugins implement `IInteractivePlugin` (an `ILemonPlugin` capability)
+and use `IPluginContext.Playback`, without referencing the application or a player
+implementation. `plugins` identifies them as `Type: Interactive`. The shared
+`IPlaybackInteraction` contract provides:
+
+- `Snapshot`: the original queue track's title, artists, album and `ArtworkUri`,
+  actual playback state, current position, optional duration, and available controls.
+- `Changed`: state, track and timeline notifications from the host. Subscribe,
+  then read `Snapshot` when initializing; callbacks run on background threads.
+- `ExecuteAsync`: play, pause, toggle, stop, next, previous, and seek. Commands use
+  the host session, its queue, source selection, and persistence. Play resumes a
+  paused/restored selection or starts the selected stopped track; seeking is
+  advertised only for an active seekable player, and clamps to the known duration.
+
+`InteractivePluginBase` supplies subscription cleanup, a bounded command queue,
+coalesced state updates, cancellation, and logging of asynchronous failures. A
+plugin implements `InitializeCoreAsync`, `UpdateAsync`, and `ShutdownCoreAsync`;
+native callbacks call `RequestCommand` and return promptly. Implementations using
+the interface directly must unsubscribe and release their native resources in
+`ShutdownAsync`, including when initialization fails.
+
+The Windows plugin uses a dedicated WinRT `MediaPlayer` solely to own the SMTC
+session; the selected LemonNeo player continues to supply audio. It publishes
+metadata, local/HTTP artwork, playback state and timeline, and handles media
+buttons and position requests. See Microsoft's
+[manual SMTC integration documentation](https://learn.microsoft.com/en-us/windows/apps/develop/media-playback/system-media-transport-controls).
+
+The macOS plugin uses Apple's
+[Now Playing and remote command APIs](https://developer.apple.com/documentation/mediaplayer/becoming-a-now-playable-app).
+Its bundled AppKit helper owns a main run loop and exchanges JSON over redirected
+standard streams with the managed plugin. This lets the console and audio player
+run normally. Artwork loads asynchronously; obsolete requests cannot replace the
+current cover. Closing the plugin's input clears Now Playing, unregisters commands,
+and exits the helper. Build this plugin on macOS with Xcode Command Line Tools
+installed (`xcode-select --install`); no .NET macOS workload is required. The native
+helper builds for the build machine's architecture, so build separately for Intel
+and Apple Silicon distributions.
+
+The macOS implementation is provisional and has not been built or exercised on
+macOS. Further development will continue on a Mac. The next step is to evaluate
+an in-process native dynamic library with a C ABI and C# P/Invoke, using either
+Swift exports or the existing Objective-C implementation. That version must
+service the host's native main thread/run loop and keep managed command callbacks
+alive until native command targets are removed. The current checkpoint retains
+the separate AppKit process and JSON pipes.
+
+Both plugins are deployed automatically when building the console on their
+platform. Their manifests declare `platforms` (`windows`, `macos`, or `linux`);
+the loader skips other platforms before resolving assemblies. Older manifests
+without this field retain their existing behavior. Permission strings remain
+descriptive declarations, matching the existing plugin permission model.
+Restoring a saved playing selection does not automatically play audio or report
+it as playing to the operating system. Clearing the queue removes the system's
+metadata and disables its controls. Plugin failures are logged without stopping
+audio playback, and all plugins are given a shutdown attempt.
+
+Run the Interactive regression checks without an audio output device:
+
+```powershell
+dotnet run --project tests/LemonNeo.Interactive.Tests -c Release
+```
+
+They cover metadata identity, commands, seeking, persistence, restoration, queue
+boundaries, natural completion, failure isolation, shutdown, and platform filtering.
+On Windows, in a desktop session, they also query real SMTC metadata, artwork and
+timeline, and send native play/pause/stop/next/previous/seek requests. On macOS,
+additionally run the console, play a local track, and verify
+Now Playing metadata/artwork, timeline, media buttons, seeking, track changes,
+queue clearing, and helper exit. The macOS native helper must be validated on macOS;
+compiling the managed project on another platform does not validate AppKit APIs.
 
 Synchronized displays use `PlaybackSessionService.GetCurrentSnapshot()` to read
 the player's current audio position on each refresh. Lyrics and the `now` command

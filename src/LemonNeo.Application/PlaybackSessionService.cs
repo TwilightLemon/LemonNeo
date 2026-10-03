@@ -315,6 +315,35 @@ public sealed class PlaybackSessionService(
         await ChangePlayerStateAsync(resolver.StopAsync, cancellationToken, discardRestoredState: true);
     }
 
+    public bool CanSeek => resolver.ActivePlayer?.Player is ISeekablePlayer;
+
+    public async Task SeekAsync(TimeSpan position, CancellationToken cancellationToken = default)
+    {
+        if (position < TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(position));
+        await _gate.WaitAsync(cancellationToken);
+        PlaybackSessionSnapshot snapshot;
+        try
+        {
+            EnsureReady();
+            if (resolver.ActivePlayer?.Player is not ISeekablePlayer player)
+                throw new NotSupportedException("The active player does not support seeking.");
+            var duration = player.Timeline.Duration ?? queue.CurrentItem?.Track.Duration;
+            if (duration is { } end && position > end) position = end;
+            await player.SeekAsync(position, cancellationToken);
+            _completionHandled = false;
+            await SaveSessionStateAsync(cancellationToken);
+            snapshot = CaptureSnapshot();
+            SetSnapshot(snapshot);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+
+        Raise(StateChanged, new PlaybackSessionChangedEventArgs(snapshot));
+        Raise(TimelineChanged, new PlaybackSessionChangedEventArgs(snapshot));
+    }
+
     public async Task SetModeAsync(
         PlaybackMode mode,
         CancellationToken cancellationToken = default)

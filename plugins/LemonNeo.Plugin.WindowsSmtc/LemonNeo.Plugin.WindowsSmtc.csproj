@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/LemonNeo.Plugin.Abstractions/LemonNeo.Plugin.Abstractions.csproj" />
+    <None Update="plugin.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="DeployToPrototypeHost" AfterTargets="Build" Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <PropertyGroup>
+      <PrototypePluginDirectory>$(MSBuildProjectDirectory)/../../src/LemonNeo.Console/bin/$(Configuration)/net10.0/plugins/LemonNeo.Plugin.WindowsSmtc/</PrototypePluginDirectory>
+    </PropertyGroup>
+    <ItemGroup>
+      <SmtcAssets Include="$(TargetDir)*.dll;$(TargetDir)*.json" />
+    </ItemGroup>
+    <MakeDir Directories="$(PrototypePluginDirectory)" />
+    <Copy SourceFiles="@(SmtcAssets)" DestinationFolder="$(PrototypePluginDirectory)" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

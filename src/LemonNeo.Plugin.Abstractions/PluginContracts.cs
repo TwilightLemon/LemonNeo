@@ -57,6 +57,8 @@ public interface IPluginContext
     /// must not be used for settings, credentials, or other durable user data.
     /// </summary>
     string CacheDirectory { get; }
+    /// <summary>Access to the host session for Interactive plugins.</summary>
+    IPlaybackInteraction Playback => throw new NotSupportedException("This host does not expose playback interaction.");
     void RegisterProvider(IMusicProvider provider);
     void RegisterPlayer(IPlayerProvider player);
 }
