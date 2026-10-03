@@ -1,7 +1,6 @@
 using LemonNeo.Application;
 using LemonNeo.Core;
 using LemonNeo.Plugin.Abstractions;
-using System.Text.RegularExpressions;
 
 namespace LemonNeo.ConsoleApp;
 
@@ -47,9 +46,6 @@ internal sealed class ConsoleLyricsDisplay(
     LyricsService lyrics,
     CancellationToken cancellationToken) : IAsyncDisposable
 {
-    private static readonly Regex RawTimedLyrics = new(
-        @"^\s*(?:\[-?\d+(?:[:,.]\d+)+\]|\[(?:ar|ti|al|by|offset):|<\?xml\b|<tt\b)",
-        RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     private readonly List<Task<LyricsLookupResult>> _loads = [];
     private MusicItemId? _trackId;
     private CancellationTokenSource? _loadCancellation;
@@ -101,60 +97,11 @@ internal sealed class ConsoleLyricsDisplay(
 
     internal static LyricsFrame CreateFrame(Lyrics value, double positionMs)
     {
-        var mainLine = SelectLine(value.Lines, line => line.EffectiveStartTimeMs, line => line.EffectiveEndTimeMs, positionMs);
-        var main = mainLine is null
-            ? value.Lines is { Count: > 0 } ? LyricsRow.Empty : TextRow(FirstTextLine(value.Text))
-            : CreateRow(mainLine, positionMs);
-
-        var romanizedLine = SelectLine(value.RomanizationLines, line => line.StartTimeMs, line => line.EndTimeMs, positionMs);
-        var romanization = romanizedLine is not null
-            ? romanizedLine.IsWordSynchronized ? WordRow(romanizedLine.Words, positionMs)
-                : new LyricsRow([new LyricsSegment(romanizedLine.Text, positionMs >= romanizedLine.StartTimeMs)])
-            : value.RomanizationLines is { Count: > 0 } ? null : TextRow(mainLine?.Romanization
-                ?? (mainLine is not null || value.Lines is not { Count: > 0 } ? FirstPlainAuxiliaryLine(value.Romanization) : null));
-
-        var translationLine = SelectLine(value.TranslationLines, line => line.EffectiveStartTimeMs, line => line.EffectiveEndTimeMs, positionMs);
-        var translation = translationLine is not null
-            ? CreateRow(translationLine, positionMs, highlightLine: false)
-            : value.TranslationLines is { Count: > 0 } ? null : TextRow(
-                mainLine?.Translations?.GetValueOrDefault("zh") ?? mainLine?.Translations?.Values.FirstOrDefault()
-                ?? (mainLine is not null || value.Lines is not { Count: > 0 } ? FirstPlainAuxiliaryLine(value.Translation) : null));
-
-        return new LyricsFrame(main,
-            string.IsNullOrWhiteSpace(romanization?.Text) ? null : romanization,
-            string.IsNullOrWhiteSpace(translation?.Text) ? null : translation);
+        var frame = LyricsTimeline.CreateFrame(value, positionMs);
+        static LyricsRow Row(LyricsDisplayRow row) => new(row.Segments.Select(s => new LyricsSegment(s.Text, s.Reached)).ToArray());
+        return new LyricsFrame(Row(frame.Main), frame.Romanization is { } romanization ? Row(romanization) : null,
+            frame.Translation is { } translation ? Row(translation) : null);
     }
-
-    private static T? SelectLine<T>(
-        IReadOnlyList<T>? lines,
-        Func<T, int?> startTime,
-        Func<T, int?> endTime,
-        double positionMs) where T : class
-    {
-        var timed = lines?.Where(line => startTime(line) is not null).OrderBy(startTime).ToArray();
-        if (timed is not { Length: > 0 }) return lines?.FirstOrDefault();
-        var line = timed.LastOrDefault(item => startTime(item) <= positionMs) ?? timed[0];
-        return endTime(line) is { } end && positionMs >= end ? null : line;
-    }
-
-    private static LyricsRow CreateRow(LyricsLine line, double positionMs, bool highlightLine = true) =>
-        line.Words is { Count: > 0 } words
-            ? WordRow(words, positionMs)
-            : new LyricsRow([new LyricsSegment(line.Text, highlightLine && positionMs >= line.EffectiveStartTimeMs)]);
-
-    private static LyricsRow WordRow(IReadOnlyList<LyricsWord> words, double positionMs) =>
-        new(words.Select(word => new LyricsSegment(word.Text, positionMs >= word.StartTimeMs)).ToArray());
-
-    private static LyricsRow TextRow(string? text) =>
-        string.IsNullOrWhiteSpace(text) ? LyricsRow.Empty : new([new LyricsSegment(text, false)]);
-
-    private static string? FirstTextLine(string? text) =>
-        text?.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
-
-    // Encoded lyrics must use the parsed timeline. Showing their first raw line
-    // here would freeze the display and expose timestamp/metadata tags.
-    private static string? FirstPlainAuxiliaryLine(string? text) =>
-        text is null || RawTimedLyrics.IsMatch(text) ? null : FirstTextLine(text);
 
     public async ValueTask DisposeAsync()
     {

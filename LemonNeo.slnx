@@ -3,6 +3,7 @@
     <Project Path="external/Lyricify-Lyrics-Helper/Lyricify.Lyrics.Helper/Lyricify.Lyrics.Helper.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/LemonNeo.Desktop.Tests/LemonNeo.Desktop.Tests.csproj" />
     <Project Path="tests/LemonNeo.Interactive.Tests/LemonNeo.Interactive.Tests.csproj" />
   </Folder>
   <Folder Name="/src/">
@@ -10,6 +11,7 @@
     <Project Path="src/LemonNeo.Configuration/LemonNeo.Configuration.csproj" />
     <Project Path="src/LemonNeo.Console/LemonNeo.Console.csproj" />
     <Project Path="src/LemonNeo.Core/LemonNeo.Core.csproj" />
+    <Project Path="src/LemonNeo.Desktop/LemonNeo.Desktop.csproj" />
     <Project Path="src/LemonNeo.Persistence/LemonNeo.Persistence.csproj" />
     <Project Path="src/LemonNeo.Playback/LemonNeo.Playback.csproj" />
     <Project Path="src/LemonNeo.Plugin.Abstractions/LemonNeo.Plugin.Abstractions.csproj" />

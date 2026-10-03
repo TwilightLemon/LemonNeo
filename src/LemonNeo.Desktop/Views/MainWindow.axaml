@@ -1,0 +1,126 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LemonNeo.Desktop.ViewModels" xmlns:core="using:LemonNeo.Core"
+        xmlns:views="using:LemonNeo.Desktop.Views" xmlns:controls="using:LemonNeo.Desktop.Controls"
+        xmlns:i18n="using:LemonNeo.Desktop.Infrastructure"
+        x:Class="LemonNeo.Desktop.Views.MainWindow" x:DataType="vm:MainViewModel"
+        Title="Lemon Neo" Width="1180" Height="790" MinWidth="880" MinHeight="620"
+        WindowStartupLocation="CenterScreen">
+  <Grid RowDefinitions="*,112" ColumnDefinitions="230,1,*">
+    <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource Brush.Sidebar}" Padding="16,20,16,12">
+      <Grid RowDefinitions="Auto,Auto,*,Auto">
+        <StackPanel Margin="12,0,0,16" Spacing="7">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <Border Background="{DynamicResource Brush.Accent}" CornerRadius="12" Width="34" Height="34">
+              <Path Classes="icon" Data="{StaticResource Icon.Music}" Fill="{DynamicResource Brush.OnAccent}" />
+            </Border>
+            <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.AppName}}" FontSize="23" FontWeight="SemiBold" VerticalAlignment="Center" />
+          </StackPanel>
+          <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.Tagline}}" TextWrapping="Wrap" />
+        </StackPanel>
+        <StackPanel Grid.Row="1" Spacing="4" Margin="0,0,0,12">
+          <Button Classes="nav" Classes.active="{Binding IsLibrary}" Command="{Binding NavigateCommand}" CommandParameter="Library">
+            <StackPanel Orientation="Horizontal" Spacing="12"><Path Classes="icon" Data="{StaticResource Icon.Library}" /><TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Library}}" /></StackPanel>
+          </Button>
+          <Button Classes="nav" Classes.active="{Binding IsSearch}" Command="{Binding NavigateCommand}" CommandParameter="Search">
+            <StackPanel Orientation="Horizontal" Spacing="12"><Path Classes="icon" Data="{StaticResource Icon.Library}" /><TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Search}}" /></StackPanel>
+          </Button>
+          <Button Classes="nav" Classes.active="{Binding IsOnline}" Command="{Binding NavigateCommand}" CommandParameter="Online">
+            <StackPanel Orientation="Horizontal" Spacing="12"><Path Classes="icon" Data="{StaticResource Icon.Folder}" /><TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Online}}" /></StackPanel>
+          </Button>
+          <Button Classes="nav" Classes.active="{Binding IsQueue}" Command="{Binding NavigateCommand}" CommandParameter="Queue">
+            <StackPanel Orientation="Horizontal" Spacing="12"><Path Classes="icon" Data="{StaticResource Icon.Queue}" /><TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Queue}}" /></StackPanel>
+          </Button>
+          <Button Classes="nav" Classes.active="{Binding IsLyrics}" Command="{Binding NavigateCommand}" CommandParameter="Lyrics">
+            <StackPanel Orientation="Horizontal" Spacing="12"><Path Classes="icon" Data="{StaticResource Icon.Lyrics}" /><TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Lyrics}}" /></StackPanel>
+          </Button>
+        </StackPanel>
+        <Grid Grid.Row="2" RowDefinitions="Auto,*">
+          <Grid ColumnDefinitions="*,Auto" Margin="16,0,8,4">
+            <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.Playlists}}" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Classes="ghost icon" Click="OnCreatePlaylist" IsEnabled="{Binding CanInteract}"
+                    ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.CreatePlaylist}}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.CreatePlaylist}}">
+              <Path Classes="icon" Data="{StaticResource Icon.Add}" />
+            </Button>
+          </Grid>
+          <ListBox Grid.Row="1" ItemsSource="{Binding Playlists}" SelectedItem="{Binding SelectedPlaylist}" IsEnabled="{Binding CanInteract}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="core:Playlist"><Grid ColumnDefinitions="*,Auto"><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" /><TextBlock Grid.Column="1" Classes="caption" Text="{Binding Items.Count}" Margin="8,0,0,0" VerticalAlignment="Center" /></Grid></DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Grid>
+        <StackPanel Grid.Row="3" Spacing="4" Margin="0,8,0,0">
+          <Button Classes="nav" Classes.active="{Binding IsTools}" Command="{Binding NavigateCommand}" CommandParameter="Tools">
+            <StackPanel Orientation="Horizontal" Spacing="12"><Path Classes="icon" Data="{StaticResource Icon.Queue}" /><TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Tools}}" /></StackPanel>
+          </Button>
+          <Button Classes="nav" Classes.active="{Binding IsSettings}" Command="{Binding NavigateCommand}" CommandParameter="Settings">
+            <StackPanel Orientation="Horizontal" Spacing="12"><Path Classes="icon" Data="{StaticResource Icon.Settings}" /><TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Settings}}" /></StackPanel>
+          </Button>
+        </StackPanel>
+      </Grid>
+    </Border>
+    <Border Grid.Column="1" Background="{DynamicResource Brush.Border}" />
+    <Grid Grid.Column="2" RowDefinitions="Auto,Auto,*" Margin="{DynamicResource Space.Page}">
+      <controls:PageHeader Title="{Binding PageTitle}" Description="{Binding PageDescription}" Summary="{Binding PageSummary}">
+        <controls:PageHeader.Actions>
+          <StackPanel Spacing="8" HorizontalAlignment="Right">
+            <StackPanel IsVisible="{Binding !IsLibrary}">
+              <TextBlock Text="{Binding TrackSummary}" Classes="caption" IsVisible="{Binding IsTrackPage}" HorizontalAlignment="Right" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsBusy}" ToolTip.Tip="{Binding Status}">
+              <ProgressBar IsIndeterminate="True" Width="60" Height="3" VerticalAlignment="Center"
+                           AutomationProperties.Name="{Binding Status}" />
+              <Button Classes="ghost" Command="{Binding CancelOperationCommand}" Content="{Translate {x:Static i18n:LanguageManager+Keys.CancelOperation}}"
+                      MinHeight="28" Padding="8,4" FontSize="{DynamicResource Font.Caption}" />
+            </StackPanel>
+          </StackPanel>
+        </controls:PageHeader.Actions>
+      </controls:PageHeader>
+      <Border Grid.Row="1" IsVisible="{Binding HasError}" Background="{DynamicResource Brush.DangerSoft}" CornerRadius="10" Padding="14" Margin="0,0,0,16">
+        <Grid ColumnDefinitions="*,Auto,Auto">
+          <TextBlock Text="{Binding Error}" Foreground="{DynamicResource Brush.Danger}" TextWrapping="Wrap" MaxHeight="90" />
+          <Button Grid.Column="1" Classes="ghost" Content="{Translate {x:Static i18n:LanguageManager+Keys.Retry}}" Command="{Binding RefreshCommand}" IsEnabled="{Binding !IsBusy}" IsVisible="{Binding CanRetryStartup}" />
+          <Button Grid.Column="2" Classes="ghost" Content="×" Command="{Binding DismissErrorCommand}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}" />
+        </Grid>
+      </Border>
+      <Grid Grid.Row="2">
+        <views:LibraryView IsVisible="{Binding IsLibraryOrQueue}" />
+        <views:SearchView IsVisible="{Binding IsSearch}" />
+        <views:OnlineView IsVisible="{Binding IsOnline}" />
+        <views:LyricsView IsVisible="{Binding IsLyrics}" />
+        <views:TrackEditorView IsVisible="{Binding IsEditor}" />
+        <views:ToolsView IsVisible="{Binding IsTools}" />
+        <views:SettingsView IsVisible="{Binding IsSettings}" />
+        <views:ComponentsView IsVisible="{Binding IsComponents}" />
+      </Grid>
+    </Grid>
+    <Border Grid.Row="1" Grid.ColumnSpan="3" Background="{DynamicResource Brush.Surface}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="0,1,0,0" Padding="24,12">
+      <Grid ColumnDefinitions="230,*,150">
+        <Grid ColumnDefinitions="48,*" Margin="0,0,20,0">
+          <controls:Artwork Width="44" Height="44" CornerRadius="12" Source="{Binding NowArtwork}"
+                            VerticalAlignment="Center" AutomationProperties.Name="{Binding NowTitle}" />
+          <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0" Spacing="4">
+            <TextBlock Text="{Binding NowTitle}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+            <TextBlock Text="{Binding NowArtist}" Classes="caption" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </Grid>
+        <StackPanel Grid.Column="1" Spacing="4" MaxWidth="540">
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
+            <Button Classes="ghost icon" Command="{Binding PreviousCommand}" IsEnabled="{Binding CanPrevious}" ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Previous}}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Previous}}"><Path Classes="icon" Data="{StaticResource Icon.Previous}" /></Button>
+            <Button Classes="primary icon" Command="{Binding TogglePlaybackCommand}" IsEnabled="{Binding CanTogglePlayback}" ToolTip.Tip="{Binding PlayLabel}" AutomationProperties.Name="{Binding PlayLabel}" CornerRadius="24"><Grid><Path Classes="icon" Data="{StaticResource Icon.Play}" IsVisible="{Binding !IsPlaying}" /><Path Classes="icon" Data="{StaticResource Icon.Pause}" IsVisible="{Binding IsPlaying}" /></Grid></Button>
+            <Button Classes="ghost icon" Command="{Binding NextCommand}" IsEnabled="{Binding CanNext}" ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Next}}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Next}}"><Path Classes="icon" Data="{StaticResource Icon.Next}" /></Button>
+            <Button Classes="ghost icon" Command="{Binding StopCommand}" IsEnabled="{Binding CanTogglePlayback}" ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Stop}}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Stop}}"><Path Classes="icon" Data="{StaticResource Icon.Stop}" /></Button>
+          </StackPanel>
+          <Grid ColumnDefinitions="44,*,44">
+            <TextBlock Text="{Binding PositionText}" Classes="caption" VerticalAlignment="Center" />
+            <Slider Name="Timeline" Grid.Column="1" Minimum="0" Maximum="{Binding DurationSeconds}" Value="{Binding PositionSeconds, Mode=OneWay}" IsEnabled="{Binding CanSeek}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Seek}}" />
+            <TextBlock Grid.Column="2" Text="{Binding DurationText}" Classes="caption" VerticalAlignment="Center" HorizontalAlignment="Right" />
+          </Grid>
+        </StackPanel>
+        <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Spacing="4">
+          <Button Classes="ghost" Content="{Binding ModeLabel}" Command="{Binding CycleModeCommand}" IsEnabled="{Binding CanInteract}" />
+          <Button Classes="ghost" Content="{Translate {x:Static i18n:LanguageManager+Keys.Lyrics}}" Command="{Binding NavigateCommand}" CommandParameter="Lyrics" />
+        </StackPanel>
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

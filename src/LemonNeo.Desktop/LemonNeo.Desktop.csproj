@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <Version>0.1.0</Version>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.3" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Irihi.Lingua" Version="1.0.0" />
+    <ProjectReference Include="../LemonNeo.Application/LemonNeo.Application.csproj" />
+    <ProjectReference Include="../LemonNeo.Configuration/LemonNeo.Configuration.csproj" />
+    <ProjectReference Include="../LemonNeo.Persistence/LemonNeo.Persistence.csproj" />
+    <ProjectReference Include="../LemonNeo.Plugin.Runtime/LemonNeo.Plugin.Runtime.csproj" />
+    <ProjectReference Include="../../plugins/LemonNeo.Sync.MockGit/LemonNeo.Sync.MockGit.csproj" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <AdditionalFiles Include="Resources/Languages/*.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <DefaultPluginProjects Include="../../plugins/LemonNeo.Plugin.MockMusic/LemonNeo.Plugin.MockMusic.csproj" />
+    <DefaultPluginProjects Include="../../plugins/LemonNeo.Plugin.LocalMusic/LemonNeo.Plugin.LocalMusic.csproj" />
+    <DefaultPluginProjects Include="../../plugins/LemonNeo.Plugin.Bass/LemonNeo.Plugin.Bass.csproj" />
+    <DefaultPluginProjects Include="../../plugins/LemonNeo.Plugin.GdStudioNetease/LemonNeo.Plugin.GdStudioNetease.csproj" />
+    <DefaultPluginProjects Include="../../plugins/LemonNeo.Plugin.Lyricify/LemonNeo.Plugin.Lyricify.csproj" />
+    <DefaultPluginProjects Include="../../plugins/LemonNeo.Plugin.Netease/LemonNeo.Plugin.Netease.csproj" />
+    <DefaultPluginProjects Include="../../plugins/LemonNeo.Plugin.QqMusic/LemonNeo.Plugin.QqMusic.csproj" />
+    <DefaultPluginProjects Include="../../plugins/LemonNeo.Plugin.WindowsSmtc/LemonNeo.Plugin.WindowsSmtc.csproj" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
+    <DefaultPluginProjects Include="../../plugins/LemonNeo.Plugin.MacNowPlaying/LemonNeo.Plugin.MacNowPlaying.csproj" Condition="$([MSBuild]::IsOSPlatform('OSX'))" />
+  </ItemGroup>
+  <Target Name="BuildDesktopPlugins" BeforeTargets="Build" Condition="'$(SkipDesktopPlugins)' != 'true'">
+    <MSBuild Projects="@(DefaultPluginProjects)" Targets="Restore;Build" Properties="Configuration=$(Configuration);DesktopPluginRoot=$(TargetDir)plugins/" RemoveProperties="TargetFramework;RuntimeIdentifier;SelfContained" BuildInParallel="false" />
+  </Target>
+  <Target Name="PublishDesktopPlugins" BeforeTargets="ComputeFilesToPublish">
+    <ItemGroup>
+      <DesktopPublishAsset Include="$(TargetDir)plugins/**/*" />
+      <ResolvedFileToPublish Include="@(DesktopPublishAsset)">
+        <RelativePath>plugins/%(DesktopPublishAsset.RecursiveDir)%(DesktopPublishAsset.Filename)%(DesktopPublishAsset.Extension)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
+</Project>

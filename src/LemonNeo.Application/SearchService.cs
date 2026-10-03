@@ -3,8 +3,38 @@ using LemonNeo.Plugin.Abstractions;
 
 namespace LemonNeo.Application;
 
-public sealed class SearchService(IProviderRegistry registry)
+public sealed class SearchService(IProviderRegistry registry, IPlaybackSourceProviderRegistry playbackSources)
 {
+    /// <summary>Searches every provider within the source capabilities of the loaded playback providers.</summary>
+    public async Task<IReadOnlyList<SearchResult>> SearchForPlaybackAsync(
+        string keyword,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var sources = playbackSources.Sources.ToArray();
+        if (sources.Length == 0) return [];
+        var namespaces = sources.SelectMany(source => source.AcceptedIdSchemes.Select(scheme => scheme.Namespace))
+            .Concat(sources.Select(source => source.ProviderId)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        bool Supported(Track track) => sources.Any(source =>
+            string.Equals(source.ProviderId, track.Id.ProviderId, StringComparison.OrdinalIgnoreCase) ||
+            track.ExternalIds.Any(id => source.AcceptedIdSchemes.Any(scheme => scheme.Accepts(id))));
+        var results = new List<SearchResult>();
+        foreach (var provider in registry.Providers.Where(provider => provider is ISearchProvider))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string?[] scopes = provider is ISearchNamespaceProvider scoped
+                ? scoped.SearchNamespaces.Where(namespaces.Contains).Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Order(StringComparer.OrdinalIgnoreCase).Cast<string?>().ToArray()
+                : [null];
+            if (scopes.Length == 0) continue;
+            var found = await Task.WhenAll(scopes.Select(scope => SearchAsync(keyword, provider.Id, scope, cancellationToken)));
+            var tracks = found.SelectMany(batch => batch).SelectMany(result => result.Tracks)
+                .Where(Supported).DistinctBy(track => track.Id).ToArray();
+            results.Add(new(provider.Id, tracks));
+        }
+        return results;
+    }
+
     public Task<IReadOnlyList<SearchResult>> SearchAsync(
         string keyword,
         string? providerId = null,

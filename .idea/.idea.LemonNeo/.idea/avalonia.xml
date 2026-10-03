@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AvaloniaProject">
+    <option name="projectPerEditor">
+      <map>
+        <entry key="src/LemonNeo.Desktop/App.axaml" value="src/LemonNeo.Desktop/LemonNeo.Desktop.csproj" />
+        <entry key="src/LemonNeo.Desktop/Resources/Themes/Controls.axaml" value="src/LemonNeo.Desktop/LemonNeo.Desktop.csproj" />
+        <entry key="src/LemonNeo.Desktop/Resources/Themes/Styles.axaml" value="src/LemonNeo.Desktop/LemonNeo.Desktop.csproj" />
+        <entry key="src/LemonNeo.Desktop/Views/ComponentsView.axaml" value="src/LemonNeo.Desktop/LemonNeo.Desktop.csproj" />
+        <entry key="src/LemonNeo.Desktop/Views/ConfirmationDialog.axaml" value="src/LemonNeo.Desktop/LemonNeo.Desktop.csproj" />
+        <entry key="src/LemonNeo.Desktop/Views/LibraryView.axaml" value="src/LemonNeo.Desktop/LemonNeo.Desktop.csproj" />
+        <entry key="src/LemonNeo.Desktop/Views/LyricsView.axaml" value="src/LemonNeo.Desktop/LemonNeo.Desktop.csproj" />
+        <entry key="src/LemonNeo.Desktop/Views/MainWindow.axaml" value="src/LemonNeo.Desktop/LemonNeo.Desktop.csproj" />
+        <entry key="src/LemonNeo.Desktop/Views/PlaylistDialog.axaml" value="src/LemonNeo.Desktop/LemonNeo.Desktop.csproj" />
+      </map>
+    </option>
+  </component>
+</project>

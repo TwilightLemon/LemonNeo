@@ -1,0 +1,52 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:LemonNeo.Desktop.ViewModels" xmlns:i18n="using:LemonNeo.Desktop.Infrastructure"
+             x:Class="LemonNeo.Desktop.Views.SettingsView" x:DataType="vm:MainViewModel">
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Spacing="18">
+      <Border Classes="card">
+        <StackPanel Spacing="16" IsEnabled="{Binding !IsBusy}">
+          <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.Appearance}}" />
+          <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Translate {x:Static i18n:LanguageManager+Keys.AppearanceDescription}}" />
+          <WrapPanel Orientation="Horizontal">
+            <Button Classes.primary="{Binding IsThemeSystem}" Margin="0,0,10,8" MinWidth="130" Content="{Translate {x:Static i18n:LanguageManager+Keys.ThemeSystem}}" Command="{Binding ThemeCommand}" CommandParameter="System" />
+            <Button Classes.primary="{Binding IsThemeLight}" Margin="0,0,10,8" MinWidth="130" Content="{Translate {x:Static i18n:LanguageManager+Keys.ThemeLight}}" Command="{Binding ThemeCommand}" CommandParameter="Light" />
+            <Button Classes.primary="{Binding IsThemeDark}" Margin="0,0,10,8" MinWidth="130" Content="{Translate {x:Static i18n:LanguageManager+Keys.ThemeDark}}" Command="{Binding ThemeCommand}" CommandParameter="Dark" />
+          </WrapPanel>
+        </StackPanel>
+      </Border>
+      <Border Classes="card">
+        <StackPanel Spacing="16" IsEnabled="{Binding !IsBusy}">
+          <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.Language}}" />
+          <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Translate {x:Static i18n:LanguageManager+Keys.LanguageDescription}}" />
+          <WrapPanel Orientation="Horizontal">
+            <Button Classes.primary="{Binding IsLanguageSystem}" Margin="0,0,10,8" MinWidth="130" Content="{Translate {x:Static i18n:LanguageManager+Keys.LanguageSystem}}" Command="{Binding LanguageCommand}" CommandParameter="System" />
+            <Button Classes.primary="{Binding IsLanguageChinese}" Margin="0,0,10,8" MinWidth="130" Content="{Translate {x:Static i18n:LanguageManager+Keys.LanguageChinese}}" Command="{Binding LanguageCommand}" CommandParameter="Chinese" />
+            <Button Classes.primary="{Binding IsLanguageEnglish}" Margin="0,0,10,8" MinWidth="130" Content="{Translate {x:Static i18n:LanguageManager+Keys.LanguageEnglish}}" Command="{Binding LanguageCommand}" CommandParameter="English" />
+          </WrapPanel>
+        </StackPanel>
+      </Border>
+      <Border Classes="card">
+        <StackPanel Spacing="14" IsEnabled="{Binding !IsBusy}">
+          <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.Motion}}" />
+          <ToggleSwitch IsChecked="{Binding ReduceMotion}" Content="{Translate {x:Static i18n:LanguageManager+Keys.ReduceMotion}}" />
+          <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Translate {x:Static i18n:LanguageManager+Keys.MotionDescription}}" />
+        </StackPanel>
+      </Border>
+      <Border Classes="card">
+        <StackPanel Spacing="12">
+          <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.Plugins}}" />
+          <TextBlock Text="{Binding PluginSummary}" Classes="muted" />
+          <ItemsControl ItemsSource="{Binding PluginDescriptions}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="x:String"><TextBlock Text="{Binding}" Margin="0,4" TextWrapping="Wrap" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+        </StackPanel>
+      </Border>
+      <Border Classes="card">
+        <StackPanel Spacing="12">
+          <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.Storage}}" />
+          <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.LibraryPath}}" /><SelectableTextBlock Text="{Binding LibraryPath}" TextWrapping="Wrap" />
+          <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.ConfigurationPath}}" /><SelectableTextBlock Text="{Binding ConfigurationPath}" TextWrapping="Wrap" />
+          <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.CachePath}}" /><SelectableTextBlock Text="{Binding CachePath}" TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

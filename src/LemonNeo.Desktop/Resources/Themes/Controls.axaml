@@ -1,0 +1,90 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:controls="using:LemonNeo.Desktop.Controls"
+                    xmlns:converters="using:Avalonia.Data.Converters">
+  <ControlTheme x:Key="LemonButton" TargetType="Button">
+    <Setter Property="Background" Value="{DynamicResource Brush.SurfaceRaised}" />
+    <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource Radius.Control}" />
+    <Setter Property="Padding" Value="{DynamicResource Space.Control}" />
+    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="{DynamicResource Motion.Fast}" />
+        <DoubleTransition Property="Opacity" Duration="{DynamicResource Motion.Fast}" />
+      </Transitions>
+    </Setter>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}">
+          <ContentPresenter Name="PART_ContentPresenter" Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}" Padding="{TemplateBinding Padding}"
+                            HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                            RecognizesAccessKey="True" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:pointerover"><Setter Property="Background" Value="{DynamicResource Brush.Hover}" /></Style>
+    <Style Selector="^:pressed"><Setter Property="Opacity" Value="0.75" /></Style>
+    <Style Selector="^:disabled"><Setter Property="Opacity" Value="0.4" /></Style>
+    <Style Selector="^:focus-visible"><Setter Property="BorderBrush" Value="{DynamicResource Brush.Focus}" /></Style>
+  </ControlTheme>
+  <ControlTheme x:Key="{x:Type controls:PageHeader}" TargetType="controls:PageHeader">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,28">
+          <StackPanel Spacing="8">
+            <TextBlock Text="{TemplateBinding Title}" FontSize="{DynamicResource Font.Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <TextBlock Text="{TemplateBinding Description}" Foreground="{DynamicResource Brush.TextSecondary}" TextWrapping="Wrap"
+                       IsVisible="{Binding Description, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+            <TextBlock Text="{TemplateBinding Summary}" Classes="caption" TextWrapping="Wrap"
+                       IsVisible="{Binding Summary, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+          </StackPanel>
+          <ContentPresenter Grid.Column="1" Content="{TemplateBinding Actions}" VerticalAlignment="Center" Margin="16,0,0,0" />
+        </Grid>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+  <ControlTheme x:Key="{x:Type controls:EmptyState}" TargetType="controls:EmptyState">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <StackPanel Spacing="16" MaxWidth="400" HorizontalAlignment="Center" VerticalAlignment="Center">
+          <Border Background="{DynamicResource Brush.AccentSoft}" CornerRadius="24" Width="80" Height="80" HorizontalAlignment="Center">
+            <Path Data="{TemplateBinding Icon}" Width="28" Height="28" Stretch="Uniform" Fill="{DynamicResource Brush.AccentText}" />
+          </Border>
+          <TextBlock Text="{TemplateBinding Title}" FontSize="22" FontWeight="SemiBold" TextAlignment="Center" TextWrapping="Wrap" />
+          <TextBlock Text="{TemplateBinding Description}" TextAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource Brush.TextSecondary}" />
+          <ContentPresenter Content="{TemplateBinding Actions}" HorizontalAlignment="Center" Margin="0,8,0,0" />
+        </StackPanel>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+  <ControlTheme x:Key="{x:Type controls:Artwork}" TargetType="controls:Artwork">
+    <Setter Property="Background" Value="{DynamicResource Brush.Artwork}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource Radius.Card}" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}" ClipToBounds="True">
+          <Grid>
+            <Viewbox Margin="8" IsVisible="{Binding Source, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static converters:ObjectConverters.IsNull}}">
+              <Grid Width="128" Height="128">
+                <Ellipse Width="128" Height="128" Fill="{DynamicResource Brush.Surface}" />
+                <Ellipse Width="98" Height="98" Stroke="{DynamicResource Brush.Border}" StrokeThickness="1" />
+                <Ellipse Width="74" Height="74" Stroke="{DynamicResource Brush.Border}" StrokeThickness="1" />
+                <Ellipse Width="44" Height="44" Fill="{DynamicResource Brush.Accent}" />
+                <Path Width="20" Height="20" Stretch="Uniform" Data="{StaticResource Icon.Music}" Fill="{DynamicResource Brush.OnAccent}" />
+              </Grid>
+            </Viewbox>
+            <Image Name="PART_Image" Source="{TemplateBinding Source}" Stretch="UniformToFill" />
+          </Grid>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+</ResourceDictionary>

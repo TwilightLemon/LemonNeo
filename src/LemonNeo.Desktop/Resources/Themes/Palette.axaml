@@ -1,0 +1,43 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- Semantic roles, shared by every view and template. Never use palette literals in a view. -->
+  <Color x:Key="Color.FluentAccentLight">#627C16</Color>
+  <Color x:Key="Color.FluentAccentDark">#DCEC7E</Color>
+  <ResourceDictionary.ThemeDictionaries>
+    <ResourceDictionary x:Key="Light">
+      <SolidColorBrush x:Key="Brush.Canvas" Color="#F6F7F2" />
+      <SolidColorBrush x:Key="Brush.Sidebar" Color="#EDEFE7" />
+      <SolidColorBrush x:Key="Brush.Surface" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="Brush.SurfaceRaised" Color="#F0F2EA" />
+      <SolidColorBrush x:Key="Brush.Text" Color="#20251A" />
+      <SolidColorBrush x:Key="Brush.TextSecondary" Color="#626B57" />
+      <SolidColorBrush x:Key="Brush.Border" Color="#DDE1D3" />
+      <SolidColorBrush x:Key="Brush.Accent" Color="#DAE96D" />
+      <SolidColorBrush x:Key="Brush.OnAccent" Color="#263008" />
+      <SolidColorBrush x:Key="Brush.AccentText" Color="#4F650B" />
+      <SolidColorBrush x:Key="Brush.AccentSoft" Color="#E5ECCB" />
+      <SolidColorBrush x:Key="Brush.Hover" Color="#E7EBDD" />
+      <SolidColorBrush x:Key="Brush.Danger" Color="#B33232" />
+      <SolidColorBrush x:Key="Brush.DangerSoft" Color="#FAE9E8" />
+      <SolidColorBrush x:Key="Brush.Focus" Color="#627C16" />
+      <SolidColorBrush x:Key="Brush.Artwork" Color="#DDE6B9" />
+    </ResourceDictionary>
+    <ResourceDictionary x:Key="Dark">
+      <SolidColorBrush x:Key="Brush.Canvas" Color="#171A15" />
+      <SolidColorBrush x:Key="Brush.Sidebar" Color="#12150F" />
+      <SolidColorBrush x:Key="Brush.Surface" Color="#20241D" />
+      <SolidColorBrush x:Key="Brush.SurfaceRaised" Color="#2A3024" />
+      <SolidColorBrush x:Key="Brush.Text" Color="#F0F2E9" />
+      <SolidColorBrush x:Key="Brush.TextSecondary" Color="#A5AF98" />
+      <SolidColorBrush x:Key="Brush.Border" Color="#363D2E" />
+      <SolidColorBrush x:Key="Brush.Accent" Color="#DCEC7E" />
+      <SolidColorBrush x:Key="Brush.OnAccent" Color="#263008" />
+      <SolidColorBrush x:Key="Brush.AccentText" Color="#DCEC7E" />
+      <SolidColorBrush x:Key="Brush.AccentSoft" Color="#333D20" />
+      <SolidColorBrush x:Key="Brush.Hover" Color="#30372A" />
+      <SolidColorBrush x:Key="Brush.Danger" Color="#FFAB9F" />
+      <SolidColorBrush x:Key="Brush.DangerSoft" Color="#442B28" />
+      <SolidColorBrush x:Key="Brush.Focus" Color="#DCEC7E" />
+      <SolidColorBrush x:Key="Brush.Artwork" Color="#3B4824" />
+    </ResourceDictionary>
+  </ResourceDictionary.ThemeDictionaries>
+</ResourceDictionary>

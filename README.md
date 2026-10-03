@@ -3,6 +3,19 @@
 This repository contains the console and class-library prototype described in
 [`prototype.md`](prototype.md). It targets .NET 10.
 
+An Avalonia UI 12 desktop host is also available:
+
+```sh
+dotnet run --project src/LemonNeo.Desktop
+```
+
+It provides a two-column music UI, light/dark/system themes, live Chinese/English
+localization, reusable component styles and templates, online search and playlist
+imports, account login, full playlist/track editing, metadata/source inspection,
+synchronized lyrics, playback, and the same synchronization service as Console.
+See [the desktop guide](docs/desktop.md) for its infrastructure, platform behavior,
+current feature scope, and verification commands.
+
 Build and start the interactive host:
 
 ```powershell

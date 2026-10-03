@@ -1,18 +1,14 @@
-namespace LemonNeo.ConsoleApp;
+namespace LemonNeo.Application;
 
-internal sealed class StartupCommands(string path)
+/// <summary>The shared Console startup script, editable by either host.</summary>
+public sealed class StartupCommands(string path)
 {
     public const string DefaultScript = "# Show version\nversion\n# Show loaded plugins\nplugins\n# Show library statistics\nlibrary\n";
-
     public string FilePath { get; } = Path.GetFullPath(path);
 
     public async Task<string[]> LoadAsync(CancellationToken cancellationToken = default)
     {
-        if (!File.Exists(FilePath))
-        {
-            await WriteAsync(DefaultScript, cancellationToken);
-        }
-
+        if (!File.Exists(FilePath)) await WriteAsync(DefaultScript, cancellationToken);
         return await File.ReadAllLinesAsync(FilePath, cancellationToken);
     }
 

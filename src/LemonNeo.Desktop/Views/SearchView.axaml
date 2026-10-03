@@ -1,0 +1,34 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:LemonNeo.Desktop.ViewModels" xmlns:i18n="using:LemonNeo.Desktop.Infrastructure"
+             x:Class="LemonNeo.Desktop.Views.SearchView" x:DataType="vm:MainViewModel">
+  <Grid RowDefinitions="Auto,Auto,*">
+    <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,16" IsEnabled="{Binding CanInteract}">
+      <TextBox Text="{Binding SearchQuery}" PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.SearchMusic}}"
+               AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.SearchMusic}}" Margin="0,0,10,0" KeyDown="OnSearchKeyDown" />
+      <Button Grid.Column="1" Classes="primary" Command="{Binding SearchCommand}" IsEnabled="{Binding CanSearch}" Content="{Translate {x:Static i18n:LanguageManager+Keys.SearchMusic}}" />
+    </Grid>
+    <WrapPanel Grid.Row="1" Margin="0,0,0,12" IsEnabled="{Binding CanInteract}">
+      <Button Classes="primary" Content="{Translate {x:Static i18n:LanguageManager+Keys.Play}}" Command="{Binding PlaySelectedCommand}" IsEnabled="{Binding CanInspectTrack}" Margin="0,0,8,8" />
+      <Button Content="{Translate {x:Static i18n:LanguageManager+Keys.TrackDetails}}" Command="{Binding InspectTrackCommand}" IsEnabled="{Binding CanInspectTrack}" Margin="0,0,8,8" />
+      <Button Content="{Translate {x:Static i18n:LanguageManager+Keys.AddToPlaylist}}" IsEnabled="{Binding CanInspectTrack}" Margin="0,0,8,8">
+        <Button.Flyout>
+          <Flyout>
+            <StackPanel Width="280" Spacing="12">
+              <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.TargetPlaylist}}" />
+              <ComboBox ItemsSource="{Binding Playlists}" SelectedItem="{Binding TargetPlaylist}" ItemTemplate="{StaticResource PlaylistOptionTemplate}"
+                        HorizontalAlignment="Stretch" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.TargetPlaylist}}" />
+              <Button Classes="primary" Content="{Translate {x:Static i18n:LanguageManager+Keys.AddToPlaylist}}" Command="{Binding AddToPlaylistCommand}" IsEnabled="{Binding CanAddToPlaylist}" />
+            </StackPanel>
+          </Flyout>
+        </Button.Flyout>
+      </Button>
+    </WrapPanel>
+    <ListBox Grid.Row="2" ItemsSource="{Binding Tracks}" SelectedItem="{Binding SelectedTrack}" ItemTemplate="{StaticResource TrackRowTemplate}" Grid.IsSharedSizeScope="True"
+             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+             IsVisible="{Binding HasTracks}" IsEnabled="{Binding CanInteract}" DoubleTapped="OnTrackDoubleTapped" KeyDown="OnTrackKeyDown" />
+    <StackPanel Grid.Row="2" IsVisible="{Binding !HasTracks}" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="400" Spacing="8">
+      <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.NoResults}}" FontSize="20" TextAlignment="Center" TextWrapping="Wrap" />
+      <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.NoResultsDescription}}" Classes="caption" TextAlignment="Center" TextWrapping="Wrap" />
+    </StackPanel>
+  </Grid>
+</UserControl>

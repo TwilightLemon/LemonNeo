@@ -1,0 +1,23 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:i18n="using:LemonNeo.Desktop.Infrastructure" xmlns:vm="using:LemonNeo.Desktop.ViewModels"
+        x:Class="LemonNeo.Desktop.Views.PlaylistDialog" x:DataType="vm:PlaylistDialogViewModel"
+        Title="{Translate {x:Static i18n:LanguageManager+Keys.CreatePlaylist}}" Width="430" SizeToContent="Height"
+        CanResize="False" WindowStartupLocation="CenterOwner">
+  <StackPanel Margin="28" Spacing="20">
+    <TextBlock Name="DialogHeading" Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.CreatePlaylist}}" />
+    <StackPanel Spacing="8" IsVisible="{Binding IsNew}">
+      <Button Name="ImportFolderButton" Content="{Translate {x:Static i18n:LanguageManager+Keys.ImportFromFolder}}"
+              Click="OnImportFolder" HorizontalAlignment="Left" />
+      <TextBlock Text="{Binding FolderPath}" IsVisible="{Binding HasFolder}" Classes="caption" TextWrapping="Wrap" />
+    </StackPanel>
+    <TextBox Name="PlaylistName" Text="{Binding Name}" PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistName}}"
+             AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistName}}" />
+    <TextBox Name="PlaylistDescription" Text="{Binding Description}" PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistDescriptionLabel}}"
+             AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="150" MinHeight="70"
+             AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistDescriptionLabel}}" />
+    <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
+      <Button Content="{Translate {x:Static i18n:LanguageManager+Keys.Cancel}}" Click="OnCancel" IsCancel="True" />
+      <Button Name="CreateButton" Classes="primary" Content="{Translate {x:Static i18n:LanguageManager+Keys.Create}}" Click="OnCreate" IsDefault="True" IsEnabled="{Binding CanSave}" />
+    </StackPanel>
+  </StackPanel>
+</Window>

@@ -4,6 +4,11 @@ namespace LemonNeo.Plugin.Runtime;
 
 public sealed class ProviderRegistry : IProviderRegistry, IPlaybackSourceProviderRegistry
 {
+    public ProviderRegistry(IEnumerable<IMusicProvider>? hostProviders = null)
+    {
+        foreach (var provider in hostProviders ?? []) Register(provider);
+    }
+
     private readonly Dictionary<string, IMusicProvider> _providers =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, PlaybackSourceProviderRegistration> _playbackSources =

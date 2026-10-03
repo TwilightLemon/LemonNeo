@@ -246,7 +246,14 @@ public sealed class PlaybackSessionService(
     public async Task<Track?> PreviousAsync(CancellationToken cancellationToken = default) =>
         await MoveAsync(queue.MovePrevious, stopWhenUnavailable: false, cancellationToken);
 
-    public async Task<Track?> PlayCurrentAsync(CancellationToken cancellationToken = default)
+    public Task<Track?> PlayCurrentAsync(CancellationToken cancellationToken = default) =>
+        PlayCurrentCoreAsync(null, cancellationToken);
+
+    /// <summary>Selects and plays an existing queue item without replacing the queue or its request.</summary>
+    public Task<Track?> PlayQueueItemAsync(Guid itemId, CancellationToken cancellationToken = default) =>
+        PlayCurrentCoreAsync(itemId, cancellationToken);
+
+    private async Task<Track?> PlayCurrentCoreAsync(Guid? itemId, CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken);
         PlaybackSessionSnapshot snapshot;
@@ -254,6 +261,12 @@ public sealed class PlaybackSessionService(
         try
         {
             EnsureReady();
+            if (itemId is { } selectedId)
+            {
+                if (queue.Select(selectedId) is null)
+                    throw new ArgumentException($"Queue item '{selectedId}' was not found.", nameof(itemId));
+                if (_restoredItemId != selectedId) ResetRestoredState();
+            }
             item = queue.CurrentItem;
             if (item is null)
             {

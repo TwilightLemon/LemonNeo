@@ -1,0 +1,41 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:LemonNeo.Desktop.ViewModels" xmlns:i18n="using:LemonNeo.Desktop.Infrastructure"
+             xmlns:controls="using:LemonNeo.Desktop.Controls"
+             x:Class="LemonNeo.Desktop.Views.LyricsView" x:DataType="vm:MainViewModel">
+  <Grid>
+    <controls:EmptyState IsVisible="{Binding !HasCurrentTrack}" Title="{Translate {x:Static i18n:LanguageManager+Keys.NoTrack}}"
+                         Description="{Translate {x:Static i18n:LanguageManager+Keys.NoTrackDescription}}" Icon="{StaticResource Icon.Music}" />
+    <ScrollViewer IsVisible="{Binding HasCurrentTrack}" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Spacing="28" HorizontalAlignment="Stretch" Margin="16">
+        <controls:Artwork Width="160" Height="160" CornerRadius="32" Source="{Binding NowArtwork}"
+                          HorizontalAlignment="Center" AutomationProperties.Name="{Binding NowTitle}" />
+        <StackPanel Spacing="10">
+          <TextBlock Text="{Binding NowTitle}" FontSize="26" FontWeight="SemiBold" TextAlignment="Center" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding NowArtist}" Classes="muted" TextAlignment="Center" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding PlaybackLabel}" Classes="caption" TextAlignment="Center" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding PlaybackDetails}" Classes="caption" TextAlignment="Center" TextWrapping="Wrap" />
+          <WrapPanel HorizontalAlignment="Center" IsEnabled="{Binding CanInteract}">
+            <Button Classes="ghost" Content="{Translate {x:Static i18n:LanguageManager+Keys.Sequential}}" Command="{Binding ModeCommand}" CommandParameter="Sequential" />
+            <Button Classes="ghost" Content="{Translate {x:Static i18n:LanguageManager+Keys.RepeatAll}}" Command="{Binding ModeCommand}" CommandParameter="RepeatAll" />
+            <Button Classes="ghost" Content="{Translate {x:Static i18n:LanguageManager+Keys.Shuffle}}" Command="{Binding ModeCommand}" CommandParameter="Shuffle" />
+          </WrapPanel>
+        </StackPanel>
+        <StackPanel Spacing="24" IsVisible="{Binding HasTimedLyrics}">
+          <TextBlock Text="{Binding PreviousLyric}" Classes="muted" TextAlignment="Center" TextWrapping="Wrap" Opacity="0.6" />
+          <controls:LyricText Segments="{Binding RomanizationSegments}" FontSize="18" IsVisible="{Binding HasRomanization}"
+                              Foreground="{DynamicResource Brush.TextSecondary}" ReachedBrush="{DynamicResource Brush.AccentText}" TextAlignment="Center" TextWrapping="Wrap" />
+          <controls:LyricText Segments="{Binding CurrentLyricSegments}" FontSize="24" FontWeight="SemiBold"
+                              Foreground="{DynamicResource Brush.TextSecondary}" ReachedBrush="{DynamicResource Brush.AccentText}" TextAlignment="Center" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding Translation}" Classes="muted" IsVisible="{Binding HasTranslation}" TextAlignment="Center" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding NextLyric}" Classes="muted" TextAlignment="Center" TextWrapping="Wrap" Opacity="0.6" />
+        </StackPanel>
+        <StackPanel IsVisible="{Binding !HasTimedLyrics}" Spacing="18">
+          <TextBlock Text="{Binding LyricsText}" Classes="muted" TextAlignment="Center" TextWrapping="Wrap" />
+          <controls:LyricText Segments="{Binding RomanizationSegments}" IsVisible="{Binding HasRomanization}" Foreground="{DynamicResource Brush.TextSecondary}"
+                              ReachedBrush="{DynamicResource Brush.AccentText}" TextAlignment="Center" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding Translation}" IsVisible="{Binding HasTranslation}" Classes="muted" TextAlignment="Center" TextWrapping="Wrap" />
+        </StackPanel>
+      </StackPanel>
+    </ScrollViewer>
+  </Grid>
+</UserControl>

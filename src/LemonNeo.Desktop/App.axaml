@@ -1,0 +1,24 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="LemonNeo.Desktop.App" Name="Lemon Neo" RequestedThemeVariant="Default">
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="/Resources/Themes/Palette.axaml" />
+        <ResourceInclude Source="/Resources/Themes/Tokens.axaml" />
+        <ResourceInclude Source="/Resources/Themes/Icons.axaml" />
+        <ResourceInclude Source="/Resources/Themes/Controls.axaml" />
+        <ResourceInclude Source="/Resources/Themes/Templates.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+  <Application.Styles>
+    <FluentTheme>
+      <FluentTheme.Palettes>
+        <ColorPaletteResources x:Key="Light" Accent="{StaticResource Color.FluentAccentLight}" />
+        <ColorPaletteResources x:Key="Dark" Accent="{StaticResource Color.FluentAccentDark}" />
+      </FluentTheme.Palettes>
+    </FluentTheme>
+    <StyleInclude Source="/Resources/Themes/Styles.axaml" />
+  </Application.Styles>
+</Application>
