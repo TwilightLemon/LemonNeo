@@ -101,7 +101,8 @@ public sealed class LyricText : TextBlock
         var offset = 0;
         _wordBounds = texts.Select(text =>
         {
-            var bounds = layout.HitTestTextRange(offset, text.Length).ToArray();
+            // Keep empty fragments aligned with their timestamps without hit-testing a zero-length range.
+            var bounds = text.Length == 0 ? [] : layout.HitTestTextRange(offset, text.Length).ToArray();
             offset += text.Length;
             return bounds;
         }).ToArray();
