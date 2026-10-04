@@ -64,7 +64,7 @@ public sealed partial class TrackEditorViewModel : ObservableObject
         Artists = string.Join("; ", metadata.Artists);
         Album = metadata.Album ?? "";
         DurationSeconds = metadata.Duration?.TotalSeconds.ToString("0.#######", _text.Culture) ?? "";
-        ArtworkUri = metadata.ArtworkUri?.ToString() ?? "";
+        if (metadata.ArtworkUri is not null) ArtworkUri = metadata.ArtworkUri.ToString();
     }
 
     public int AddExternalIds(IEnumerable<ExternalMusicId> identifiers)

@@ -245,7 +245,12 @@ public sealed class LyricifyMetadataPlugin :
         var duration = int.TryParse(ReadJsonString(song, "dt"), out var milliseconds)
             ? milliseconds
             : 0;
-        return new NeteaseSearchResult(title, artists, album, null, duration, id);
+        return new NeteaseSearchResult(title, artists, album, null, duration, id)
+        {
+            ArtworkUrl = albumValue.ValueKind == JsonValueKind.Object
+                ? ReadJsonString(albumValue, "picUrl")
+                : null
+        };
     }
 
     private async Task<ISearchResult?> GetKugouTrackAsync(
@@ -289,7 +294,10 @@ public sealed class LyricifyMetadataPlugin :
             ReadJsonString(data, "album_name") ?? string.Empty,
             null,
             duration,
-            hash);
+            hash)
+        {
+            ArtworkUrl = ArtworkHelper.WithSize(ReadJsonString(data, "img"))
+        };
     }
 
     private static string? ReadJsonString(JsonElement value, string property) =>
@@ -343,7 +351,7 @@ public sealed class LyricifyMetadataPlugin :
             $"Search failed after {attempts} attempt(s): {lastError}");
     }
 
-    private static Track ToSearchTrack(string sourceNamespace, ISearchResult result)
+    internal static Track ToSearchTrack(string sourceNamespace, ISearchResult result)
     {
         var identifiers = GetIdentifiers(sourceNamespace, result);
         var primaryId = identifiers.FirstOrDefault(identifier =>
@@ -362,9 +370,13 @@ public sealed class LyricifyMetadataPlugin :
             Duration = result.DurationMs is null
                 ? null
                 : TimeSpan.FromMilliseconds(result.DurationMs.Value),
+            ArtworkUri = GetArtworkUri(result),
             ExternalIds = identifiers
         };
     }
+
+    private static Uri? GetArtworkUri(ISearchResult result) =>
+        ArtworkHelper.NormalizeUrl(result.ArtworkUrl) is { } url ? new Uri(url) : null;
 
     public async Task<MetadataLookupResult> LookupMetadataAsync(
         MetadataLookupRequest request,
@@ -512,6 +524,7 @@ public sealed class LyricifyMetadataPlugin :
                 Artists = result.Artists,
                 Album = string.IsNullOrWhiteSpace(result.Album) ? null : result.Album,
                 Duration = result.DurationMs is null ? null : TimeSpan.FromMilliseconds(result.DurationMs.Value),
+                ArtworkUri = GetArtworkUri(result),
                 ExternalIds = GetIdentifiers(sourceNamespace, result)
             }
         };

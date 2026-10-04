@@ -10,5 +10,7 @@ contributors, under the Apache License 2.0.
 
 The fork is included as the `external/Lyricify-Lyrics-Helper` git submodule and
 referenced directly by the plugin. It preserves QQ Music's `contentroma` as
-`QqLyricsResponse.Romaji`. The built assembly and its transitive dependencies
+`QqLyricsResponse.Romaji`, and carries available catalog artwork through the
+search results, including Apple Music URL templates and Spotify image lists.
+The built assembly and its transitive dependencies
 are copied into the dynamically loaded plugin directory during the build.
