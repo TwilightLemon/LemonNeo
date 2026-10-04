@@ -17,7 +17,7 @@ public partial class App : Avalonia.Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            // Use native decorations, menus, file pickers, and platform font fallback.
+            // Use platform window controls, menus, file pickers, and font fallback.
             var paths = AppPathProvider.CreateDefault();
             var runtime = new DesktopRuntime(paths, DesktopOptions.Parse(Program.Arguments, paths));
             var text = new LocalizationService();

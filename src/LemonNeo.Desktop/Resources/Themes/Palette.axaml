@@ -4,8 +4,9 @@
   <Color x:Key="Color.FluentAccentDark">#DCEC7E</Color>
   <ResourceDictionary.ThemeDictionaries>
     <ResourceDictionary x:Key="Light">
-      <SolidColorBrush x:Key="Brush.Canvas" Color="#F6F7F2" />
+      <SolidColorBrush x:Key="Brush.Canvas" Color="#FBFBFB" />
       <SolidColorBrush x:Key="Brush.Sidebar" Color="#EDEFE7" />
+      <SolidColorBrush x:Key="Brush.SidebarTranslucent" Color="#FFF" Opacity="0.85" />
       <SolidColorBrush x:Key="Brush.Surface" Color="#FFFFFF" />
       <SolidColorBrush x:Key="Brush.SurfaceRaised" Color="#F0F2EA" />
       <SolidColorBrush x:Key="Brush.Text" Color="#20251A" />
@@ -24,6 +25,7 @@
     <ResourceDictionary x:Key="Dark">
       <SolidColorBrush x:Key="Brush.Canvas" Color="#171A15" />
       <SolidColorBrush x:Key="Brush.Sidebar" Color="#12150F" />
+      <SolidColorBrush x:Key="Brush.SidebarTranslucent" Color="#12150F" Opacity="0.85" />
       <SolidColorBrush x:Key="Brush.Surface" Color="#20241D" />
       <SolidColorBrush x:Key="Brush.SurfaceRaised" Color="#2A3024" />
       <SolidColorBrush x:Key="Brush.Text" Color="#F0F2E9" />

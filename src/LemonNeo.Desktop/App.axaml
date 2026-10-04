@@ -12,6 +12,7 @@
       </ResourceDictionary.MergedDictionaries>
     </ResourceDictionary>
   </Application.Resources>
+  <!-- The caption theme derives from Fluent's official drawn decorations. -->
   <Application.Styles>
     <FluentTheme>
       <FluentTheme.Palettes>
@@ -19,6 +20,7 @@
         <ColorPaletteResources x:Key="Dark" Accent="{StaticResource Color.FluentAccentDark}" />
       </FluentTheme.Palettes>
     </FluentTheme>
+    <StyleInclude Source="/Resources/Themes/WindowChrome.axaml" />
     <StyleInclude Source="/Resources/Themes/Styles.axaml" />
   </Application.Styles>
 </Application>

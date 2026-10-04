@@ -172,6 +172,9 @@ public sealed class DesktopTests
                             Assert.True(button.TranslatePoint(default, window)!.Value.Y + button.Bounds.Height <= topBar.Bounds.Height);
                         }
                         Assert.Equal(32, window.FindControl<TextBox>("GlobalSearch")!.Bounds.Height);
+                        var searchArea = window.FindControl<Grid>("SearchArea")!;
+                        Assert.True(searchArea.TranslatePoint(default, topBar)!.Value.X + searchArea.Bounds.Width <= topBar.Bounds.Width - topBar.Padding.Right,
+                            "Search must stay clear of the reserved window buttons at every supported size.");
                         var timeline = window.FindControl<Slider>("Timeline")!;
                         var timelineCenter = timeline.TranslatePoint(new(timeline.Bounds.Width / 2, timeline.Bounds.Height / 2), window)!.Value;
                         Assert.Equal(playbackBar.Bounds.Width, timeline.Bounds.Width);

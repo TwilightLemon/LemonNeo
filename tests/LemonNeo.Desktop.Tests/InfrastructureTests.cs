@@ -93,10 +93,21 @@ public sealed class InfrastructureTests
         {
             await appearance.SetAsync(new(theme, LanguagePreference.English, true));
             Dispatcher.UIThread.RunJobs();
-            var canvas = ((ISolidColorBrush)window.Background!).Color;
+            // The transparent window exposes the compositor; body contrast uses the opaque content surface.
+            var content = Assert.IsAssignableFrom<ISolidColorBrush>(window.FindControl<Border>("ContentBackground")!.Background);
+            Assert.Equal(1, content.Opacity);
+            var canvas = content.Color;
             var foreground = ((ISolidColorBrush)window.Foreground!).Color;
             colors.Add(canvas);
             Assert.True(Contrast(canvas, foreground) >= 4.5, "Body text must meet WCAG AA contrast in both palettes.");
+            var sidebar = window.FindControl<Border>("Sidebar")!;
+            var tint = Assert.IsAssignableFrom<ISolidColorBrush>(sidebar.Background);
+            var fallback = Assert.IsAssignableFrom<ISolidColorBrush>(window.TransparencyBackgroundFallback);
+            Assert.InRange(tint.Opacity, 0.01, 0.99);
+            Assert.Equal(1, sidebar.Opacity);
+            Assert.Equal(tint.Color, fallback.Color);
+            Assert.Equal(1, fallback.Opacity);
+            Assert.True(Contrast(fallback.Color, foreground) >= 4.5, "The opaque fallback must keep sidebar text readable.");
             Assert.True(window.TryFindResource("Brush.Accent", window.ActualThemeVariant, out var accent));
             Assert.True(window.TryFindResource("Brush.OnAccent", window.ActualThemeVariant, out var onAccent));
             Assert.True(Contrast(((ISolidColorBrush)accent!).Color, ((ISolidColorBrush)onAccent!).Color) >= 4.5);

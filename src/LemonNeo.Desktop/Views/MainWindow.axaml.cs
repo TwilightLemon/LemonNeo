@@ -19,6 +19,12 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        // Avalonia draws Windows captions and preserves native macOS traffic lights.
+        // Keep system decorations on Linux, where client-area extension varies by window manager.
+        ExtendClientAreaToDecorationsHint = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS();
+        TopBar.Classes.Set("windows", OperatingSystem.IsWindows());
+        Sidebar.Classes.Set("macos", OperatingSystem.IsMacOS());
+        MacCaptionDragArea.IsVisible = OperatingSystem.IsMacOS();
         Timeline.AddHandler(PointerPressedEvent, OnSeekStarted, RoutingStrategies.Tunnel, handledEventsToo: true);
         Timeline.AddHandler(PointerReleasedEvent, OnSeekFinished, RoutingStrategies.Bubble, handledEventsToo: true);
         Timeline.AddHandler(Thumb.DragCompletedEvent, OnThumbDragCompleted, handledEventsToo: true);

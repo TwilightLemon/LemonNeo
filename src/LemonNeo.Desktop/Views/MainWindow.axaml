@@ -2,20 +2,35 @@
         xmlns:vm="using:LemonNeo.Desktop.ViewModels" xmlns:core="using:LemonNeo.Core"
         xmlns:views="using:LemonNeo.Desktop.Views" xmlns:controls="using:LemonNeo.Desktop.Controls"
         xmlns:i18n="using:LemonNeo.Desktop.Infrastructure"
-        x:Class="LemonNeo.Desktop.Views.MainWindow" x:DataType="vm:MainViewModel"
+        x:Class="LemonNeo.Desktop.Views.MainWindow" x:DataType="vm:MainViewModel" Name="DesktopWindow"
         Title="Lemon Neo" Width="1180" Height="790" MinWidth="880" MinHeight="620"
+        WindowDecorations="Full" ExtendClientAreaTitleBarHeightHint="56"
+        WindowDecorationsTheme="{StaticResource LemonWindowDecorations}"
+        Background="Transparent" TransparencyLevelHint="AcrylicBlur, Blur, None"
+        TransparencyBackgroundFallback="{DynamicResource Brush.Sidebar}"
         WindowStartupLocation="CenterScreen">
+  <Window.Styles>
+    <Style Selector="Border#TopBar"><Setter Property="Padding" Value="24,10" /></Style>
+    <Style Selector="Border#Sidebar"><Setter Property="Padding" Value="16,20,16,12" /></Style>
+    <Style Selector="Border#TopBar.windows">
+      <Setter Property="Padding" Value="24,10,164,10" />
+    </Style>
+    <Style Selector="Border#Sidebar.macos">
+      <Setter Property="Padding" Value="16,56,16,12" />
+    </Style>
+  </Window.Styles>
   <Grid Name="ShellRoot" RowDefinitions="56,*,Auto" ColumnDefinitions="230,1,*" ClipToBounds="True">
-    <Border Name="Sidebar" Grid.RowSpan="3" Background="{DynamicResource Brush.Sidebar}" Padding="16,20,16,12">
+    <Border Name="ContentBackground" Grid.Column="2" Grid.RowSpan="3" Background="{DynamicResource Brush.Canvas}" IsHitTestVisible="False" />
+    <Border Name="Sidebar" Grid.RowSpan="3" Background="{DynamicResource Brush.SidebarTranslucent}">
       <Grid RowDefinitions="Auto,Auto,*,Auto">
-        <StackPanel Margin="12,0,0,16" Spacing="7">
-          <StackPanel Orientation="Horizontal" Spacing="10">
-            <Border Background="{DynamicResource Brush.Accent}" CornerRadius="12" Width="34" Height="34">
-              <Path Classes="icon" Data="{StaticResource Icon.Music}" Fill="{DynamicResource Brush.OnAccent}" />
-            </Border>
-            <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.AppName}}" FontSize="23" FontWeight="SemiBold" VerticalAlignment="Center" />
-          </StackPanel>
-          <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.Tagline}}" TextWrapping="Wrap" />
+        <StackPanel Margin="12,0,0,16" Orientation="Horizontal" Spacing="10">
+          <Border Background="{DynamicResource Brush.Accent}" CornerRadius="12" Width="34"
+            Height="34">
+            <Path Classes="icon" Data="{StaticResource Icon.Music}"
+              Fill="{DynamicResource Brush.OnAccent}" />
+          </Border>
+          <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.AppName}}" FontSize="23"
+            FontWeight="SemiBold" VerticalAlignment="Center" />
         </StackPanel>
         <StackPanel Grid.Row="1" Spacing="4" Margin="0,0,0,12">
           <Button Classes="nav" Classes.active="{Binding Navigation.IsLibrary}" Command="{Binding Navigation.NavigateCommand}" CommandParameter="Library">
@@ -52,10 +67,19 @@
         </StackPanel>
       </Grid>
     </Border>
+    <Border Name="MacCaptionDragArea" Background="Transparent" IsVisible="False"
+            WindowDecorationProperties.ElementRole="TitleBar" />
     <Border Grid.Column="1" Grid.RowSpan="3" Background="{DynamicResource Brush.Border}" />
-    <Border Name="TopBar" Grid.Column="2" Padding="24,10" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="0,0,0,1">
-      <Grid ColumnDefinitions="Auto,*,Auto">
-        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+    <Border Name="TopBar" Grid.Column="2" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="0,0,0,1"
+            WindowDecorationProperties.ElementRole="TitleBar">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="5*" MaxWidth="448" />
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" WindowDecorationProperties.ElementRole="User">
           <Button Name="BackButton" Classes="ghost compact" Command="{Binding Navigation.BackCommand}" ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Back}}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Back}}">
             <Path Classes="icon" Data="{StaticResource Icon.Back}" />
           </Button>
@@ -63,7 +87,8 @@
             <Path Classes="icon" Data="{StaticResource Icon.Forward}" />
           </Button>
         </StackPanel>
-        <Grid Grid.Column="1" ColumnDefinitions="*,Auto" Width="420" HorizontalAlignment="Left" Margin="16,0,12,0" VerticalAlignment="Center">
+        <Grid Name="SearchArea" Grid.Column="1" ColumnDefinitions="*,Auto" Margin="16,0,12,0" VerticalAlignment="Center"
+              WindowDecorationProperties.ElementRole="User">
           <TextBox Name="GlobalSearch" Classes="toolbarSearch" Text="{Binding SearchQuery}" KeyDown="OnSearchKeyDown"
                    PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.SearchMusic}}"
                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.SearchMusic}}" IsEnabled="{Binding SharedContext.IsInitialized}" />
@@ -72,7 +97,7 @@
             <Path Classes="icon" Data="{StaticResource Icon.Search}" />
           </Button>
         </Grid>
-        <ProgressBar Grid.Column="2" IsIndeterminate="True" IsVisible="{Binding IsBusy}" Width="40" Height="3" VerticalAlignment="Center" AutomationProperties.Name="{Binding Status}" />
+        <ProgressBar Grid.Column="3" IsIndeterminate="True" IsVisible="{Binding IsBusy}" Width="40" Height="3" VerticalAlignment="Center" IsHitTestVisible="False" AutomationProperties.Name="{Binding Status}" />
       </Grid>
     </Border>
     <Grid Grid.Row="1" Grid.Column="2" RowDefinitions="Auto,*" Margin="32,20,32,24">

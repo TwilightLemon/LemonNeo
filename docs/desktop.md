@@ -99,11 +99,23 @@ names, and provider error details remain the data supplied by their sources.
 
 | Area | Windows | macOS | Linux |
 | --- | --- | --- | --- |
-| Window | Native decorations | Native traffic-light controls | Window-manager decorations |
+| Window | Three Avalonia-drawn caption buttons in the toolbar | Native traffic-light controls above the sidebar | Window-manager decorations |
 | Folder import | Native storage picker | Native storage picker | Avalonia storage picker / available desktop integration |
 | Import shortcut | Ctrl+O | Command+O | Ctrl+O |
 | Settings and storage | Roaming/local AppData | Application Support / Caches | XDG config/data/cache |
 | Media controls | Windows SMTC plugin | Now Playing plugin and AppKit helper | Regular desktop playback |
+
+Windows and macOS extend the client area using Avalonia 12's official window
+decoration APIs. `WindowChrome.axaml` derives from Fluent's `WindowDrawnDecorations`
+theme, preserving its caption actions and fullscreen popover. There is no separate
+title strip or title text: the existing toolbar supplies the native drag region,
+with room reserved for the three Windows buttons. macOS keeps its native buttons
+in the sidebar's top area. Linux retains its system decorations.
+
+The sidebar uses a theme-aware tint at 72% opacity over the requested
+`AcrylicBlur, Blur, None` backdrop. Avalonia selects the first supported effect;
+environments without blur use the opaque sidebar color as the transparency
+fallback. The right content column and playback surface keep their opaque brushes.
 
 The UI uses platform font fallback and scales with Avalonia's DPI handling.
 It does not assume drive letters, Windows shell APIs, or a fixed desktop theme.
