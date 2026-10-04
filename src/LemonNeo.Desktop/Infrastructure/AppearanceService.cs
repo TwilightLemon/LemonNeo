@@ -5,11 +5,17 @@ using LemonNeo.Configuration;
 namespace LemonNeo.Desktop.Infrastructure;
 
 public enum ThemePreference { System, Light, Dark }
+public enum LyricAlignment { Center, Left }
 
 public sealed record UiPreferences(
     ThemePreference Theme = ThemePreference.System,
     LanguagePreference Language = LanguagePreference.System,
-    bool ReduceMotion = false);
+    bool ReduceMotion = false,
+    double LyricFontSize = 24,
+    bool ShowRomanization = true,
+    bool ShowTranslation = true,
+    LyricAlignment LyricAlignment = LyricAlignment.Center,
+    bool BoldLyrics = false);
 
 /// <summary>Owns live UI preferences. The default follows the operating system.</summary>
 public sealed class AppearanceService(
@@ -28,13 +34,17 @@ public sealed class AppearanceService(
         Apply(preferences);
     }
 
-    public async Task SetAsync(UiPreferences preferences, CancellationToken cancellationToken = default)
+    public Task SetAsync(UiPreferences preferences, CancellationToken cancellationToken = default) =>
+        UpdateAsync(_ => preferences, cancellationToken);
+
+    public async Task UpdateAsync(Func<UiPreferences, UiPreferences> update, CancellationToken cancellationToken = default)
     {
         await _saveGate.WaitAsync(cancellationToken);
         try
         {
+            var preferences = Normalize(update(Current));
             // Persist first: a failed write leaves the UI and saved settings in agreement.
-            await store.SetAsync(ConfigurationKey, Normalize(preferences), cancellationToken);
+            await store.SetAsync(ConfigurationKey, preferences, cancellationToken);
             Apply(preferences);
         }
         finally { _saveGate.Release(); }
@@ -43,7 +53,9 @@ public sealed class AppearanceService(
     private static UiPreferences Normalize(UiPreferences value) => value with
     {
         Theme = Enum.IsDefined(value.Theme) ? value.Theme : ThemePreference.System,
-        Language = Enum.IsDefined(value.Language) ? value.Language : LanguagePreference.System
+        Language = Enum.IsDefined(value.Language) ? value.Language : LanguagePreference.System,
+        LyricFontSize = double.IsFinite(value.LyricFontSize) ? Math.Clamp(value.LyricFontSize, 16, 48) : 24,
+        LyricAlignment = Enum.IsDefined(value.LyricAlignment) ? value.LyricAlignment : LyricAlignment.Center
     };
 
     private void Apply(UiPreferences preferences)

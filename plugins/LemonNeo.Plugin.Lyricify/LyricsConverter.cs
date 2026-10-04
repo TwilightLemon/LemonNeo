@@ -8,8 +8,10 @@ using LemonLyricsLine = LemonNeo.Plugin.Abstractions.LyricsLine;
 
 namespace LemonNeo.Plugin.Lyricify;
 
-internal static class LyricsConverter
+internal static partial class LyricsConverter
 {
+    [GeneratedRegex(@"(?m)^(?<timestamps>(?:[ \t]*\[[^\]\r\n]+\])*)[ \t]*//[ \t]*(?=\r?$)", RegexOptions.CultureInvariant)]
+    private static partial Regex EmptyQqTranslation();
     public static LemonLyrics Parse(
         string raw,
         LyricsRawTypes type,
@@ -58,10 +60,21 @@ internal static class LyricsConverter
             ? helperLines.Select(ConvertLine).ToArray()
             : raw.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
                 .Select(text => new LemonLyricsLine(text)).ToArray();
+        var qqMusic = string.Equals(source, MusicIdNamespaces.QQMusic, StringComparison.OrdinalIgnoreCase);
+        if (qqMusic) lines = lines.Select(NormalizeEmbeddedTranslations).ToArray();
         var translationLines = ParseAuxiliary(translation)?.Select(ConvertLine).ToArray()
             ?? lines.Where(line => line.Translations is { Count: > 0 }).Select(line => new LemonLyricsLine(
                 line.Translations!.GetValueOrDefault("zh") ?? line.Translations!.Values.First(),
                 line.EffectiveStartTimeMs, line.EffectiveEndTimeMs, line.Translations)).ToArray();
+        if (qqMusic)
+        {
+            // Keep the empty row and its timestamp so a missing translation cannot shift later rows.
+            translationLines = translationLines.Select(line => IsEmptyQqTranslation(line.Text)
+                ? line with { Text = "", Words = null, Translations = null }
+                : NormalizeEmbeddedTranslations(line)).ToArray();
+            translation = translation is null ? null : EmptyQqTranslation().Replace(translation, "${timestamps}");
+            if (string.IsNullOrWhiteSpace(translation)) translation = null;
+        }
 
         var romanizedLines = new List<LyricsRomanizationLine>();
         foreach (var line in lines.Where(line => !string.IsNullOrWhiteSpace(line.Romanization)))
@@ -122,6 +135,14 @@ internal static class LyricsConverter
             words,
             line.SubLine is { } background ? ConvertLine(background) : null);
     }
+
+    private static bool IsEmptyQqTranslation(string text) => text.Trim() == "//";
+
+    private static LemonLyricsLine NormalizeEmbeddedTranslations(LemonLyricsLine line) => line with
+    {
+        Translations = line.Translations?.ToDictionary(entry => entry.Key, entry => IsEmptyQqTranslation(entry.Value) ? "" : entry.Value),
+        BackgroundLine = line.BackgroundLine is { } background ? NormalizeEmbeddedTranslations(background) : null
+    };
 
     private static List<ILineInfo>? ParseAuxiliary(string? raw)
     {

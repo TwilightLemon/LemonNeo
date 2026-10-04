@@ -1,3 +1,5 @@
+using Avalonia.Media;
+using CommunityToolkit.Mvvm.Input;
 using LemonNeo.Application;
 using LemonNeo.Core;
 using LemonNeo.Desktop.Infrastructure;
@@ -15,14 +17,117 @@ public sealed class LyricsViewModel : PageViewModel
     private Track? _lyricsTrack;
     private string _lyricsStatusKey = "NoLyrics";
     private IReadOnlyList<LyricsLine> _lyricLines = [];
+    private UiPreferences _preferences;
+    private int _pendingPreferenceSaves;
+    private readonly List<Task> _preferenceTasks = [];
     public LyricsViewModel(DesktopContext context, PlaybackViewModel playback) : base(context, DesktopRoutes.Lyrics)
     {
         Playback = playback; _snapshot = playback.Snapshot;
+        _preferences = context.Appearance.Current;
+        AlignLeftCommand = new(() => SetAlignment(LyricAlignment.Left));
+        AlignCenterCommand = new(() => SetAlignment(LyricAlignment.Center));
+        SeekLyricCommand = new(position => Playback.SeekAsync(position / 1000), position => position >= 0 && Playback.CanSeek);
+        Context.Appearance.Changed += OnAppearanceChanged;
         Playback.Changed += OnPlaybackChanged;
         UpdateSnapshot();
     }
     public PlaybackViewModel Playback { get; }
-    public string LyricsText => _lyrics?.Text ?? _text[_lyricsStatusKey];
+    public Lyrics? Document => _lyrics;
+    public double PositionMilliseconds => _snapshot.Timeline.Position.TotalMilliseconds;
+    public bool IsStopped => _snapshot.State == PlayerState.Stopped;
+    public bool ReduceMotion => Context.Appearance.Current.ReduceMotion;
+    public RelayCommand AlignLeftCommand { get; }
+    public RelayCommand AlignCenterCommand { get; }
+    public AsyncRelayCommand<double> SeekLyricCommand { get; }
+    public bool IsLeftAligned => _preferences.LyricAlignment == LyricAlignment.Left;
+    public bool IsCenterAligned => !IsLeftAligned;
+    public TextAlignment LyricTextAlignment => IsLeftAligned ? TextAlignment.Left : TextAlignment.Center;
+    public double LyricFontSize
+    {
+        get => _preferences.LyricFontSize;
+        set
+        {
+            var size = double.IsFinite(value) ? Math.Clamp(Math.Round(value), 16, 48) : 24;
+            if (size == LyricFontSize) return;
+            _preferences = _preferences with { LyricFontSize = size };
+            RefreshPreferenceProperties();
+            QueuePreferenceSave(p => p with { LyricFontSize = size });
+        }
+    }
+    public bool ShowRomanization
+    {
+        get => _preferences.ShowRomanization;
+        set
+        {
+            if (value == ShowRomanization) return;
+            _preferences = _preferences with { ShowRomanization = value };
+            RefreshPreferenceProperties();
+            QueuePreferenceSave(p => p with { ShowRomanization = value });
+        }
+    }
+    public bool ShowTranslation
+    {
+        get => _preferences.ShowTranslation;
+        set
+        {
+            if (value == ShowTranslation) return;
+            _preferences = _preferences with { ShowTranslation = value };
+            RefreshPreferenceProperties();
+            QueuePreferenceSave(p => p with { ShowTranslation = value });
+        }
+    }
+    public bool BoldLyrics
+    {
+        get => _preferences.BoldLyrics;
+        set
+        {
+            if (value == BoldLyrics) return;
+            _preferences = _preferences with { BoldLyrics = value };
+            RefreshPreferenceProperties();
+            QueuePreferenceSave(p => p with { BoldLyrics = value });
+        }
+    }
+
+    private void SetAlignment(LyricAlignment alignment)
+    {
+        if (_preferences.LyricAlignment == alignment) return;
+        _preferences = _preferences with { LyricAlignment = alignment };
+        RefreshPreferenceProperties();
+        QueuePreferenceSave(p => p with { LyricAlignment = alignment });
+    }
+    private void QueuePreferenceSave(Func<UiPreferences, UiPreferences> update)
+    {
+        if (_pendingPreferenceSaves == 0) SetError(null);
+        _preferenceTasks.RemoveAll(t => t.IsCompleted);
+        _preferenceTasks.Add(SavePreferenceAsync(update));
+    }
+    private async Task SavePreferenceAsync(Func<UiPreferences, UiPreferences> update)
+    {
+        _pendingPreferenceSaves++;
+        try { await Context.Appearance.UpdateAsync(update, _lifetime.Token); }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { SetError("OperationFailed", [exception.Message]); }
+        finally
+        {
+            if (--_pendingPreferenceSaves == 0)
+            {
+                _preferences = Context.Appearance.Current;
+                RefreshPreferenceProperties();
+            }
+        }
+    }
+    private void OnAppearanceChanged(object? sender, EventArgs args)
+    {
+        if (_pendingPreferenceSaves == 0) _preferences = Context.Appearance.Current;
+        RefreshPreferenceProperties();
+    }
+    private void RefreshPreferenceProperties()
+    {
+        foreach (var name in new[] { nameof(LyricFontSize), nameof(ShowRomanization), nameof(ShowTranslation), nameof(BoldLyrics),
+                     nameof(IsLeftAligned), nameof(IsCenterAligned), nameof(LyricTextAlignment), nameof(ReduceMotion) })
+            OnPropertyChanged(name);
+    }
+    public string LyricsText => string.IsNullOrWhiteSpace(_lyrics?.Text) ? _text[_lyricsStatusKey] : _lyrics.Text;
     public string CurrentLyric { get; private set; } = "";
     public string PreviousLyric { get; private set; } = "";
     public string NextLyric { get; private set; } = "";
@@ -39,6 +144,7 @@ public sealed class LyricsViewModel : PageViewModel
     private void UpdateSnapshot()
     {
         _snapshot = Playback.Snapshot;
+        SeekLyricCommand.NotifyCanExecuteChanged();
         UpdateLyricsPosition();
         if (Equals(_lyricsTrack, _snapshot.CurrentTrack)) return;
         _lyricsTrack = _snapshot.CurrentTrack;
@@ -52,6 +158,7 @@ public sealed class LyricsViewModel : PageViewModel
         _lyrics = null;
         _lyricLines = [];
         _lyricsStatusKey = track is null ? "NoLyrics" : "LyricsLoading";
+        UpdateLyricsPosition();
         RaiseLyricsProperties();
         if (track is null) return;
         try
@@ -71,6 +178,8 @@ public sealed class LyricsViewModel : PageViewModel
 
     private void UpdateLyricsPosition()
     {
+        OnPropertyChanged(nameof(PositionMilliseconds));
+        OnPropertyChanged(nameof(IsStopped));
         var milliseconds = _snapshot.Timeline.Position.TotalMilliseconds;
         var index = -1;
         for (var i = 0; i < _lyricLines.Count; i++)
@@ -101,11 +210,14 @@ public sealed class LyricsViewModel : PageViewModel
         }
         OnPropertyChanged(nameof(HasTranslation));
     }
-    private void RaiseLyricsProperties() { OnPropertyChanged(nameof(LyricsText)); OnPropertyChanged(nameof(HasTimedLyrics)); }
+    private void RaiseLyricsProperties() { OnPropertyChanged(nameof(Document)); OnPropertyChanged(nameof(LyricsText)); OnPropertyChanged(nameof(HasTimedLyrics)); }
     protected override void RefreshLocalizedProperties() { base.RefreshLocalizedProperties(); UpdateLyricsPosition(); RaiseLyricsProperties(); }
     public override async ValueTask DisposeAsync()
     {
         Playback.Changed -= OnPlaybackChanged;
+        Context.Appearance.Changed -= OnAppearanceChanged;
+        // Finish accepted preference writes before cancelling lyric requests on shutdown.
+        await Task.WhenAll(_preferenceTasks);
         await _lifetime.CancelAsync(); await base.DisposeAsync(); await Task.WhenAll(_lyricsTasks);
         _lyricsCancellation?.Dispose(); _lifetime.Dispose();
     }

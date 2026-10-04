@@ -18,6 +18,7 @@ internal sealed class FeatureProvider : IMusicProvider, ISearchProvider, ISearch
     public List<SearchRequest> Searches { get; } = [];
     public IReadOnlyList<string> LastMetadataTargets { get; private set; } = [];
     public bool FailSearch { get; set; }
+    public Lyrics? LyricsOverride { get; set; }
     public TaskCompletionSource SearchStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public TaskCompletionSource SearchRelease { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public Track First { get; } = new()
@@ -93,7 +94,7 @@ internal sealed class FeatureProvider : IMusicProvider, ISearchProvider, ISearch
                 Duration = TimeSpan.FromSeconds(42), ExternalIds = [new("isrc", "TEST00000001"), new("test-net", "alternate-one", "song-id")] }
         }], new Dictionary<string, string> { ["other-net"] = "Fixture metadata warning" }));
     }
-    public Task<Lyrics?> GetLyricsAsync(Track track, CancellationToken cancellationToken = default) => Task.FromResult<Lyrics?>(new(
+    public Task<Lyrics?> GetLyricsAsync(Track track, CancellationToken cancellationToken = default) => Task.FromResult<Lyrics?>(LyricsOverride ?? new(
         "hello world\nDone", "en", true,
         Lines: [new("hello world", 0, 3000, Words: [new("hello ", 0, 1000), new("world", 1000, 2500)]), new("Done", 4000, 5000)],
         Source: "Fixture", TranslationLines: [new("你好", 500, 1500), new("世界", 1500, 3000)],

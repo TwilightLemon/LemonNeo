@@ -5,6 +5,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/LemonNeo.Desktop.Tests/LemonNeo.Desktop.Tests.csproj" />
     <Project Path="tests/LemonNeo.Interactive.Tests/LemonNeo.Interactive.Tests.csproj" />
+    <Project Path="tests/LemonNeo.Lyrics.Tests/LemonNeo.Lyrics.Tests.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/LemonNeo.Application/LemonNeo.Application.csproj" />

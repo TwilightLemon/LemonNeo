@@ -1,6 +1,9 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -13,6 +16,7 @@ using LemonNeo.Desktop.ViewModels;
 using LemonNeo.Desktop.Views;
 using LemonNeo.Persistence;
 using LemonNeo.Plugin.Runtime;
+using LemonNeo.Plugin.Abstractions;
 using Xunit;
 
 namespace LemonNeo.Desktop.Tests;
@@ -288,6 +292,129 @@ public sealed class FeatureTests
         Assert.Equal(PlaybackMode.Shuffle, fixture.Runtime.Get<PlaybackSessionService>().Queue.Mode);
         await vm.Playback.StopCommand.ExecuteAsync(null);
         Assert.Empty(vm.Lyrics.CurrentLyricSegments); Assert.Empty(vm.Lyrics.RomanizationSegments); Assert.Equal("", vm.Lyrics.Translation);
+    }
+
+    [AvaloniaFact]
+    public async Task NowPlayingLyricsLayoutAndDisplaySettingsWorkInBothPalettesAndWindowSizes()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var vm = fixture.ViewModel;
+        var main = new[] { "隣にいてくれたのに", "\"I'm me\" なんて言ってさ", "一人よがり最悪だ", "自分らしくいたいだけ", "願いごとはひとつだけ", "君とまた歩きたい" };
+        var romanization = new[] { "tonari ni i te kure ta noni", "nante i xtu te sa", "hitori yogari saiaku da", "jibun rashiku itai dake", "negaigoto wa hitotsu dake", "kimi to mata arukitai" };
+        var translated = new[] { "你总会陪在我身边", "但我总是只为自己着想", "自以为是的我 简直是太差劲了", "只是想活出自己的样子", "我的愿望只有一个", "想与你再次并肩前行" };
+        fixture.Provider.LyricsOverride = new("", IsSynchronized: true,
+            Lines: main.Select((line, i) => new LyricsLine(line, i * 1000, (i + 1) * 1000,
+                Words: line.Select((c, j) => new LyricsWord(c.ToString(), i * 1000 + j * 1000 / line.Length, i * 1000 + (j + 1) * 1000 / line.Length)).ToArray())).ToArray(),
+            RomanizationLines: romanization.Select((line, i) => new LyricsRomanizationLine(line.Split(' ').Select((word, j) =>
+                new LyricsWord(word + " ", i * 1000 + j * 1000 / line.Split(' ').Length, i * 1000 + (j + 1) * 1000 / line.Split(' ').Length)).ToArray())).ToArray(),
+            TranslationLines: translated.Select((line, i) => new LyricsLine(line, i * 1000, (i + 1) * 1000)).ToArray());
+        await vm.Navigation.NavigateAsync(DesktopRoutes.Search);
+        vm.Search.SearchQuery = "one"; await vm.Search.SearchAsync();
+        vm.Search.SelectedTrack = vm.Search.Tracks.Single();
+        await vm.Search.PlaySelectedCommand.ExecuteAsync(null);
+        await vm.Navigation.NavigateAsync(DesktopRoutes.Lyrics);
+        await WaitUntilAsync(() => vm.Lyrics.Document is not null);
+        await vm.Playback.SeekAsync(1.6);
+        await vm.Playback.TogglePlaybackCommand.ExecuteAsync(null);
+        var window = new MainWindow { DataContext = vm };
+        window.Show();
+        try
+        {
+            foreach (var theme in new[] { ThemePreference.Light, ThemePreference.Dark })
+                foreach (var size in new[] { new Size(1180, 790), new Size(880, 620) })
+                {
+                    await fixture.Appearance.SetAsync(fixture.Appearance.Current with { Theme = theme, Language = LanguagePreference.Chinese });
+                    window.Width = size.Width; window.Height = size.Height;
+                    Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+                    var view = Assert.Single(window.GetVisualDescendants().OfType<LyricsView>());
+                    var presenter = Assert.Single(view.GetVisualDescendants().OfType<LyricsPresenter>());
+                    var cover = Assert.Single(view.GetVisualDescendants().OfType<Artwork>());
+                    Assert.Equal(1, presenter.CurrentIndex);
+                    Assert.Equal(vm.Lyrics.LyricFontSize, presenter.FontSize);
+                    Assert.InRange(presenter.Bounds.Height, 120, view.Bounds.Height);
+                    var coverPoint = cover.TranslatePoint(default, view)!.Value;
+                    var lyricPoint = presenter.TranslatePoint(default, view)!.Value;
+                    if (size.Width == 1180) Assert.True(lyricPoint.X > coverPoint.X + cover.Bounds.Width);
+                    else Assert.True(lyricPoint.Y >= coverPoint.Y + cover.Bounds.Height);
+                    using var rendered = new RenderTargetBitmap(new PixelSize((int)size.Width, (int)size.Height));
+                    rendered.Render(window);
+                    if (Environment.GetEnvironmentVariable("LEMONNEO_PREVIEW_DIRECTORY") is { Length: > 0 } directory)
+                    {
+                        Directory.CreateDirectory(directory);
+                        rendered.Save(Path.Combine(directory, $"Lyrics-{theme}-{size.Width}.png"), PngBitmapEncoderOptions.Default);
+                    }
+                }
+            var timeline = Assert.Single(window.GetVisualDescendants().OfType<LyricsPresenter>());
+            var currentMain = Assert.Single(timeline.GetVisualDescendants().OfType<LyricText>(), t => t.Text == main[1]);
+            var currentRomanization = Assert.Single(timeline.GetVisualDescendants().OfType<LyricText>(), t => t.Text?.Trim() == romanization[1]);
+            var currentTranslation = Assert.Single(timeline.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == translated[1]);
+            foreach (var target in new TextBlock[] { currentMain, currentRomanization, currentTranslation })
+            {
+                await vm.Playback.SeekAsync(1.6); Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+                var point = target.TranslatePoint(new Point(target.Bounds.Width / 2, target.Bounds.Height / 2), window)!.Value;
+                window.MouseDown(point, MouseButton.Left); window.MouseUp(point, MouseButton.Left);
+                await WaitUntilAsync(() => vm.Playback.PositionSeconds == 1 && !vm.Lyrics.SeekLyricCommand.IsRunning);
+                Assert.False(vm.Playback.IsPlaying);
+                Assert.True(timeline.IsFollowing);
+                Assert.True(Assert.IsType<StackPanel>(target.Parent).Focusable);
+            }
+            var settings = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "LyricsSettingsButton");
+            var flyout = Assert.IsType<Flyout>(settings.Flyout);
+            flyout.ShowAt(settings); Dispatcher.UIThread.RunJobs();
+            var panel = Assert.IsType<StackPanel>(flyout.Content);
+            var bold = Assert.Single(panel.GetVisualDescendants().OfType<ToggleSwitch>(), toggle => toggle.Name == "BoldLyricsToggle");
+            Assert.False(bold.IsChecked);
+            bold.IsChecked = true;
+            await WaitUntilAsync(() => fixture.Appearance.Current.BoldLyrics);
+            Assert.True(vm.Lyrics.BoldLyrics); Assert.True(timeline.BoldLyrics);
+            Assert.Equal(FontWeight.Bold, currentMain.FontWeight);
+            Assert.Equal(FontWeight.Bold, currentRomanization.FontWeight);
+            Assert.Equal(FontWeight.Bold, currentTranslation.FontWeight);
+            var left = panel.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "AlignLeftButton");
+            var center = panel.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "AlignCenterButton");
+            foreach (var theme in new[] { ThemePreference.Light, ThemePreference.Dark })
+            {
+                await fixture.Appearance.SetAsync(fixture.Appearance.Current with { Theme = theme });
+                Assert.NotNull(center.Command);
+                center.Command.Execute(center.CommandParameter);
+                await WaitUntilAsync(() => fixture.Appearance.Current.LyricAlignment == LyricAlignment.Center);
+                Dispatcher.UIThread.RunJobs();
+                Assert.True(center.TryFindResource("Brush.Accent", center.ActualThemeVariant, out var accent));
+                Assert.Equal(((ISolidColorBrush)accent!).Color, ((ISolidColorBrush)center.Background!).Color);
+                Assert.Equal(((ISolidColorBrush)center.Background!).Color, ((ISolidColorBrush)Assert.Single(center.GetVisualDescendants().OfType<Border>()).Background!).Color);
+                Assert.NotEqual(((ISolidColorBrush)center.Background!).Color, ((ISolidColorBrush)left.Background!).Color);
+                Assert.NotNull(left.Command);
+                left.Command.Execute(left.CommandParameter);
+                await WaitUntilAsync(() => fixture.Appearance.Current.LyricAlignment == LyricAlignment.Left);
+                Dispatcher.UIThread.RunJobs();
+                Assert.Equal(((ISolidColorBrush)accent!).Color, ((ISolidColorBrush)left.Background!).Color);
+                Assert.NotEqual(((ISolidColorBrush)left.Background!).Color, ((ISolidColorBrush)center.Background!).Color);
+                if (Environment.GetEnvironmentVariable("LEMONNEO_PREVIEW_DIRECTORY") is { Length: > 0 } directory)
+                {
+                    var popup = TopLevel.GetTopLevel(panel)!;
+                    using var rendered = new RenderTargetBitmap(new PixelSize((int)Math.Ceiling(popup.Bounds.Width), (int)Math.Ceiling(popup.Bounds.Height)));
+                    rendered.Render(popup);
+                    rendered.Save(Path.Combine(directory, $"Lyrics-Settings-{theme}.png"), PngBitmapEncoderOptions.Default);
+                }
+            }
+            var toggles = panel.GetVisualDescendants().OfType<ToggleSwitch>().ToArray();
+            Assert.Equal(3, toggles.Length);
+            foreach (var toggle in toggles) toggle.IsChecked = false;
+            panel.GetVisualDescendants().OfType<Slider>().Single().Value = 32;
+            Assert.False(vm.Lyrics.ShowRomanization); Assert.False(vm.Lyrics.ShowTranslation);
+            Assert.False(vm.Lyrics.BoldLyrics); Assert.False(timeline.BoldLyrics);
+            Assert.Equal(FontWeight.Normal, currentMain.FontWeight);
+            Assert.Equal(FontWeight.Normal, currentRomanization.FontWeight);
+            Assert.Equal(FontWeight.Normal, currentTranslation.FontWeight);
+            Assert.Equal(32, vm.Lyrics.LyricFontSize);
+            vm.Lyrics.AlignLeftCommand.Execute(null);
+            await WaitUntilAsync(() => fixture.Appearance.Current.LyricFontSize == 32 && !fixture.Appearance.Current.ShowRomanization
+                && !fixture.Appearance.Current.ShowTranslation && !fixture.Appearance.Current.BoldLyrics
+                && fixture.Appearance.Current.LyricAlignment == LyricAlignment.Left);
+            Assert.Equal(TextAlignment.Left, Assert.Single(window.GetVisualDescendants().OfType<LyricsPresenter>()).TextAlignment);
+            flyout.Hide();
+        }
+        finally { window.Close(); }
     }
 
     [AvaloniaFact]
