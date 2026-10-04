@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.Input;
 using Avalonia.Threading;
 using Avalonia.Media.Imaging;
+using Avalonia.Media;
 using LemonNeo.Application;
 using LemonNeo.Core;
 using LemonNeo.Desktop.Infrastructure;
@@ -117,18 +118,26 @@ public sealed class PlaybackViewModel : PageViewModel
         try
         {
             bitmap = await _artwork.LoadAsync(uri, cancellationToken);
+            Color? color = null;
+            if (bitmap is not null)
+            {
+                try { color = await Task.Run(() => ArtworkColorExtractor.Extract(bitmap, cancellationToken), cancellationToken); }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+                catch (Exception exception) { System.Diagnostics.Trace.WriteLine($"Artwork color extraction failed: {exception}"); }
+            }
             if (_closing || cancellationToken.IsCancellationRequested || !Equals(uri, _artworkUri)) return;
-            SetArtwork(bitmap);
+            SetArtwork(bitmap, color);
             bitmap = null;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         finally { bitmap?.Dispose(); }
     }
 
-    private void SetArtwork(Bitmap? bitmap)
+    private void SetArtwork(Bitmap? bitmap, Color? color = null)
     {
         var previous = _nowArtwork;
         if (SetProperty(ref _nowArtwork, bitmap, nameof(NowArtwork))) previous?.Dispose();
+        Context.Appearance.SetArtworkColor(color);
     }
 
     private void RaisePlaybackProperties()

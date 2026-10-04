@@ -16,6 +16,11 @@ synchronized lyrics, playback, and the same synchronization service as Console.
 See [the desktop guide](docs/desktop.md) for its infrastructure, platform behavior,
 current feature scope, and verification commands.
 
+Desktop appearance also supports nine built-in color palettes, optional colors
+from the playing track's artwork with a selected fallback, and smooth transitions
+in light and dark mode. See [desktop theme colors](docs/desktop-theming.md) for
+settings, implementation, and regression tests.
+
 Build and start the interactive host:
 
 ```powershell

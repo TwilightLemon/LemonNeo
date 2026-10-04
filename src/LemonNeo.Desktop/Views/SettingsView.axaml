@@ -28,6 +28,33 @@
                 <Button Classes.primary="{Binding IsThemeLight}" Margin="0,0,10,8" MinWidth="130" Content="{Translate {x:Static i18n:LanguageManager+Keys.ThemeLight}}" Command="{Binding ThemeCommand}" CommandParameter="Light" />
                 <Button Classes.primary="{Binding IsThemeDark}" Margin="0,0,10,8" MinWidth="130" Content="{Translate {x:Static i18n:LanguageManager+Keys.ThemeDark}}" Command="{Binding ThemeCommand}" CommandParameter="Dark" />
               </WrapPanel>
+              <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.ThemeColors}}" />
+              <ToggleSwitch IsChecked="{Binding UseArtworkColors}" Content="{Translate {x:Static i18n:LanguageManager+Keys.UseArtworkColors}}" />
+              <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding ThemeColorStatus}" />
+              <ItemsControl ItemsSource="{Binding ThemeColors}">
+                <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ThemeColorOption">
+                    <Button Classes="themeColor" Classes.selected="{Binding IsSelected}" Command="{Binding SelectCommand}"
+                            Width="176" Margin="0,0,10,10" HorizontalContentAlignment="Stretch" AutomationProperties.Name="{Binding Name}">
+                      <StackPanel Spacing="10">
+                        <Border CornerRadius="6" ClipToBounds="True" Height="32">
+                          <Grid ColumnDefinitions="2*,*,*">
+                            <Border Background="{Binding Accent}" />
+                            <Border Grid.Column="1" Background="{Binding Dark}" />
+                            <Border Grid.Column="2" Background="{Binding Light}" />
+                          </Grid>
+                        </Border>
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBlock Text="{Binding Name}" />
+                          <Path Grid.Column="1" Classes="icon" Width="14" Height="14" IsVisible="{Binding IsSelected}"
+                                Data="M 2,7 L 5,10 L 12,3" Stroke="{DynamicResource Brush.AccentText}" StrokeThickness="2" Fill="Transparent" />
+                        </Grid>
+                      </StackPanel>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
             </StackPanel>
           </Border>
           <Border Classes="card">

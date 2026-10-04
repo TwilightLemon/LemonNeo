@@ -14,6 +14,9 @@
     <Project Path="src/LemonNeo.Plugin.Runtime/LemonNeo.Plugin.Runtime.csproj" />
     <Project Path="src/LemonNeo.Sync.Abstractions/LemonNeo.Sync.Abstractions.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/LemonNeo.Desktop.Tests/LemonNeo.Desktop.Tests.csproj" />
+  </Folder>
   <Folder Name="/plugins/">
     <Project Path="plugins/LemonNeo.Plugin.WindowsSmtc/LemonNeo.Plugin.WindowsSmtc.csproj" />
     <Project Path="plugins/LemonNeo.Plugin.MacNowPlaying/LemonNeo.Plugin.MacNowPlaying.csproj" />

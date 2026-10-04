@@ -51,6 +51,7 @@ public partial class App : Avalonia.Application
                     {
                         System.Diagnostics.Trace.WriteLine($"Desktop plugin shutdown failed: {exception}");
                     }
+                    appearance.Dispose();
                     shutdownComplete = true;
                     window.Close();
                 }

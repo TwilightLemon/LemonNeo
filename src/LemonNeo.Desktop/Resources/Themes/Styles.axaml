@@ -33,6 +33,15 @@
   <Style Selector="Button.icon"><Setter Property="Width" Value="40" /><Setter Property="Height" Value="40" /><Setter Property="Padding" Value="10" /></Style>
   <Style Selector="Button.compact"><Setter Property="MinWidth" Value="32" /><Setter Property="MinHeight" Value="32" /><Setter Property="Height" Value="32" /><Setter Property="Padding" Value="7,4" /><Setter Property="CornerRadius" Value="8" /></Style>
   <Style Selector="Button.danger"><Setter Property="Foreground" Value="{DynamicResource Brush.Danger}" /><Setter Property="Background" Value="{DynamicResource Brush.DangerSoft}" /></Style>
+  <Style Selector="Button.themeColor">
+    <Setter Property="Background" Value="{DynamicResource Brush.Surface}" />
+    <Setter Property="BorderThickness" Value="2" /><Setter Property="Padding" Value="12" />
+  </Style>
+  <Style Selector="Button.themeColor.selected">
+    <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentText}" />
+    <Setter Property="Background" Value="{DynamicResource Brush.AccentSoft}" />
+  </Style>
+  <Style Selector="Button.themeColor.selected:pointerover"><Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentText}" /></Style>
   <Style Selector="Path.icon"><Setter Property="Width" Value="18" /><Setter Property="Height" Value="18" /><Setter Property="Stretch" Value="Uniform" /><Setter Property="Fill" Value="{DynamicResource Brush.TextSecondary}" /></Style>
   <Style Selector="Button.primary Path.icon"><Setter Property="Fill" Value="{DynamicResource Brush.OnAccent}" /></Style>
   <Style Selector="Button.primary TextBlock"><Setter Property="Foreground" Value="{DynamicResource Brush.OnAccent}" /></Style>
@@ -46,7 +55,12 @@
     <Setter Property="Padding" Value="12,10" />
   </Style>
   <Style Selector="TextBox.toolbarSearch"><Setter Property="MinHeight" Value="32" /><Setter Property="Height" Value="32" /><Setter Property="Padding" Value="10,5" /><Setter Property="CornerRadius" Value="8" /></Style>
-  <Style Selector="ComboBox"><Setter Property="CornerRadius" Value="{DynamicResource Radius.Control}" /><Setter Property="MinHeight" Value="40" /></Style>
+  <Style Selector="ComboBox">
+    <Setter Property="CornerRadius" Value="{DynamicResource Radius.Control}" /><Setter Property="MinHeight" Value="40" />
+    <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
+    <Setter Property="Background" Value="{DynamicResource Brush.Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />
+  </Style>
   <Style Selector="ToggleSwitch">
     <Setter Property="OnContent" Value="{Translate {x:Static i18n:LanguageManager+Keys.On}}" />
     <Setter Property="OffContent" Value="{Translate {x:Static i18n:LanguageManager+Keys.Off}}" />

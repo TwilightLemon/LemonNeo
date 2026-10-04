@@ -1,5 +1,4 @@
-using Avalonia;
-using Avalonia.Styling;
+using Avalonia.Media;
 using LemonNeo.Configuration;
 
 namespace LemonNeo.Desktop.Infrastructure;
@@ -15,23 +14,26 @@ public sealed record UiPreferences(
     bool ShowRomanization = true,
     bool ShowTranslation = true,
     LyricAlignment LyricAlignment = LyricAlignment.Center,
-    bool BoldLyrics = false);
+    bool BoldLyrics = false,
+    ThemeColorPreset ThemeColor = ThemeColorPreset.Classic,
+    bool UseArtworkColors = false);
 
 /// <summary>Owns live UI preferences. The default follows the operating system.</summary>
 public sealed class AppearanceService(
     Avalonia.Application application,
     LocalizationService localization,
-    IAppConfigurationStore store)
+    IAppConfigurationStore store) : IDisposable
 {
     public const string ConfigurationKey = "desktop.ui";
     private readonly SemaphoreSlim _saveGate = new(1, 1);
+    public ThemeColorService Colors { get; } = new(application);
     public UiPreferences Current { get; private set; } = new();
     public event EventHandler? Changed;
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
         var preferences = await store.GetAsync<UiPreferences>(ConfigurationKey, cancellationToken) ?? new();
-        Apply(preferences);
+        Apply(preferences, animate: false);
     }
 
     public Task SetAsync(UiPreferences preferences, CancellationToken cancellationToken = default) =>
@@ -55,21 +57,21 @@ public sealed class AppearanceService(
         Theme = Enum.IsDefined(value.Theme) ? value.Theme : ThemePreference.System,
         Language = Enum.IsDefined(value.Language) ? value.Language : LanguagePreference.System,
         LyricFontSize = double.IsFinite(value.LyricFontSize) ? Math.Clamp(value.LyricFontSize, 16, 48) : 24,
-        LyricAlignment = Enum.IsDefined(value.LyricAlignment) ? value.LyricAlignment : LyricAlignment.Center
+        LyricAlignment = Enum.IsDefined(value.LyricAlignment) ? value.LyricAlignment : LyricAlignment.Center,
+        ThemeColor = Enum.IsDefined(value.ThemeColor) ? value.ThemeColor : ThemeColorPreset.Classic
     };
 
-    private void Apply(UiPreferences preferences)
+    public void SetArtworkColor(Color? color) => Colors.SetArtworkColor(color);
+
+    private void Apply(UiPreferences preferences, bool animate = true)
     {
         Current = Normalize(preferences);
-        application.RequestedThemeVariant = Current.Theme switch
-        {
-            ThemePreference.Light => ThemeVariant.Light,
-            ThemePreference.Dark => ThemeVariant.Dark,
-            _ => ThemeVariant.Default
-        };
+        Colors.ApplyPreferences(Current, animate);
         application.Resources["Motion.Fast"] = TimeSpan.FromMilliseconds(Current.ReduceMotion ? 0 : 140);
         application.Resources["Motion.Normal"] = TimeSpan.FromMilliseconds(Current.ReduceMotion ? 0 : 220);
         localization.Apply(Current.Language);
         Changed?.Invoke(this, EventArgs.Empty);
     }
+
+    public void Dispose() => Colors.Dispose();
 }
