@@ -163,7 +163,7 @@ Desktop calls the same application services and provider contracts as Console:
 | `external-ids [add\|update\|remove]` | Track details: add, edit and remove namespace/kind/value rows, then save |
 | `remove`, `move-track` | Library → Track actions: remove, move up/down or enter a destination position in the full playlist order, including when filtered |
 | `metadata [namespace ...]`, `enrich` | Track details → Metadata: namespace targets, matches/errors, enrichment preview and explicit Apply |
-| `match-playlist [namespace ...]` | Selected playlist → Match playlist: namespace targets, batch enrichment, saved results and provider errors |
+| `match-playlist [namespace ...]` | Selected playlist → Playlist actions → Match playlist: dedicated page with namespace checkboxes, batch enrichment, saved results and provider errors |
 | `lyrics` | Track details → Lyrics: complete lyrics, source, synchronization flags, translation, romanization and provider errors |
 | `sources` | Track details → Playable sources: candidates, identities, confidence, resolution method, location and provider errors |
 | `play [--source]`, `play-playlist [start] [--source]` | Track double-click / Enter, Play / Play all; Search uses automatic source discovery and Library offers a playback-source selector |
@@ -196,6 +196,40 @@ save failure, and a failed new-item save can be retried without adding a duplica
 Metadata enrichment is previewed first; applying it changes the editor and saving
 persists that item. Batch matching enriches all occurrences of matching tracks
 with up to three requests in flight and surfaces provider errors.
+
+Match playlist opens a separate page for the selected playlist, with Back,
+matching/cancellation actions, the playlist summary, saved-result status and
+provider errors. Its target namespaces and Track details → Metadata → Search
+sources use the same multi-selection defaults. Available options come from loaded
+`IMetadataProvider.MetadataNamespaces`, deduplicated case-insensitively. Loaded
+playback providers' `AcceptedIdSchemes` namespaces and native provider IDs determine
+which options appear first and are checked initially. Other sources remain
+selectable. If no available metadata namespace is supported, all options start
+checked. Clearing every checkbox disables matching/search; it never searches all
+sources implicitly. Back/forward navigation preserves the user's selections.
+
+### Maintaining playback-source support
+
+Plugins maintain the support range through capability contracts, without a
+Desktop-specific list or manifest field. A provider registered via
+`IPluginContext.RegisterProvider` that implements `IPlaybackProvider` is added to
+`IPlaybackSourceProviderRegistry.Sources`. If it also implements
+`ITrackIdResolverProvider`, `ProviderRegistry` snapshots its `AcceptedIdSchemes`
+during registration. Plugin unload or failed initialization removes its
+registrations. The Desktop loads plugins at startup; rebuilding/replacing a plugin
+and restarting the app refreshes the declarations and default selections.
+
+To add external-ID support, declare the correct namespace and kind in
+`AcceptedIdSchemes`, implement `ResolveTrackIdAsync` for that scheme, and ensure
+`ResolvePlaybackAsync` can resolve the resulting native track. Use the shared
+`MusicIdNamespaces` constants. For example, GDStudio Netease declares
+`netease/song-id`, while QQ Music playback declares `qqmusic/song-mid`. Metadata
+plugins independently advertise search coverage in `MetadataNamespaces` and return
+matching `ExternalMusicId` values. A new namespace appears as an option when a
+metadata provider advertises it, and becomes preferred when a loaded playback
+provider supports it. The checkbox preference compares namespaces; actual source
+discovery also checks identifier kinds, and playback availability still depends
+on the provider's resolution and authentication.
 
 Playlist track counts and total duration appear beneath its title and optional
 description. Empty descriptions take no space. The library overview omits its

@@ -123,6 +123,7 @@ public sealed class MainViewModel : PageViewModel
         DesktopRoutes.Search => CreateSearchPage(),
         DesktopRoutes.Online => new OnlineViewModel(Context),
         DesktopRoutes.Editor => new TrackEditorPageViewModel(Context, Navigation, Playback, null),
+        DesktopRoutes.MatchPlaylist => new MatchPlaylistPageViewModel(Context, Navigation, playlist ?? throw new ArgumentException("A playlist is required.")),
         DesktopRoutes.Tools => new ToolsViewModel(Context, Navigation),
         DesktopRoutes.Settings => new SettingsViewModel(Context),
         DesktopRoutes.Lyrics => new LyricsViewModel(Context, Playback),

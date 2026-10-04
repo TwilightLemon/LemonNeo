@@ -33,9 +33,7 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
             if (!CanUseMetadataMatch(row)) return;
             var added = Editor!.AddExternalIds(row!.Match.Metadata.ExternalIds); SetStatus("MetadataIdsAdded", added);
         }, row => CanUseMetadataMatch(row) && row!.Match.Metadata.ExternalIds.Count > 0);
-        MetadataSources = _runtime.Get<IProviderRegistry>().Providers.OfType<IMetadataProvider>()
-            .SelectMany(p => p.MetadataNamespaces).Where(ns => !string.IsNullOrWhiteSpace(ns)).Select(ns => ns.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).Select(ns => new MetadataSourceOption(ns)).ToArray();
+        MetadataSources = MetadataSourceOption.Create(_runtime.Get<IProviderRegistry>(), _runtime.Get<IPlaybackSourceProviderRegistry>());
         foreach (var source in MetadataSources) source.PropertyChanged += OnMetadataSourceChanged;
         UseTrackSearchQuery();
         LyricsDetailsCommand = new(InspectLyricsAsync); SourcesCommand = new(InspectSourcesAsync);

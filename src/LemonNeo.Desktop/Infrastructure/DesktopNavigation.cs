@@ -12,8 +12,8 @@ namespace LemonNeo.Desktop.Infrastructure;
 public static class DesktopRoutes
 {
     public const string Library = "Library", Search = "Search", Online = "Online", Queue = "Queue", Lyrics = "Lyrics",
-        Editor = "Editor", Tools = "Tools", Settings = "Settings", Components = "Components";
-    public static IReadOnlyList<string> All { get; } = [Library, Search, Online, Queue, Lyrics, Editor, Tools, Settings, Components];
+        Editor = "Editor", MatchPlaylist = "MatchPlaylist", Tools = "Tools", Settings = "Settings", Components = "Components";
+    public static IReadOnlyList<string> All { get; } = [Library, Search, Online, Queue, Lyrics, Editor, MatchPlaylist, Tools, Settings, Components];
 }
 
 public sealed class DesktopNavigation : ObservableObject, IAsyncDisposable
@@ -148,6 +148,7 @@ public sealed class DesktopNavigation : ObservableObject, IAsyncDisposable
         {
             LibraryViewModel => new LibraryView(), SearchViewModel => new SearchView(), OnlineViewModel => new OnlineView(),
             LyricsViewModel => new LyricsView(), TrackEditorPageViewModel => new TrackEditorView(), ToolsViewModel => new ToolsView(),
+            MatchPlaylistPageViewModel => new MatchPlaylistView(),
             SettingsViewModel => new SettingsView(), ComponentsViewModel => new ComponentsView(),
             _ => throw new ArgumentException($"No view registered for {model.GetType().Name}.")
         };

@@ -148,11 +148,6 @@ public sealed partial class TrackEditorViewModel : ObservableObject
 }
 
 public sealed record ProviderOption(string? Id, string Name);
-public sealed partial class MetadataSourceOption(string sourceNamespace) : ObservableObject
-{
-    public string Namespace { get; } = sourceNamespace;
-    [ObservableProperty] private bool _isSelected = true;
-}
 public sealed record RemotePlaylistRow(string ProviderId, string? Id, string Name, string Collection, string TrackCount)
 {
     public bool CanImport => Id is not null;

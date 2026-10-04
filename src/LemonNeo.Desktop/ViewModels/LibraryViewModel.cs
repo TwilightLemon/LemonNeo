@@ -3,7 +3,6 @@ using CommunityToolkit.Mvvm.Input;
 using LemonNeo.Application;
 using LemonNeo.Core;
 using LemonNeo.Desktop.Infrastructure;
-using LemonNeo.Plugin.Abstractions;
 
 namespace LemonNeo.Desktop.ViewModels;
 
@@ -11,8 +10,6 @@ public sealed partial class LibraryViewModel : TrackListViewModel
 {
     private readonly Guid? _playlistId;
     private Guid[] _queueIds = [];
-    [ObservableProperty] private string _metadataTargets = "";
-    [ObservableProperty] private string _inspectionMessages = "";
     public LibraryViewModel(DesktopContext context, DesktopNavigation navigation, PlaybackViewModel playback, string route, Guid? playlistId = null)
         : base(context, navigation, playback, route)
     {
@@ -26,7 +23,8 @@ public sealed partial class LibraryViewModel : TrackListViewModel
             _ = Navigation.OpenEditorAsync(new TrackRow(new Track { Id = new("library", Guid.NewGuid().ToString("N")), Title = "" }, 0, _text,
                 PlaylistId: SelectedPlaylist!.Id), true);
         });
-        MatchPlaylistCommand = new(() => SelectedPlaylist is { } playlist ? MatchPlaylistAsync(playlist.Id) : Task.CompletedTask);
+        MatchPlaylistCommand = new(() => CanEditPlaylist && SelectedPlaylist is { } playlist
+            ? Navigation.NavigateAsync(DesktopRoutes.MatchPlaylist, playlist.Id) : Task.CompletedTask);
         RefreshCommand = new(ReloadLibraryAsync);
         Playback.Changed += OnPlaybackChanged;
         RefreshTracks();
@@ -50,8 +48,6 @@ public sealed partial class LibraryViewModel : TrackListViewModel
     public RelayCommand NewTrackCommand { get; }
     public AsyncRelayCommand MatchPlaylistCommand { get; }
     public AsyncRelayCommand RefreshCommand { get; }
-    public string MetadataNamespaces => string.Join(", ", _runtime.Get<IProviderRegistry>().Providers.OfType<IMetadataProvider>()
-        .SelectMany(p => p.MetadataNamespaces).Distinct(StringComparer.OrdinalIgnoreCase).Order());
     protected override IEnumerable<TrackRow> GetTracks() => IsQueue
         ? _runtime.Get<PlaybackSessionService>().Queue.Items.Select((i, index) => new TrackRow(i.Track, index + 1, _text, QueueItemId: i.Id))
         : SelectedPlaylist is { } playlist
@@ -142,35 +138,6 @@ public sealed partial class LibraryViewModel : TrackListViewModel
         SetStatus("LibrarySaved");
     });
 
-    public Task MatchPlaylistAsync(Guid playlistId) => ExecuteAsync(async ct =>
-    {
-        var playlist = _runtime.Get<PlaylistService>().GetRequired(playlistId);
-        var targets = ParseNamespaces(MetadataTargets);
-        var tracks = playlist.Items.Select(i => i.Track).DistinctBy(t => t.Id).ToArray();
-        using var concurrency = new SemaphoreSlim(3);
-        var results = await Task.WhenAll(tracks.Select(async track =>
-        {
-            await concurrency.WaitAsync(ct);
-            try { return (Original: track, Result: await Task.Run(() => _runtime.Get<MetadataService>().EnrichAsync(track, targets, ct), ct)); }
-            finally { concurrency.Release(); }
-        }));
-        ct.ThrowIfCancellationRequested();
-        var matched = 0;
-        InspectionMessages = FormatErrors(results.SelectMany(r => r.Result.Lookup.SourceErrors).DistinctBy(e => e.Key));
-        foreach (var result in results.Where(r => !ReferenceEquals(r.Original, r.Result.Track)))
-        {
-            foreach (var item in playlist.Items.Where(i => i.Track.Id == result.Original.Id))
-                _runtime.Get<PlaylistService>().UpdateTrack(playlistId, item.Id, result.Result.Track);
-            matched++;
-        }
-        await _runtime.Get<LibraryService>().SaveAsync(ct);
-        Context.RefreshLibrary();
-        SetStatus("PlaylistMatched", matched, tracks.Length);
-    });
-
-    private static string[] ParseNamespaces(string text) => text.Split([',', ';', ' ', '\r', '\n'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-        .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-    private static string FormatErrors(IEnumerable<KeyValuePair<string, string>> errors) => string.Join(Environment.NewLine, errors.Select(e => $"{e.Key}: {e.Value}"));
     private void OnPlaybackChanged(object? sender, EventArgs args)
     {
         if (!IsQueue) return;
