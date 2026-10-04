@@ -1,5 +1,6 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:vm="using:LemonNeo.Desktop.ViewModels" xmlns:core="using:LemonNeo.Core">
+                    xmlns:vm="using:LemonNeo.Desktop.ViewModels" xmlns:core="using:LemonNeo.Core"
+                    xmlns:i18n="using:LemonNeo.Desktop.Infrastructure">
   <DataTemplate x:Key="ProviderOptionTemplate" x:DataType="vm:ProviderOption">
     <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
   </DataTemplate>
@@ -24,17 +25,23 @@
     </Grid>
   </DataTemplate>
   <DataTemplate x:Key="MetadataMatchTemplate" x:DataType="vm:MetadataMatchRow">
-    <StackPanel Spacing="6" Margin="0,8">
-      <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
-      <TextBlock Text="{Binding Artists}" Classes="muted" TextWrapping="Wrap" />
-      <WrapPanel>
-        <TextBlock Text="{Binding Source}" Classes="caption" Margin="0,0,16,0" />
-        <TextBlock Text="{Binding Confidence}" Classes="caption" Margin="0,0,16,0" />
-        <TextBlock Text="{Binding Level}" Classes="caption" />
-      </WrapPanel>
-      <TextBlock Text="{Binding Album}" Classes="caption" TextWrapping="Wrap" />
-      <SelectableTextBlock Text="{Binding ExternalIds}" TextWrapping="Wrap" />
-    </StackPanel>
+    <Border Background="{DynamicResource Brush.SurfaceRaised}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1" CornerRadius="12" Padding="16" Margin="0,8">
+      <StackPanel Spacing="6">
+        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <TextBlock Text="{Binding Artists}" Classes="muted" TextWrapping="Wrap" />
+        <WrapPanel>
+          <TextBlock Text="{Binding Source}" Classes="caption" Margin="0,0,16,0" />
+          <TextBlock Text="{Binding Confidence}" Classes="caption" Margin="0,0,16,0" />
+          <TextBlock Text="{Binding Level}" Classes="caption" />
+        </WrapPanel>
+        <TextBlock Text="{Binding Album}" Classes="caption" TextWrapping="Wrap" />
+        <SelectableTextBlock Text="{Binding ExternalIds}" TextWrapping="Wrap" />
+        <WrapPanel Margin="0,8,0,0">
+          <Button Name="ReplaceMatchMetadataButton" Content="{Translate {x:Static i18n:LanguageManager+Keys.ReplaceMatchMetadata}}" Command="{Binding ReplaceMetadataCommand}" CommandParameter="{Binding}" Margin="0,0,10,8" />
+          <Button Name="AddMatchExternalIdsButton" Content="{Translate {x:Static i18n:LanguageManager+Keys.AddMatchExternalIds}}" Command="{Binding AddExternalIdsCommand}" CommandParameter="{Binding}" Margin="0,0,10,8" />
+        </WrapPanel>
+      </StackPanel>
+    </Border>
   </DataTemplate>
   <DataTemplate x:Key="PlaybackSourceTemplate" x:DataType="vm:PlaybackSourceRow">
     <StackPanel Spacing="6">

@@ -12,11 +12,13 @@ internal sealed class FeatureProvider : IMusicProvider, ISearchProvider, ISearch
     public ProviderDescriptor Descriptor => new("Test service", "Deterministic desktop integration fixture");
     public IReadOnlyCollection<string> SearchNamespaces => ["test-net", "other-net", "unavailable-net"];
     public IReadOnlyCollection<MusicIdScheme> AcceptedIdSchemes => [new("test-net", "song-id"), new("other-net", "song-id")];
-    public IReadOnlyCollection<string> MetadataNamespaces => ["test-net"];
+    public IReadOnlyCollection<string> MetadataNamespaces { get; set; } = ["test-net"];
     public AuthenticationState State { get; private set; } = new(false);
     public SearchRequest? LastSearch { get; private set; }
     public List<SearchRequest> Searches { get; } = [];
     public IReadOnlyList<string> LastMetadataTargets { get; private set; } = [];
+    public MetadataLookupRequest? LastMetadataRequest { get; private set; }
+    public MetadataLookupResult? MetadataOverride { get; set; }
     public bool FailSearch { get; set; }
     public Lyrics? LyricsOverride { get; set; }
     public TaskCompletionSource SearchStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -85,6 +87,8 @@ internal sealed class FeatureProvider : IMusicProvider, ISearchProvider, ISearch
     {
         cancellationToken.ThrowIfCancellationRequested();
         LastMetadataTargets = request.TargetNamespaces;
+        LastMetadataRequest = request;
+        if (MetadataOverride is { } result) return Task.FromResult(result);
         if (request.TargetNamespaces.Count > 0 && !request.TargetNamespaces.Contains("test-net"))
             return Task.FromResult(new MetadataLookupResult([], new Dictionary<string, string>()));
         return Task.FromResult(new MetadataLookupResult([new()

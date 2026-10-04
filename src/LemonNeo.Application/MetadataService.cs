@@ -10,13 +10,15 @@ public sealed class MetadataService(IProviderRegistry registry)
         IReadOnlyList<string>? targetNamespaces = null,
         int limitPerSource = 3,
         double minimumConfidence = 0.7,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? searchKeyword = null)
     {
         var matches = new List<MetadataMatch>();
         var errors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var request = new MetadataLookupRequest
         {
             Track = track,
+            SearchKeyword = string.IsNullOrWhiteSpace(searchKeyword) ? null : searchKeyword.Trim(),
             TargetNamespaces = targetNamespaces ?? [],
             LimitPerSource = limitPerSource,
             MinimumConfidence = minimumConfidence
@@ -25,11 +27,14 @@ public sealed class MetadataService(IProviderRegistry registry)
         foreach (var provider in registry.Providers.OfType<IMetadataProvider>())
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (request.TargetNamespaces.Count > 0 && !provider.MetadataNamespaces.Any(ns =>
+                request.TargetNamespaces.Contains(ns, StringComparer.OrdinalIgnoreCase))) continue;
             var providerId = ((IMusicProvider)provider).Id;
             try
             {
                 var result = await provider.LookupMetadataAsync(request, cancellationToken);
-                matches.AddRange(result.Matches);
+                matches.AddRange(result.Matches.Where(match => request.TargetNamespaces.Count == 0 ||
+                    request.TargetNamespaces.Contains(match.SourceNamespace, StringComparer.OrdinalIgnoreCase)));
                 foreach (var error in result.SourceErrors)
                 {
                     errors[$"{providerId}/{error.Key}"] = error.Value;
@@ -41,6 +46,7 @@ public sealed class MetadataService(IProviderRegistry registry)
             }
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         return new MetadataLookupResult(
             matches.OrderByDescending(match => match.Confidence)
                 .ThenBy(match => match.SourceNamespace, StringComparer.Ordinal)

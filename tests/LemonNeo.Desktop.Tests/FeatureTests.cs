@@ -225,7 +225,7 @@ public sealed class FeatureTests
     }
 
     [AvaloniaFact]
-    public async Task EnrichmentIsPreviewedThenAppliedAndBatchMatchingUpdatesEveryDuplicate()
+    public async Task MetadataMatchActionsUpdateOnlyTheChosenItemAndBatchMatchingUpdatesEveryDuplicate()
     {
         await using var fixture = await Fixture.CreateAsync();
         var vm = fixture.ViewModel;
@@ -235,17 +235,17 @@ public sealed class FeatureTests
         await vm.Library.AddTrackAsync(id, fixture.Provider.First);
         vm.Library.SelectedTrack = vm.Library.Tracks[0];
         vm.Library.InspectTrackCommand.Execute(null);
-        vm.EditorPage.MetadataTargets = "test-net";
         await vm.EditorPage.MetadataCommand.ExecuteAsync(null);
-        Assert.Single(vm.EditorPage.MetadataMatches);
+        var match = Assert.Single(vm.EditorPage.MetadataMatches);
         Assert.Equal(new[] { "test-net" }, fixture.Provider.LastMetadataTargets);
         Assert.Contains("Fixture metadata warning", vm.EditorPage.InspectionMessages);
-        await vm.EditorPage.EnrichCommand.ExecuteAsync(null);
-        Assert.True(vm.EditorPage.HasEnrichedPreview);
         Assert.Equal("One", vm.EditorPage.Editor!.Title);
         Assert.All((await fixture.LoadLibraryAsync()).Playlists.Single().Items, i => Assert.Equal("One", i.Track.Title));
-        vm.EditorPage.ApplyEnrichmentCommand.Execute(null);
+        match.ReplaceMetadataCommand.Execute(match);
         Assert.Equal("Matched One", vm.EditorPage.Editor.Title);
+        Assert.Single(vm.EditorPage.Editor.ExternalIds);
+        match.AddExternalIdsCommand.Execute(match);
+        match.AddExternalIdsCommand.Execute(match);
         Assert.Equal(2, vm.EditorPage.Editor.ExternalIds.Count(row => row.Namespace == "test-net"));
         await vm.EditorPage.SaveEditorAsync();
         Assert.Null(vm.EditorPage.Error);
@@ -258,6 +258,109 @@ public sealed class FeatureTests
         Assert.Equal(2, (await fixture.LoadLibraryAsync()).Playlists.Single().Items[0].Track.ExternalIds.Count(row => row.Namespace == "test-net"));
         await vm.Library.MatchPlaylistAsync(id);
         Assert.All((await fixture.LoadLibraryAsync()).Playlists.Single().Items, i => Assert.Equal("Matched album", i.Track.Album!.Title));
+    }
+
+    [AvaloniaFact]
+    public async Task MetadataSearchUsesPluginSourcesEditableKeywordsSortedMatchesAndIndependentActions()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        fixture.Provider.MetadataNamespaces = ["test-net", "other-net", "TEST-NET"];
+        MetadataMatch Match(string source, string title, double confidence, IReadOnlyList<ExternalMusicId> ids) => new()
+        {
+            MetadataProviderId = fixture.Provider.Id, SourceNamespace = source, Confidence = confidence, MatchLevel = "Fixture",
+            Metadata = new() { Title = title, Artists = ["Chosen artist"], Album = "Chosen album", Duration = TimeSpan.FromSeconds(90), ExternalIds = ids }
+        };
+        fixture.Provider.MetadataOverride = new([
+            Match("test-net", "Low", .1, []),
+            Match("other-net", "Best", .95, [new("other-net", "best", "song-id")]),
+            Match("test-net", "Chosen", .6, [new("TEST-NET", "one", "SONG-ID"), new("test-net", "alternative", "song-id"),
+                new("test-net", "mid", "song-mid"), new("isrc", "TEST00000001")]),
+            Match("unavailable-net", "Outside selection", 1, [])], new Dictionary<string, string>());
+        var vm = fixture.ViewModel;
+        await vm.Library.CreatePlaylistAsync("Metadata editing");
+        await vm.Library.AddTrackAsync(vm.SelectedPlaylist!.Id, fixture.Provider.First);
+        vm.Library.SelectedTrack = vm.Library.Tracks[0];
+        await vm.Navigation.OpenEditorAsync(vm.Library.SelectedTrack);
+        var page = vm.EditorPage;
+        var editor = page.Editor!;
+        Assert.Equal(["other-net", "test-net"], page.MetadataSources.Select(source => source.Namespace));
+        Assert.All(page.MetadataSources, source => Assert.True(source.IsSelected));
+        Assert.Equal("One Fixture artist", page.MetadataSearchQuery);
+        var window = new MainWindow { DataContext = vm, Width = 1180, Height = 790 };
+        window.Show();
+        try
+        {
+            Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            var view = Assert.Single(window.GetVisualDescendants().OfType<TrackEditorView>());
+            Assert.Single(view.GetVisualDescendants().OfType<TabControl>()).SelectedIndex = 1;
+            Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            var boxes = view.GetVisualDescendants().OfType<CheckBox>().ToArray();
+            Assert.Equal(2, boxes.Length);
+            var find = Assert.Single(view.GetVisualDescendants().OfType<Button>(), button => button.Name == "FindMetadataMatchesButton");
+            foreach (var box in boxes) box.IsChecked = false;
+            Assert.False(page.CanFindMetadata); Assert.False(find.IsEffectivelyEnabled);
+            boxes[0].IsChecked = true; boxes[1].IsChecked = true;
+            var query = Assert.Single(view.GetVisualDescendants().OfType<TextBox>(), box => box.Name == "MetadataSearchQueryBox");
+            query.Text = "  custom song and artist  ";
+            Assert.True(find.IsEffectivelyEnabled);
+            await page.MetadataCommand.ExecuteAsync(null);
+            Assert.Null(page.Error);
+            Assert.Equal("custom song and artist", fixture.Provider.LastMetadataRequest!.SearchKeyword);
+            Assert.Equal("One", fixture.Provider.LastMetadataRequest.Track.Title);
+            Assert.Equal(["other-net", "test-net"], fixture.Provider.LastMetadataTargets);
+            Assert.Equal(["Best", "Chosen", "Low"], page.MetadataMatches.Select(match => match.Title));
+            Assert.Equal("One", editor.Title);
+            Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            var chosen = page.MetadataMatches[1];
+            var replace = Assert.Single(view.GetVisualDescendants().OfType<Button>(), button =>
+                button.Name == "ReplaceMatchMetadataButton" && ReferenceEquals(button.DataContext, chosen));
+            var addIds = Assert.Single(view.GetVisualDescendants().OfType<Button>(), button =>
+                button.Name == "AddMatchExternalIdsButton" && ReferenceEquals(button.DataContext, chosen));
+            editor.ArtworkUri = "https://example.invalid/current-artwork";
+            replace.Command!.Execute(replace.CommandParameter);
+            Assert.Equal("Chosen", editor.Title); Assert.Equal("Chosen artist", editor.Artists);
+            Assert.Equal("Chosen album", editor.Album); Assert.Equal("90", editor.DurationSeconds);
+            Assert.Equal("", editor.ArtworkUri);
+            Assert.Equal(fixture.Provider.First.Id, editor.Build().Id);
+            Assert.Single(editor.ExternalIds);
+            addIds.Command!.Execute(addIds.CommandParameter);
+            addIds.Command.Execute(addIds.CommandParameter);
+            Assert.Equal(4, editor.ExternalIds.Count);
+            Assert.Equal("Chosen", editor.Title);
+            Assert.Equal(4, editor.Build().ExternalIds.Count);
+            Assert.Equal("One", (await fixture.LoadLibraryAsync()).Playlists.Single().Items.Single().Track.Title);
+            Assert.Single((await fixture.LoadLibraryAsync()).Playlists.Single().Items.Single().Track.ExternalIds);
+            foreach (var language in new[] { LanguagePreference.English, LanguagePreference.Chinese })
+                foreach (var theme in new[] { ThemePreference.Light, ThemePreference.Dark })
+                {
+                    await fixture.Appearance.SetAsync(new(theme, language, true));
+                    Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+                    using var rendered = new RenderTargetBitmap(new PixelSize(1180, 790));
+                    rendered.Render(window);
+                    if (Environment.GetEnvironmentVariable("LEMONNEO_PREVIEW_DIRECTORY") is { Length: > 0 } directory)
+                    {
+                        Directory.CreateDirectory(directory);
+                        rendered.Save(Path.Combine(directory, $"Metadata-{language}-{theme}.png"), PngBitmapEncoderOptions.Default);
+                    }
+                }
+            page.UseTrackSearchQueryCommand.Execute(null);
+            Assert.Equal("Chosen Chosen artist", query.Text);
+            query.Text = "";
+            Assert.False(find.IsEffectivelyEnabled);
+            page.UseTrackSearchQueryCommand.Execute(null);
+            boxes[0].IsChecked = false;
+            await page.MetadataCommand.ExecuteAsync(null);
+            Assert.Equal(["test-net"], fixture.Provider.LastMetadataTargets);
+            Assert.Equal(["Chosen", "Low"], page.MetadataMatches.Select(match => match.Title));
+            Assert.False(chosen.ReplaceMetadataCommand.CanExecute(chosen));
+            await page.SaveEditorAsync();
+            Assert.Null(page.Error);
+            var saved = (await fixture.LoadLibraryAsync()).Playlists.Single().Items.Single().Track;
+            Assert.Equal("Chosen", saved.Title);
+            Assert.Equal(fixture.Provider.First.Id, saved.Id);
+            Assert.Equal(4, saved.ExternalIds.Count);
+        }
+        finally { window.Close(); }
     }
 
     [AvaloniaFact]
@@ -491,7 +594,7 @@ public sealed class FeatureTests
         await vm.Library.AddTrackAsync(vm.SelectedPlaylist!.Id, fixture.Provider.First);
         vm.Library.SelectedTrack = vm.Library.Tracks[0];
         await vm.Navigation.OpenEditorAsync(vm.Library.SelectedTrack);
-        await vm.EditorPage.InspectMetadataAsync(true);
+        await vm.EditorPage.InspectMetadataAsync();
         await vm.EditorPage.InspectLyricsAsync();
         await vm.EditorPage.InspectSourcesAsync();
         var window = new MainWindow { DataContext = vm, Width = 880, Height = 620 };

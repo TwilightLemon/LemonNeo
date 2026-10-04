@@ -78,16 +78,29 @@
           <TabItem Header="{Translate {x:Static i18n:LanguageManager+Keys.MetadataLabel}}">
             <ScrollViewer HorizontalScrollBarVisibility="Disabled">
               <StackPanel Spacing="14" Margin="0,16,12,16" IsEnabled="{Binding CanInteract}">
-                <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.MetadataTargets}}" Classes="caption" TextWrapping="Wrap" />
-                <TextBox Text="{Binding MetadataTargets}" PlaceholderText="{Binding MetadataNamespaces}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.MetadataTargets}}" />
-                <WrapPanel>
-                  <Button Content="{Translate {x:Static i18n:LanguageManager+Keys.MetadataLookup}}" Command="{Binding MetadataCommand}" Margin="0,0,10,8" />
-                  <Button Content="{Translate {x:Static i18n:LanguageManager+Keys.EnrichPreview}}" Command="{Binding EnrichCommand}" Margin="0,0,10,8" />
-                </WrapPanel>
-                <SelectableTextBlock Text="{Binding EnrichmentSummary}" TextWrapping="Wrap" />
-                <Button Classes="primary" Content="{Translate {x:Static i18n:LanguageManager+Keys.ApplyEnrichment}}" Command="{Binding ApplyEnrichmentCommand}"
-                        IsVisible="{Binding HasEnrichedPreview}" HorizontalAlignment="Left" />
-                <ItemsControl ItemsSource="{Binding MetadataMatches}" ItemTemplate="{StaticResource MetadataMatchTemplate}" />
+                <StackPanel Spacing="6">
+                  <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.MetadataSearchSources}}" Classes="caption" TextWrapping="Wrap" />
+                  <ItemsControl Name="MetadataSourceSelector" ItemsSource="{Binding MetadataSources}" IsVisible="{Binding HasMetadataSources}">
+                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:MetadataSourceOption">
+                        <CheckBox Content="{Binding Namespace}" IsChecked="{Binding IsSelected, Mode=TwoWay}" Margin="0,0,20,8" />
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.NoMetadataSources}}" IsVisible="{Binding !HasMetadataSources}" Classes="muted" TextWrapping="Wrap" />
+                </StackPanel>
+                <StackPanel Spacing="8">
+                  <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.MetadataSearchQuery}}" Classes="caption" />
+                  <Grid ColumnDefinitions="*,Auto,Auto">
+                    <TextBox Name="MetadataSearchQueryBox" Text="{Binding MetadataSearchQuery, Mode=TwoWay}"
+                             AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.MetadataSearchQuery}}" />
+                    <Button Grid.Column="1" Content="{Translate {x:Static i18n:LanguageManager+Keys.UseTrackSearchQuery}}" Command="{Binding UseTrackSearchQueryCommand}" Margin="10,0,0,0" />
+                    <Button Name="FindMetadataMatchesButton" Grid.Column="2" Classes="primary" Content="{Translate {x:Static i18n:LanguageManager+Keys.MetadataLookup}}" Command="{Binding MetadataCommand}" Margin="10,0,0,0" />
+                  </Grid>
+                </StackPanel>
+                <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.MetadataMatchActionsHint}}" Classes="caption" TextWrapping="Wrap" />
+                <ItemsControl Name="MetadataMatchesList" ItemsSource="{Binding MetadataMatches}" ItemTemplate="{StaticResource MetadataMatchTemplate}" />
               </StackPanel>
             </ScrollViewer>
           </TabItem>

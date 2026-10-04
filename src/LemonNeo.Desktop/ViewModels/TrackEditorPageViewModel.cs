@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -20,13 +21,24 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
         _targetPlaylist = Playlists.FirstOrDefault();
         CloseEditorCommand = new(Navigation.GoBackAsync);
         SaveEditorCommand = new(SaveEditorAsync);
-        MetadataCommand = new(() => InspectMetadataAsync(false)); EnrichCommand = new(() => InspectMetadataAsync(true));
-        LyricsDetailsCommand = new(InspectLyricsAsync); SourcesCommand = new(InspectSourcesAsync);
-        ApplyEnrichmentCommand = new(() =>
+        MetadataCommand = new(InspectMetadataAsync, () => CanFindMetadata);
+        UseTrackSearchQueryCommand = new(UseTrackSearchQuery, () => CanInteract && Editor is not null);
+        ReplaceMatchMetadataCommand = new(row =>
         {
-            if (!CanInteract || _enrichedPreview is null || Editor is null) return;
-            Editor.Apply(_enrichedPreview); SetStatus("EnrichmentApplied");
-        });
+            if (!CanUseMetadataMatch(row) || string.IsNullOrWhiteSpace(row!.Match.Metadata.Title)) return;
+            Editor!.ApplyMetadata(row!.Match.Metadata); SetStatus("MetadataApplied");
+        }, row => CanUseMetadataMatch(row) && !string.IsNullOrWhiteSpace(row!.Match.Metadata.Title));
+        AddMatchExternalIdsCommand = new(row =>
+        {
+            if (!CanUseMetadataMatch(row)) return;
+            var added = Editor!.AddExternalIds(row!.Match.Metadata.ExternalIds); SetStatus("MetadataIdsAdded", added);
+        }, row => CanUseMetadataMatch(row) && row!.Match.Metadata.ExternalIds.Count > 0);
+        MetadataSources = _runtime.Get<IProviderRegistry>().Providers.OfType<IMetadataProvider>()
+            .SelectMany(p => p.MetadataNamespaces).Where(ns => !string.IsNullOrWhiteSpace(ns)).Select(ns => ns.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).Select(ns => new MetadataSourceOption(ns)).ToArray();
+        foreach (var source in MetadataSources) source.PropertyChanged += OnMetadataSourceChanged;
+        UseTrackSearchQuery();
+        LyricsDetailsCommand = new(InspectLyricsAsync); SourcesCommand = new(InspectSourcesAsync);
         PlaySourceCommand = new(() => SelectedSource is { } source && _sourceTrack is { } track
             ? playback.ExecutePlaybackAsync(ct =>
                 _runtime.Get<PlaybackSessionService>().PlayTrackAsync(track, new(RequiredSourceProviderId: source.Provider), ct)) : Task.CompletedTask);
@@ -37,26 +49,26 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
     public Playlist? TargetPlaylist { get => _targetPlaylist; set { if (SetProperty(ref _targetPlaylist, value)) RaiseInteractionProperties(); } }
     public bool CanSaveEditor => CanInteract && Editor is { } editor && (editor.PlaylistId is not null || TargetPlaylist is not null);
     public bool EditorNeedsPlaylist => Editor is { PlaylistId: null };
-    public bool HasEnrichedPreview => _enrichedPreview is not null;
+    public IReadOnlyList<MetadataSourceOption> MetadataSources { get; }
+    public bool HasMetadataSources => MetadataSources.Count > 0;
+    public bool CanFindMetadata => CanInteract && Editor is not null && !string.IsNullOrWhiteSpace(MetadataSearchQuery)
+        && MetadataSources.Any(source => source.IsSelected);
     public ObservableCollection<MetadataMatchRow> MetadataMatches { get; } = [];
     public ObservableCollection<PlaybackSourceRow> DiscoveredSources { get; } = [];
-    public string MetadataNamespaces => string.Join(", ", _runtime.Get<IProviderRegistry>().Providers.OfType<IMetadataProvider>()
-        .SelectMany(p => p.MetadataNamespaces).Distinct(StringComparer.OrdinalIgnoreCase).Order());
     public AsyncRelayCommand CloseEditorCommand { get; }
     public AsyncRelayCommand SaveEditorCommand { get; }
     public AsyncRelayCommand MetadataCommand { get; }
-    public AsyncRelayCommand EnrichCommand { get; }
-    public RelayCommand ApplyEnrichmentCommand { get; }
+    public RelayCommand UseTrackSearchQueryCommand { get; }
+    public RelayCommand<MetadataMatchRow> ReplaceMatchMetadataCommand { get; }
+    public RelayCommand<MetadataMatchRow> AddMatchExternalIdsCommand { get; }
     public AsyncRelayCommand LyricsDetailsCommand { get; }
     public AsyncRelayCommand SourcesCommand { get; }
     public AsyncRelayCommand PlaySourceCommand { get; }
     private Track? _sourceTrack;
-    private Track? _enrichedPreview;
     private LyricsLookupResult? _inspectedLyrics;
-    [ObservableProperty] private string _metadataTargets = "";
+    [ObservableProperty] private string _metadataSearchQuery = "";
     [ObservableProperty] private string _inspectionMessages = "";
     [ObservableProperty] private string _lyricsDetails = "";
-    [ObservableProperty] private string _enrichmentSummary = "";
     [ObservableProperty] private PlaybackSourceRow? _selectedSource;
     public Task SaveEditorAsync()
     {
@@ -77,29 +89,41 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
     }
 
     private Track GetInspectionTrack() => Editor?.Build(validateExternalIdSchemes: false) ?? throw new ArgumentException(_text["SelectTrackFirst"]);
-    private static string[] ParseNamespaces(string text) => text.Split([',', ';', ' ', '\r', '\n'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-        .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     private static string FormatErrors(IEnumerable<KeyValuePair<string, string>> errors) => string.Join(Environment.NewLine, errors.Select(e => $"{e.Key}: {e.Value}"));
 
-    public Task InspectMetadataAsync(bool enrich) => ExecuteAsync(async ct =>
+    private bool CanUseMetadataMatch(MetadataMatchRow? row) => CanInteract && Editor is not null && row is not null
+        && MetadataMatches.Any(candidate => ReferenceEquals(candidate, row));
+
+    private void UseTrackSearchQuery() => MetadataSearchQuery = Editor is { } editor
+        ? string.Join(" ", new[] { editor.Title.Trim() }.Concat(editor.Artists.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))) : "";
+
+    partial void OnMetadataSearchQueryChanged(string value) => RefreshMetadataCommands();
+    private void OnMetadataSourceChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName == nameof(MetadataSourceOption.IsSelected)) RefreshMetadataCommands();
+    }
+    private void RefreshMetadataCommands()
+    {
+        OnPropertyChanged(nameof(CanFindMetadata));
+        MetadataCommand?.NotifyCanExecuteChanged();
+        UseTrackSearchQueryCommand?.NotifyCanExecuteChanged();
+        ReplaceMatchMetadataCommand?.NotifyCanExecuteChanged();
+        AddMatchExternalIdsCommand?.NotifyCanExecuteChanged();
+    }
+
+    public Task InspectMetadataAsync() => ExecuteAsync(async ct =>
     {
         var track = GetInspectionTrack();
-        var targets = ParseNamespaces(MetadataTargets);
-        MetadataLookupResult result;
-        if (enrich)
-        {
-            var lookup = await Task.Run(() => _runtime.Get<MetadataService>().EnrichAsync(track, targets, ct), ct);
-            result = lookup.Lookup;
-            _enrichedPreview = ReferenceEquals(track, lookup.Track) ? null : lookup.Track;
-            EnrichmentSummary = _enrichedPreview is { } preview
-                ? $"{preview.Title}\n{string.Join(" / ", preview.Artists.Select(a => a.Name))}\n{preview.Album?.Title}\n{preview.ArtworkUri}\n" +
-                    string.Join(Environment.NewLine, preview.ExternalIds.Select(i => $"{i.Namespace}:{i.Kind ?? "-"} = {i.Value}"))
-                : _text["NoReliableMatch"];
-            OnPropertyChanged(nameof(HasEnrichedPreview));
-        }
-        else result = await Task.Run(() => _runtime.Get<MetadataService>().LookupAsync(track, targets, cancellationToken: ct), ct);
+        if (string.IsNullOrWhiteSpace(MetadataSearchQuery)) throw new ArgumentException(_text["SearchQueryRequired"]);
+        var targets = MetadataSources.Where(source => source.IsSelected).Select(source => source.Namespace).ToArray();
+        if (targets.Length == 0) throw new ArgumentException(_text["SelectMetadataSources"]);
+        var query = MetadataSearchQuery.Trim();
+        var result = await Task.Run(() => _runtime.Get<MetadataService>().LookupAsync(track, targets, limitPerSource: 20,
+            minimumConfidence: 0, cancellationToken: ct, searchKeyword: query), ct);
+        ct.ThrowIfCancellationRequested();
         MetadataMatches.Clear();
-        foreach (var match in result.Matches) MetadataMatches.Add(new(match, _text));
+        foreach (var match in result.Matches) MetadataMatches.Add(new(match, _text, ReplaceMatchMetadataCommand, AddMatchExternalIdsCommand));
+        RefreshMetadataCommands();
         InspectionMessages = FormatErrors(result.SourceErrors);
         SetStatus("MetadataCompleted", result.Matches.Count);
     });
@@ -152,14 +176,21 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
     {
         TargetPlaylist = Playlists.FirstOrDefault(p => p.Id == TargetPlaylist?.Id) ?? Playlists.FirstOrDefault();
     }
-    protected override void RaiseInteractionProperties() { base.RaiseInteractionProperties(); OnPropertyChanged(nameof(CanSaveEditor)); }
+    protected override void RaiseInteractionProperties()
+    {
+        base.RaiseInteractionProperties(); OnPropertyChanged(nameof(CanSaveEditor)); RefreshMetadataCommands();
+    }
     protected override void RefreshLocalizedProperties()
     {
-        base.RefreshLocalizedProperties(); OnPropertyChanged(nameof(MetadataNamespaces));
+        base.RefreshLocalizedProperties();
         if (_inspectedLyrics is { } result) LyricsDetails = result.Lyrics is { } lyrics ? FormatLyricsDetails(lyrics, result.ProviderId) : _text["NoLyrics"];
-        if (_enrichedPreview is null && !string.IsNullOrEmpty(EnrichmentSummary)) EnrichmentSummary = _text["NoReliableMatch"];
-        for (var i = 0; i < MetadataMatches.Count; i++) MetadataMatches[i] = new(MetadataMatches[i].Match, _text);
+        for (var i = 0; i < MetadataMatches.Count; i++) MetadataMatches[i] = new(MetadataMatches[i].Match, _text, ReplaceMatchMetadataCommand, AddMatchExternalIdsCommand);
         for (var i = 0; i < DiscoveredSources.Count; i++) DiscoveredSources[i] = new(DiscoveredSources[i].Candidate, _text);
     }
-    public override async ValueTask DisposeAsync() { Context.LibraryChanged -= OnLibraryChanged; await base.DisposeAsync(); }
+    public override async ValueTask DisposeAsync()
+    {
+        Context.LibraryChanged -= OnLibraryChanged;
+        foreach (var source in MetadataSources) source.PropertyChanged -= OnMetadataSourceChanged;
+        await base.DisposeAsync();
+    }
 }

@@ -46,6 +46,8 @@ public sealed record TrackMetadata
 public sealed record MetadataLookupRequest
 {
     public required Track Track { get; init; }
+    /// <summary>Optional search text; candidate confidence is still measured against Track.</summary>
+    public string? SearchKeyword { get; init; }
     public IReadOnlyList<string> TargetNamespaces { get; init; } = [];
     public int LimitPerSource { get; init; } = 3;
     public double MinimumConfidence { get; init; } = 0.7;

@@ -373,10 +373,9 @@ public sealed class LyricifyMetadataPlugin :
         var requestedNamespaces = request.TargetNamespaces.Count == 0
             ? null
             : request.TargetNamespaces.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var helperTrack = ToHelperMetadata(request.Track);
         var searches = Sources
             .Where(source => requestedNamespaces is null || requestedNamespaces.Contains(source.Namespace))
-            .Select(source => SearchSourceAsync(source, helperTrack, request, cancellationToken));
+            .Select(source => SearchSourceAsync(source, request, cancellationToken));
         var sourceResults = await Task.WhenAll(searches);
 
         var matches = sourceResults.SelectMany(result => result.Matches)
@@ -464,20 +463,12 @@ public sealed class LyricifyMetadataPlugin :
 
     private static async Task<SourceSearchResult> SearchSourceAsync(
         SourceDefinition source,
-        TrackMultiArtistMetadata helperTrack,
         MetadataLookupRequest request,
         CancellationToken cancellationToken)
     {
         try
         {
-            var results = await source.Searcher.GetSearcher()
-                .SearchForResults(helperTrack)
-                .WaitAsync(RequestTimeout, cancellationToken);
-            var matches = results
-                .Where(result => Confidence(result.MatchType) >= request.MinimumConfidence)
-                .Take(Math.Max(0, request.LimitPerSource))
-                .Select(result => ToMetadataMatch(source.Namespace, result))
-                .ToArray();
+            var matches = await SearchMetadataMatchesAsync(source.Searcher.GetSearcher(), source.Namespace, request, cancellationToken);
             return new SourceSearchResult(source.Namespace, matches, null);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -486,15 +477,35 @@ public sealed class LyricifyMetadataPlugin :
         }
     }
 
-    private static MetadataMatch ToMetadataMatch(string sourceNamespace, ISearchResult result)
+    internal static async Task<IReadOnlyList<MetadataMatch>> SearchMetadataMatchesAsync(
+        ISearcher searcher,
+        string sourceNamespace,
+        MetadataLookupRequest request,
+        CancellationToken cancellationToken = default)
     {
-        var matchType = result.MatchType ?? CompareHelper.MatchType.NoMatch;
+        cancellationToken.ThrowIfCancellationRequested();
+        var helperTrack = ToHelperMetadata(request.Track);
+        var customKeyword = !string.IsNullOrWhiteSpace(request.SearchKeyword);
+        var results = customKeyword
+            ? await searcher.SearchForResults(request.SearchKeyword!.Trim()).WaitAsync(RequestTimeout, cancellationToken) ?? []
+            : await searcher.SearchForResults(helperTrack).WaitAsync(RequestTimeout, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        return results.Select(result => ToMetadataMatch(sourceNamespace, result,
+                customKeyword ? CompareHelper.CompareTrack(helperTrack, result) : null))
+            .Where(match => match.Confidence >= request.MinimumConfidence)
+            .OrderByDescending(match => match.Confidence)
+            .Take(Math.Max(0, request.LimitPerSource)).ToArray();
+    }
+
+    private static MetadataMatch ToMetadataMatch(string sourceNamespace, ISearchResult result, CompareHelper.MatchType? matchType = null)
+    {
+        var level = matchType ?? result.MatchType ?? CompareHelper.MatchType.NoMatch;
         return new MetadataMatch
         {
             MetadataProviderId = "lyricify",
             SourceNamespace = sourceNamespace,
-            Confidence = Confidence(matchType),
-            MatchLevel = matchType.ToString(),
+            Confidence = Confidence(level),
+            MatchLevel = level.ToString(),
             Metadata = new LemonTrackMetadata
             {
                 Title = result.Title,

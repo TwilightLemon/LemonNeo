@@ -58,6 +58,37 @@ public sealed partial class TrackEditorViewModel : ObservableObject
         foreach (var id in track.ExternalIds) ExternalIds.Add(new() { Namespace = id.Namespace, Kind = id.Kind ?? "", Value = id.Value });
     }
 
+    public void ApplyMetadata(TrackMetadata metadata)
+    {
+        Title = metadata.Title;
+        Artists = string.Join("; ", metadata.Artists);
+        Album = metadata.Album ?? "";
+        DurationSeconds = metadata.Duration?.TotalSeconds.ToString("0.#######", _text.Culture) ?? "";
+        ArtworkUri = metadata.ArtworkUri?.ToString() ?? "";
+    }
+
+    public int AddExternalIds(IEnumerable<ExternalMusicId> identifiers)
+    {
+        var incoming = identifiers.Where(id => !string.IsNullOrWhiteSpace(id.Namespace) && !string.IsNullOrWhiteSpace(id.Value))
+            .Select(id => new ExternalMusicId(id.Namespace.Trim(), id.Value.Trim(), NormalizeKind(id.Kind)))
+            .DistinctBy(IdIdentity).ToArray();
+        var existing = ExternalIds.Select(row => IdIdentity(new((row.Namespace ?? "").Trim(), (row.Value ?? "").Trim(), NormalizeKind(row.Kind)))).ToHashSet();
+        var added = 0;
+        foreach (var id in incoming)
+        {
+            if (!existing.Add(IdIdentity(id))) continue;
+            ExternalIds.Add(new() { Namespace = id.Namespace, Kind = id.Kind ?? "", Value = id.Value });
+            added++;
+        }
+        // Provider-supplied alternatives remain valid when several IDs share the same namespace and kind.
+        _snapshot = _snapshot with { ExternalIds = _snapshot.ExternalIds.Concat(incoming).DistinctBy(IdIdentity).ToArray() };
+        return added;
+    }
+
+    private static string? NormalizeKind(string? kind) => string.IsNullOrWhiteSpace(kind) || kind.Trim() == "-" ? null : kind.Trim();
+    private static (string, string?, string) IdIdentity(ExternalMusicId id) =>
+        (id.Namespace.ToUpperInvariant(), id.Kind?.ToUpperInvariant(), id.Value);
+
     internal void AttachItem(Guid playlistId, Guid itemId)
     {
         PlaylistId = playlistId; ItemId = itemId;
@@ -86,7 +117,7 @@ public sealed partial class TrackEditorViewModel : ObservableObject
         {
             if (string.IsNullOrWhiteSpace(row.Namespace) || string.IsNullOrWhiteSpace(row.Value))
                 throw new ArgumentException(_text["ExternalIdInvalid"]);
-            var kind = string.IsNullOrWhiteSpace(row.Kind) || row.Kind.Trim() == "-" ? null : row.Kind.Trim();
+            var kind = NormalizeKind(row.Kind);
             ids.Add(new(row.Namespace.Trim(), row.Value.Trim(), kind));
         }
         static (string, string?) Scheme(ExternalMusicId id) => (id.Namespace.ToUpperInvariant(), id.Kind?.ToUpperInvariant());
@@ -117,11 +148,17 @@ public sealed partial class TrackEditorViewModel : ObservableObject
 }
 
 public sealed record ProviderOption(string? Id, string Name);
+public sealed partial class MetadataSourceOption(string sourceNamespace) : ObservableObject
+{
+    public string Namespace { get; } = sourceNamespace;
+    [ObservableProperty] private bool _isSelected = true;
+}
 public sealed record RemotePlaylistRow(string ProviderId, string? Id, string Name, string Collection, string TrackCount)
 {
     public bool CanImport => Id is not null;
 }
-public sealed record MetadataMatchRow(MetadataMatch Match, LocalizationService Text)
+public sealed record MetadataMatchRow(MetadataMatch Match, LocalizationService Text,
+    RelayCommand<MetadataMatchRow> ReplaceMetadataCommand, RelayCommand<MetadataMatchRow> AddExternalIdsCommand)
 {
     public string Source => $"{Match.MetadataProviderId} / {Match.SourceNamespace}";
     public string Title => Match.Metadata.Title;
