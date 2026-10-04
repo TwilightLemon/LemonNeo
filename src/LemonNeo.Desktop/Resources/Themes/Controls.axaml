@@ -101,9 +101,10 @@
         <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,28">
           <StackPanel Spacing="8">
             <TextBlock Text="{TemplateBinding Title}" FontSize="{DynamicResource Font.Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
-            <TextBlock Text="{TemplateBinding Description}" Foreground="{DynamicResource Brush.TextSecondary}" TextWrapping="Wrap"
+            <TextBlock Text="{TemplateBinding Description}" Foreground="{DynamicResource Brush.TextSecondary}" TextWrapping="NoWrap"
+                       MaxLines="1" TextTrimming="CharacterEllipsis"
                        IsVisible="{Binding Description, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
-            <TextBlock Text="{TemplateBinding Summary}" Classes="caption" TextWrapping="Wrap"
+            <TextBlock Text="{TemplateBinding Summary}" Classes="caption" TextWrapping="NoWrap" MaxLines="1" TextTrimming="CharacterEllipsis"
                        IsVisible="{Binding Summary, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
           </StackPanel>
           <ContentPresenter Grid.Column="1" Content="{TemplateBinding Actions}" VerticalAlignment="Center" Margin="16,0,0,0" />
