@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using LemonNeo.Core;
 using LemonNeo.Plugin.Abstractions;
@@ -13,7 +11,7 @@ namespace LemonNeo.Application;
 /// </summary>
 public sealed class LyricsCache(string cacheDirectory, ILogger<LyricsCache> logger)
 {
-    private const int FormatVersion = 1;
+    private const int FormatVersion = 2;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -25,15 +23,32 @@ public sealed class LyricsCache(string cacheDirectory, ILogger<LyricsCache> logg
     public async Task<LyricsLookupResult?> TryGetAsync(Track track, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var path = GetPath(track);
+        var identifiers = MusicCacheIdentity.GetIdentifiers(track.ExternalIds);
+        foreach (var identifier in identifiers)
+        {
+            var result = await TryGetAsync(identifier, cancellationToken);
+            if (result is null) continue;
+            foreach (var alias in identifiers)
+            {
+                if (alias != identifier && !File.Exists(GetPath(alias)))
+                    await StoreAsync(alias, result.Lyrics!, result.ProviderId!, cancellationToken);
+            }
+            return result;
+        }
+        return null;
+    }
+
+    private async Task<LyricsLookupResult?> TryGetAsync(ExternalMusicId identifier, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var path = GetPath(identifier);
         try
         {
             await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read,
                 FileShare.Read | FileShare.Delete, 4096, FileOptions.Asynchronous | FileOptions.SequentialScan);
             var entry = await JsonSerializer.DeserializeAsync<CacheEntry>(stream, JsonOptions, cancellationToken);
             if (entry is null || entry.FormatVersion != FormatVersion ||
-                !string.Equals(entry.TrackId.ProviderId, track.Id.ProviderId, StringComparison.OrdinalIgnoreCase) ||
-                !string.Equals(entry.TrackId.RemoteId, track.Id.RemoteId, StringComparison.Ordinal) ||
+                entry.Identifier != identifier ||
                 string.IsNullOrWhiteSpace(entry.ProviderId) || !IsValid(entry.Lyrics)) return null;
 
             return new LyricsLookupResult(entry.Lyrics, entry.ProviderId, new Dictionary<string, string>());
@@ -44,7 +59,7 @@ public sealed class LyricsCache(string cacheDirectory, ILogger<LyricsCache> logg
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
         {
-            logger.LogWarning(exception, "Could not read cached lyrics for {TrackId}; fetching lyrics from providers.", track.Id);
+            logger.LogWarning(exception, "Could not read cached lyrics for {MusicId}; fetching lyrics from providers.", identifier);
             return null;
         }
     }
@@ -54,6 +69,17 @@ public sealed class LyricsCache(string cacheDirectory, ILogger<LyricsCache> logg
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!IsValid(lyrics)) return;
+        var identifiers = MusicCacheIdentity.GetIdentifiers(lyrics.SourceId is { } sourceId
+            ? track.ExternalIds.Append(sourceId)
+            : track.ExternalIds);
+        foreach (var identifier in identifiers)
+            await StoreAsync(identifier, lyrics, providerId, cancellationToken);
+    }
+
+    private async Task StoreAsync(ExternalMusicId identifier, Lyrics lyrics, string providerId,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         var temporaryPath = Path.Combine(_directory, Guid.NewGuid().ToString("N") + ".part");
         try
         {
@@ -62,14 +88,14 @@ public sealed class LyricsCache(string cacheDirectory, ILogger<LyricsCache> logg
                              FileShare.None, 4096, FileOptions.Asynchronous))
             {
                 await JsonSerializer.SerializeAsync(stream,
-                    new CacheEntry(FormatVersion, track.Id, providerId, lyrics), JsonOptions, cancellationToken);
+                    new CacheEntry(FormatVersion, identifier, providerId, lyrics), JsonOptions, cancellationToken);
             }
             cancellationToken.ThrowIfCancellationRequested();
-            File.Move(temporaryPath, GetPath(track), overwrite: true);
+            File.Move(temporaryPath, GetPath(identifier), overwrite: true);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
         {
-            logger.LogWarning(exception, "Could not cache lyrics for {TrackId}. Fetched lyrics remain available.", track.Id);
+            logger.LogWarning(exception, "Could not cache lyrics for {MusicId}. Fetched lyrics remain available.", identifier);
         }
         finally
         {
@@ -81,16 +107,8 @@ public sealed class LyricsCache(string cacheDirectory, ILogger<LyricsCache> logg
         }
     }
 
-    private string GetPath(Track track)
-    {
-        var identity = JsonSerializer.Serialize(new
-        {
-            ProviderId = track.Id.ProviderId.ToUpperInvariant(),
-            track.Id.RemoteId
-        });
-        return Path.Combine(_directory,
-            Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(identity))) + ".json");
-    }
+    private string GetPath(ExternalMusicId identifier) =>
+        Path.Combine(_directory, MusicCacheIdentity.GetKey(identifier) + ".json");
 
     private static bool IsValid(Lyrics? lyrics) => lyrics is not null && lyrics.Text is not null &&
         (!string.IsNullOrWhiteSpace(lyrics.Text) || lyrics.Lines?.Any(line => !string.IsNullOrWhiteSpace(line?.Text)) == true) &&
@@ -102,5 +120,5 @@ public sealed class LyricsCache(string cacheDirectory, ILogger<LyricsCache> logg
 
     private static bool IsValidWord(LyricsWord? word) => word is not null && word.Text is not null;
 
-    private sealed record CacheEntry(int FormatVersion, MusicItemId TrackId, string ProviderId, Lyrics Lyrics);
+    private sealed record CacheEntry(int FormatVersion, ExternalMusicId Identifier, string ProviderId, Lyrics Lyrics);
 }

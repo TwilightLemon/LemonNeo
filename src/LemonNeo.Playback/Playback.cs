@@ -16,6 +16,7 @@ public interface IPlaybackQueue
     PlaybackQueueState Snapshot();
     void Replace(IEnumerable<Track> tracks, int startIndex = 0);
     PlaybackQueueItem Enqueue(Track track);
+    bool UpdateTrack(Guid itemId, Track track);
     bool Remove(Guid itemId);
     PlaybackQueueItem? Select(Guid itemId);
     PlaybackQueueItem? MoveNext();
@@ -196,6 +197,18 @@ public sealed class PlaybackQueue : IPlaybackQueue
             }
 
             return item;
+        }
+    }
+
+    public bool UpdateTrack(Guid itemId, Track track)
+    {
+        ArgumentNullException.ThrowIfNull(track);
+        lock (_gate)
+        {
+            var index = _items.FindIndex(item => item.Id == itemId);
+            if (index < 0) return false;
+            _items[index] = _items[index] with { Track = track };
+            return true;
         }
     }
 

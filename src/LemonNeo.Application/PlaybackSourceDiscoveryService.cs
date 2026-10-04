@@ -18,6 +18,8 @@ public sealed class PlaybackSourceDiscoveryService(
     IPlaybackSourceProviderRegistry playbackSources,
     MetadataService metadataService)
 {
+    private const double MinimumMetadataConfidence = 0.85;
+
     public Task<PlaybackSourceDiscoveryResult> FindKnownAsync(
         Track track,
         PlaybackRequest? request = null,
@@ -57,7 +59,7 @@ public sealed class PlaybackSourceDiscoveryService(
                 track,
                 targetNamespaces,
                 limitPerSource: 2,
-                minimumConfidence: 0.85,
+                minimumConfidence: MinimumMetadataConfidence,
                 cancellationToken: cancellationToken)
             : new MetadataLookupResult([], new Dictionary<string, string>());
         foreach (var error in metadataLookup.SourceErrors)
@@ -65,8 +67,10 @@ public sealed class PlaybackSourceDiscoveryService(
             errors[$"metadata/{error.Key}"] = error.Value;
         }
 
-        var metadata = new[] { FromTrack(track) }
-            .Concat(metadataLookup.Matches.Select(match => match.Metadata))
+        var metadata = FromTrack(track);
+        var matches = metadataLookup.Matches
+            .Where(match => match.Confidence >= MinimumMetadataConfidence)
+            .OrderByDescending(match => match.Confidence)
             .ToArray();
 
         foreach (var sourceProvider in selectedSources)
@@ -98,6 +102,7 @@ public sealed class PlaybackSourceDiscoveryService(
                         provider,
                         idResolver,
                         metadata,
+                        confidence: 0.98,
                         request,
                         cancellationToken);
                     if (resolved is not null)
@@ -105,22 +110,26 @@ public sealed class PlaybackSourceDiscoveryService(
                         candidates.Add(resolved);
                         continue;
                     }
-                }
 
-                var searchMetadata = SelectSearchMetadata(
-                    musicProvider,
-                    provider as ITrackIdResolverProvider,
-                    metadataLookup.Matches,
-                    metadata[0]);
-                var searched = await SearchProviderAsync(
-                    musicProvider,
-                    provider,
-                    searchMetadata,
-                    request,
-                    cancellationToken);
-                if (searched is not null)
-                {
-                    candidates.Add(searched);
+                    var bestMatch = matches.FirstOrDefault(match =>
+                        match.Metadata.ExternalIds.Any(identifier =>
+                            idResolver.AcceptedIdSchemes.Any(scheme => scheme.Accepts(identifier))));
+                    if (bestMatch is not null)
+                    {
+                        var matched = await ResolveDeclaredIdsAsync(
+                            musicProvider.Id,
+                            provider,
+                            idResolver,
+                            bestMatch.Metadata,
+                            bestMatch.Confidence,
+                            request,
+                            cancellationToken);
+                        if (matched is not null)
+                            candidates.Add(matched with
+                            {
+                                ResolutionMethod = $"metadata-match:{bestMatch.MetadataProviderId}/{bestMatch.SourceNamespace}"
+                            });
+                    }
                 }
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
@@ -134,102 +143,41 @@ public sealed class PlaybackSourceDiscoveryService(
             errors);
     }
 
-    private static TrackMetadata SelectSearchMetadata(
-        IMusicProvider provider,
-        ITrackIdResolverProvider? idResolver,
-        IReadOnlyList<MetadataMatch> matches,
-        TrackMetadata fallback)
-    {
-        if (idResolver is not null)
-        {
-            var targetMatch = matches.FirstOrDefault(match =>
-                match.Metadata.ExternalIds.Any(identifier =>
-                    idResolver.AcceptedIdSchemes.Any(scheme =>
-                        string.Equals(scheme.Namespace, identifier.Namespace, StringComparison.OrdinalIgnoreCase) &&
-                        string.Equals(scheme.Kind, identifier.Kind, StringComparison.OrdinalIgnoreCase))));
-            if (targetMatch is not null)
-            {
-                return targetMatch.Metadata;
-            }
-        }
-
-        return matches.FirstOrDefault(match =>
-                   string.Equals(match.SourceNamespace, provider.Id, StringComparison.OrdinalIgnoreCase))?.Metadata
-               ?? fallback;
-    }
-
     private static async Task<PlaybackSourceCandidate?> ResolveDeclaredIdsAsync(
         string providerId,
         IPlaybackProvider playbackProvider,
         ITrackIdResolverProvider resolver,
-        IReadOnlyList<TrackMetadata> metadata,
+        TrackMetadata metadata,
+        double confidence,
         PlaybackRequest request,
         CancellationToken cancellationToken)
     {
-        foreach (var item in metadata)
+        foreach (var identifier in metadata.ExternalIds)
         {
-            foreach (var identifier in item.ExternalIds)
+            if (!resolver.AcceptedIdSchemes.Any(scheme => scheme.Accepts(identifier)))
             {
-                if (!resolver.AcceptedIdSchemes.Any(scheme => scheme.Accepts(identifier)))
-                {
-                    continue;
-                }
+                continue;
+            }
 
-                var resolvedTrack = await resolver.ResolveTrackIdAsync(identifier, item, cancellationToken);
-                if (resolvedTrack is null)
-                {
-                    continue;
-                }
+            var resolvedTrack = await resolver.ResolveTrackIdAsync(identifier, metadata, cancellationToken);
+            if (resolvedTrack is null)
+            {
+                continue;
+            }
 
-                var source = await playbackProvider.ResolvePlaybackAsync(resolvedTrack, request, cancellationToken);
-                if (source is not null)
-                {
-                    return new PlaybackSourceCandidate(
-                        providerId,
-                        resolvedTrack,
-                        source,
-                        0.98,
-                        $"declared-id:{identifier.Namespace}/{identifier.Kind}");
-                }
+            var source = await playbackProvider.ResolvePlaybackAsync(resolvedTrack, request, cancellationToken);
+            if (source is not null)
+            {
+                return new PlaybackSourceCandidate(
+                    providerId,
+                    resolvedTrack,
+                    source,
+                    confidence,
+                    $"declared-id:{identifier.Namespace}/{identifier.Kind}");
             }
         }
 
         return null;
-    }
-
-    private async Task<PlaybackSourceCandidate?> SearchProviderAsync(
-        IMusicProvider musicProvider,
-        IPlaybackProvider playbackProvider,
-        TrackMetadata metadata,
-        PlaybackRequest request,
-        CancellationToken cancellationToken)
-    {
-        var tracks = new List<Track>();
-        if (musicProvider is ISearchProvider searchProvider)
-        {
-            var query = string.Join(' ', new[] { metadata.Title }.Concat(metadata.Artists));
-            var result = await searchProvider.SearchAsync(new SearchRequest(query, 20), cancellationToken);
-            tracks.AddRange(result.Tracks);
-        }
-
-        var best = tracks.DistinctBy(candidate => candidate.Id)
-            .Select(candidate => new { Track = candidate, Score = Score(metadata, candidate) })
-            .OrderByDescending(candidate => candidate.Score)
-            .FirstOrDefault();
-        if (best is null || best.Score < 0.72)
-        {
-            return null;
-        }
-
-        var source = await playbackProvider.ResolvePlaybackAsync(best.Track, request, cancellationToken);
-        return source is null
-            ? null
-            : new PlaybackSourceCandidate(
-                musicProvider.Id,
-                best.Track,
-                source,
-                best.Score,
-                "provider-search");
     }
 
     private static TrackMetadata FromTrack(Track track) => new()
@@ -241,21 +189,4 @@ public sealed class PlaybackSourceDiscoveryService(
         ArtworkUri = track.ArtworkUri,
         ExternalIds = track.ExternalIds
     };
-
-    private static double Score(TrackMetadata expected, Track candidate)
-    {
-        var title = Normalize(expected.Title) == Normalize(candidate.Title) ? 0.6 : 0;
-        var expectedArtists = expected.Artists.Select(Normalize).Where(value => value.Length > 0).ToHashSet();
-        var candidateArtists = candidate.Artists.Select(artist => Normalize(artist.Name)).ToHashSet();
-        var artist = expectedArtists.Count == 0
-            ? 0.2
-            : expectedArtists.Overlaps(candidateArtists) ? 0.3 : 0;
-        var duration = expected.Duration is null || candidate.Duration is null
-            ? 0.1
-            : Math.Abs((expected.Duration.Value - candidate.Duration.Value).TotalSeconds) <= 3 ? 0.1 : 0;
-        return title + artist + duration;
-    }
-
-    private static string Normalize(string? value) => new(
-        (value ?? string.Empty).Where(char.IsLetterOrDigit).Select(char.ToUpperInvariant).ToArray());
 }

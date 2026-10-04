@@ -87,8 +87,8 @@ public sealed record HttpPlaybackSource : PlaybackSource
     /// <summary>
     /// Optional provider-qualified identity for this exact audio variant (track,
     /// quality, and format). It stays stable when a signed playback URL changes.
-    /// The host's audio cache does not require this value: it selects cached
-    /// audio by the original track and playback request before URL resolution.
+    /// The host's audio cache does not use this value: it selects cached
+    /// audio by external music IDs and the playback request before URL resolution.
     /// </summary>
     public string? CacheKey { get; init; }
 }

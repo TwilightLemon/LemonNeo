@@ -620,6 +620,14 @@ public sealed class PlaybackSessionService(
 
     private async Task SaveSessionStateAsync(CancellationToken cancellationToken = default)
     {
+        if (queue.CurrentItem is { } item && resolver.CurrentQueueTrack is { } resolved &&
+            item.Track.Id == resolved.Id)
+        {
+            // Retain discovered cache aliases in both the live queue and its saved snapshot.
+            var identifiers = MusicCacheIdentity.GetIdentifiers(item.Track.ExternalIds.Concat(resolved.ExternalIds));
+            if (!item.Track.ExternalIds.SequenceEqual(identifiers))
+                queue.UpdateTrack(item.Id, item.Track with { ExternalIds = identifiers });
+        }
         var snapshot = CaptureSnapshot();
         var state = queue.Snapshot() with
         {

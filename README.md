@@ -290,12 +290,18 @@ The host's `PlaybackAudioCache` owns finite HTTP audio caching for all players.
 Cached audio lives under `<cache-root>/Music`, following the resolved cache
 directory (including `LEMONNEO_CACHE_HOME`). Run `paths` to see that root.
 `PlaybackResolver` selects a completed cache before validating source plugins,
-discovering IDs, or requesting a playback URL. Its index uses the original
-playlist/queue track ID, requested quality, and required source provider; qualities
+discovering IDs, or requesting a playback URL. Its index uses an external music
+ID's namespace, type (`Kind`), and value, together with requested quality and
+required source provider. Namespace and type are case-insensitive; ID values
+are case-sensitive. Each known external ID has its own alias, so different
+provider snapshots can share a cache and ID order or additional IDs do not
+change existing keys. Cache hits also add aliases for newly known IDs. Qualities
 and explicit source selections have separate entries. An entry survives URL
 expiration, a host restart, and changing the player. Cached playlist items can
 play offline even when their source plugin is unavailable. Cross-provider
-discovery still indexes audio by the original playlist item.
+discovery indexes audio under both original and discovered external IDs. Newly
+discovered IDs are saved in the playback queue for offline reuse after a restart.
+Tracks without a valid external ID cannot create an audio cache entry.
 
 Players implement the optional `IStreamingPlayer` capability to send original
 encoded audio chunks as `ReadOnlySpan<byte>` values to an `IPlaybackDownloadSink`
@@ -316,8 +322,8 @@ retained; other URLs use `.audio`. Interrupted downloads are removed when playba
 stops or switches tracks. Live/unknown-size streams do not publish completed
 entries. Cache write failures are reported and streaming playback continues.
 Cache files contain disposable audio data and can be cleared without changing
-playlists or playback state. Old BASS-private cache files have no queue/request
-index and are not automatically migrated to the host cache.
+playlists or playback state. Old BASS-private caches and track-ID-based host
+indexes are not migrated; external-ID indexes are rebuilt on subsequent downloads.
 
 The host's `LyricsCache` stores complete lyrics under `<cache-root>/Lyrics`,
 following the same resolved cache directory and `LEMONNEO_CACHE_HOME` override.
@@ -325,7 +331,9 @@ following the same resolved cache directory and `LEMONNEO_CACHE_HOME` override.
 accessing providers, so saved lyrics remain available offline and after a restart,
 even if the original lyrics plugin is unavailable. JSON entries retain main lyrics,
 word timestamps, translations, romanization, background lines, and source metadata.
-Entries use the original track ID regardless of playback quality or audio source.
+Entries use the same external-ID identity regardless of playback quality or audio
+source, with aliases for the track's IDs and the lyrics' source ID when available.
+Entries are not keyed by `Track.Id`; old track-ID-based entries are refetched.
 Writes use unique temporary files and an atomic replacement. Missing, invalid, or
 incompatible entries fall back to providers; failures and empty lyrics are not
 cached, and cache write failures do not prevent displaying the fetched lyrics.
@@ -478,9 +486,13 @@ $env:LEMONNEO_MUSIXMATCH_USER_TOKEN = '<Musixmatch user token>'
 
 External track identifiers are qualified by `(namespace, kind)`. A playback
 provider may consume an identifier only when it explicitly declares that scheme.
-If schemes differ, Lemon Neo searches the target provider and uses the target
-provider's native track ID instead. This prevents, for example, a QQ Music
-numeric `song-id` from being mistaken for a `song-mid`.
+When existing IDs cannot be resolved, metadata providers supply scored matches.
+For each playback source, Lemon Neo selects the highest `MetadataMatch.Confidence`
+at or above 0.85 whose external IDs match an accepted scheme, and resolves those
+IDs through that source. The resulting playback candidate retains the metadata
+provider's confidence. Unscored catalogue search results are not used for automatic
+matching. This prevents, for example, a QQ Music numeric `song-id` from being
+mistaken for a `song-mid`.
 
 Run `players` to inspect the active player implementations. BASS has priority for
 local files and direct HTTP audio streams; the console player remains the fallback
@@ -524,13 +536,14 @@ results therefore cannot make the in-memory library grow.
 Run the host cache regression checks (no audio output device required):
 
 ```powershell
-dotnet run --project tests/LemonNeo.Playback.Tests -c Release
+dotnet test tests/LemonNeo.Desktop.Tests -c Release -p:SkipDesktopPlugins=true --filter FullyQualifiedName~MusicCacheTests
 ```
 
-These cover playback during an incomplete download, offline cache selection
-without a source plugin, reuse by another player, quality/source isolation,
-cross-provider queue identities, early completion callbacks, corruption recovery,
-temporary-file cleanup, and cache write failures.
+These cover external-ID reuse across provider snapshots, namespace/type/value
+isolation, quality/source isolation, lyrics source aliases, offline playback
+after cross-provider discovery and queue restoration without a source plugin,
+incomplete downloads, early completion callbacks, corruption recovery, and
+temporary-file cleanup.
 
 Run the native BASS regression checks (requires an audio output device):
 

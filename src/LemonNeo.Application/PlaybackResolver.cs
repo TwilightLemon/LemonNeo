@@ -13,6 +13,7 @@ public sealed class PlaybackResolver(
 {
     private IPlaybackDownloadSink? _download;
     public IPlayerProvider? ActivePlayer { get; private set; }
+    public Track? CurrentQueueTrack { get; private set; }
 
     public async Task<PlaybackSource> PlayAsync(
         Track track,
@@ -24,20 +25,8 @@ public sealed class PlaybackResolver(
             var playbackRequest = request ?? new PlaybackRequest();
             // A persisted queue snapshot is sufficient for offline playback.
             // Check before provider validation, ID discovery, and URL resolution.
-            var cachedSource = await audioCache.TryGetAsync(track, playbackRequest, cancellationToken);
-            if (cachedSource is not null)
-            {
-                try
-                {
-                    await PlaySourceAsync(track, cachedSource, track, playbackRequest, cancellationToken);
-                    return cachedSource;
-                }
-                catch (Exception exception) when (exception is not OperationCanceledException)
-                {
-                    // A verified byte stream can still be rejected by a decoder.
-                    audioCache.Invalidate(track, playbackRequest);
-                }
-            }
+            if (await TryPlayCachedAsync(track, playbackRequest, cancellationToken) is { } cachedSource)
+                return cachedSource;
             ValidateRequiredSourceProvider(playbackRequest);
             var resolvedTrack = track;
             PlaybackSource? source = null;
@@ -79,7 +68,15 @@ public sealed class PlaybackResolver(
                 resolvedTrack = candidate.Track;
             }
 
-            await PlaySourceAsync(resolvedTrack, source, track, playbackRequest, cancellationToken);
+            var cacheTrack = track with
+            {
+                ExternalIds = MusicCacheIdentity.GetIdentifiers(track.ExternalIds.Concat(resolvedTrack.ExternalIds))
+            };
+            // Discovery may reveal an ID whose audio was already cached by another snapshot.
+            if (!track.ExternalIds.SequenceEqual(cacheTrack.ExternalIds) &&
+                await TryPlayCachedAsync(cacheTrack, playbackRequest, cancellationToken) is { } discoveredCache)
+                return discoveredCache;
+            await PlaySourceAsync(resolvedTrack, source, cacheTrack, playbackRequest, cancellationToken);
             return source;
         }
         catch (Exception exception) when (exception is not OperationCanceledException and not PlaybackResolutionException)
@@ -94,6 +91,24 @@ public sealed class PlaybackResolver(
     public Task ResumeAsync(CancellationToken cancellationToken = default) =>
         ActivePlayer?.Player.ResumeAsync(cancellationToken) ?? Task.CompletedTask;
 
+    private async Task<FilePlaybackSource?> TryPlayCachedAsync(
+        Track track, PlaybackRequest request, CancellationToken cancellationToken)
+    {
+        var source = await audioCache.TryGetAsync(track, request, cancellationToken);
+        if (source is null) return null;
+        try
+        {
+            await PlaySourceAsync(track, source, track, request, cancellationToken);
+            return source;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // A verified byte stream can still be rejected by a decoder.
+            audioCache.Invalidate(track, request);
+            return null;
+        }
+    }
+
     private async Task PlaySourceAsync(
         Track resolvedTrack,
         PlaybackSource source,
@@ -107,8 +122,7 @@ public sealed class PlaybackResolver(
         {
             if (source is HttpPlaybackSource { IsDirectAudio: true } http && player.Player is IStreamingPlayer streaming)
             {
-                // The original queue ID is the lookup key even if discovery
-                // matched the track to another catalogue/provider.
+                // Original and discovered external IDs are aliases for this download.
                 _download = audioCache.Start(queueTrack, request, http);
                 if (_download is not null)
                     await streaming.PlayAsync(resolvedTrack, http, _download, cancellationToken);
@@ -120,6 +134,7 @@ public sealed class PlaybackResolver(
                 await player.Player.PlayAsync(resolvedTrack, source, cancellationToken);
             }
             ActivePlayer = player;
+            CurrentQueueTrack = queueTrack;
         }
         catch
         {
@@ -163,5 +178,6 @@ public sealed class PlaybackResolver(
         _download?.Dispose();
         _download = null;
         ActivePlayer = null;
+        CurrentQueueTrack = null;
     }
 }
