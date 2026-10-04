@@ -39,6 +39,9 @@
           <Button Classes="nav" Classes.active="{Binding Navigation.IsSearch}" Command="{Binding Navigation.NavigateCommand}" CommandParameter="Search">
             <StackPanel Orientation="Horizontal" Spacing="12"><Path Classes="icon" Data="{StaticResource Icon.Search}" /><TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Search}}" /></StackPanel>
           </Button>
+          <Button Name="AccountsNavigationButton" Classes="nav" Classes.active="{Binding Navigation.IsAccounts}" Command="{Binding Navigation.NavigateCommand}" CommandParameter="Accounts">
+            <StackPanel Orientation="Horizontal" Spacing="12"><Path Classes="icon" Data="{StaticResource Icon.Account}" /><TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Accounts}}" /></StackPanel>
+          </Button>
           <Button Classes="nav" Classes.active="{Binding Navigation.IsOnline}" Command="{Binding Navigation.NavigateCommand}" CommandParameter="Online">
             <StackPanel Orientation="Horizontal" Spacing="12"><Path Classes="icon" Data="{StaticResource Icon.Folder}" /><TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Online}}" /></StackPanel>
           </Button>

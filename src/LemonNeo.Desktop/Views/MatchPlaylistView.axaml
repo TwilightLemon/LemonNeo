@@ -39,7 +39,7 @@
           <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.NoMetadataSources}}" IsVisible="{Binding !HasMetadataSources}" Classes="muted" TextWrapping="Wrap" />
           <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.SelectMetadataSources}}" Classes="caption" TextWrapping="Wrap" IsVisible="{Binding HasMetadataSources}" />
         </StackPanel>
-        <TextBlock Text="{Binding Status}" TextWrapping="Wrap" />
+        <TextBlock Text="{Binding Status}" IsVisible="{Binding HasStatus}" TextWrapping="Wrap" />
         <SelectableTextBlock Text="{Binding InspectionMessages}" Classes="muted" TextWrapping="Wrap" />
       </StackPanel>
     </ScrollViewer>

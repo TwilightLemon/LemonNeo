@@ -37,7 +37,8 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
     public virtual string? PageSummary => null;
     public bool IsBusy { get => _isBusy; private set => SetProperty(ref _isBusy, value); }
     public bool CanInteract => !IsBusy && Context.IsInitialized && !_closing;
-    public string Status => _text.Format(_statusKey, _statusArguments);
+    public bool HasStatus => _statusKey != "Ready";
+    public string Status => HasStatus ? _text.Format(_statusKey, _statusArguments) : "";
     public string? Error => _errorKey is null ? null : _text.Format(_errorKey, _errorArguments) +
         (_errorDetails is null ? "" : Environment.NewLine + _errorDetails);
     public bool HasError => _errorKey is not null;
@@ -83,7 +84,8 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
 
     protected void SetStatus(string key, params object?[] arguments)
     {
-        _statusKey = key; _statusArguments = arguments; OnPropertyChanged(nameof(Status));
+        _statusKey = key; _statusArguments = arguments;
+        OnPropertyChanged(nameof(Status)); OnPropertyChanged(nameof(HasStatus));
     }
     protected void SetError(string? key, object?[]? arguments = null, string? details = null)
     {

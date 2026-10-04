@@ -2,7 +2,7 @@
              xmlns:controls="using:LemonNeo.Desktop.Controls" xmlns:vm="using:LemonNeo.Desktop.ViewModels" xmlns:i18n="using:LemonNeo.Desktop.Infrastructure"
              x:Class="LemonNeo.Desktop.Views.ToolsView" x:DataType="vm:ToolsViewModel">
   <Grid RowDefinitions="Auto,Auto,*">
-    <controls:PageHeader Title="{Binding PageTitle}" Description="{Binding PageDescription}" Summary="{Binding PageSummary}">
+    <controls:PageHeader Title="{Binding PageTitle}" Summary="{Binding PageSummary}">
       <controls:PageHeader.Actions>
         <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsBusy}" ToolTip.Tip="{Binding Status}">
           <ProgressBar IsIndeterminate="True" Width="60" Height="3" VerticalAlignment="Center" AutomationProperties.Name="{Binding Status}" />

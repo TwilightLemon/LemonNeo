@@ -35,6 +35,23 @@
     <Style Selector="^:disabled"><Setter Property="Opacity" Value="0.4" /></Style>
     <Style Selector="^:focus-visible"><Setter Property="BorderBrush" Value="{DynamicResource Brush.Focus}" /></Style>
   </ControlTheme>
+  <ControlTheme x:Key="ServiceTabTheme" TargetType="ListBoxItem">
+    <Setter Property="BorderThickness" Value="0,0,0,2" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+          <ContentPresenter Name="PART_ContentPresenter" Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+                            Padding="{TemplateBinding Padding}" HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalContentAlignment="Center" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:selected"><Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentText}" /></Style>
+    <Style Selector="^:focus-visible"><Setter Property="BorderBrush" Value="{DynamicResource Brush.Focus}" /></Style>
+  </ControlTheme>
   <ControlTheme x:Key="PlaybackTrackButton" TargetType="RepeatButton">
     <Setter Property="Template">
       <ControlTemplate>

@@ -11,137 +11,137 @@ public sealed partial class OnlineViewModel : PageViewModel
 {
     public OnlineViewModel(DesktopContext context) : base(context, DesktopRoutes.Online)
     {
-        LoginCommand = new(LoginAsync); LogoutCommand = new(LogoutAsync);
         RemotePlaylistsCommand = new(LoadRemotePlaylistsAsync);
-        ImportRemoteCommand = new(() => SelectedRemotePlaylist is { Id: { } id } row ? ImportRemoteAsync(row.ProviderId, id) : Task.CompletedTask);
-        ImportRemoteIdCommand = new(() => SelectedPlaylistProvider?.Id is { } provider ? ImportRemoteAsync(provider, RemotePlaylistId) : Task.CompletedTask);
+        ImportRemoteCommand = new(() => CanImportRemote && SelectedRemotePlaylist is { Id: { } id } row
+            ? ImportRemoteAsync(row.ProviderId, id) : Task.CompletedTask);
+        RemotePlaylists.CollectionChanged += (_, _) => RaiseRemotePlaylistProperties();
+        PlaylistCategories.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasCategoryMenu));
         RefreshProviderOptions();
+        Context.AuthenticationChanged += OnAuthenticationChanged;
     }
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(CanLogin))] private string _cookie = "";
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(CanImportRemoteId))] private string _remotePlaylistId = "";
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(CanBrowseRemote)), NotifyPropertyChangedFor(nameof(CanImportRemoteId))] private ProviderOption? _selectedPlaylistProvider;
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(CanImportRemote))] private RemotePlaylistRow? _selectedRemotePlaylist;
-    private ProviderOption? _selectedAuthenticationProvider;
-    public ProviderOption? SelectedAuthenticationProvider
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(RemoteEmptyTitle)), NotifyPropertyChangedFor(nameof(RemoteEmptyDescription))]
+    private bool _hasLoadedRemotePlaylists;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(CanImportRemote)), NotifyPropertyChangedFor(nameof(HasSelectedRemotePlaylist)),
+        NotifyPropertyChangedFor(nameof(SelectedPlaylistSummary))] private RemotePlaylistRow? _selectedRemotePlaylist;
+    private ProviderOption? _selectedService;
+    private RemotePlaylistCategory? _selectedCategory;
+    private readonly Dictionary<string, string> _playlistSelections = [];
+    private bool _activated;
+    public ProviderOption? SelectedService
     {
-        get => _selectedAuthenticationProvider;
+        get => _selectedService;
         set
         {
-            var changedProvider = _selectedAuthenticationProvider?.Id != value?.Id;
-            if (SetProperty(ref _selectedAuthenticationProvider, value))
+            var changedProvider = _selectedService?.Id != value?.Id;
+            if (SetProperty(ref _selectedService, value))
             {
-                if (changedProvider) Cookie = "";
-                OnPropertyChanged(nameof(AuthenticationStatus));
-                OnPropertyChanged(nameof(AuthenticationAccount));
-                OnPropertyChanged(nameof(CanLogin)); OnPropertyChanged(nameof(CanLogout));
+                if (changedProvider)
+                {
+                    ResetRemotePlaylists();
+                    SetError(null);
+                    SetStatus("Ready");
+                }
+                RaiseServiceProperties();
+                if (changedProvider && _activated && CanBrowseRemote) RemotePlaylistsCommand.Execute(null);
             }
         }
     }
-    public ObservableCollection<ProviderOption> AuthenticationProviders { get; } = [];
-    public ObservableCollection<ProviderOption> PlaylistProviders { get; } = [];
+    public ObservableCollection<ProviderOption> Services { get; } = [];
+    public ObservableCollection<RemotePlaylistCategory> PlaylistCategories { get; } = [];
     public ObservableCollection<RemotePlaylistRow> RemotePlaylists { get; } = [];
-    public bool CanLogin => CanInteract && SelectedAuthenticationProvider?.Id is not null && !string.IsNullOrWhiteSpace(Cookie);
-    public bool CanLogout => CanInteract && SelectedAuthenticationProvider?.Id is { } id &&
-        _runtime.Get<IProviderRegistry>().Get(id) is IAuthenticationProvider { State.IsAuthenticated: true };
-    public bool CanBrowseRemote => CanInteract && SelectedPlaylistProvider?.Id is not null;
-    public bool CanImportRemoteId => CanBrowseRemote && !string.IsNullOrWhiteSpace(RemotePlaylistId);
-    public bool CanImportRemote => CanInteract && SelectedRemotePlaylist is { CanImport: true };
-    public string AuthenticationStatus => SelectedAuthenticationProvider?.Id is { } id &&
-        _runtime.Get<IProviderRegistry>().Get(id) is IAuthenticationProvider { State.IsAuthenticated: true }
-        ? _text["Authenticated"] : _text["NotAuthenticated"];
-    public string AuthenticationAccount => SelectedAuthenticationProvider?.Id is { } id &&
-        _runtime.Get<IProviderRegistry>().Get(id) is IAuthenticationProvider { State.IsAuthenticated: true } provider
-        ? $"{provider.State.AccountName ?? provider.State.UserId ?? id}  ·  {provider.State.UserId ?? "—"}" : "";
-
-    public AsyncRelayCommand LoginCommand { get; }
-    public AsyncRelayCommand LogoutCommand { get; }
+    public bool HasCategoryMenu => PlaylistCategories.Count > 1;
+    public RemotePlaylistCategory? SelectedCategory
+    {
+        get => _selectedCategory;
+        set
+        {
+            if (Equals(_selectedCategory, value)) return;
+            RememberPlaylistSelection();
+            SetProperty(ref _selectedCategory, value);
+            RemotePlaylists.Clear();
+            if (value is not null)
+                foreach (var row in value.Playlists) RemotePlaylists.Add(row);
+            var selectedId = value is not null ? _playlistSelections.GetValueOrDefault(value.Id) : null;
+            SelectedRemotePlaylist = RemotePlaylists.FirstOrDefault(row => row.CanImport && row.Id == selectedId)
+                ?? RemotePlaylists.FirstOrDefault(row => row.CanImport);
+            RaiseRemotePlaylistProperties();
+        }
+    }
+    public bool HasServices => Services.Count > 0;
+    private IMusicProvider? Service => SelectedService?.Id is { } id ? _runtime.Get<IProviderRegistry>().Get(id) : null;
+    public bool SupportsPlaylists => Service is IPlaylistProvider;
+    public bool HasRemotePlaylists => RemotePlaylists.Any(row => row.CanImport);
+    public bool HasSelectedRemotePlaylist => SelectedRemotePlaylist is { CanImport: true };
+    public string SelectedPlaylistSummary => SelectedRemotePlaylist is { TrackCount: not "—" } row
+        ? _text.Format("RemoteTrackCount", row.TrackCount) : _text["RemoteTrackCountUnknown"];
+    public string RemoteEmptyTitle => !SupportsPlaylists ? _text["NoPlaylistServices"]
+        : HasLoadedRemotePlaylists ? _text[HasCategoryMenu && SelectedCategory is not null ? "EmptyCollection" : "NoRemotePlaylistsFound"]
+        : _text["EmptyRemote"];
+    public string RemoteEmptyDescription => !SupportsPlaylists ? _text["NoPlaylistServicesDescription"]
+        : HasLoadedRemotePlaylists ? _text[HasCategoryMenu && SelectedCategory is not null ? "EmptyCollectionDescription" : "NoRemotePlaylistsFoundDescription"]
+        : _text["EmptyRemoteDescription"];
+    public bool CanBrowseRemote => CanInteract && SupportsPlaylists;
+    public bool CanImportRemote => CanInteract && SelectedRemotePlaylist is { CanImport: true } row
+        && row.ProviderId == SelectedService?.Id && RemotePlaylists.Contains(row);
     public AsyncRelayCommand RemotePlaylistsCommand { get; }
     public AsyncRelayCommand ImportRemoteCommand { get; }
-    public AsyncRelayCommand ImportRemoteIdCommand { get; }
     private void RefreshProviderOptions()
     {
         var providers = _runtime.Get<IProviderRegistry>().Providers;
-        static ProviderOption Option(IMusicProvider p) => new(p.Id, $"{p.Descriptor.Name} ({p.Id})");
-        static ProviderOption? Replace(ObservableCollection<ProviderOption> collection, IEnumerable<ProviderOption> values, ProviderOption? selection)
+        var options = providers.Where(p => p is IPlaylistProvider)
+            .Select(p => new ProviderOption(p.Id, p.Descriptor.Name)).ToArray();
+        var selectedId = SelectedService?.Id
+            ?? providers.FirstOrDefault(p => p is IPlaylistProvider and IAuthenticationProvider { State.IsAuthenticated: true })?.Id
+            ?? options.FirstOrDefault()?.Id;
+        // Keep tab selection and page state when revisiting or changing language.
+        if (!Services.SequenceEqual(options))
         {
-            collection.Clear(); foreach (var value in values) collection.Add(value);
-            return collection.FirstOrDefault(o => o.Id == selection?.Id) ?? collection.FirstOrDefault();
+            Services.Clear(); foreach (var option in options) Services.Add(option);
         }
-        SelectedAuthenticationProvider = Replace(AuthenticationProviders, providers.Where(p => p is IAuthenticationProvider).Select(Option), SelectedAuthenticationProvider);
-        SelectedPlaylistProvider = Replace(PlaylistProviders, providers.Where(p => p is IPlaylistProvider).Select(Option), SelectedPlaylistProvider);
+        SelectedService = Services.FirstOrDefault(option => option.Id == selectedId) ?? Services.FirstOrDefault();
+        OnPropertyChanged(nameof(HasServices));
+        RaiseServiceProperties();
+        RaiseRemotePlaylistProperties();
     }
-    public Task LoginAsync() => ExecuteAsync(async ct =>
-    {
-        try
-        {
-            var provider = GetAuthenticationProvider();
-            if (!(await Task.Run(() => provider.GetAvailableMethodsAsync(ct), ct)).Contains(AuthMethod.Cookie))
-                throw new ArgumentException(_text["CookieUnsupported"]);
-            if (string.IsNullOrWhiteSpace(Cookie)) throw new ArgumentException(_text["CookieRequired"]);
-            await Task.Run(() => provider.AuthenticateAsync(new(AuthMethod.Cookie, new Dictionary<string, string> { ["cookie"] = Cookie.Trim() }), ct), ct);
-            if (PlaylistProviders.FirstOrDefault(p => p.Id == SelectedAuthenticationProvider?.Id) is { } playlists)
-                SelectedPlaylistProvider = playlists;
-            SetStatus("LoginCompleted");
-        }
-        finally
-        {
-            Cookie = "";
-            OnPropertyChanged(nameof(AuthenticationStatus)); OnPropertyChanged(nameof(AuthenticationAccount));
-        }
-    });
-
-    public Task LogoutAsync() => ExecuteAsync(async ct =>
-    {
-        await Task.Run(() => GetAuthenticationProvider().SignOutAsync(ct), ct);
-        Cookie = "";
-        RemotePlaylists.Clear();
-        SelectedRemotePlaylist = null;
-        OnPropertyChanged(nameof(AuthenticationStatus)); OnPropertyChanged(nameof(AuthenticationAccount));
-        SetStatus("LogoutCompleted");
-    });
-
-    private IAuthenticationProvider GetAuthenticationProvider() => SelectedAuthenticationProvider?.Id is { } id &&
-        _runtime.Get<IProviderRegistry>().Get(id) is IAuthenticationProvider provider
-        ? provider : throw new ArgumentException(_text["ProviderUnavailable"]);
-
-    partial void OnSelectedPlaylistProviderChanged(ProviderOption? oldValue, ProviderOption? newValue)
-    {
-        if (oldValue?.Id == newValue?.Id) return;
-        RemotePlaylists.Clear(); SelectedRemotePlaylist = null;
-    }
-
     public Task LoadRemotePlaylistsAsync() => ExecuteAsync(async ct =>
     {
-        if (SelectedPlaylistProvider?.Id is not { } id || _runtime.Get<IProviderRegistry>().Get(id) is not IPlaylistProvider provider)
+        if (SelectedService?.Id is not { } id || Service is not IPlaylistProvider provider)
             throw new ArgumentException(_text["ProviderUnavailable"]);
-        var rows = new List<RemotePlaylistRow>();
+        var categories = new List<RemotePlaylistCategory>();
+        var selectedCategoryId = SelectedCategory?.Id;
         await Task.Run(async () =>
         {
             if (provider is IPlaylistCollectionProvider groups)
             {
                 await foreach (var collection in groups.GetUserPlaylistCollectionsAsync(ct))
                 {
-                    if (collection.Playlists.Count == 0) rows.Add(new(id, null, _text["EmptyCollection"], collection.Name, "—"));
-                    foreach (var playlist in collection.Playlists)
-                        rows.Add(new(id, playlist.Id, playlist.Name, collection.Name, playlist.TrackCount?.ToString(_text.Culture) ?? "—"));
+                    var rows = collection.Playlists.Select(playlist => new RemotePlaylistRow(id, playlist.Id, playlist.Name,
+                        collection.Name, playlist.TrackCount?.ToString(_text.Culture) ?? "—")).ToArray();
+                    categories.Add(new(collection.Id, collection.Name, rows));
                 }
             }
             else
             {
+                var rows = new List<RemotePlaylistRow>();
                 await foreach (var playlist in provider.GetUserPlaylistsAsync(ct))
                     rows.Add(new(id, playlist.Id, playlist.Name, _text["RemotePlaylists"], playlist.TrackCount?.ToString(_text.Culture) ?? "—"));
+                categories.Add(new("", _text["RemotePlaylists"], rows));
             }
         }, ct);
         ct.ThrowIfCancellationRequested();
-        RemotePlaylists.Clear();
-        foreach (var row in rows) RemotePlaylists.Add(row);
-        SelectedRemotePlaylist = RemotePlaylists.FirstOrDefault(r => r.CanImport);
-        SetStatus("RemotePlaylistsLoaded", rows.Count(r => r.CanImport));
+        if (SelectedService?.Id != id) return;
+        RememberPlaylistSelection();
+        PlaylistCategories.Clear();
+        foreach (var category in categories) PlaylistCategories.Add(category);
+        SelectedCategory = PlaylistCategories.FirstOrDefault(category => category.Id == selectedCategoryId)
+            ?? PlaylistCategories.FirstOrDefault(category => category.Playlists.Any(row => row.CanImport))
+            ?? PlaylistCategories.FirstOrDefault();
+        HasLoadedRemotePlaylists = true;
     });
 
-    public Task ImportRemoteAsync(string providerId, string id) => ExecuteAsync(async ct =>
+    private Task ImportRemoteAsync(string providerId, string id) => ExecuteAsync(async ct =>
     {
-        if (string.IsNullOrWhiteSpace(id)) throw new ArgumentException(_text["RemoteIdRequired"]);
+        if (string.IsNullOrWhiteSpace(id)) throw new ArgumentException(_text["RemotePlaylistUnavailable"]);
         var importer = _runtime.Get<ImportService>();
         var remote = await Task.Run(() => importer.GetRemotePlaylistAsync(providerId, id.Trim(), ct), ct);
         ct.ThrowIfCancellationRequested();
@@ -151,17 +151,70 @@ public sealed partial class OnlineViewModel : PageViewModel
         SetStatus("RemoteImported", playlist.Name, playlist.Items.Count);
     });
 
-    public override Task ActivateAsync() { RefreshProviderOptions(); return Task.CompletedTask; }
+    public override async Task ActivateAsync()
+    {
+        _activated = true;
+        RefreshProviderOptions();
+        RaiseServiceProperties();
+        if (!HasLoadedRemotePlaylists && CanBrowseRemote) await RemotePlaylistsCommand.ExecuteAsync(null);
+    }
+    private void ResetRemotePlaylists()
+    {
+        PlaylistCategories.Clear();
+        SelectedCategory = null;
+        _playlistSelections.Clear();
+        RemotePlaylists.Clear();
+        SelectedRemotePlaylist = null;
+        HasLoadedRemotePlaylists = false;
+    }
+    private void RememberPlaylistSelection()
+    {
+        if (SelectedCategory is { } category && SelectedRemotePlaylist is { CanImport: true, Id: { } id })
+            _playlistSelections[category.Id] = id;
+    }
+    private void RaiseServiceProperties()
+    {
+        foreach (var name in new[] { nameof(SupportsPlaylists), nameof(CanBrowseRemote), nameof(CanImportRemote) }) OnPropertyChanged(name);
+    }
+    private void RaiseRemotePlaylistProperties()
+    {
+        foreach (var name in new[] { nameof(HasRemotePlaylists), nameof(CanImportRemote), nameof(RemoteEmptyTitle),
+            nameof(RemoteEmptyDescription), nameof(SelectedPlaylistSummary) }) OnPropertyChanged(name);
+    }
     protected override void RaiseInteractionProperties()
     {
         base.RaiseInteractionProperties();
-        foreach (var name in new[] { nameof(CanLogin), nameof(CanLogout), nameof(CanBrowseRemote), nameof(CanImportRemoteId), nameof(CanImportRemote),
-            nameof(AuthenticationStatus), nameof(AuthenticationAccount) }) OnPropertyChanged(name);
+        RaiseServiceProperties();
     }
     protected override void RefreshLocalizedProperties()
     {
         base.RefreshLocalizedProperties(); RefreshProviderOptions(); RaiseInteractionProperties();
-        for (var i = 0; i < RemotePlaylists.Count; i++)
-            if (!RemotePlaylists[i].CanImport) RemotePlaylists[i] = RemotePlaylists[i] with { Name = _text["EmptyCollection"] };
+        if (Service is not IPlaylistCollectionProvider)
+            for (var i = 0; i < PlaylistCategories.Count; i++)
+            {
+                var category = PlaylistCategories[i];
+                var name = _text["RemotePlaylists"];
+                if (category.Name == name && category.Playlists.All(row => row.Collection == name)) continue;
+                var selected = ReferenceEquals(category, SelectedCategory);
+                var updated = category with { Name = name, Playlists = category.Playlists.Select(row => row with { Collection = name }).ToArray() };
+                PlaylistCategories[i] = updated;
+                if (selected) SelectedCategory = updated;
+            }
+        RaiseRemotePlaylistProperties();
+    }
+    private void OnAuthenticationChanged(string providerId)
+    {
+        if (SelectedService?.Id != providerId) return;
+        if (IsBusy) CancelOperationCommand.Execute(null);
+        ResetRemotePlaylists();
+        SetError(null);
+        SetStatus("Ready");
+    }
+    public override async ValueTask DisposeAsync()
+    {
+        Context.AuthenticationChanged -= OnAuthenticationChanged;
+        await base.DisposeAsync();
     }
 }
+
+public sealed record RemotePlaylistCategory(string Id, string Name, IReadOnlyList<RemotePlaylistRow> Playlists);

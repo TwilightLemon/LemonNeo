@@ -45,6 +45,7 @@ public sealed class MainViewModel : PageViewModel
     public LibraryViewModel Queue => Navigation.GetPage<LibraryViewModel>(DesktopRoutes.Queue);
     public SearchViewModel Search => Navigation.GetPage<SearchViewModel>(DesktopRoutes.Search);
     public OnlineViewModel Online => Navigation.GetPage<OnlineViewModel>(DesktopRoutes.Online);
+    public AccountsViewModel Accounts => Navigation.GetPage<AccountsViewModel>(DesktopRoutes.Accounts);
     public TrackEditorPageViewModel EditorPage => Navigation.GetPage<TrackEditorPageViewModel>(DesktopRoutes.Editor);
     public ToolsViewModel Tools => Navigation.GetPage<ToolsViewModel>(DesktopRoutes.Tools);
     public SettingsViewModel Settings => Navigation.GetPage<SettingsViewModel>(DesktopRoutes.Settings);
@@ -122,6 +123,7 @@ public sealed class MainViewModel : PageViewModel
         DesktopRoutes.Library or DesktopRoutes.Queue => new LibraryViewModel(Context, Navigation, Playback, route, playlist),
         DesktopRoutes.Search => CreateSearchPage(),
         DesktopRoutes.Online => new OnlineViewModel(Context),
+        DesktopRoutes.Accounts => new AccountsViewModel(Context),
         DesktopRoutes.Editor => new TrackEditorPageViewModel(Context, Navigation, Playback, null),
         DesktopRoutes.MatchPlaylist => new MatchPlaylistPageViewModel(Context, Navigation, playlist ?? throw new ArgumentException("A playlist is required.")),
         DesktopRoutes.Tools => new ToolsViewModel(Context, Navigation),

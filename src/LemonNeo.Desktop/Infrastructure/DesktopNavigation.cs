@@ -11,9 +11,9 @@ namespace LemonNeo.Desktop.Infrastructure;
 
 public static class DesktopRoutes
 {
-    public const string Library = "Library", Search = "Search", Online = "Online", Queue = "Queue", Lyrics = "Lyrics",
+    public const string Library = "Library", Search = "Search", Accounts = "Accounts", Online = "Online", Queue = "Queue", Lyrics = "Lyrics",
         Editor = "Editor", MatchPlaylist = "MatchPlaylist", Tools = "Tools", Settings = "Settings", Components = "Components";
-    public static IReadOnlyList<string> All { get; } = [Library, Search, Online, Queue, Lyrics, Editor, MatchPlaylist, Tools, Settings, Components];
+    public static IReadOnlyList<string> All { get; } = [Library, Search, Accounts, Online, Queue, Lyrics, Editor, MatchPlaylist, Tools, Settings, Components];
 }
 
 public sealed class DesktopNavigation : ObservableObject, IAsyncDisposable
@@ -48,6 +48,7 @@ public sealed class DesktopNavigation : ObservableObject, IAsyncDisposable
     public bool CanGoForward => !IsNavigating && _forward.Count > 0;
     public bool IsLibrary => Current.Route == DesktopRoutes.Library;
     public bool IsSearch => Current.Route == DesktopRoutes.Search;
+    public bool IsAccounts => Current.Route == DesktopRoutes.Accounts;
     public bool IsOnline => Current.Route == DesktopRoutes.Online;
     public bool IsQueue => Current.Route == DesktopRoutes.Queue;
     public bool IsLyrics => Current.Route == DesktopRoutes.Lyrics;
@@ -147,6 +148,7 @@ public sealed class DesktopNavigation : ObservableObject, IAsyncDisposable
         Control view = model switch
         {
             LibraryViewModel => new LibraryView(), SearchViewModel => new SearchView(), OnlineViewModel => new OnlineView(),
+            AccountsViewModel => new AccountsView(),
             LyricsViewModel => new LyricsView(), TrackEditorPageViewModel => new TrackEditorView(), ToolsViewModel => new ToolsView(),
             MatchPlaylistPageViewModel => new MatchPlaylistView(),
             SettingsViewModel => new SettingsView(), ComponentsViewModel => new ComponentsView(),
@@ -163,7 +165,7 @@ public sealed class DesktopNavigation : ObservableObject, IAsyncDisposable
 
     private void RaiseNavigationProperties()
     {
-        foreach (var name in new[] { nameof(CanGoBack), nameof(CanGoForward), nameof(IsLibrary), nameof(IsSearch), nameof(IsOnline),
+        foreach (var name in new[] { nameof(CanGoBack), nameof(CanGoForward), nameof(IsLibrary), nameof(IsSearch), nameof(IsAccounts), nameof(IsOnline),
             nameof(IsQueue), nameof(IsLyrics), nameof(IsTools), nameof(IsSettings) }) OnPropertyChanged(name);
         BackCommand.NotifyCanExecuteChanged(); ForwardCommand.NotifyCanExecuteChanged();
     }

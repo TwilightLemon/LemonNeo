@@ -18,6 +18,7 @@ public sealed class NeteaseUserPlugin :
     private const string CookieKey = "music-163-cookie";
     private const string UserIdKey = "user-id";
     private const string NicknameKey = "nickname";
+    private const string AvatarKey = "avatar-uri";
     private const string UserAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36";
@@ -51,9 +52,10 @@ public sealed class NeteaseUserPlugin :
         _cookie = await _credentials.GetSecretAsync(CookieKey, cancellationToken);
         var userId = await _storage.GetAsync(UserIdKey, cancellationToken);
         var nickname = await _storage.GetAsync(NicknameKey, cancellationToken);
+        var avatar = await _storage.GetAsync(AvatarKey, cancellationToken);
         if (!string.IsNullOrWhiteSpace(_cookie) && !string.IsNullOrWhiteSpace(userId))
         {
-            _state = new AuthenticationState(true, nickname ?? userId, userId);
+            _state = new AuthenticationState(true, nickname ?? userId, userId, TryCreateAvatarUri(avatar));
         }
 
         context.RegisterProvider(this);
@@ -95,8 +97,12 @@ public sealed class NeteaseUserPlugin :
         await credentials.SetSecretAsync(CookieKey, cookie, cancellationToken);
         await storage.SetAsync(UserIdKey, account.UserId, cancellationToken);
         await storage.SetAsync(NicknameKey, account.Nickname, cancellationToken);
+        if (account.AvatarUri is { } avatar)
+            await storage.SetAsync(AvatarKey, avatar.AbsoluteUri, cancellationToken);
+        else
+            await storage.DeleteAsync(AvatarKey, cancellationToken);
         _cookie = cookie;
-        _state = new AuthenticationState(true, account.Nickname, account.UserId);
+        _state = new AuthenticationState(true, account.Nickname, account.UserId, account.AvatarUri);
         _logger?.LogInformation("Authenticated Netease user {UserId}.", account.UserId);
         return _state;
     }
@@ -108,6 +114,7 @@ public sealed class NeteaseUserPlugin :
         await credentials.DeleteSecretAsync(CookieKey, cancellationToken);
         await storage.DeleteAsync(UserIdKey, cancellationToken);
         await storage.DeleteAsync(NicknameKey, cancellationToken);
+        await storage.DeleteAsync(AvatarKey, cancellationToken);
         _cookie = null;
         _state = new AuthenticationState(false);
     }
@@ -209,7 +216,7 @@ public sealed class NeteaseUserPlugin :
         return TryMapTrack(songs[0]);
     }
 
-    private async Task<(string UserId, string Nickname)> GetAccountAsync(
+    private async Task<(string UserId, string Nickname, Uri? AvatarUri)> GetAccountAsync(
         string cookie,
         CancellationToken cancellationToken)
     {
@@ -223,8 +230,11 @@ public sealed class NeteaseUserPlugin :
                 "The cookie is not associated with an authenticated Netease Music profile.");
         }
 
-        return (userId, ReadString(profile, "nickname") ?? userId);
+        return (userId, ReadString(profile, "nickname") ?? userId, TryCreateAvatarUri(ReadString(profile, "avatarUrl")));
     }
+
+    private static Uri? TryCreateAvatarUri(string? value) =>
+        Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" ? uri : null;
 
     private async Task<JsonDocument> GetJsonAsync(
         string relativePath,

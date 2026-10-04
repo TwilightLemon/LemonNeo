@@ -55,6 +55,19 @@
   <Style Selector="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="Padding" Value="12,10" /><Setter Property="Margin" Value="0,2" /><Setter Property="CornerRadius" Value="{DynamicResource Radius.Control}" /></Style>
   <Style Selector="ListBoxItem:selected /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource Brush.AccentSoft}" /></Style>
   <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource Brush.Hover}" /></Style>
+  <Style Selector="ListBox.serviceTabs ListBoxItem">
+    <Setter Property="Padding" Value="16,10" /><Setter Property="Margin" Value="0" /><Setter Property="CornerRadius" Value="0" />
+  </Style>
+  <Style Selector="ListBox.serviceTabs ListBoxItem /template/ ContentPresenter,
+                   ListBox.serviceTabs ListBoxItem:selected /template/ ContentPresenter,
+                   ListBox.serviceTabs ListBoxItem:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="ListBox.serviceTabs ListBoxItem TextBlock"><Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}" /></Style>
+  <Style Selector="ListBox.serviceTabs ListBoxItem:selected TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Brush.AccentText}" /><Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="ListBox.serviceTabs ListBoxItem:pointerover TextBlock"><Setter Property="Foreground" Value="{DynamicResource Brush.Text}" /></Style>
   <Style Selector="Slider"><Setter Property="Foreground" Value="{DynamicResource Brush.AccentText}" /></Style>
   <Style Selector="ProgressBar"><Setter Property="Foreground" Value="{DynamicResource Brush.AccentText}" /></Style>
 </Styles>

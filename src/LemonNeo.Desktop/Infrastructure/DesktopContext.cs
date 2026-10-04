@@ -15,6 +15,8 @@ public sealed class DesktopContext(DesktopRuntime runtime, LocalizationService t
     public ObservableCollection<Playlist> Playlists { get; } = [];
     public bool IsInitialized { get => _initialized; internal set => SetProperty(ref _initialized, value); }
     public event EventHandler? LibraryChanged;
+    public event Action<string>? AuthenticationChanged;
+    public void NotifyAuthenticationChanged(string providerId) => AuthenticationChanged?.Invoke(providerId);
     public string LibrarySummary => Text.Format("LibraryStatistics", Playlists.Count,
         Runtime.Get<LibraryService>().Current.Playlists.SelectMany(p => p.Items).DistinctBy(i => i.Track.Id).Count(),
         Runtime.Get<LibraryService>().Current.Playlists.Sum(p => p.Items.Count));
