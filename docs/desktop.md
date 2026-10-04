@@ -18,6 +18,54 @@ variables described in the root README also apply to the desktop host.
 
 ## UI infrastructure
 
+`NavigationPage` hosts a stack of pages. Back/forward buttons and Alt+Left/Right
+restore the existing page view, including selections, filters, tabs and drafts.
+Navigating to a new destination clears forward history. Views and view models
+are created on demand; individual playlists and the queue have separate state.
+Each view owns its page header, actions, progress and error notices. The shell
+owns startup, the sidebar and a separate playback view model.
+
+The sidebar spans the full window height. The right column contains a compact
+top toolbar, the active page and the playback bar at its bottom. Back/forward
+buttons use 32-pixel targets in the toolbar alongside global search. Enter or
+the search button opens the search page on demand and starts its own operation;
+the results page does not duplicate the search input. The playback bar centers
+previous/play-pause/next in the right column, using equal side regions. Clicking
+the cover, title or artist opens Now playing. Playback mode uses an icon with
+a localized tooltip. A full-width thin seek slider sits on the content/playback
+boundary; its thumb appears on hover or keyboard focus, and the loading indicator
+overlays the same line. Time appears at the right. The bar has no stop or cancel
+buttons. Playback glyphs are adapted from LemonLite's `Styles/IconData.xaml`.
+
+Library and playlist playback always use automatic source selection. Their
+filter input, track details and action buttons share one horizontal toolbar;
+the filter expands to fill the remaining width.
+
+The queue button at the right of the playback bar opens a full-height card at
+the window's right edge. Its view model is created on first use, independently
+of page navigation. The overlay popup slides in with `CubicEaseOut` and closes
+when clicking outside, pressing Escape or using its close button. Outside
+clicks are consumed so they do not activate the page beneath it. Reduced motion
+opens the card immediately. Search filters the queue independently of library
+filters; the current row is marked by queue item UUID so duplicate songs remain
+distinct. Clicking a row or pressing Enter plays that existing queue item and
+retains the chosen playback source. The card also provides Clear queue.
+
+`PageViewModel` provides an operation lifetime, busy state, cancellation and
+localized notices for each page. Search, online services, track inspection,
+tools and settings operate independently. Slow provider calls run off the UI
+thread, and completing a request on a hidden page does not change the current
+destination. Abandoned editor pages cancel their work and unsubscribe events.
+Folder scans, remote playlist reads and sync fetches are separated from applying
+their results: provider work runs on a worker and library changes resume on the
+UI thread, using the same application services as Console.
+
+Navigation uses a 220 ms `SlideFadeTransition`: the old page hides immediately,
+and the new page rises 32 pixels and fades in with `CubicEaseOut`.
+Going back reverses the new page's travel direction. Transitions restore
+transforms and opacity even after cancellation, and rapid navigation requests
+are queued. Reduced motion disables page animations for subsequent navigation.
+
 The default theme follows the operating system. Settings can select light, dark,
 or system, independently of the language preference. Theme resources use
 Avalonia `ThemeDictionaries` and `DynamicResource`, so existing windows update
@@ -75,11 +123,12 @@ font/X11 or Wayland dependencies for native operation.
 
 ## Music UI and Console command coverage
 
-The sidebar contains the library, search, online services, queue, now playing,
-tools, settings, and persisted local playlists. Navigation remains visible at the
+The sidebar contains the library, search, online services, tools, settings, and
+persisted local playlists. Now playing opens from the playback bar's song information,
+and the queue opens from its right-side queue button. Navigation remains visible at the
 minimum window size, with the playlist list scrolling independently. Component
 previews are available from Tools. Double-click or press Enter on a selected track to play. The bottom
-bar offers play/pause, previous/next, stop, and seeking. Playback is restored on
+bar in the right column offers play/pause, previous/next, mode switching and seeking. Playback is restored on
 startup and starts only after an explicit play action. Selecting an existing queue
 row preserves queue item identities and the chosen source.
 
@@ -92,7 +141,7 @@ Desktop calls the same application services and provider contracts as Console:
 | `library`, `paths` | Tools → Plugins: playlist/unique-track/item statistics and all shared paths |
 | `startup [show\|set\|reset]` | Tools → Console startup script: edit/save, import a file, reload, reset |
 | `auth`, `login`, `logout` | Online services → Accounts: authentication state, cookie login, logout |
-| `search [--source]` | Search: keyword across all providers; source namespaces are selected automatically from loaded playback-source capabilities |
+| `search [--source]` | Top toolbar search → search results: keyword across all providers; source namespaces are selected automatically from loaded playback-source capabilities |
 | `add <playlist> <provider> <id>` | Search → selected result → destination playlist → Add to playlist; direct ID lookup remains a Console action |
 | `remote-playlists`, `import` | Online services → Remote playlists: browse named collections and import a selected playlist or an ID |
 | `import-folder` | Sidebar + → New playlist → Import from folder: native picker; edit name/description and confirm creation |
@@ -106,9 +155,9 @@ Desktop calls the same application services and provider contracts as Console:
 | `lyrics` | Track details → Lyrics: complete lyrics, source, synchronization flags, translation, romanization and provider errors |
 | `sources` | Track details → Playable sources: candidates, identities, confidence, resolution method, location and provider errors |
 | `play [--source]`, `play-playlist [start] [--source]` | Track double-click / Enter, Play / Play all; Search uses automatic source discovery and Library offers a playback-source selector |
-| `play-current`, `pause`, `resume`, `stop`, `previous`, `next` | Playback bar and queue row selection |
-| `mode`, `now-playing` | Now playing: sequential/repeat/shuffle choices, identity, queue position, engine, source and timeline |
-| `queue [clear]` | Play queue and Clear queue |
+| `play-current`, `pause`, `resume`, `previous`, `next` | Playback bar and queue row selection; `stop` remains available in Console |
+| `mode`, `now-playing` | Playback mode icon and clickable song information → Now playing: sequential/repeat/shuffle choices, identity, queue position, engine, source and timeline |
+| `queue [clear]` | Playback bar queue button → queue card and Clear queue |
 | `sync status\|pull\|push` | Tools → Synchronization: status/revisions, pull/merge, push and conflict reports |
 | `save`, `exit` | Tools → Save and native window close; edits also save immediately |
 
@@ -138,8 +187,8 @@ with up to three requests in flight and surfaces provider errors.
 
 Playlist track counts and total duration appear beneath its title and optional
 description. Empty descriptions take no space. The library overview omits its
-subtitle and shows statistics below the title. Search and queue statistics remain
-beside the header, and the library overview hides track/playlist action menus.
+subtitle and shows statistics below the title. Search and queue have their own
+headers and statistics, and the library overview hides track/playlist action menus.
 Track rows give the title and album proportional columns, with a shared
 content-sized duration column that keeps rows aligned as the window changes size.
 Track lists have no statistics, shortcut-hint, or persistent status footer.
@@ -188,6 +237,19 @@ account input clearing, grouped remote imports, playlist CRUD, duplicate item
 editing/reordering, external-ID validation, failed-save retries, metadata preview
 and batch matching, word/translation timelines, selected sources, cancellation
 with responsive playback, synchronization, and shared startup-file persistence.
+Navigation checks cover lazy loading, page-owned headers, preserved back/forward
+views, independent playlist/queue state, settings and library operations during
+pending searches, directional transform/opacity animation, cancellation cleanup,
+queued navigation and reduced motion.
+Layout checks verify the full-height sidebar, right-column playback, compact
+toolbar, centered playback controls and icons, and the boundary timeline. Playback
+interaction checks cover click/drag/keyboard seeking, mode icons, clickable song
+information and the loading overlay. Global search checks cover Enter, the search
+button, lazy loading and navigation during pending requests.
+Queue card checks cover lazy loading, independent filters, duplicate item
+identities and source preservation, current row highlighting, right-edge placement
+after resizing, live theme/language changes, outside dismissal, Escape, clear,
+slide animation and cancellation cleanup.
 All new tabs and action flyouts are rendered in English/Chinese and both palettes.
 Tests use deterministic providers and an in-memory player to avoid network-account
 and audio-device requirements.

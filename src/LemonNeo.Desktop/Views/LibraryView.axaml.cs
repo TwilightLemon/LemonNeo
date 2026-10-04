@@ -23,11 +23,11 @@ public partial class LibraryView : UserControl
     }
     private async void OnTrackDoubleTapped(object? sender, TappedEventArgs args)
     {
-        if (DataContext is MainViewModel { SelectedTrack: { } track } vm) await vm.PlayAsync(track);
+        if (DataContext is LibraryViewModel { SelectedTrack: { } track } vm) await vm.PlayAsync(track);
     }
     private async void OnTrackKeyDown(object? sender, KeyEventArgs args)
     {
-        if (args.Key == Key.Enter && DataContext is MainViewModel { SelectedTrack: { } track } vm)
+        if (args.Key == Key.Enter && DataContext is LibraryViewModel { SelectedTrack: { } track } vm)
         {
             args.Handled = true;
             await vm.PlayAsync(track);

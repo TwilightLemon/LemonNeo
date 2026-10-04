@@ -10,7 +10,7 @@ public partial class ToolsView : UserControl
     public ToolsView() => InitializeComponent();
     private async void OnImportScript(object? sender, RoutedEventArgs args)
     {
-        if (DataContext is not MainViewModel { CanInteract: true } vm || TopLevel.GetTopLevel(this) is not { StorageProvider.CanOpen: true } top) return;
+        if (DataContext is not ToolsViewModel { CanInteract: true } vm || TopLevel.GetTopLevel(this) is not { StorageProvider.CanOpen: true } top) return;
         var files = await top.StorageProvider.OpenFilePickerAsync(new()
         {
             Title = ((Irihi.Lingua.LinguaObservableString)LanguageManager.Instance.ImportScript).CurrentValue, AllowMultiple = false,

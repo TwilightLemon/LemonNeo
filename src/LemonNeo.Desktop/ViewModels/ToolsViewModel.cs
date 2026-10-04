@@ -10,54 +10,23 @@ using LemonNeo.Sync.Abstractions;
 
 namespace LemonNeo.Desktop.ViewModels;
 
-public sealed partial class MainViewModel
+public sealed partial class ToolsViewModel : PageViewModel
 {
-    [ObservableProperty] private string _startupScript = "";
-    [ObservableProperty] private string _syncDetails = "";
-    private SyncStatus? _syncStatus;
-    private SyncResult? _syncResult;
-    private MergeResult? _syncMerge;
-    [ObservableProperty] private ProviderOption? _selectedSyncProvider;
-    private IReadOnlyList<LyricsDisplaySegment> _currentLyricSegments = [];
-    private IReadOnlyList<LyricsDisplaySegment> _romanizationSegments = [];
-    public IReadOnlyList<LyricsDisplaySegment> CurrentLyricSegments => _currentLyricSegments;
-    public IReadOnlyList<LyricsDisplaySegment> RomanizationSegments => _romanizationSegments;
-    public bool HasRomanization => RomanizationSegments.Count > 0;
-    public bool HasTranslation => !string.IsNullOrWhiteSpace(Translation);
-    public ObservableCollection<ProviderOption> SyncProviders { get; } = [];
-    public ObservableCollection<string> SyncConflicts { get; } = [];
-    public string Version => $"Lemon Neo {typeof(MainViewModel).Assembly.GetName().Version?.ToString(3)}";
-    public string StartupPath => _runtime.Get<StartupCommands>().FilePath;
-    public string PluginPath => _runtime.Get<DesktopOptions>().PluginDirectory;
-    public string DataPath => _runtime.Paths.DataDirectory;
-    public string Diagnostics => BuildDiagnostics();
-    public string PathDetails => string.Join(Environment.NewLine, new[]
+    private readonly PlaybackSessionService _session;
+    private bool _startupLoaded;
+    private Task? _activation;
+    public ToolsViewModel(DesktopContext context, DesktopNavigation navigation) : base(context, DesktopRoutes.Tools)
     {
-        $"{_text["ConfigurationPath"]}: {ConfigurationPath}", $"{_text["AppSettingsPath"]}: {_runtime.Paths.AppConfigurationFile}",
-        $"{_text["DataPath"]}: {DataPath}", $"{_text["HistoryPath"]}: {Path.Combine(DataPath, "command-history.json")}",
-        $"{_text["CachePath"]}: {CachePath}", $"{_text["LyricsCachePath"]}: {Path.Combine(CachePath, "Lyrics")}",
-        $"{_text["LibraryPath"]}: {LibraryPath}", $"{_text["PluginPath"]}: {PluginPath}", $"{_text["StartupPath"]}: {StartupPath}"
-    });
-    public string MetadataNamespaces => string.Join(", ", _runtime.Get<IProviderRegistry>().Providers.OfType<IMetadataProvider>()
-        .SelectMany(p => p.MetadataNamespaces).Distinct(StringComparer.OrdinalIgnoreCase).Order());
-    public RelayCommand CancelOperationCommand { get; private set; } = null!;
-    public AsyncRelayCommand SaveCommand { get; private set; } = null!;
-    public AsyncRelayCommand<string> ModeCommand { get; private set; } = null!;
-    public AsyncRelayCommand<string> SyncCommand { get; private set; } = null!;
-    public AsyncRelayCommand SaveStartupCommand { get; private set; } = null!;
-    public AsyncRelayCommand ReloadStartupCommand { get; private set; } = null!;
-    public AsyncRelayCommand ResetStartupCommand { get; private set; } = null!;
-
-    private void InitializeToolCommands()
-    {
-        CancelOperationCommand = new(() => { _operationCancellation?.Cancel(); _playbackCancellation?.Cancel(); }, () => IsBusy);
+        _session = _runtime.Get<PlaybackSessionService>();
+        NavigateCommand = navigation.NavigateCommand;
+        RefreshCommand = new(() => ExecuteAsync(async ct => { await _runtime.Get<LibraryService>().LoadAsync(ct); Context.RefreshLibrary(); }));
+        RefreshSyncProviders();
         SaveCommand = new(() => ExecuteAsync(async ct =>
         {
             await _runtime.Get<LibraryService>().SaveAsync(ct);
             await _session.SaveAsync(ct);
             SetStatus("LibrarySaved");
         }));
-        ModeCommand = new(mode => ExecutePlaybackAsync(ct => _session.SetModeAsync(Enum.Parse<LemonNeo.Core.PlaybackMode>(mode!), ct)));
         SyncCommand = new(action => SynchronizeAsync(action ?? "status"));
         SaveStartupCommand = new(() => ExecuteAsync(async ct =>
         {
@@ -73,6 +42,40 @@ public sealed partial class MainViewModel
         }));
     }
 
+    [ObservableProperty] private string _startupScript = "";
+    [ObservableProperty] private string _syncDetails = "";
+    private SyncStatus? _syncStatus;
+    private SyncResult? _syncResult;
+    private MergeResult? _syncMerge;
+    [ObservableProperty] private ProviderOption? _selectedSyncProvider;
+    public ObservableCollection<ProviderOption> SyncProviders { get; } = [];
+    public ObservableCollection<string> SyncConflicts { get; } = [];
+    public string Version => $"Lemon Neo {typeof(ToolsViewModel).Assembly.GetName().Version?.ToString(3)}";
+    public string StartupPath => _runtime.Get<StartupCommands>().FilePath;
+    public string PluginPath => _runtime.Get<DesktopOptions>().PluginDirectory;
+    public string DataPath => _runtime.Paths.DataDirectory;
+    public string Diagnostics => BuildDiagnostics();
+    public string PathDetails => string.Join(Environment.NewLine, new[]
+    {
+        $"{_text["ConfigurationPath"]}: {ConfigurationPath}", $"{_text["AppSettingsPath"]}: {_runtime.Paths.AppConfigurationFile}",
+        $"{_text["DataPath"]}: {DataPath}", $"{_text["HistoryPath"]}: {Path.Combine(DataPath, "command-history.json")}",
+        $"{_text["CachePath"]}: {CachePath}", $"{_text["LyricsCachePath"]}: {Path.Combine(CachePath, "Lyrics")}",
+        $"{_text["LibraryPath"]}: {LibraryPath}", $"{_text["PluginPath"]}: {PluginPath}", $"{_text["StartupPath"]}: {StartupPath}"
+    });
+    public string MetadataNamespaces => string.Join(", ", _runtime.Get<IProviderRegistry>().Providers.OfType<IMetadataProvider>()
+        .SelectMany(p => p.MetadataNamespaces).Distinct(StringComparer.OrdinalIgnoreCase).Order());
+
+    public string LibrarySummary => Context.LibrarySummary;
+    public string ConfigurationPath => _runtime.Paths.ConfigurationDirectory;
+    public string CachePath => _runtime.Paths.CacheDirectory;
+    public string LibraryPath => _runtime.Get<DesktopOptions>().LibraryDirectory;
+    public AsyncRelayCommand<string> NavigateCommand { get; }
+    public AsyncRelayCommand RefreshCommand { get; }
+    public AsyncRelayCommand SaveCommand { get; }
+    public AsyncRelayCommand<string> SyncCommand { get; }
+    public AsyncRelayCommand SaveStartupCommand { get; }
+    public AsyncRelayCommand ReloadStartupCommand { get; }
+    public AsyncRelayCommand ResetStartupCommand { get; }
     private async Task LoadStartupScriptCoreAsync(CancellationToken ct) =>
         StartupScript = string.Join(Environment.NewLine, await _runtime.Get<StartupCommands>().LoadAsync(ct));
 
@@ -100,21 +103,24 @@ public sealed partial class MainViewModel
         switch (action)
         {
             case "status":
-                var status = await _runtime.Get<SyncService>().GetStatusAsync(id, ct);
+                var status = await Task.Run(() => _runtime.Get<SyncService>().GetStatusAsync(id, ct), ct);
                 _syncStatus = status;
                 break;
             case "pull":
-                var pull = await _runtime.Get<SyncService>().PullAsync(id, ct);
+                var sync = _runtime.Get<SyncService>();
+                var remote = await Task.Run(() => sync.FetchRemoteAsync(id, ct), ct);
+                var pull = await sync.ApplyRemoteAsync(id, remote, ct);
                 _syncResult = pull.ProviderResult;
                 if (!pull.ProviderResult.Success) throw new InvalidOperationException(pull.ProviderResult.Message);
                 if (pull.MergeResult is { } merge)
                 {
                     _syncMerge = merge;
-                    RefreshLibrary();
+                    Context.RefreshLibrary();
                 }
                 break;
             case "push":
-                var push = await _runtime.Get<SyncService>().PushAsync(id, ct);
+                await _runtime.Get<LibraryService>().SaveAsync(ct);
+                var push = await Task.Run(() => _runtime.Get<SyncService>().PushRemoteAsync(id, ct), ct);
                 _syncResult = push;
                 if (!push.Success) throw new InvalidOperationException(push.Message);
                 break;
@@ -174,27 +180,16 @@ public sealed partial class MainViewModel
         return text.ToString();
     }
 
-    private void RaiseFeatureProperties()
+    public override Task ActivateAsync()
     {
-        foreach (var name in new[] { nameof(Version), nameof(Diagnostics), nameof(PathDetails), nameof(MetadataNamespaces), nameof(AuthenticationStatus),
-            nameof(AuthenticationAccount), nameof(PlaybackDetails), nameof(StartupPath), nameof(PluginPath), nameof(DataPath) }) OnPropertyChanged(name);
-        RaiseSelectionProperties();
+        RefreshSyncProviders();
+        if (!_startupLoaded && (_activation is null || _activation.IsCompleted))
+            _activation = ExecuteAsync(async ct => { await LoadStartupScriptCoreAsync(ct); _startupLoaded = true; });
+        return _activation ?? Task.CompletedTask;
     }
-
-    private void SetLyricSegments(LyricsDisplayFrame frame)
+    protected override void RefreshLocalizedProperties()
     {
-        if (!_currentLyricSegments.SequenceEqual(frame.Main.Segments))
-        {
-            _currentLyricSegments = frame.Main.Segments;
-            OnPropertyChanged(nameof(CurrentLyricSegments));
-        }
-        var romanization = frame.Romanization?.Segments ?? [];
-        if (!_romanizationSegments.SequenceEqual(romanization))
-        {
-            _romanizationSegments = romanization;
-            OnPropertyChanged(nameof(RomanizationSegments));
-            OnPropertyChanged(nameof(HasRomanization));
-        }
-        OnPropertyChanged(nameof(HasTranslation));
+        base.RefreshLocalizedProperties(); RefreshSyncText();
+        foreach (var name in new[] { nameof(Diagnostics), nameof(PathDetails), nameof(LibrarySummary), nameof(MetadataNamespaces) }) OnPropertyChanged(name);
     }
 }

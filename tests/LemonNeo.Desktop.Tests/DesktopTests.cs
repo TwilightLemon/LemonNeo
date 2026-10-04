@@ -1,7 +1,9 @@
 using Avalonia;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Controls;
 using Avalonia.Automation;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
@@ -32,36 +34,39 @@ public sealed class DesktopTests
         await using var vm = new MainViewModel(runtime, text, appearance, runtime.Get<ArtworkService>());
         await vm.InitializeAsync();
         Assert.Null(vm.Error);
-        await vm.CreatePlaylistAsync("My local music", folderPath: folder);
-        Assert.Null(vm.Error);
-        Assert.Equal(2, vm.Tracks.Count);
+        await vm.Library.CreatePlaylistAsync("My local music", folderPath: folder);
+        Assert.Null(vm.Library.Error);
+        Assert.Equal(2, vm.Library.Tracks.Count);
         var importedId = Assert.Single(vm.Playlists).Id;
         var saved = Assert.Single((await new JsonLibraryRepository(paths.MusicLibraryDirectory).LoadAsync()).Playlists);
         Assert.Equal("My local music", saved.Name);
         Assert.Null(saved.Description);
         Assert.Equal(2, saved.Items.Count);
-        vm.Filter = "night";
-        Assert.Equal("Night", Assert.Single(vm.Tracks).Title);
-        await vm.PlaySelectedCommand.ExecuteAsync(null);
-        Assert.Null(vm.Error);
-        Assert.True(vm.IsPlaying);
-        Assert.Equal("Night", vm.NowTitle);
+        vm.Library.Filter = "night";
+        Assert.Equal("Night", Assert.Single(vm.Library.Tracks).Title);
+        await vm.Library.PlaySelectedCommand.ExecuteAsync(null);
+        Assert.Null(vm.Playback.Error);
+        Assert.True(vm.Playback.IsPlaying);
+        Assert.Equal("Night", vm.Playback.NowTitle);
         Assert.Single(runtime.Get<PlaybackSessionService>().Queue.Items);
         var positionNotifications = 0;
-        vm.PropertyChanged += (_, args) => { if (args.PropertyName == nameof(vm.PositionSeconds)) positionNotifications++; };
-        vm.IsSeeking = true;
-        await vm.TogglePlaybackCommand.ExecuteAsync(null);
+        vm.Playback.PropertyChanged += (_, args) => { if (args.PropertyName == nameof(vm.Playback.PositionSeconds)) positionNotifications++; };
+        vm.Playback.IsSeeking = true;
+        await vm.Playback.TogglePlaybackCommand.ExecuteAsync(null);
         Assert.Equal(PlayerState.Paused, player.Player.State);
         Assert.Equal(0, positionNotifications);
-        await vm.SeekAsync(7);
-        vm.EndSeek();
+        await vm.Playback.SeekAsync(7);
+        vm.Playback.EndSeek();
         Assert.True(positionNotifications > 0);
-        Assert.Equal(7, vm.PositionSeconds);
+        Assert.Equal(7, vm.Playback.PositionSeconds);
         Assert.Equal(TimeSpan.FromSeconds(7), (await new JsonPlaybackStateRepository(paths.MusicLibraryDirectory).LoadAsync()).Position);
-        await vm.CreatePlaylistAsync("A fresh playlist");
+        await vm.Library.CreatePlaylistAsync("A fresh playlist");
         Assert.Equal(2, vm.Playlists.Count);
         vm.SelectedPlaylist = vm.Playlists.Single(p => p.Id == importedId);
-        Assert.Equal(2, vm.Tracks.Count);
+        Assert.Equal("night", vm.Library.Filter);
+        Assert.Single(vm.Library.Tracks);
+        vm.Library.Filter = "";
+        Assert.Equal(2, vm.Library.Tracks.Count);
     }
 
     [AvaloniaFact]
@@ -86,11 +91,11 @@ public sealed class DesktopTests
         var appearance = new AppearanceService(Avalonia.Application.Current!, text, runtime.Get<IAppConfigurationStore>());
         await using var vm = new MainViewModel(runtime, text, appearance, runtime.Get<ArtworkService>());
         await vm.InitializeAsync();
-        vm.Navigate(DesktopPage.Queue);
-        vm.Filter = track.Title;
-        Assert.Equal(2, vm.Tracks.Count);
-        await vm.PlayAsync(vm.Tracks[1]);
-        Assert.Null(vm.Error);
+        await vm.Navigation.NavigateAsync(DesktopRoutes.Queue);
+        vm.Queue.Filter = track.Title;
+        Assert.Equal(2, vm.Queue.Tracks.Count);
+        await vm.Queue.PlayAsync(vm.Queue.Tracks[1]);
+        Assert.Null(vm.Playback.Error);
         var queue = runtime.Get<PlaybackSessionService>().Queue;
         Assert.Equal(new[] { first.Id, second.Id, duplicate.Id }, queue.Items.Select(i => i.Id));
         Assert.Equal(duplicate.Id, queue.CurrentItem!.Id);
@@ -109,11 +114,11 @@ public sealed class DesktopTests
         var playlist = runtime.Get<PlaylistService>().Create("Unavailable");
         runtime.Get<PlaylistService>().Add(playlist.Id, new Track { Id = new("missing", "missing"), Title = "No source" });
         await runtime.Get<LibraryService>().SaveAsync();
-        await vm.ReloadLibraryAsync();
-        await vm.PlayAllCommand.ExecuteAsync(null);
-        Assert.True(vm.HasError);
-        Assert.False(vm.IsBusy);
-        Assert.True(vm.CanInteract);
+        await vm.Library.ReloadLibraryAsync();
+        await vm.Library.PlayAllCommand.ExecuteAsync(null);
+        Assert.True(vm.Playback.HasError);
+        Assert.False(vm.Playback.IsBusy);
+        Assert.True(vm.Playback.CanInteract);
     }
 
     [AvaloniaFact]
@@ -125,7 +130,7 @@ public sealed class DesktopTests
         var appearance = new AppearanceService(Avalonia.Application.Current!, text, runtime.Get<IAppConfigurationStore>());
         await using var vm = new MainViewModel(runtime, text, appearance, runtime.Get<ArtworkService>());
         await vm.InitializeAsync();
-        await vm.CreatePlaylistAsync("Music", folderPath: CreateMusicFolder(paths));
+        await vm.Library.CreatePlaylistAsync("Music", folderPath: CreateMusicFolder(paths));
         var window = new MainWindow { DataContext = vm };
         window.Show();
         try
@@ -133,9 +138,9 @@ public sealed class DesktopTests
             foreach (var theme in new[] { ThemePreference.Light, ThemePreference.Dark })
             {
                 await appearance.SetAsync(new(theme, LanguagePreference.Chinese, true));
-                foreach (var page in Enum.GetValues<DesktopPage>())
+                foreach (var page in DesktopRoutes.All)
                 {
-                    vm.Navigate(page);
+                    await vm.Navigation.NavigateAsync(page);
                     foreach (var size in new[] { new Size(880, 620), new Size(1180, 790) })
                     {
                         window.Width = size.Width; window.Height = size.Height;
@@ -145,13 +150,48 @@ public sealed class DesktopTests
                         bitmap.Render(window);
                         var activeView = Assert.Single(window.GetVisualDescendants().OfType<UserControl>(), v => v.IsEffectivelyVisible);
                         Assert.True(activeView.Bounds.Width > 300 && activeView.Bounds.Height > 200, "Navigation must give the active page usable space at the minimum window size.");
-                        var playButton = window.GetVisualDescendants().OfType<Button>().First(b => b.Command == vm.TogglePlaybackCommand);
+                        var playButton = window.GetVisualDescendants().OfType<Button>().First(b => b.Command == vm.Playback.TogglePlaybackCommand);
                         Assert.True(playButton.Bounds.Width >= 40 && playButton.Bounds.Height >= 40, "Playback controls must remain usable at every supported window size.");
+                        var sidebar = window.FindControl<Border>("Sidebar")!;
+                        var topBar = window.FindControl<Border>("TopBar")!;
+                        var playbackBar = window.FindControl<Border>("PlaybackBar")!;
+                        var pageContent = window.FindControl<ContentControl>("PageContent")!;
+                        var playbackLocation = playbackBar.TranslatePoint(default, window)!.Value;
+                        var pageLocation = pageContent.TranslatePoint(default, window)!.Value;
+                        Assert.Equal(size.Height, sidebar.Bounds.Height);
+                        Assert.Equal(0, topBar.TranslatePoint(default, window)!.Value.Y);
+                        Assert.Equal(sidebar.Bounds.Right + 1, playbackLocation.X);
+                        Assert.Equal(size.Height, playbackLocation.Y + playbackBar.Bounds.Height);
+                        Assert.Equal(topBar.Bounds.Width, playbackBar.Bounds.Width);
+                        Assert.True(pageLocation.Y >= topBar.Bounds.Height && pageLocation.Y + pageContent.Bounds.Height <= playbackLocation.Y);
+                        foreach (var buttonName in new[] { "BackButton", "ForwardButton" })
+                        {
+                            var button = window.FindControl<Button>(buttonName)!;
+                            Assert.InRange(button.Bounds.Width, 32, 34);
+                            Assert.Equal(32, button.Bounds.Height);
+                            Assert.True(button.TranslatePoint(default, window)!.Value.Y + button.Bounds.Height <= topBar.Bounds.Height);
+                        }
+                        Assert.Equal(32, window.FindControl<TextBox>("GlobalSearch")!.Bounds.Height);
+                        var timeline = window.FindControl<Slider>("Timeline")!;
+                        var timelineCenter = timeline.TranslatePoint(new(timeline.Bounds.Width / 2, timeline.Bounds.Height / 2), window)!.Value;
+                        Assert.Equal(playbackBar.Bounds.Width, timeline.Bounds.Width);
+                        Assert.InRange(Math.Abs(timelineCenter.Y - playbackLocation.Y), 0, 1);
+                        var playCenter = playButton.TranslatePoint(new(playButton.Bounds.Width / 2, playButton.Bounds.Height / 2), window)!.Value;
+                        Assert.InRange(Math.Abs(playCenter.X - (playbackLocation.X + playbackBar.Bounds.Width / 2)), 0, 1);
+                        Assert.InRange(Math.Abs(playCenter.Y - (playbackLocation.Y + playbackBar.Bounds.Height / 2)), 0, 1);
+                        foreach (var buttonName in new[] { "PreviousButton", "PlayPauseButton", "NextButton", "PlaybackModeButton" })
+                        {
+                            var button = window.FindControl<Button>(buttonName)!;
+                            var icon = Assert.Single(button.GetVisualDescendants().OfType<Viewbox>(), v => v.IsVisible);
+                            var iconCenter = icon.TranslatePoint(new(icon.Bounds.Width / 2, icon.Bounds.Height / 2), button)!.Value;
+                            Assert.InRange(Math.Abs(iconCenter.X - button.Bounds.Width / 2), 0, 1);
+                            Assert.InRange(Math.Abs(iconCenter.Y - button.Bounds.Height / 2), 0, 1);
+                        }
                         foreach (var navigation in window.GetVisualDescendants().OfType<Button>().Where(b => b.Classes.Contains("nav")))
                         {
                             var location = navigation.TranslatePoint(default, window)!.Value;
-                            Assert.True(location.Y >= 0 && location.Y + navigation.Bounds.Height <= size.Height - 112,
-                                "Every primary navigation action must remain visible above the playback bar.");
+                            Assert.True(location.Y >= 0 && location.Y + navigation.Bounds.Height <= size.Height,
+                                "Every primary navigation action must remain visible in the full-height sidebar.");
                         }
                         // Optional artifacts for visual review; CI needs no display server.
                         if (Environment.GetEnvironmentVariable("LEMONNEO_PREVIEW_DIRECTORY") is { Length: > 0 } directory)
@@ -164,6 +204,137 @@ public sealed class DesktopTests
             }
         }
         finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task PlaybackBarSupportsSeekingModeIconsSongInformationNavigationAndLoadingOverlay()
+    {
+        using var paths = new TestPaths();
+        await using var runtime = CreateRuntime(paths, new TestPlayerProvider());
+        var text = new LocalizationService();
+        var appearance = new AppearanceService(Avalonia.Application.Current!, text, runtime.Get<IAppConfigurationStore>());
+        await using var vm = new MainViewModel(runtime, text, appearance, runtime.Get<ArtworkService>());
+        await vm.InitializeAsync();
+        await appearance.SetAsync(new(ThemePreference.Light, LanguagePreference.English, true));
+        await vm.Library.CreatePlaylistAsync("Music", folderPath: CreateMusicFolder(paths));
+        await vm.Library.PlayAllCommand.ExecuteAsync(null);
+        var window = new MainWindow { DataContext = vm, Width = 880, Height = 620 };
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task? pending = null;
+        window.Show();
+        try
+        {
+            Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            var bar = window.FindControl<Border>("PlaybackBar")!;
+            var timeline = window.FindControl<Slider>("Timeline")!;
+            var loading = window.FindControl<ProgressBar>("PlaybackLoading")!;
+            var mode = window.FindControl<Button>("PlaybackModeButton")!;
+            Assert.DoesNotContain(bar.GetVisualDescendants().OfType<Button>(), b => b.Command == vm.Playback.StopCommand || b.Command == vm.Playback.CancelOperationCommand);
+            foreach (var expected in new[] { PlaybackMode.RepeatAll, PlaybackMode.Shuffle, PlaybackMode.Sequential })
+            {
+                await ClickAsync(mode);
+                Assert.Equal(expected, runtime.Get<PlaybackSessionService>().Queue.Mode);
+                Assert.True(window.TryFindResource($"Icon.Playback.{expected}", window.ActualThemeVariant, out var geometry));
+                Assert.Same(geometry, Assert.Single(mode.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Path>(), p => p.IsEffectivelyVisible).Data);
+                Assert.Equal(vm.Playback.ModeLabel, mode.GetValue(AutomationProperties.NameProperty));
+            }
+
+            await ClickAsync(window.FindControl<Button>("PlayPauseButton")!);
+            Assert.False(vm.Playback.IsPlaying);
+            SavePreview("Playback-Paused");
+            await ClickAsync(window.FindControl<Button>("PlayPauseButton")!);
+            Assert.True(vm.Playback.IsPlaying);
+            SavePreview("Playback-Playing");
+            await ClickAsync(window.FindControl<Button>("NextButton")!);
+            Assert.Equal(1, runtime.Get<PlaybackSessionService>().Snapshot.CurrentIndex);
+            await ClickAsync(window.FindControl<Button>("PreviousButton")!);
+            Assert.Equal(0, runtime.Get<PlaybackSessionService>().Snapshot.CurrentIndex);
+
+            var middle = timeline.TranslatePoint(new(timeline.Bounds.Width / 2, timeline.Bounds.Height / 2 + 1), window)!.Value;
+            window.MouseDown(middle, MouseButton.Left); window.MouseUp(middle, MouseButton.Left);
+            await WaitForSeekAsync();
+            Assert.InRange(vm.Playback.PositionSeconds, 89, 91);
+            timeline.Focus();
+            window.KeyPressQwerty(PhysicalKey.End, RawInputModifiers.None); window.KeyReleaseQwerty(PhysicalKey.End, RawInputModifiers.None);
+            await WaitForSeekAsync();
+            Assert.Equal(180, vm.Playback.PositionSeconds);
+            window.UpdateLayout();
+            var thumb = timeline.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.Thumb>().Single();
+            var thumbPoint = thumb.TranslatePoint(new(thumb.Bounds.Width / 2, thumb.Bounds.Height / 2), window)!.Value;
+            var quarter = timeline.TranslatePoint(new(timeline.Bounds.Width / 4, timeline.Bounds.Height / 2), window)!.Value;
+            window.MouseDown(thumbPoint, MouseButton.Left);
+            window.MouseMove(quarter, RawInputModifiers.LeftMouseButton);
+            window.MouseUp(quarter, MouseButton.Left);
+            await WaitForSeekAsync();
+            Assert.InRange(vm.Playback.PositionSeconds, 43, 47);
+
+            var info = window.FindControl<Button>("NowPlayingButton")!;
+            foreach (var part in new Control[]
+            {
+                info.GetVisualDescendants().OfType<LemonNeo.Desktop.Controls.Artwork>().Single(),
+                info.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Text == vm.Playback.NowTitle),
+                info.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Text == vm.Playback.NowArtist)
+            })
+            {
+                var point = part.TranslatePoint(new(part.Bounds.Width / 2, part.Bounds.Height / 2), window)!.Value;
+                window.MouseDown(point, MouseButton.Left); window.MouseUp(point, MouseButton.Left);
+                await vm.Navigation.NavigateCommand.ExecutionTask!;
+                Assert.Equal(DesktopRoutes.Lyrics, vm.Navigation.Current.Route);
+                await vm.Navigation.GoBackAsync();
+            }
+
+            var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            pending = vm.Playback.ExecutePlaybackAsync(async ct => { started.TrySetResult(); await release.Task.WaitAsync(ct); });
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            Assert.True(loading.IsVisible);
+            Assert.Equal(timeline.Bounds.Width, loading.Bounds.Width);
+            var loadingCenter = loading.TranslatePoint(new(loading.Bounds.Width / 2, loading.Bounds.Height / 2), window)!.Value;
+            Assert.Equal(middle.Y - 1, loadingCenter.Y);
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            await Task.Delay(30);
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            SavePreview("Playback-Loading");
+            await ClickAsync(info);
+            Assert.Equal(DesktopRoutes.Lyrics, vm.Navigation.Current.Route);
+            release.TrySetResult(); await pending;
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(loading.IsVisible);
+        }
+        finally
+        {
+            release.TrySetResult();
+            if (pending is not null) await pending;
+            window.Close();
+        }
+
+        async Task ClickAsync(Button button)
+        {
+            window.UpdateLayout();
+            var point = button.TranslatePoint(new(button.Bounds.Width / 2, button.Bounds.Height / 2), window)!.Value;
+            window.MouseDown(point, MouseButton.Left); window.MouseUp(point, MouseButton.Left);
+            if (button.Command is CommunityToolkit.Mvvm.Input.IAsyncRelayCommand { ExecutionTask: { } execution })
+                await execution.WaitAsync(TimeSpan.FromSeconds(5));
+            Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+        }
+        async Task WaitForSeekAsync()
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            while (vm.Playback.IsSeeking || vm.Playback.IsBusy)
+            {
+                Dispatcher.UIThread.RunJobs();
+                await Task.Delay(5, timeout.Token);
+            }
+            Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+        }
+        void SavePreview(string name)
+        {
+            if (Environment.GetEnvironmentVariable("LEMONNEO_PREVIEW_DIRECTORY") is not { Length: > 0 } directory) return;
+            Directory.CreateDirectory(directory);
+            using var bitmap = new RenderTargetBitmap(new PixelSize((int)window.Width, (int)window.Height));
+            bitmap.Render(window);
+            bitmap.Save(Path.Combine(directory, $"{name}.png"), PngBitmapEncoderOptions.Default);
+        }
     }
 
     [AvaloniaFact]
@@ -206,12 +377,12 @@ public sealed class DesktopTests
             Assert.Empty(runtime.Get<LibraryService>().Current.Playlists);
             confirmed.FindControl<Button>("CreateButton")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            while (vm.Playlists.Count == 0 || vm.IsBusy)
+            while (vm.Playlists.Count == 0 || vm.Library.IsBusy)
             {
                 Dispatcher.UIThread.RunJobs();
                 await Task.Delay(10, timeout.Token);
             }
-            Assert.Null(vm.Error);
+            Assert.Null(vm.Library.Error);
             var saved = Assert.Single((await new JsonLibraryRepository(paths.MusicLibraryDirectory).LoadAsync()).Playlists);
             Assert.Equal("Custom title", saved.Name);
             Assert.Equal("Custom description", saved.Description);
@@ -234,9 +405,9 @@ public sealed class DesktopTests
         var appearance = new AppearanceService(Avalonia.Application.Current!, text, runtime.Get<IAppConfigurationStore>());
         await using var vm = new MainViewModel(runtime, text, appearance, runtime.Get<ArtworkService>());
         await vm.InitializeAsync();
-        await vm.CreatePlaylistAsync("Missing folder", "Description", Path.Combine(paths.DataDirectory, "missing"));
-        Assert.True(vm.HasError);
-        Assert.True(vm.CanInteract);
+        await vm.Library.CreatePlaylistAsync("Missing folder", "Description", Path.Combine(paths.DataDirectory, "missing"));
+        Assert.True(vm.Library.HasError);
+        Assert.True(vm.Library.CanInteract);
         Assert.Empty(vm.Playlists);
         Assert.Empty(runtime.Get<LibraryService>().Current.Playlists);
         Assert.Empty((await new JsonLibraryRepository(paths.MusicLibraryDirectory).LoadAsync()).Playlists);

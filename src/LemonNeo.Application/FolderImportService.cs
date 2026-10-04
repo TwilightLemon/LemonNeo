@@ -19,6 +19,18 @@ public sealed class FolderImportService(
         string providerId = "local",
         CancellationToken cancellationToken = default)
     {
+        var scan = await ScanAsync(directoryPath, recursive, providerId, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        return ImportScan(scan, playlistName);
+    }
+
+    /// <summary>Reads provider data without changing the shared library.</summary>
+    public async Task<FolderScanResult> ScanAsync(
+        string directoryPath,
+        bool recursive = true,
+        string providerId = "local",
+        CancellationToken cancellationToken = default)
+    {
         var provider = registry.Get(providerId)
             ?? throw new ProviderException($"Provider '{providerId}' was not found.");
         if (provider is not IFolderImportProvider folderProvider)
@@ -38,6 +50,11 @@ public sealed class FolderImportService(
             throw new ProviderException($"Could not scan music folder '{directoryPath}'.", exception);
         }
 
+        return scan;
+    }
+
+    public FolderImportResult ImportScan(FolderScanResult scan, string? playlistName = null)
+    {
         var playlist = playlists.Create(
             string.IsNullOrWhiteSpace(playlistName) ? scan.SuggestedPlaylistName : playlistName,
             $"Imported from {scan.DirectoryPath}");

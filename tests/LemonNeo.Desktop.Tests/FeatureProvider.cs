@@ -19,6 +19,7 @@ internal sealed class FeatureProvider : IMusicProvider, ISearchProvider, ISearch
     public IReadOnlyList<string> LastMetadataTargets { get; private set; } = [];
     public bool FailSearch { get; set; }
     public TaskCompletionSource SearchStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public TaskCompletionSource SearchRelease { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public Track First { get; } = new()
     {
         Id = new("test-service", "one"), Title = "One", Duration = TimeSpan.FromSeconds(10),
@@ -42,6 +43,11 @@ internal sealed class FeatureProvider : IMusicProvider, ISearchProvider, ISearch
         {
             SearchStarted.TrySetResult();
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }
+        if (request.Keyword == "deferred")
+        {
+            SearchStarted.TrySetResult();
+            await SearchRelease.Task.WaitAsync(cancellationToken);
         }
         if (FailSearch) throw new InvalidOperationException("Fixture service unavailable");
         return new(Id, request.Keyword == "one" ? [First] : [First, Second]);

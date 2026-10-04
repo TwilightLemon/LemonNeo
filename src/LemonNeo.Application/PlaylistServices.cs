@@ -234,6 +234,17 @@ public sealed class ImportService(
         string remotePlaylistId,
         CancellationToken cancellationToken = default)
     {
+        var remote = await GetRemotePlaylistAsync(providerId, remotePlaylistId, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        return ImportRemote(remote);
+    }
+
+    /// <summary>Reads provider data without changing the shared library.</summary>
+    public async Task<RemotePlaylist> GetRemotePlaylistAsync(
+        string providerId,
+        string remotePlaylistId,
+        CancellationToken cancellationToken = default)
+    {
         var provider = registry.Get(providerId)
             ?? throw new ProviderException($"Provider '{providerId}' was not found.");
         if (provider is not IPlaylistProvider playlistProvider)
@@ -253,6 +264,11 @@ public sealed class ImportService(
             throw new ProviderException($"Could not import playlist '{remotePlaylistId}'.", exception);
         }
 
+        return remote;
+    }
+
+    public Playlist ImportRemote(RemotePlaylist remote)
+    {
         var local = playlists.Create(remote.Name, remote.Description);
         foreach (var track in remote.Tracks)
         {

@@ -1,57 +1,75 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="using:LemonNeo.Desktop.ViewModels" xmlns:i18n="using:LemonNeo.Desktop.Infrastructure"
-             x:Class="LemonNeo.Desktop.Views.OnlineView" x:DataType="vm:MainViewModel">
-  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-    <StackPanel Spacing="18" IsEnabled="{Binding CanInteract}">
-      <Border Classes="card">
-        <StackPanel Spacing="12">
-          <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.Accounts}}" />
-          <ComboBox ItemsSource="{Binding AuthenticationProviders}" SelectedItem="{Binding SelectedAuthenticationProvider}" ItemTemplate="{StaticResource ProviderOptionTemplate}"
-                    HorizontalAlignment="Stretch" PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.AuthenticationProvider}}"
-                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.AuthenticationProvider}}" />
-          <TextBlock Text="{Binding AuthenticationStatus}" FontWeight="SemiBold" />
-          <TextBlock Text="{Binding AuthenticationAccount}" Classes="caption" TextWrapping="Wrap" />
-          <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.CookieHint}}" Classes="caption" TextWrapping="Wrap" />
-          <TextBox Text="{Binding Cookie}" PasswordChar="●" PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.Cookie}}"
-                   AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Cookie}}" />
-          <WrapPanel>
-            <Button Classes="primary" Command="{Binding LoginCommand}" IsEnabled="{Binding CanLogin}" Content="{Translate {x:Static i18n:LanguageManager+Keys.Login}}" Margin="0,0,10,0" />
-            <Button Command="{Binding LogoutCommand}" IsEnabled="{Binding CanLogout}" Content="{Translate {x:Static i18n:LanguageManager+Keys.Logout}}" />
-          </WrapPanel>
+             xmlns:controls="using:LemonNeo.Desktop.Controls" xmlns:vm="using:LemonNeo.Desktop.ViewModels" xmlns:i18n="using:LemonNeo.Desktop.Infrastructure"
+             x:Class="LemonNeo.Desktop.Views.OnlineView" x:DataType="vm:OnlineViewModel">
+  <Grid RowDefinitions="Auto,Auto,*">
+    <controls:PageHeader Title="{Binding PageTitle}" Description="{Binding PageDescription}" Summary="{Binding PageSummary}">
+      <controls:PageHeader.Actions>
+        <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsBusy}" ToolTip.Tip="{Binding Status}">
+          <ProgressBar IsIndeterminate="True" Width="60" Height="3" VerticalAlignment="Center" AutomationProperties.Name="{Binding Status}" />
+          <Button Classes="ghost" Command="{Binding CancelOperationCommand}" Content="{Translate {x:Static i18n:LanguageManager+Keys.CancelOperation}}" />
         </StackPanel>
-      </Border>
-      <Border Classes="card">
-        <StackPanel Spacing="14">
-          <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.RemotePlaylists}}" />
-          <Grid ColumnDefinitions="*,Auto">
-            <ComboBox ItemsSource="{Binding PlaylistProviders}" SelectedItem="{Binding SelectedPlaylistProvider}" ItemTemplate="{StaticResource ProviderOptionTemplate}"
-                      HorizontalAlignment="Stretch" Margin="0,0,10,0" PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistProvider}}"
-                      AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistProvider}}" />
-            <Button Grid.Column="1" Command="{Binding RemotePlaylistsCommand}" IsEnabled="{Binding CanBrowseRemote}" Content="{Translate {x:Static i18n:LanguageManager+Keys.LoadRemotePlaylists}}" />
-          </Grid>
-          <ListBox ItemsSource="{Binding RemotePlaylists}" SelectedItem="{Binding SelectedRemotePlaylist}" MaxHeight="260" MinHeight="90">
-            <ListBox.ItemTemplate>
-              <DataTemplate x:DataType="vm:RemotePlaylistRow">
-                <Grid ColumnDefinitions="*,Auto" MinHeight="44">
-                  <StackPanel Spacing="6">
-                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                    <TextBlock Text="{Binding Collection}" Classes="caption" TextWrapping="Wrap" />
-                    <TextBlock Text="{Binding Id}" Classes="caption" TextWrapping="Wrap" />
-                  </StackPanel>
-                  <TextBlock Grid.Column="1" Text="{Binding TrackCount}" Classes="caption" Margin="12,0,0,0" VerticalAlignment="Center" />
-                </Grid>
-              </DataTemplate>
-            </ListBox.ItemTemplate>
-          </ListBox>
-          <Button Classes="primary" Command="{Binding ImportRemoteCommand}" IsEnabled="{Binding CanImportRemote}"
-                  HorizontalAlignment="Left" Content="{Translate {x:Static i18n:LanguageManager+Keys.ImportRemote}}" />
-          <Grid ColumnDefinitions="*,Auto">
-            <TextBox Text="{Binding RemotePlaylistId}" PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.RemotePlaylistId}}" Margin="0,0,10,0"
-                     AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.RemotePlaylistId}}" />
-            <Button Grid.Column="1" Command="{Binding ImportRemoteIdCommand}" IsEnabled="{Binding CanImportRemoteId}" Content="{Translate {x:Static i18n:LanguageManager+Keys.ImportRemote}}" />
-          </Grid>
+      </controls:PageHeader.Actions>
+    </controls:PageHeader>
+    <Border Grid.Row="1" IsVisible="{Binding HasError}" Background="{DynamicResource Brush.DangerSoft}" CornerRadius="10" Padding="14" Margin="0,0,0,12">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Text="{Binding Error}" Foreground="{DynamicResource Brush.Danger}" TextWrapping="Wrap" MaxHeight="90" />
+        <Button Grid.Column="1" Classes="ghost" Content="×" Command="{Binding DismissErrorCommand}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}" />
+      </Grid>
+    </Border>
+    <Grid Grid.Row="2">
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="18" IsEnabled="{Binding CanInteract}">
+          <Border Classes="card">
+            <StackPanel Spacing="12">
+              <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.Accounts}}" />
+              <ComboBox ItemsSource="{Binding AuthenticationProviders}" SelectedItem="{Binding SelectedAuthenticationProvider}" ItemTemplate="{StaticResource ProviderOptionTemplate}"
+                        HorizontalAlignment="Stretch" PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.AuthenticationProvider}}"
+                        AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.AuthenticationProvider}}" />
+              <TextBlock Text="{Binding AuthenticationStatus}" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding AuthenticationAccount}" Classes="caption" TextWrapping="Wrap" />
+              <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.CookieHint}}" Classes="caption" TextWrapping="Wrap" />
+              <TextBox Text="{Binding Cookie}" PasswordChar="●" PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.Cookie}}"
+                       AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Cookie}}" />
+              <WrapPanel>
+                <Button Classes="primary" Command="{Binding LoginCommand}" IsEnabled="{Binding CanLogin}" Content="{Translate {x:Static i18n:LanguageManager+Keys.Login}}" Margin="0,0,10,0" />
+                <Button Command="{Binding LogoutCommand}" IsEnabled="{Binding CanLogout}" Content="{Translate {x:Static i18n:LanguageManager+Keys.Logout}}" />
+              </WrapPanel>
+            </StackPanel>
+          </Border>
+          <Border Classes="card">
+            <StackPanel Spacing="14">
+              <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.RemotePlaylists}}" />
+              <Grid ColumnDefinitions="*,Auto">
+                <ComboBox ItemsSource="{Binding PlaylistProviders}" SelectedItem="{Binding SelectedPlaylistProvider}" ItemTemplate="{StaticResource ProviderOptionTemplate}"
+                          HorizontalAlignment="Stretch" Margin="0,0,10,0" PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistProvider}}"
+                          AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistProvider}}" />
+                <Button Grid.Column="1" Command="{Binding RemotePlaylistsCommand}" IsEnabled="{Binding CanBrowseRemote}" Content="{Translate {x:Static i18n:LanguageManager+Keys.LoadRemotePlaylists}}" />
+              </Grid>
+              <ListBox ItemsSource="{Binding RemotePlaylists}" SelectedItem="{Binding SelectedRemotePlaylist}" MaxHeight="260" MinHeight="90">
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:RemotePlaylistRow">
+                    <Grid ColumnDefinitions="*,Auto" MinHeight="44">
+                      <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding Collection}" Classes="caption" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding Id}" Classes="caption" TextWrapping="Wrap" />
+                      </StackPanel>
+                      <TextBlock Grid.Column="1" Text="{Binding TrackCount}" Classes="caption" Margin="12,0,0,0" VerticalAlignment="Center" />
+                    </Grid>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+              <Button Classes="primary" Command="{Binding ImportRemoteCommand}" IsEnabled="{Binding CanImportRemote}"
+                      HorizontalAlignment="Left" Content="{Translate {x:Static i18n:LanguageManager+Keys.ImportRemote}}" />
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBox Text="{Binding RemotePlaylistId}" PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.RemotePlaylistId}}" Margin="0,0,10,0"
+                         AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.RemotePlaylistId}}" />
+                <Button Grid.Column="1" Command="{Binding ImportRemoteIdCommand}" IsEnabled="{Binding CanImportRemoteId}" Content="{Translate {x:Static i18n:LanguageManager+Keys.ImportRemote}}" />
+              </Grid>
+            </StackPanel>
+          </Border>
         </StackPanel>
-      </Border>
-    </StackPanel>
-  </ScrollViewer>
+      </ScrollViewer>
+    </Grid>
+  </Grid>
 </UserControl>

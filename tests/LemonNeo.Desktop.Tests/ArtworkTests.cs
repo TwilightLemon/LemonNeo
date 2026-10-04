@@ -103,9 +103,9 @@ public sealed class ArtworkTests
         var appearance = new AppearanceService(Avalonia.Application.Current!, text, runtime.Get<IAppConfigurationStore>());
         await using var vm = new MainViewModel(runtime, text, appearance, runtime.Get<ArtworkService>());
         await vm.InitializeAsync();
-        await WaitUntilAsync(() => vm.NowArtwork is not null);
-        Assert.False(vm.IsPlaying);
-        vm.Navigate(DesktopPage.Lyrics);
+        await WaitUntilAsync(() => vm.Playback.NowArtwork is not null);
+        Assert.False(vm.Playback.IsPlaying);
+        await vm.Navigation.NavigateAsync(DesktopRoutes.Lyrics);
         var window = new MainWindow { DataContext = vm };
         window.Show();
         try
@@ -121,8 +121,8 @@ public sealed class ArtworkTests
                 rendered.Render(window);
                 foreach (var cover in covers)
                 {
-                    Assert.Same(vm.NowArtwork, cover.Source);
-                    Assert.Same(vm.NowArtwork, Assert.Single(cover.GetVisualDescendants().OfType<Image>()).Source);
+                    Assert.Same(vm.Playback.NowArtwork, cover.Source);
+                    Assert.Same(vm.Playback.NowArtwork, Assert.Single(cover.GetVisualDescendants().OfType<Image>()).Source);
                     Assert.False(Assert.Single(cover.GetVisualDescendants().OfType<Viewbox>()).IsVisible);
                     Assert.True(cover.IsEffectivelyVisible);
                     var center = cover.TranslatePoint(new Point(cover.Bounds.Width / 2, cover.Bounds.Height / 2), window)!.Value;
@@ -135,9 +135,9 @@ public sealed class ArtworkTests
                 }
             }
 
-            await vm.ClearQueueCommand.ExecuteAsync(null);
+            await vm.Playback.ClearQueueCommand.ExecuteAsync(null);
             Dispatcher.UIThread.RunJobs();
-            Assert.Null(vm.NowArtwork);
+            Assert.Null(vm.Playback.NowArtwork);
             foreach (var cover in window.GetVisualDescendants().OfType<Artwork>())
             {
                 Assert.Null(cover.Source);
@@ -185,24 +185,24 @@ public sealed class ArtworkTests
             // Metadata can change while the provider-qualified track identity stays the same.
             var newTrack = oldTrack with { Title = "New", ArtworkUri = new Uri("https://covers.example/new") };
             await SelectTrackAsync(session, vm, newTrack);
-            await WaitUntilAsync(() => vm.NowArtwork is not null);
-            var currentCover = vm.NowArtwork;
+            await WaitUntilAsync(() => vm.Playback.NowArtwork is not null);
+            var currentCover = vm.Playback.NowArtwork;
             Assert.True(slowStarted.Task.Result.IsCancellationRequested);
 
             slowResponse.SetResult(new(HttpStatusCode.OK) { Content = lateContent });
             await lateContent.Disposed.Task.WaitAsync(TimeSpan.FromSeconds(5));
             Dispatcher.UIThread.RunJobs();
-            Assert.Same(currentCover, vm.NowArtwork);
+            Assert.Same(currentCover, vm.Playback.NowArtwork);
 
-            await vm.TogglePlaybackCommand.ExecuteAsync(null);
-            await vm.SeekAsync(7);
+            await vm.Playback.TogglePlaybackCommand.ExecuteAsync(null);
+            await vm.Playback.SeekAsync(7);
             await SelectTrackAsync(session, vm, newTrack with { Id = new("local", "shared-cover"), Title = "Shared cover" });
-            Assert.Same(currentCover, vm.NowArtwork);
+            Assert.Same(currentCover, vm.Playback.NowArtwork);
             Assert.Equal(new[] { "/old", "/new" }, requests.ToArray());
 
             await SelectTrackAsync(session, vm, CreateTrack(paths, "No cover", null));
-            Assert.Null(vm.NowArtwork);
-            Assert.False(vm.HasError);
+            Assert.Null(vm.Playback.NowArtwork);
+            Assert.False(vm.Playback.HasError);
         }
         finally
         {
@@ -237,7 +237,7 @@ public sealed class ArtworkTests
         }
         finally { await vm.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)); }
         Assert.True(started.Task.Result.IsCancellationRequested);
-        Assert.Null(vm.NowArtwork);
+        Assert.Null(vm.Playback.NowArtwork);
     }
 
     private static ArtworkService CreateService(HttpClient client) => new(client, NullLogger<ArtworkService>.Instance);
@@ -260,7 +260,7 @@ public sealed class ArtworkTests
     private static async Task SelectTrackAsync(PlaybackSessionService session, MainViewModel vm, Track track)
     {
         await session.PlayPlaylistAsync([track]);
-        await WaitUntilAsync(() => vm.NowTitle == track.Title);
+        await WaitUntilAsync(() => vm.Playback.NowTitle == track.Title);
     }
 
     private static string WriteCover(TestPaths paths)

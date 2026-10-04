@@ -1,0 +1,42 @@
+using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.ComponentModel;
+using LemonNeo.Application;
+using LemonNeo.Core;
+
+namespace LemonNeo.Desktop.Infrastructure;
+
+/// <summary>Shared services and persisted data, without page-specific interaction state.</summary>
+public sealed class DesktopContext(DesktopRuntime runtime, LocalizationService text, AppearanceService appearance) : ObservableObject
+{
+    private bool _initialized;
+    public DesktopRuntime Runtime { get; } = runtime;
+    public LocalizationService Text { get; } = text;
+    public AppearanceService Appearance { get; } = appearance;
+    public ObservableCollection<Playlist> Playlists { get; } = [];
+    public bool IsInitialized { get => _initialized; internal set => SetProperty(ref _initialized, value); }
+    public event EventHandler? LibraryChanged;
+    public string LibrarySummary => Text.Format("LibraryStatistics", Playlists.Count,
+        Runtime.Get<LibraryService>().Current.Playlists.SelectMany(p => p.Items).DistinctBy(i => i.Track.Id).Count(),
+        Runtime.Get<LibraryService>().Current.Playlists.Sum(p => p.Items.Count));
+
+    public void RefreshLibrary()
+    {
+        var values = Runtime.Get<LibraryService>().Current.Playlists.OrderBy(p => p.Name, StringComparer.Create(Text.Culture, true)).ToArray();
+        // Preserve the sidebar selection while refreshing existing playlist objects.
+        for (var i = Playlists.Count - 1; i >= 0; i--)
+            if (!values.Any(p => p.Id == Playlists[i].Id)) Playlists.RemoveAt(i);
+        for (var i = 0; i < values.Length; i++)
+        {
+            var existing = Playlists.FirstOrDefault(p => p.Id == values[i].Id);
+            if (existing is null) Playlists.Insert(i, values[i]);
+            else
+            {
+                var index = Playlists.IndexOf(existing);
+                if (index != i) Playlists.Move(index, i);
+                if (!ReferenceEquals(existing, values[i])) Playlists[i] = values[i];
+            }
+        }
+        OnPropertyChanged(nameof(LibrarySummary));
+        LibraryChanged?.Invoke(this, EventArgs.Empty);
+    }
+}

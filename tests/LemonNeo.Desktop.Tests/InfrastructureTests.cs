@@ -44,8 +44,15 @@ public sealed class InfrastructureTests
     [AvaloniaFact]
     public async Task ExistingViewsAndDialogsUpdateWhenCultureChanges()
     {
+        using var paths = new TestPaths();
+        await using var runtime = new DesktopRuntime(paths, new(Path.Combine(AppContext.BaseDirectory, "plugins"), paths.MusicLibraryDirectory));
         var text = new LocalizationService();
-        var window = new MainWindow();
+        var appearance = new AppearanceService(Avalonia.Application.Current!, text, runtime.Get<IAppConfigurationStore>());
+        await using var vm = new LemonNeo.Desktop.ViewModels.MainViewModel(runtime, text, appearance, runtime.Get<ArtworkService>());
+        await vm.InitializeAsync();
+        await appearance.SetAsync(new(ThemePreference.Light, LanguagePreference.English, true));
+        await vm.Navigation.NavigateAsync(DesktopRoutes.Settings);
+        var window = new MainWindow { DataContext = vm };
         var dialog = new PlaylistDialog();
         var moveDialog = new MoveTrackDialog(2, 3);
         window.Show();
@@ -74,8 +81,12 @@ public sealed class InfrastructureTests
     public async Task PaletteSwitchUpdatesExistingControlsAndHasReadableContrast()
     {
         using var paths = new TestPaths();
-        var appearance = new AppearanceService(Avalonia.Application.Current!, new LocalizationService(), new JsonAppConfigurationStore(paths));
-        var window = new MainWindow();
+        await using var runtime = new DesktopRuntime(paths, new(Path.Combine(AppContext.BaseDirectory, "plugins"), paths.MusicLibraryDirectory));
+        var text = new LocalizationService();
+        var appearance = new AppearanceService(Avalonia.Application.Current!, text, runtime.Get<IAppConfigurationStore>());
+        await using var vm = new LemonNeo.Desktop.ViewModels.MainViewModel(runtime, text, appearance, runtime.Get<ArtworkService>());
+        await vm.InitializeAsync();
+        var window = new MainWindow { DataContext = vm };
         window.Show();
         var colors = new List<Color>();
         foreach (var theme in new[] { ThemePreference.Light, ThemePreference.Dark })
