@@ -1,80 +1,209 @@
-<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vm="using:LemonNeo.Desktop.ViewModels" xmlns:core="using:LemonNeo.Core"
-        xmlns:views="using:LemonNeo.Desktop.Views" xmlns:controls="using:LemonNeo.Desktop.Controls"
-        xmlns:i18n="using:LemonNeo.Desktop.Infrastructure"
-        x:Class="LemonNeo.Desktop.Views.MainWindow" x:DataType="vm:MainViewModel" Name="DesktopWindow"
-        Title="Lemon Neo" Width="1180" Height="790" MinWidth="880" MinHeight="620"
-        WindowDecorations="Full" ExtendClientAreaTitleBarHeightHint="56"
-        WindowDecorationsTheme="{StaticResource LemonWindowDecorations}"
-        Background="Transparent" TransparencyLevelHint="AcrylicBlur, Blur, None"
-        TransparencyBackgroundFallback="{DynamicResource Brush.Sidebar}"
-        WindowStartupLocation="CenterScreen">
+<Window
+  x:Class="LemonNeo.Desktop.Views.MainWindow"
+  xmlns="https://github.com/avaloniaui"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:controls="using:LemonNeo.Desktop.Controls"
+  xmlns:i18n="using:LemonNeo.Desktop.Infrastructure"
+  xmlns:views="using:LemonNeo.Desktop.Views"
+  xmlns:vm="using:LemonNeo.Desktop.ViewModels"
+  Name="DesktopWindow"
+  Title="Lemon Neo"
+  Width="1180"
+  Height="790"
+  MinWidth="880"
+  MinHeight="620"
+  x:DataType="vm:MainViewModel"
+  Background="Transparent"
+  ExtendClientAreaTitleBarHeightHint="56"
+  TransparencyBackgroundFallback="{DynamicResource Brush.Sidebar}"
+  TransparencyLevelHint="AcrylicBlur, Blur, None"
+  WindowDecorations="Full"
+  WindowDecorationsTheme="{StaticResource LemonWindowDecorations}"
+  WindowStartupLocation="CenterScreen">
   <Window.Styles>
-    <Style Selector="Border#TopBar"><Setter Property="Padding" Value="24,10" /></Style>
-    <Style Selector="Border#Sidebar"><Setter Property="Padding" Value="16,20,16,12" /></Style>
+    <Style Selector="Border#TopBar">
+      <Setter Property="Padding" Value="24,10" />
+    </Style>
+    <Style Selector="Border#Sidebar">
+      <Setter Property="Padding" Value="16,20,16,12" />
+    </Style>
     <Style Selector="Border#TopBar.windows">
       <Setter Property="Padding" Value="24,10,164,10" />
     </Style>
     <Style Selector="Border#Sidebar.macos">
-      <Setter Property="Padding" Value="16,56,16,12" />
+      <Setter Property="Padding" Value="16,32,16,12" />
     </Style>
   </Window.Styles>
-  <Grid Name="ShellRoot" RowDefinitions="56,*,Auto" ColumnDefinitions="230,1,*" ClipToBounds="True">
-    <Border Name="ContentBackground" Grid.Column="2" Grid.RowSpan="3" Background="{DynamicResource Brush.Canvas}" IsHitTestVisible="False" />
-    <Border Name="Sidebar" Grid.RowSpan="3" Background="{DynamicResource Brush.SidebarTranslucent}">
+  <Grid
+    Name="ShellRoot"
+    ClipToBounds="True"
+    ColumnDefinitions="230,*"
+    RowDefinitions="56,*,Auto">
+    <Border
+      Name="ContentBackground"
+      Grid.RowSpan="3"
+      Grid.Column="1"
+      Background="{DynamicResource Brush.Canvas}"
+      IsHitTestVisible="False" />
+    <Border
+      Name="Sidebar"
+      Grid.RowSpan="3"
+      Background="{DynamicResource Brush.SidebarTranslucent}">
       <Grid RowDefinitions="Auto,Auto,*,Auto">
-        <StackPanel Margin="12,0,0,16" Orientation="Horizontal" Spacing="10">
-          <Border Background="{DynamicResource Brush.Accent}" CornerRadius="12" Width="34"
-            Height="34">
-            <Path Classes="icon" Data="{StaticResource Icon.Music}"
+        <StackPanel
+          Margin="12,0,0,16"
+          Orientation="Horizontal"
+          Spacing="10">
+          <Border
+            Width="34"
+            Height="34"
+            Background="{DynamicResource Brush.Accent}"
+            CornerRadius="12">
+            <Path
+              Classes="icon"
+              Data="{StaticResource Icon.Music}"
               Fill="{DynamicResource Brush.OnAccent}" />
           </Border>
-          <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.AppName}}" FontSize="23"
-            FontWeight="SemiBold" VerticalAlignment="Center" />
+          <TextBlock
+            VerticalAlignment="Center"
+            FontSize="23"
+            FontWeight="SemiBold"
+            Text="{Translate {x:Static i18n:LanguageManager+Keys.AppName}}" />
         </StackPanel>
-        <StackPanel Grid.Row="1" Spacing="4" Margin="0,0,0,12">
-          <Button Classes="nav" Classes.active="{Binding Navigation.IsLibrary}" Command="{Binding Navigation.NavigateCommand}" CommandParameter="Library">
-            <StackPanel Orientation="Horizontal" Spacing="12"><Path Classes="icon" Data="{StaticResource Icon.Library}" /><TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Library}}" /></StackPanel>
+        <StackPanel
+          Grid.Row="1"
+          Margin="0,0,0,12"
+          Spacing="4">
+          <StackPanel.Styles>
+            <Style Selector="TextBlock">
+              <Setter Property="VerticalAlignment" Value="Center" />
+            </Style>
+          </StackPanel.Styles>
+          <Button
+            Classes="nav"
+            Classes.active="{Binding Navigation.IsLibrary}"
+            Command="{Binding Navigation.NavigateCommand}"
+            CommandParameter="Library">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+              <Path Classes="icon" Data="{StaticResource Icon.Library}" />
+              <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Library}}" />
+            </StackPanel>
           </Button>
-          <Button Classes="nav" Classes.active="{Binding Navigation.IsSearch}" Command="{Binding Navigation.NavigateCommand}" CommandParameter="Search">
-            <StackPanel Orientation="Horizontal" Spacing="12"><Path Classes="icon" Data="{StaticResource Icon.Search}" /><TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Search}}" /></StackPanel>
+          <Button
+            Classes="nav"
+            Classes.active="{Binding Navigation.IsSearch}"
+            Command="{Binding Navigation.NavigateCommand}"
+            CommandParameter="Search">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+              <Path Classes="icon" Data="{StaticResource Icon.Search}" />
+              <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Search}}" />
+            </StackPanel>
           </Button>
-          <Button Name="AccountsNavigationButton" Classes="nav" Classes.active="{Binding Navigation.IsAccounts}" Command="{Binding Navigation.NavigateCommand}" CommandParameter="Accounts">
-            <StackPanel Orientation="Horizontal" Spacing="12"><Path Classes="icon" Data="{StaticResource Icon.Account}" /><TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Accounts}}" /></StackPanel>
+          <Button
+            Name="AccountsNavigationButton"
+            Classes="nav"
+            Classes.active="{Binding Navigation.IsAccounts}"
+            Command="{Binding Navigation.NavigateCommand}"
+            CommandParameter="Accounts">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+              <Path Classes="icon" Data="{StaticResource Icon.Account}" />
+              <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Accounts}}" />
+            </StackPanel>
           </Button>
-          <Button Classes="nav" Classes.active="{Binding Navigation.IsOnline}" Command="{Binding Navigation.NavigateCommand}" CommandParameter="Online">
-            <StackPanel Orientation="Horizontal" Spacing="12"><Path Classes="icon" Data="{StaticResource Icon.Folder}" /><TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Online}}" /></StackPanel>
+          <Button
+            Classes="nav"
+            Classes.active="{Binding Navigation.IsOnline}"
+            Command="{Binding Navigation.NavigateCommand}"
+            CommandParameter="Online">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+              <Path Classes="icon" Data="{StaticResource Icon.Folder}" />
+              <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Online}}" />
+            </StackPanel>
           </Button>
         </StackPanel>
         <Grid Grid.Row="2" RowDefinitions="Auto,*">
-          <Grid ColumnDefinitions="*,Auto" Margin="16,0,8,4">
-            <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.Playlists}}" VerticalAlignment="Center" />
-            <Button Grid.Column="1" Classes="ghost icon" Click="OnCreatePlaylist" IsEnabled="{Binding SharedContext.IsInitialized}"
-                    ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.CreatePlaylist}}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.CreatePlaylist}}">
+          <Grid Margin="16,0,8,4" ColumnDefinitions="*,Auto">
+            <TextBlock
+              VerticalAlignment="Center"
+              Classes="caption"
+              Text="{Translate {x:Static i18n:LanguageManager+Keys.Playlists}}" />
+            <Button
+              Grid.Column="1"
+              AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.CreatePlaylist}}"
+              Classes="ghost icon"
+              Click="OnCreatePlaylist"
+              IsEnabled="{Binding SharedContext.IsInitialized}"
+              ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.CreatePlaylist}}">
               <Path Classes="icon" Data="{StaticResource Icon.Add}" />
             </Button>
           </Grid>
-          <ListBox Grid.Row="1" ItemsSource="{Binding Playlists}" SelectedItem="{Binding SelectedPlaylist}" IsEnabled="{Binding SharedContext.IsInitialized}">
+          <ListBox
+            Name="PlaylistList"
+            Grid.Row="1"
+            IsEnabled="{Binding SharedContext.IsInitialized}"
+            ItemsSource="{Binding Playlists}"
+            SelectedItem="{Binding SelectedPlaylist}">
             <ListBox.ItemTemplate>
-              <DataTemplate x:DataType="core:Playlist"><Grid ColumnDefinitions="*,Auto"><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" /><TextBlock Grid.Column="1" Classes="caption" Text="{Binding Items.Count}" Margin="8,0,0,0" VerticalAlignment="Center" /></Grid></DataTemplate>
+              <DataTemplate x:DataType="vm:PlaylistMenuItemViewModel">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock
+                    VerticalAlignment="Center"
+                    Text="{Binding Name}"
+                    TextTrimming="CharacterEllipsis" />
+                  <TextBlock
+                    Grid.Column="1"
+                    Margin="8,0,0,0"
+                    VerticalAlignment="Center"
+                    Classes="caption"
+                    Text="{Binding TrackCount}" />
+                </Grid>
+              </DataTemplate>
             </ListBox.ItemTemplate>
           </ListBox>
         </Grid>
-        <StackPanel Grid.Row="3" Spacing="4" Margin="0,8,0,0">
-          <Button Classes="nav" Classes.active="{Binding Navigation.IsTools}" Command="{Binding Navigation.NavigateCommand}" CommandParameter="Tools">
-            <StackPanel Orientation="Horizontal" Spacing="12"><Path Classes="icon" Data="{StaticResource Icon.Queue}" /><TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Tools}}" /></StackPanel>
+        <StackPanel
+          Grid.Row="3"
+          Margin="0,8,0,0"
+          Spacing="4">
+          <StackPanel.Styles>
+            <Style Selector="TextBlock">
+              <Setter Property="VerticalAlignment" Value="Center" />
+            </Style>
+          </StackPanel.Styles>
+          <Button
+            Classes="nav"
+            Classes.active="{Binding Navigation.IsTools}"
+            Command="{Binding Navigation.NavigateCommand}"
+            CommandParameter="Tools">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+              <Path Classes="icon" Data="{StaticResource Icon.Queue}" />
+              <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Tools}}" />
+            </StackPanel>
           </Button>
-          <Button Classes="nav" Classes.active="{Binding Navigation.IsSettings}" Command="{Binding Navigation.NavigateCommand}" CommandParameter="Settings">
-            <StackPanel Orientation="Horizontal" Spacing="12"><Path Classes="icon" Data="{StaticResource Icon.Settings}" /><TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Settings}}" /></StackPanel>
+          <Button
+            Classes="nav"
+            Classes.active="{Binding Navigation.IsSettings}"
+            Command="{Binding Navigation.NavigateCommand}"
+            CommandParameter="Settings">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+              <Path Classes="icon" Data="{StaticResource Icon.Settings}" />
+              <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Settings}}" />
+            </StackPanel>
           </Button>
         </StackPanel>
       </Grid>
     </Border>
-    <Border Name="MacCaptionDragArea" Background="Transparent" IsVisible="False"
-            WindowDecorationProperties.ElementRole="TitleBar" />
-    <Border Grid.Column="1" Grid.RowSpan="3" Background="{DynamicResource Brush.Border}" />
-    <Border Name="TopBar" Grid.Column="2" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="0,0,0,1"
-            WindowDecorationProperties.ElementRole="TitleBar">
+    <Border
+      Name="MacCaptionDragArea"
+      Background="Transparent"
+      IsVisible="False"
+      WindowDecorationProperties.ElementRole="TitleBar" />
+    <Border
+      Name="TopBar"
+      Grid.Column="1"
+      BorderBrush="{DynamicResource Brush.Border}"
+      BorderThickness="0,0,0,0"
+      WindowDecorationProperties.ElementRole="TitleBar">
       <Grid>
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="Auto" />
@@ -82,131 +211,393 @@
           <ColumnDefinition Width="*" />
           <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
-        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" WindowDecorationProperties.ElementRole="User">
-          <Button Name="BackButton" Classes="ghost compact" Command="{Binding Navigation.BackCommand}" ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Back}}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Back}}">
+        <StackPanel
+          VerticalAlignment="Center"
+          Orientation="Horizontal"
+          Spacing="12"
+          WindowDecorationProperties.ElementRole="User">
+          <Button
+            Name="BackButton"
+            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Back}}"
+            Classes="ghost compact"
+            Command="{Binding Navigation.BackCommand}"
+            ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Back}}">
             <Path Classes="icon" Data="{StaticResource Icon.Back}" />
           </Button>
-          <Button Name="ForwardButton" Classes="ghost compact" Command="{Binding Navigation.ForwardCommand}" ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Forward}}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Forward}}">
+          <Button
+            Name="ForwardButton"
+            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Forward}}"
+            Classes="ghost compact"
+            Command="{Binding Navigation.ForwardCommand}"
+            ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Forward}}">
             <Path Classes="icon" Data="{StaticResource Icon.Forward}" />
           </Button>
         </StackPanel>
-        <Grid Name="SearchArea" Grid.Column="1" ColumnDefinitions="*,Auto" Margin="16,0,12,0" VerticalAlignment="Center"
-              WindowDecorationProperties.ElementRole="User">
-          <TextBox Name="GlobalSearch" Classes="toolbarSearch" Text="{Binding SearchQuery}" KeyDown="OnSearchKeyDown"
-                   PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.SearchMusic}}"
-                   AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.SearchMusic}}" IsEnabled="{Binding SharedContext.IsInitialized}" />
-          <Button Grid.Column="1" Classes="ghost compact" Margin="4,0,0,0" Command="{Binding SearchCommand}"
-                  ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.SearchMusic}}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.SearchMusic}}">
+        <Grid
+          Name="SearchArea"
+          Grid.Column="1"
+          Margin="16,0,12,0"
+          VerticalAlignment="Center"
+          ColumnDefinitions="*,Auto"
+          WindowDecorationProperties.ElementRole="User">
+          <TextBox
+            Name="GlobalSearch"
+            VerticalContentAlignment="Center"
+            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.SearchMusic}}"
+            Classes="toolbarSearch"
+            IsEnabled="{Binding SharedContext.IsInitialized}"
+            KeyDown="OnSearchKeyDown"
+            PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.SearchMusic}}"
+            Text="{Binding SearchQuery}" />
+          <Button
+            Grid.Column="1"
+            Margin="4,0,0,0"
+            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.SearchMusic}}"
+            Classes="ghost compact"
+            Command="{Binding SearchCommand}"
+            ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.SearchMusic}}">
             <Path Classes="icon" Data="{StaticResource Icon.Search}" />
           </Button>
         </Grid>
-        <ProgressBar Grid.Column="3" IsIndeterminate="True" IsVisible="{Binding IsBusy}" Width="40" Height="3" VerticalAlignment="Center" IsHitTestVisible="False" AutomationProperties.Name="{Binding Status}" />
+        <ProgressBar
+          Grid.Column="3"
+          Width="40"
+          Height="3"
+          VerticalAlignment="Center"
+          AutomationProperties.Name="{Binding Status}"
+          IsHitTestVisible="False"
+          IsIndeterminate="True"
+          IsVisible="{Binding IsBusy}" />
       </Grid>
     </Border>
-    <Grid Grid.Row="1" Grid.Column="2" RowDefinitions="Auto,*" Margin="32,20,32,24">
-      <Border IsVisible="{Binding HasError}" Background="{DynamicResource Brush.DangerSoft}" CornerRadius="10" Padding="14" Margin="0,0,0,12">
+    <Grid
+      Grid.Row="1"
+      Grid.Column="1"
+      Margin="32,20,32,24"
+      RowDefinitions="Auto,*">
+      <Border
+        Margin="0,0,0,12"
+        Padding="14"
+        Background="{DynamicResource Brush.DangerSoft}"
+        CornerRadius="10"
+        IsVisible="{Binding HasError}">
         <Grid ColumnDefinitions="*,Auto,Auto">
-          <TextBlock Text="{Binding Error}" Foreground="{DynamicResource Brush.Danger}" TextWrapping="Wrap" MaxHeight="90" />
-          <Button Grid.Column="1" Classes="ghost" Content="{Translate {x:Static i18n:LanguageManager+Keys.Retry}}" Command="{Binding RefreshCommand}" IsEnabled="{Binding !IsBusy}" IsVisible="{Binding CanRetryStartup}" />
-          <Button Grid.Column="2" Classes="ghost" Content="×" Command="{Binding DismissErrorCommand}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}" />
+          <TextBlock
+            MaxHeight="90"
+            Foreground="{DynamicResource Brush.Danger}"
+            Text="{Binding Error}"
+            TextWrapping="Wrap" />
+          <Button
+            Grid.Column="1"
+            Classes="ghost"
+            Command="{Binding RefreshCommand}"
+            Content="{Translate {x:Static i18n:LanguageManager+Keys.Retry}}"
+            IsEnabled="{Binding !IsBusy}"
+            IsVisible="{Binding CanRetryStartup}" />
+          <Button
+            Grid.Column="2"
+            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}"
+            Classes="ghost"
+            Command="{Binding DismissErrorCommand}"
+            Content="×" />
         </Grid>
       </Border>
-      <ContentControl Name="PageContent" Grid.Row="1" Content="{Binding Navigation.Host}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
+      <ContentControl
+        Name="PageContent"
+        Grid.Row="1"
+        HorizontalContentAlignment="Stretch"
+        VerticalContentAlignment="Stretch"
+        Content="{Binding Navigation.Host}" />
     </Grid>
-    <Border Name="PlaybackBar" Grid.Row="2" Grid.Column="2" MinHeight="96" Background="{DynamicResource Brush.Surface}">
+    <Border
+      Name="PlaybackBar"
+      Grid.Row="2"
+      Grid.Column="1"
+      MinHeight="96"
+      Background="{DynamicResource Brush.Surface}">
       <Grid>
-        <Grid RowDefinitions="Auto,*" Margin="20,16">
-          <Grid IsVisible="{Binding Playback.HasError}" ColumnDefinitions="*,Auto" Margin="0,0,0,4">
-            <TextBlock Text="{Binding Playback.Error}" Foreground="{DynamicResource Brush.Danger}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Playback.Error}" />
-            <Button Grid.Column="1" Classes="ghost compact" Content="×" MinHeight="20" Height="20" Padding="4,0" Command="{Binding Playback.DismissErrorCommand}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}" />
+        <Grid Margin="20,16" RowDefinitions="Auto,*">
+          <Grid
+            Margin="0,0,0,4"
+            ColumnDefinitions="*,Auto"
+            IsVisible="{Binding Playback.HasError}">
+            <TextBlock
+              Foreground="{DynamicResource Brush.Danger}"
+              Text="{Binding Playback.Error}"
+              TextTrimming="CharacterEllipsis"
+              ToolTip.Tip="{Binding Playback.Error}" />
+            <Button
+              Grid.Column="1"
+              Height="20"
+              MinHeight="20"
+              Padding="4,0"
+              AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}"
+              Classes="ghost compact"
+              Command="{Binding Playback.DismissErrorCommand}"
+              Content="×" />
           </Grid>
           <Grid Grid.Row="1" ColumnDefinitions="*,Auto,*">
-            <Button Name="NowPlayingButton" Classes="ghost" Command="{Binding Navigation.NavigateCommand}" CommandParameter="Lyrics"
-                    HorizontalContentAlignment="Stretch" Padding="8,0" Margin="0,0,20,0" CornerRadius="12"
-                    ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Lyrics}}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Lyrics}}">
+            <Button
+              Name="NowPlayingButton"
+              Margin="0,0,20,0"
+              Padding="8,0"
+              HorizontalContentAlignment="Stretch"
+              AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Lyrics}}"
+              Classes="ghost"
+              Command="{Binding Navigation.NavigateCommand}"
+              CommandParameter="Lyrics"
+              CornerRadius="12"
+              ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Lyrics}}">
               <Grid ColumnDefinitions="48,*">
-                <controls:Artwork Width="48" Height="48" CornerRadius="10" Source="{Binding Playback.NowArtwork}"
-                                  VerticalAlignment="Center" AutomationProperties.Name="{Binding Playback.NowTitle}" />
-                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0" Spacing="4">
-                  <TextBlock Text="{Binding Playback.NowTitle}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Playback.NowTitle}" />
-                  <TextBlock Text="{Binding Playback.NowArtist}" Classes="caption" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Playback.NowArtist}" />
+                <controls:Artwork
+                  Width="48"
+                  Height="48"
+                  VerticalAlignment="Center"
+                  AutomationProperties.Name="{Binding Playback.NowTitle}"
+                  CornerRadius="10"
+                  Source="{Binding Playback.NowArtwork}" />
+                <StackPanel
+                  Grid.Column="1"
+                  Margin="12,0,0,0"
+                  VerticalAlignment="Center"
+                  Spacing="4">
+                  <TextBlock
+                    FontWeight="SemiBold"
+                    Text="{Binding Playback.NowTitle}"
+                    TextTrimming="CharacterEllipsis"
+                    ToolTip.Tip="{Binding Playback.NowTitle}" />
+                  <TextBlock
+                    Classes="caption"
+                    Text="{Binding Playback.NowArtist}"
+                    TextTrimming="CharacterEllipsis"
+                    ToolTip.Tip="{Binding Playback.NowArtist}" />
                 </StackPanel>
               </Grid>
             </Button>
-            <StackPanel Name="PlaybackControls" Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-              <Button Name="PreviousButton" Classes="ghost icon" Command="{Binding Playback.PreviousCommand}" IsEnabled="{Binding Playback.CanPrevious}" Padding="0"
-                      ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Previous}}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Previous}}">
-                <Viewbox Height="22" MaxWidth="24" HorizontalAlignment="Center" VerticalAlignment="Center">
-                  <Path Data="{StaticResource Icon.Playback.Previous}" Fill="{DynamicResource Brush.Text}" Stretch="Uniform" />
+            <StackPanel
+              Name="PlaybackControls"
+              Grid.Column="1"
+              VerticalAlignment="Center"
+              Orientation="Horizontal"
+              Spacing="12">
+              <Button
+                Name="PreviousButton"
+                Padding="0"
+                AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Previous}}"
+                Classes="ghost icon"
+                Command="{Binding Playback.PreviousCommand}"
+                IsEnabled="{Binding Playback.CanPrevious}"
+                ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Previous}}">
+                <Viewbox
+                  Height="20"
+                  MaxWidth="22"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center">
+                  <Path
+                    Data="{StaticResource Icon.Playback.Previous}"
+                    Fill="{DynamicResource Brush.Text}"
+                    Stretch="Uniform" />
                 </Viewbox>
               </Button>
-              <Button Name="PlayPauseButton" Classes="primary" Command="{Binding Playback.TogglePlaybackCommand}" IsEnabled="{Binding Playback.CanTogglePlayback}"
-                      Width="48" Height="48" Padding="0" CornerRadius="24" ToolTip.Tip="{Binding Playback.PlayLabel}" AutomationProperties.Name="{Binding Playback.PlayLabel}">
+              <Button
+                Name="PlayPauseButton"
+                Width="48"
+                Height="48"
+                Padding="0"
+                AutomationProperties.Name="{Binding Playback.PlayLabel}"
+                Classes="primary"
+                Command="{Binding Playback.TogglePlaybackCommand}"
+                CornerRadius="24"
+                IsEnabled="{Binding Playback.CanTogglePlayback}"
+                ToolTip.Tip="{Binding Playback.PlayLabel}">
                 <Grid>
-                  <Viewbox Height="24" MaxWidth="24" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding !Playback.IsPlaying}">
-                    <Path Data="{StaticResource Icon.Playback.Play}" Fill="{DynamicResource Brush.OnAccent}" Stretch="Uniform" />
+                  <Viewbox
+                    Height="20"
+                    MaxWidth="22"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    IsVisible="{Binding !Playback.IsPlaying}">
+                    <Path
+                      Data="{StaticResource Icon.Playback.Play}"
+                      Fill="{DynamicResource Brush.OnAccent}"
+                      Stretch="Uniform" />
                   </Viewbox>
-                  <Viewbox Height="24" MaxWidth="24" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding Playback.IsPlaying}">
-                    <Path Data="{StaticResource Icon.Playback.Pause}" Fill="{DynamicResource Brush.OnAccent}" Stretch="Uniform" />
+                  <Viewbox
+                    Height="20"
+                    MaxWidth="22"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    IsVisible="{Binding Playback.IsPlaying}">
+                    <Path
+                      Data="{StaticResource Icon.Playback.Pause}"
+                      Fill="{DynamicResource Brush.OnAccent}"
+                      Stretch="Uniform" />
                   </Viewbox>
                 </Grid>
               </Button>
-              <Button Name="NextButton" Classes="ghost icon" Command="{Binding Playback.NextCommand}" IsEnabled="{Binding Playback.CanNext}" Padding="0"
-                      ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Next}}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Next}}">
-                <Viewbox Height="22" MaxWidth="24" HorizontalAlignment="Center" VerticalAlignment="Center">
-                  <Path Data="{StaticResource Icon.Playback.Next}" Fill="{DynamicResource Brush.Text}" Stretch="Uniform" />
+              <Button
+                Name="NextButton"
+                Padding="0"
+                AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Next}}"
+                Classes="ghost icon"
+                Command="{Binding Playback.NextCommand}"
+                IsEnabled="{Binding Playback.CanNext}"
+                ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Next}}">
+                <Viewbox
+                  Height="20"
+                  MaxWidth="22"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center">
+                  <Path
+                    Data="{StaticResource Icon.Playback.Next}"
+                    Fill="{DynamicResource Brush.Text}"
+                    Stretch="Uniform" />
                 </Viewbox>
               </Button>
             </StackPanel>
-            <Grid Grid.Column="2" ColumnDefinitions="Auto,*" Margin="16,0,0,0">
-              <Button Name="PlaybackModeButton" Classes="ghost icon" Padding="0" Command="{Binding Playback.CycleModeCommand}" IsEnabled="{Binding Playback.CanInteract}"
-                      VerticalAlignment="Center" ToolTip.Tip="{Binding Playback.ModeLabel}" AutomationProperties.Name="{Binding Playback.ModeLabel}">
+            <Grid
+              Grid.Column="2"
+              Margin="16,0,0,0"
+              ColumnDefinitions="Auto,*">
+              <Button
+                Name="PlaybackModeButton"
+                Padding="0"
+                VerticalAlignment="Center"
+                AutomationProperties.Name="{Binding Playback.ModeLabel}"
+                Classes="ghost icon"
+                Command="{Binding Playback.CycleModeCommand}"
+                IsEnabled="{Binding Playback.CanInteract}"
+                ToolTip.Tip="{Binding Playback.ModeLabel}">
                 <Grid>
-                  <Viewbox Height="20" MaxWidth="22" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding Playback.IsSequential}">
-                    <Path Data="{StaticResource Icon.Playback.Sequential}" Fill="{DynamicResource Brush.TextSecondary}" Stretch="Uniform" />
+                  <Viewbox
+                    Height="18"
+                    MaxWidth="20"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    IsVisible="{Binding Playback.IsSequential}">
+                    <Path
+                      Data="{StaticResource Icon.Playback.Sequential}"
+                      Fill="{DynamicResource Brush.TextSecondary}"
+                      Stretch="Uniform" />
                   </Viewbox>
-                  <Viewbox Height="20" MaxWidth="22" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding Playback.IsRepeatAll}">
-                    <Path Data="{StaticResource Icon.Playback.RepeatAll}" Fill="{DynamicResource Brush.TextSecondary}" Stretch="Uniform" />
+                  <Viewbox
+                    Height="18"
+                    MaxWidth="20"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    IsVisible="{Binding Playback.IsRepeatAll}">
+                    <Path
+                      Data="{StaticResource Icon.Playback.RepeatAll}"
+                      Fill="{DynamicResource Brush.TextSecondary}"
+                      Stretch="Uniform" />
                   </Viewbox>
-                  <Viewbox Height="20" MaxWidth="22" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding Playback.IsShuffle}">
-                    <Path Data="{StaticResource Icon.Playback.Shuffle}" Fill="{DynamicResource Brush.TextSecondary}" Stretch="Uniform" />
+                  <Viewbox
+                    Height="18"
+                    MaxWidth="20"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    IsVisible="{Binding Playback.IsShuffle}">
+                    <Path
+                      Data="{StaticResource Icon.Playback.Shuffle}"
+                      Fill="{DynamicResource Brush.TextSecondary}"
+                      Stretch="Uniform" />
                   </Viewbox>
                 </Grid>
               </Button>
-              <Grid Grid.Column="1" ColumnDefinitions="*,Auto" VerticalAlignment="Center" Margin="8,0,0,0">
-                <TextBlock Text="{Binding Playback.TimeLabel}" Classes="caption" TextTrimming="CharacterEllipsis" HorizontalAlignment="Right" VerticalAlignment="Center" />
-                <Button Name="QueueButton" Grid.Column="1" Classes="ghost icon" Command="{Binding ToggleQueueCommand}" Padding="0" Margin="8,0,0,0"
-                        ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Queue}}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Queue}}">
-                  <Viewbox Height="20" MaxWidth="22" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Path Data="{StaticResource Icon.Playback.Queue}" Fill="{DynamicResource Brush.TextSecondary}" Stretch="Uniform" />
+              <Grid
+                Grid.Column="1"
+                Margin="8,0,0,0"
+                VerticalAlignment="Center"
+                ColumnDefinitions="*,Auto">
+                <TextBlock
+                  HorizontalAlignment="Right"
+                  VerticalAlignment="Center"
+                  Classes="caption"
+                  Text="{Binding Playback.TimeLabel}"
+                  TextTrimming="CharacterEllipsis" />
+                <Button
+                  Name="QueueButton"
+                  Grid.Column="1"
+                  Margin="8,0,0,0"
+                  Padding="0"
+                  AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Queue}}"
+                  Classes="ghost icon"
+                  Command="{Binding ToggleQueueCommand}"
+                  ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Queue}}">
+                  <Viewbox
+                    Height="18"
+                    MaxWidth="20"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+                    <Path
+                      Data="{StaticResource Icon.Playback.Queue}"
+                      Fill="{DynamicResource Brush.TextSecondary}"
+                      Stretch="Uniform" />
                   </Viewbox>
                 </Button>
               </Grid>
             </Grid>
           </Grid>
         </Grid>
-        <Slider Name="Timeline" Theme="{StaticResource PlaybackTimeline}" Minimum="0" Maximum="{Binding Playback.DurationSeconds}"
-                Value="{Binding Playback.PositionSeconds, Mode=OneWay}" IsEnabled="{Binding Playback.CanSeek}" Margin="0,-10,0,0" VerticalAlignment="Top"
-                AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Seek}}" />
-        <ProgressBar Name="PlaybackLoading" IsIndeterminate="True" IsVisible="{Binding Playback.IsBusy}" Height="2" MinHeight="0" Margin="0,-1,0,0"
-                     VerticalAlignment="Top" Background="Transparent" Foreground="{DynamicResource Brush.AccentText}" IsHitTestVisible="False" AutomationProperties.Name="{Binding Playback.Status}" />
+        <Slider
+          Name="Timeline"
+          Margin="0,-10,0,0"
+          VerticalAlignment="Top"
+          AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Seek}}"
+          IsEnabled="{Binding Playback.CanSeek}"
+          Maximum="{Binding Playback.DurationSeconds}"
+          Minimum="0"
+          Theme="{StaticResource PlaybackTimeline}"
+          Value="{Binding Playback.PositionSeconds, Mode=OneWay}" />
+        <ProgressBar
+          Name="PlaybackLoading"
+          Height="2"
+          MinHeight="0"
+          Margin="0,-1,0,0"
+          VerticalAlignment="Top"
+          AutomationProperties.Name="{Binding Playback.Status}"
+          Background="Transparent"
+          Foreground="{DynamicResource Brush.AccentText}"
+          IsHitTestVisible="False"
+          IsIndeterminate="True"
+          IsVisible="{Binding Playback.IsBusy}" />
       </Grid>
     </Border>
-    <Popup Name="QueuePopup" IsOpen="{Binding IsQueueOpen, Mode=TwoWay}" PlacementTarget="ShellRoot"
-           Placement="AnchorAndGravity" PlacementAnchor="TopRight" PlacementGravity="BottomLeft" PlacementConstraintAdjustment="None"
-           ShouldUseOverlayLayer="True" IsLightDismissEnabled="True" OverlayDismissEventPassThrough="False"
-           Opened="OnQueueOpened" Closed="OnQueueClosed">
-      <Border Name="QueueCard" Width="380" Height="{Binding #ShellRoot.Bounds.Height}" CornerRadius="16,0,0,16"
-              Background="{DynamicResource Brush.Surface}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1,0,0,0" Padding="20,24,20,16"
-              Focusable="True" KeyDown="OnQueueKeyDown">
+    <Popup
+      Name="QueuePopup"
+      Closed="OnQueueClosed"
+      IsLightDismissEnabled="True"
+      IsOpen="{Binding IsQueueOpen, Mode=TwoWay}"
+      Opened="OnQueueOpened"
+      OverlayDismissEventPassThrough="False"
+      Placement="AnchorAndGravity"
+      PlacementAnchor="TopRight"
+      PlacementConstraintAdjustment="None"
+      PlacementGravity="BottomLeft"
+      PlacementTarget="ShellRoot"
+      ShouldUseOverlayLayer="True">
+      <Border
+        Name="QueueCard"
+        Width="380"
+        Height="{Binding #ShellRoot.Bounds.Height}"
+        Padding="20,24,20,16"
+        Background="{DynamicResource Brush.Surface}"
+        BorderBrush="{DynamicResource Brush.Border}"
+        BorderThickness="1,0,0,0"
+        CornerRadius="16,0,0,16"
+        Focusable="True"
+        KeyDown="OnQueueKeyDown">
         <Grid>
-          <ContentControl Content="{Binding QueueDrawer}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+          <ContentControl
+            HorizontalContentAlignment="Stretch"
+            VerticalContentAlignment="Stretch"
+            Content="{Binding QueueDrawer}">
             <ContentControl.DataTemplates>
-              <DataTemplate DataType="{x:Type vm:PlaybackQueueViewModel}"><views:QueueDrawerView /></DataTemplate>
+              <DataTemplate DataType="{x:Type vm:PlaybackQueueViewModel}">
+                <views:QueueDrawerView />
+              </DataTemplate>
             </ContentControl.DataTemplates>
           </ContentControl>
-          <Button Name="CloseQueueButton" Classes="ghost compact" Content="×" Command="{Binding CloseQueueCommand}" HorizontalAlignment="Right" VerticalAlignment="Top"
-                  ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.CloseQueue}}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.CloseQueue}}" />
         </Grid>
       </Border>
     </Popup>

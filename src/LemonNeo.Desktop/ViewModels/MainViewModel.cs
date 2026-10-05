@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.Input;
 using LemonNeo.Application;
-using LemonNeo.Core;
 using LemonNeo.Desktop.Infrastructure;
 using LemonNeo.Plugin.Runtime;
 
@@ -10,7 +9,7 @@ namespace LemonNeo.Desktop.ViewModels;
 /// <summary>The shell owns startup and navigation; feature operations belong to their pages.</summary>
 public sealed class MainViewModel : PageViewModel
 {
-    private Playlist? _selectedPlaylist;
+    private PlaylistMenuItemViewModel? _selectedPlaylist;
     private string _searchQuery = "";
     private SearchViewModel? _searchPage;
     private PlaybackQueueViewModel? _queueDrawer;
@@ -26,12 +25,13 @@ public sealed class MainViewModel : PageViewModel
         SearchCommand = new(SubmitSearchAsync, () => CanSearch);
         ToggleQueueCommand = new(ToggleQueue);
         CloseQueueCommand = new(() => IsQueueOpen = false, () => IsQueueOpen);
+        Context.LibraryChanged += OnLibraryChanged;
     }
     public DesktopContext SharedContext => Context;
     public PlaybackViewModel Playback { get; }
     public DesktopNavigation Navigation { get; }
-    public ObservableCollection<Playlist> Playlists => Context.Playlists;
-    public Playlist? SelectedPlaylist
+    public ObservableCollection<PlaylistMenuItemViewModel> Playlists { get; } = [];
+    public PlaylistMenuItemViewModel? SelectedPlaylist
     {
         get => _selectedPlaylist;
         set
@@ -138,8 +138,28 @@ public sealed class MainViewModel : PageViewModel
         if (args.PropertyName != nameof(DesktopNavigation.Current)) return;
         IsQueueOpen = false;
         if (Navigation.Current is LibraryViewModel { IsLibrary: true } library)
-            SetProperty(ref _selectedPlaylist, library.SelectedPlaylist, nameof(SelectedPlaylist));
+            SetProperty(ref _selectedPlaylist, Playlists.FirstOrDefault(p => p.Id == library.SelectedPlaylist?.Id), nameof(SelectedPlaylist));
         if (Navigation.Current is SearchViewModel search) SearchQuery = search.SearchQuery;
+    }
+
+    private void OnLibraryChanged(object? sender, EventArgs args)
+    {
+        var selectedId = _selectedPlaylist?.Id;
+        var values = Context.Playlists;
+        for (var i = Playlists.Count - 1; i >= 0; i--)
+            if (!values.Any(p => p.Id == Playlists[i].Id)) Playlists.RemoveAt(i);
+        for (var i = 0; i < values.Count; i++)
+        {
+            var existing = Playlists.FirstOrDefault(p => p.Id == values[i].Id);
+            if (existing is null) Playlists.Insert(i, new PlaylistMenuItemViewModel(values[i]));
+            else
+            {
+                existing.Update(values[i]);
+                var index = Playlists.IndexOf(existing);
+                if (index != i) Playlists.Move(index, i);
+            }
+        }
+        SetProperty(ref _selectedPlaylist, Playlists.FirstOrDefault(p => p.Id == selectedId), nameof(SelectedPlaylist));
     }
 
     public Task InitializeAsync() => RunOperationAsync(async ct =>
@@ -159,6 +179,7 @@ public sealed class MainViewModel : PageViewModel
 
     public override async ValueTask DisposeAsync()
     {
+        Context.LibraryChanged -= OnLibraryChanged;
         Navigation.PropertyChanged -= OnNavigationChanged;
         if (_searchPage is not null) _searchPage.PropertyChanged -= OnSearchChanged;
         await base.DisposeAsync();
