@@ -1,7 +1,7 @@
 <Project>
   <!-- Hosts discover plugins at runtime; they never reference plugin assemblies. -->
   <Target Name="DeployPluginToDesktop" AfterTargets="Build"
-          Condition="$([System.String]::Copy('$(MSBuildProjectName)').StartsWith('LemonNeo.Plugin.')) and Exists('$(MSBuildProjectDirectory)/plugin.json') and ('$(MSBuildProjectName)' != 'LemonNeo.Plugin.WindowsSmtc' or $([MSBuild]::IsOSPlatform('Windows'))) and ('$(MSBuildProjectName)' != 'LemonNeo.Plugin.MacNowPlaying' or $([MSBuild]::IsOSPlatform('OSX')))">
+          Condition="'$(IsTestFixture)' != 'true' and $([System.String]::Copy('$(MSBuildProjectName)').StartsWith('LemonNeo.Plugin.')) and Exists('$(MSBuildProjectDirectory)/plugin.json') and ('$(MSBuildProjectName)' != 'LemonNeo.Plugin.WindowsSmtc' or $([MSBuild]::IsOSPlatform('Windows'))) and ('$(MSBuildProjectName)' != 'LemonNeo.Plugin.MacNowPlaying' or $([MSBuild]::IsOSPlatform('OSX')))">
     <PropertyGroup>
       <DesktopPluginRoot Condition="'$(DesktopPluginRoot)' == ''">$(MSBuildThisFileDirectory)src/LemonNeo.Desktop/bin/$(Configuration)/net10.0/plugins/</DesktopPluginRoot>
       <DesktopPluginDirectory>$(DesktopPluginRoot)$(MSBuildProjectName)/</DesktopPluginDirectory>

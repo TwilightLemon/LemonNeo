@@ -1,5 +1,5 @@
 {
-  "id": "org.lemonneo.lyricify",
+  "id": "LemonNeo.Plugin.Lyricify",
   "name": "Lyricify Metadata & Lyrics",
   "version": "1.0.0",
   "entryAssembly": "LemonNeo.Plugin.Lyricify.dll",

@@ -10,7 +10,9 @@ public sealed class LoadedPlugin : IAsyncDisposable
     private readonly PluginLoadContext _loadContext;
     private readonly ProviderRegistry _registry;
     private readonly PlayerRegistry _playerRegistry;
+    private readonly IAppSettingsService _settings;
     private bool _disposed;
+    private bool _shutdown;
 
     internal LoadedPlugin(
         PluginManifest manifest,
@@ -19,7 +21,8 @@ public sealed class LoadedPlugin : IAsyncDisposable
         IReadOnlyList<IPlayerProvider> players,
         PluginLoadContext loadContext,
         ProviderRegistry registry,
-        PlayerRegistry playerRegistry)
+        PlayerRegistry playerRegistry,
+        IAppSettingsService settings)
     {
         Manifest = manifest;
         Instance = instance;
@@ -28,6 +31,7 @@ public sealed class LoadedPlugin : IAsyncDisposable
         _loadContext = loadContext;
         _registry = registry;
         _playerRegistry = playerRegistry;
+        _settings = settings;
     }
 
     public PluginManifest Manifest { get; }
@@ -35,6 +39,13 @@ public sealed class LoadedPlugin : IAsyncDisposable
     public IReadOnlyList<IMusicProvider> Providers { get; }
     public IReadOnlyList<IPlayerProvider> Players { get; }
     public bool IsInteractive => Instance is IInteractivePlugin;
+
+    public async Task ShutdownAsync()
+    {
+        if (_shutdown) return;
+        _shutdown = true;
+        await Instance.ShutdownAsync(CancellationToken.None);
+    }
 
     public async ValueTask DisposeAsync()
     {
@@ -46,13 +57,14 @@ public sealed class LoadedPlugin : IAsyncDisposable
         _disposed = true;
         try
         {
-            await Instance.ShutdownAsync(CancellationToken.None);
+            await ShutdownAsync();
         }
         finally
         {
             _registry.Remove(Providers);
             _playerRegistry.Remove(Players);
-            _loadContext.Unload();
+            try { await _settings.ReleasePackageAsync(Manifest.Id); }
+            finally { _loadContext.Unload(); }
         }
     }
 }
@@ -63,6 +75,7 @@ public sealed class PluginLoader(
     ILoggerFactory loggerFactory,
     IHttpClientFactory httpClientFactory,
     IPluginDataStoreFactory dataStoreFactory,
+    IAppSettingsService settings,
     ILogger<PluginLoader> logger,
     IPlaybackInteraction? playback = null) : IAsyncDisposable
 {
@@ -120,6 +133,8 @@ public sealed class PluginLoader(
             cancellationToken) ?? throw new PluginLoadException($"Invalid manifest: {manifestPath}");
 
         ValidateManifest(manifest, manifestPath);
+        if (_loaded.Any(plugin => string.Equals(plugin.Manifest.Id, manifest.Id, StringComparison.OrdinalIgnoreCase)))
+            throw new PluginLoadException($"Plugin package '{manifest.Id}' is already loaded.");
         if (manifest.Platforms.Count > 0 && !manifest.Platforms.Any(IsCurrentPlatform))
         {
             logger.LogInformation("Skipping plugin {PluginId}: unsupported operating system.", manifest.Id);
@@ -161,7 +176,7 @@ public sealed class PluginLoader(
                 httpClientFactory,
                 registry,
                 playerRegistry,
-                dataStoreFactory.CreateStorage(manifest.Id),
+                settings.ForPackage(manifest.Id),
                 dataStoreFactory.CreateCredentialVault(manifest.Id),
                 dataStoreFactory.GetCacheDirectory(manifest.Id),
                 playback);
@@ -195,11 +210,17 @@ public sealed class PluginLoader(
                 context.RegisteredPlayers,
                 loadContext,
                 registry,
-                playerRegistry);
+                playerRegistry,
+                settings);
         }
         catch
         {
-            loadContext.Unload();
+            try { await settings.ReleasePackageAsync(manifest.Id, CancellationToken.None); }
+            catch (Exception releaseException)
+            {
+                logger.LogWarning(releaseException, "Could not release configuration for failed plugin {PluginId}.", manifest.Id);
+            }
+            finally { loadContext.Unload(); }
             throw;
         }
     }
@@ -217,6 +238,9 @@ public sealed class PluginLoader(
         {
             throw new PluginLoadException($"Plugin version '{manifest.Version}' is invalid.");
         }
+
+        if (!PackageNames.IsValid(manifest.Id))
+            throw new PluginLoadException($"Plugin ID '{manifest.Id}' must use a PascalCase package name.");
 
         if (manifest.Platforms.Any(platform => platform is not ("windows" or "macos" or "linux")))
             throw new PluginLoadException($"Plugin '{manifest.Id}' has an invalid platform; use windows, macos, or linux.");
@@ -237,6 +261,17 @@ public sealed class PluginLoader(
         _ => false
     };
 
+    public async Task ShutdownAsync()
+    {
+        List<Exception> errors = [];
+        for (var index = _loaded.Count - 1; index >= 0; index--)
+        {
+            try { await _loaded[index].ShutdownAsync(); }
+            catch (Exception exception) { errors.Add(exception); }
+        }
+        if (errors.Count > 0) throw new AggregateException("Plugin shutdown failed.", errors);
+    }
+
     public async ValueTask DisposeAsync()
     {
         for (var index = _loaded.Count - 1; index >= 0; index--)
@@ -249,5 +284,6 @@ public sealed class PluginLoader(
         }
 
         _loaded.Clear();
+        LastReport = new([], LastReport.Failures);
     }
 }

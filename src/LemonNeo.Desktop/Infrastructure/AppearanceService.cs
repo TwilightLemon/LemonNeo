@@ -1,87 +1,39 @@
 using Avalonia.Media;
-using LemonNeo.Configuration;
+using LemonNeo.Plugin.Abstractions;
 
 namespace LemonNeo.Desktop.Infrastructure;
 
-public enum ThemePreference { System, Light, Dark }
-public enum LyricAlignment { Center, Left }
-
-public sealed record UiPreferences(
-    ThemePreference Theme = ThemePreference.System,
-    LanguagePreference Language = LanguagePreference.System,
-    bool ReduceMotion = false,
-    double LyricFontSize = 24,
-    bool ShowRomanization = true,
-    bool ShowTranslation = true,
-    LyricAlignment LyricAlignment = LyricAlignment.Center,
-    bool BoldLyrics = false,
-    ThemeColorPreset ThemeColor = ThemeColorPreset.Classic,
-    bool UseArtworkColors = false,
-    int DesktopLyricLineCount = 2,
-    double DesktopLyricFontSize = 28,
-    bool DesktopShowRomanization = true,
-    bool DesktopShowTranslation = true,
-    double DesktopLyricWindowWidth = 760,
-    double DesktopLyricWindowHeight = 300);
-
-/// <summary>Owns live UI preferences. The default follows the operating system.</summary>
-public sealed class AppearanceService(
-    Avalonia.Application application,
-    LocalizationService localization,
-    IAppConfigurationStore store) : IDisposable
+/// <summary>Applies theme and motion changes; configuration is owned by Runtime.</summary>
+public sealed class AppearanceService : IDisposable
 {
-    public const string ConfigurationKey = "desktop.ui";
-    private readonly SemaphoreSlim _saveGate = new(1, 1);
-    public ThemeColorService Colors { get; } = new(application);
-    public UiPreferences Current { get; private set; } = new();
-    public event EventHandler? Changed;
+    private readonly Avalonia.Application _application;
+    private readonly ISettingsScope _settings;
+    private readonly IDisposable _subscription;
+    private bool _reduceMotion;
 
-    public async Task LoadAsync(CancellationToken cancellationToken = default)
+    public AppearanceService(Avalonia.Application application, ISettingsScope settings)
     {
-        var preferences = await store.GetAsync<UiPreferences>(ConfigurationKey, cancellationToken) ?? new();
-        Apply(preferences, animate: false);
+        _application = application;
+        _settings = settings;
+        Colors = new(application);
+        Apply(Current, initialize: true);
+        _subscription = settings.Subscribe<AppearancePreferences>(value => Apply(value, initialize: false));
     }
 
-    public Task SetAsync(UiPreferences preferences, CancellationToken cancellationToken = default) =>
-        UpdateAsync(_ => preferences, cancellationToken);
-
-    public async Task UpdateAsync(Func<UiPreferences, UiPreferences> update, CancellationToken cancellationToken = default)
-    {
-        await _saveGate.WaitAsync(cancellationToken);
-        try
-        {
-            var preferences = Normalize(update(Current));
-            // Persist first: a failed write leaves the UI and saved settings in agreement.
-            await store.SetAsync(ConfigurationKey, preferences, cancellationToken);
-            Apply(preferences);
-        }
-        finally { _saveGate.Release(); }
-    }
-
-    private static UiPreferences Normalize(UiPreferences value) => value with
-    {
-        Theme = Enum.IsDefined(value.Theme) ? value.Theme : ThemePreference.System,
-        Language = Enum.IsDefined(value.Language) ? value.Language : LanguagePreference.System,
-        LyricFontSize = double.IsFinite(value.LyricFontSize) ? Math.Clamp(value.LyricFontSize, 16, 48) : 24,
-        LyricAlignment = Enum.IsDefined(value.LyricAlignment) ? value.LyricAlignment : LyricAlignment.Center,
-        ThemeColor = Enum.IsDefined(value.ThemeColor) ? value.ThemeColor : ThemeColorPreset.Classic,
-        DesktopLyricLineCount = Math.Clamp(value.DesktopLyricLineCount, 1, 2),
-        DesktopLyricFontSize = double.IsFinite(value.DesktopLyricFontSize) ? Math.Clamp(value.DesktopLyricFontSize, 16, 48) : 28,
-        DesktopLyricWindowWidth = double.IsFinite(value.DesktopLyricWindowWidth) ? Math.Clamp(value.DesktopLyricWindowWidth, 320, 3000) : 760,
-        DesktopLyricWindowHeight = double.IsFinite(value.DesktopLyricWindowHeight) ? Math.Clamp(value.DesktopLyricWindowHeight, 110, 1200) : 300
-    };
-
+    public AppearancePreferences Current => _settings.Get<AppearancePreferences>();
+    public ThemeColorService Colors { get; }
     public void SetArtworkColor(Color? color) => Colors.SetArtworkColor(color);
 
-    private void Apply(UiPreferences preferences, bool animate = true)
+    private void Apply(AppearancePreferences value, bool initialize)
     {
-        Current = Normalize(preferences);
-        Colors.ApplyPreferences(Current, animate);
-        application.Resources["Motion.Fast"] = TimeSpan.FromMilliseconds(Current.ReduceMotion ? 0 : 140);
-        application.Resources["Motion.Normal"] = TimeSpan.FromMilliseconds(Current.ReduceMotion ? 0 : 220);
-        localization.Apply(Current.Language);
-        Changed?.Invoke(this, EventArgs.Empty);
+        Colors.ApplyPreferences(value, animate: !initialize);
+        if (initialize || _reduceMotion != value.ReduceMotion)
+        {
+            _application.Resources["Motion.Fast"] = TimeSpan.FromMilliseconds(value.ReduceMotion ? 0 : 140);
+            _application.Resources["Motion.Normal"] = TimeSpan.FromMilliseconds(value.ReduceMotion ? 0 : 220);
+        }
+        _reduceMotion = value.ReduceMotion;
     }
 
-    public void Dispose() => Colors.Dispose();
+    public void Dispose() { _subscription.Dispose(); Colors.Dispose(); }
 }

@@ -1,3 +1,5 @@
+> 早期原型设计记录。当前持久化实现以 [Runtime 统一配置与 Library 持久化](persistence-design.md) 为准。
+
 # Lemon Neo Prototype
 
 ## 1. 项目定位
@@ -569,7 +571,7 @@ public interface IPluginContext
 
     IHttpClientFactory HttpClientFactory { get; }
 
-    IPluginStorage Storage { get; }
+    ISettingsScope Settings { get; }
 
     ICredentialVault Credentials { get; }
 }
@@ -578,7 +580,7 @@ public interface IPluginContext
 第一版：
 
 ```text
-IPluginStorage
+ISettingsScope
 ICredentialVault
 ```
 
@@ -603,7 +605,7 @@ plugin.json 示例：
 
 ```json
 {
-  "id": "org.lemonneo.mockmusic",
+  "id": "LemonNeo.Plugin.MockMusic",
   "name": "Mock Music",
   "version": "1.0.0",
   "entryAssembly": "LemonNeo.Plugin.MockMusic.dll",

@@ -8,7 +8,7 @@ internal sealed class PluginContext(
     IHttpClientFactory httpClientFactory,
     ProviderRegistry registry,
     PlayerRegistry playerRegistry,
-    IPluginStorage storage,
+    ISettingsScope settings,
     ICredentialVault credentials,
     string cacheDirectory,
     IPlaybackInteraction? playback) : IPluginContext
@@ -18,7 +18,7 @@ internal sealed class PluginContext(
 
     public ILoggerFactory LoggerFactory { get; } = loggerFactory;
     public IHttpClientFactory HttpClientFactory { get; } = httpClientFactory;
-    public IPluginStorage Storage { get; } = storage;
+    public ISettingsScope Settings { get; } = settings;
     public ICredentialVault Credentials { get; } = credentials;
     public string CacheDirectory { get; } = cacheDirectory;
     public IPlaybackInteraction Playback => playback ?? throw new NotSupportedException("This host does not expose playback interaction.");

@@ -1,3 +1,5 @@
+using LemonNeo.Plugin.Abstractions;
+
 namespace LemonNeo.Configuration;
 
 public interface IAppPathProvider
@@ -6,9 +8,9 @@ public interface IAppPathProvider
     string DataDirectory { get; }
     string CacheDirectory { get; }
     string MusicLibraryDirectory { get; }
-    string AppConfigurationFile { get; }
     string DataProtectionKeysDirectory { get; }
-    string GetPluginConfigurationDirectory(string pluginId);
+    string GetPackageConfigurationDirectory(string packageId);
+    string GetEntityConfigurationFile(string packageId, string entityName);
     string GetPluginCredentialDirectory(string pluginId);
     string GetPluginCacheDirectory(string pluginId);
 }
@@ -27,7 +29,6 @@ public sealed class AppPathProvider : IAppPathProvider
         DataDirectory = Path.GetFullPath(dataDirectory);
         CacheDirectory = Path.GetFullPath(cacheDirectory);
         MusicLibraryDirectory = Path.GetFullPath(musicLibraryDirectory);
-        AppConfigurationFile = Path.Combine(ConfigurationDirectory, "appsettings.json");
         DataProtectionKeysDirectory = Path.Combine(DataDirectory, "Keys");
     }
 
@@ -35,7 +36,6 @@ public sealed class AppPathProvider : IAppPathProvider
     public string DataDirectory { get; }
     public string CacheDirectory { get; }
     public string MusicLibraryDirectory { get; }
-    public string AppConfigurationFile { get; }
     public string DataProtectionKeysDirectory { get; }
 
     public static AppPathProvider CreateDefault()
@@ -86,8 +86,17 @@ public sealed class AppPathProvider : IAppPathProvider
             libraryDirectory);
     }
 
-    public string GetPluginConfigurationDirectory(string pluginId) =>
-        Path.Combine(ConfigurationDirectory, "Plugins", SafeSegment(pluginId));
+    public string GetPackageConfigurationDirectory(string packageId)
+    {
+        PackageNames.Validate(packageId);
+        return Path.Combine(ConfigurationDirectory, packageId);
+    }
+
+    public string GetEntityConfigurationFile(string packageId, string entityName)
+    {
+        if (!PackageNames.IsIdentifier(entityName)) throw new ArgumentException("Invalid configuration entity name.", nameof(entityName));
+        return Path.Combine(GetPackageConfigurationDirectory(packageId), entityName + ".json");
+    }
 
     public string GetPluginCredentialDirectory(string pluginId) =>
         Path.Combine(DataDirectory, "Credentials", SafeSegment(pluginId));

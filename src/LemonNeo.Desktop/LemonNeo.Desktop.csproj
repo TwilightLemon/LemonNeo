@@ -10,6 +10,7 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Irihi.Lingua" Version="1.0.0" />
     <ProjectReference Include="../LemonNeo.Application/LemonNeo.Application.csproj" />
+    <ProjectReference Include="../LemonNeo.Runtime/LemonNeo.Runtime.csproj" />
     <ProjectReference Include="../LemonNeo.Configuration/LemonNeo.Configuration.csproj" />
     <ProjectReference Include="../LemonNeo.Persistence/LemonNeo.Persistence.csproj" />
     <ProjectReference Include="../LemonNeo.Plugin.Runtime/LemonNeo.Plugin.Runtime.csproj" />

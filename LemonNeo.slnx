@@ -10,12 +10,14 @@
     <Project Path="src/LemonNeo.Desktop/LemonNeo.Desktop.csproj" />
     <Project Path="src/LemonNeo.Persistence/LemonNeo.Persistence.csproj" />
     <Project Path="src/LemonNeo.Playback/LemonNeo.Playback.csproj" />
+    <Project Path="src/LemonNeo.Runtime/LemonNeo.Runtime.csproj" />
     <Project Path="src/LemonNeo.Plugin.Abstractions/LemonNeo.Plugin.Abstractions.csproj" />
     <Project Path="src/LemonNeo.Plugin.Runtime/LemonNeo.Plugin.Runtime.csproj" />
     <Project Path="src/LemonNeo.Sync.Abstractions/LemonNeo.Sync.Abstractions.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/LemonNeo.Desktop.Tests/LemonNeo.Desktop.Tests.csproj" />
+    <Project Path="tests/LemonNeo.Runtime.Tests/LemonNeo.Runtime.Tests.csproj" />
+    <Project Path="tests/LemonNeo.Plugin.ConfigurationFixture/LemonNeo.Plugin.ConfigurationFixture.csproj" />
   </Folder>
   <Folder Name="/plugins/">
     <Project Path="plugins/LemonNeo.Plugin.WindowsSmtc/LemonNeo.Plugin.WindowsSmtc.csproj" />

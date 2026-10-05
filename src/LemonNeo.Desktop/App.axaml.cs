@@ -6,6 +6,7 @@ using LemonNeo.Configuration;
 using LemonNeo.Desktop.Infrastructure;
 using LemonNeo.Desktop.ViewModels;
 using LemonNeo.Desktop.Views;
+using LemonNeo.Plugin.Abstractions;
 
 namespace LemonNeo.Desktop;
 
@@ -20,8 +21,10 @@ public partial class App : Avalonia.Application
             // Use platform window controls, menus, file pickers, and font fallback.
             var paths = AppPathProvider.CreateDefault();
             var runtime = new DesktopRuntime(paths, DesktopOptions.Parse(Program.Arguments, paths));
-            var text = new LocalizationService();
-            var appearance = new AppearanceService(this, text, runtime.Get<IAppConfigurationStore>());
+            var settings = runtime.Settings.ForPackage(PackageNames.Desktop);
+            DesktopPreferences.Register(settings);
+            var text = new LocalizationService(settings);
+            var appearance = new AppearanceService(this, settings);
             var viewModel = new MainViewModel(runtime, text, appearance, runtime.Get<ArtworkService>());
             var window = new MainWindow { DataContext = viewModel };
             desktop.MainWindow = window;
@@ -53,6 +56,7 @@ public partial class App : Avalonia.Application
                         System.Diagnostics.Trace.WriteLine($"Desktop plugin shutdown failed: {exception}");
                     }
                     appearance.Dispose();
+                    text.Dispose();
                     shutdownComplete = true;
                     window.Close();
                 }

@@ -5,6 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../LemonNeo.Application/LemonNeo.Application.csproj" />
+    <ProjectReference Include="../LemonNeo.Runtime/LemonNeo.Runtime.csproj" />
     <ProjectReference Include="../LemonNeo.Configuration/LemonNeo.Configuration.csproj" />
     <ProjectReference Include="../LemonNeo.Core/LemonNeo.Core.csproj" />
     <ProjectReference Include="../LemonNeo.Persistence/LemonNeo.Persistence.csproj" />
@@ -26,7 +27,7 @@
     <DefaultPluginProjects Include="$(MSBuildProjectDirectory)/../../plugins/LemonNeo.Plugin.WindowsSmtc/LemonNeo.Plugin.WindowsSmtc.csproj" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
     <DefaultPluginProjects Include="$(MSBuildProjectDirectory)/../../plugins/LemonNeo.Plugin.MacNowPlaying/LemonNeo.Plugin.MacNowPlaying.csproj" Condition="$([MSBuild]::IsOSPlatform('OSX'))" />
   </ItemGroup>
-  <Target Name="BuildDefaultPlugins" BeforeTargets="Build">
+  <Target Name="BuildDefaultPlugins" BeforeTargets="Build" Condition="'$(SkipConsolePlugins)' != 'true'">
     <MSBuild Projects="@(DefaultPluginProjects)"
              Targets="Build"
              Properties="Configuration=$(Configuration)"

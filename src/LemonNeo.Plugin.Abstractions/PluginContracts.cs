@@ -50,7 +50,7 @@ public interface IPluginContext
 {
     ILoggerFactory LoggerFactory { get; }
     IHttpClientFactory HttpClientFactory { get; }
-    IPluginStorage Storage { get; }
+    ISettingsScope Settings { get; }
     ICredentialVault Credentials { get; }
     /// <summary>
     /// Gets the plugin's private cache directory. Its contents are disposable and
@@ -63,13 +63,6 @@ public interface IPluginContext
     void RegisterPlayer(IPlayerProvider player);
 }
 
-public interface IPluginStorage
-{
-    Task<string?> GetAsync(string key, CancellationToken cancellationToken = default);
-    Task SetAsync(string key, string value, CancellationToken cancellationToken = default);
-    Task DeleteAsync(string key, CancellationToken cancellationToken = default);
-}
-
 public interface ICredentialVault
 {
     Task<string?> GetSecretAsync(string key, CancellationToken cancellationToken = default);
@@ -79,7 +72,6 @@ public interface ICredentialVault
 
 public interface IPluginDataStoreFactory
 {
-    IPluginStorage CreateStorage(string pluginId);
     ICredentialVault CreateCredentialVault(string pluginId);
     string GetCacheDirectory(string pluginId);
 }

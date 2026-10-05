@@ -1,5 +1,5 @@
 {
-  "id": "org.lemonneo.qqmusic.user",
+  "id": "LemonNeo.Plugin.QqMusic",
   "name": "QQ Music User Library",
   "version": "1.0.0",
   "minimumHostVersion": "0.1.0",

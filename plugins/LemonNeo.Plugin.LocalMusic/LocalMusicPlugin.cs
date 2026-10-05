@@ -23,7 +23,7 @@ public sealed class LocalMusicPlugin :
     private readonly ConcurrentDictionary<string, Track> _catalog = new(StringComparer.Ordinal);
 
     public PluginDescriptor Descriptor { get; } = new(
-        "org.lemonneo.localmusic",
+        "LemonNeo.Plugin.LocalMusic",
         "Local Music",
         "1.0.0");
 

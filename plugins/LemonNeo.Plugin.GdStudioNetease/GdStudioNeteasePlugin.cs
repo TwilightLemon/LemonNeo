@@ -14,7 +14,7 @@ public sealed class GdStudioNeteasePlugin :
     ITrackIdResolverProvider
 {
     private const string ProviderId = "gdstudio-netease";
-    private const string PluginId = "org.lemonneo.gdstudio.netease";
+    private const string PluginId = "LemonNeo.Plugin.GdStudioNetease";
     private const string UserAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
         "AppleWebKit/537.36 (KHTML, like Gecko) " +

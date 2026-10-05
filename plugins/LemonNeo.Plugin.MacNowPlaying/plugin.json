@@ -1,5 +1,5 @@
 {
-  "id": "macos-now-playing",
+  "id": "LemonNeo.Plugin.MacNowPlaying",
   "name": "macOS Now Playing",
   "version": "0.1.0",
   "entryAssembly": "LemonNeo.Plugin.MacNowPlaying.dll",

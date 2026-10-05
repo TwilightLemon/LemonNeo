@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../LemonNeo.Application/LemonNeo.Application.csproj" />
+    <ProjectReference Include="../LemonNeo.Configuration/LemonNeo.Configuration.csproj" />
+    <ProjectReference Include="../LemonNeo.Persistence/LemonNeo.Persistence.csproj" />
+    <ProjectReference Include="../LemonNeo.Plugin.Runtime/LemonNeo.Plugin.Runtime.csproj" />
+    <ProjectReference Include="../../plugins/LemonNeo.Sync.MockGit/LemonNeo.Sync.MockGit.csproj" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+</Project>

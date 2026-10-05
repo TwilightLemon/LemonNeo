@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsTestProject>true</IsTestProject>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.0" />
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" PrivateAssets="all" />
+    <PackageReference Include="Avalonia.Headless.XUnit" Version="12.1.3" />
+    <ProjectReference Include="../../src/LemonNeo.Runtime/LemonNeo.Runtime.csproj" />
+    <ProjectReference Include="../../src/LemonNeo.Desktop/LemonNeo.Desktop.csproj" />
+    <ProjectReference Include="../LemonNeo.Plugin.ConfigurationFixture/LemonNeo.Plugin.ConfigurationFixture.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <Target Name="CopyConfigurationFixture" AfterTargets="Build">
+    <ItemGroup>
+      <FixtureAsset Include="../LemonNeo.Plugin.ConfigurationFixture/bin/$(Configuration)/net10.0/*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(FixtureAsset)" DestinationFolder="$(TargetDir)fixtures/" />
+  </Target>
+</Project>

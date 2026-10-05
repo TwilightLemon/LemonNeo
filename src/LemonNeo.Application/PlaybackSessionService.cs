@@ -39,7 +39,7 @@ public sealed class PlaybackCompletedEventArgs(
 public sealed class PlaybackSessionService(
     PlaybackResolver resolver,
     IPlaybackQueue queue,
-    IPlaybackStateRepository repository,
+    IAppSettingsService settings,
     ILogger<PlaybackSessionService> logger) : IAsyncDisposable
 {
     private static readonly TimeSpan MonitorInterval = TimeSpan.FromMilliseconds(250);
@@ -64,7 +64,8 @@ public sealed class PlaybackSessionService(
     private Guid? _restoredItemId;
     private TimeSpan _restoredPosition;
     private PlaybackStatus? _restoredStatus;
-    private DateTimeOffset _lastSavedAt;
+    private readonly ISettingsScope _settings = settings.ForPackage(PackageNames.Application);
+    private bool _preparedForShutdown;
 
     public event EventHandler<PlaybackSessionChangedEventArgs>? StateChanged;
     public event EventHandler<PlaybackSessionChangedEventArgs>? TimelineChanged;
@@ -132,26 +133,36 @@ public sealed class PlaybackSessionService(
         PlaybackSessionSnapshot snapshot;
         try
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            ObjectDisposedException.ThrowIf(_disposed || _preparedForShutdown, this);
             if (_initialized)
             {
                 return;
             }
 
-            var saved = await repository.LoadAsync(cancellationToken);
-            queue.Restore(saved);
-            await resolver.SetVolumeAsync(double.IsFinite(saved.Volume) ? Math.Clamp(saved.Volume, 0, 1) : 1, cancellationToken);
-            if (queue.CurrentItem is { } restoredItem && restoredItem.Id == saved.CurrentItemId)
+            await _settings.RegisterAsync(nameof(PlaybackQueueState), new PlaybackQueueState(), cancellationToken: cancellationToken);
+            await _settings.RegisterAsync(nameof(PlaybackResumeState), new PlaybackResumeState(), value => value with
             {
-                _restoredItemId = saved.CurrentItemId;
-                _restoredPosition = saved.Position < TimeSpan.Zero ? TimeSpan.Zero : saved.Position;
+                Position = value.Position < TimeSpan.Zero ? TimeSpan.Zero : value.Position,
+                Status = Enum.IsDefined(value.Status) ? value.Status : PlaybackStatus.Stopped
+            }, cancellationToken);
+            await _settings.RegisterAsync(nameof(PlaybackPreferences), new PlaybackPreferences(), value => value with
+            {
+                Volume = double.IsFinite(value.Volume) ? Math.Clamp(value.Volume, 0, 1) : 1
+            }, cancellationToken);
+            var saved = _settings.Get<PlaybackQueueState>();
+            var resume = _settings.Get<PlaybackResumeState>();
+            queue.Restore(saved);
+            await resolver.SetVolumeAsync(_settings.Get<PlaybackPreferences>().Volume, cancellationToken);
+            if (queue.CurrentItem is { } restoredItem && restoredItem.Id == resume.ItemId)
+            {
+                _restoredItemId = resume.ItemId;
+                _restoredPosition = resume.Position < TimeSpan.Zero ? TimeSpan.Zero : resume.Position;
                 if (restoredItem.Track.Duration is { } duration && _restoredPosition > duration)
                 {
                     _restoredPosition = duration;
                 }
-                _restoredStatus = Enum.IsDefined(saved.Status) ? saved.Status : PlaybackStatus.Stopped;
+                _restoredStatus = Enum.IsDefined(resume.Status) ? resume.Status : PlaybackStatus.Stopped;
             }
-            _lastSavedAt = DateTimeOffset.UtcNow;
             _initialized = true;
             snapshot = CaptureSnapshot();
             SetSnapshot(snapshot);
@@ -180,9 +191,8 @@ public sealed class PlaybackSessionService(
             ResetRestoredState();
             queue.SetRequest(request ?? new PlaybackRequest());
             PublishSelectedTrack();
-            await repository.SaveAsync(queue.Snapshot() with { Volume = Volume }, cancellationToken);
             await resolver.PlayAsync(track, queue.Request, cancellationToken);
-            await SaveSessionStateAsync(cancellationToken);
+            UpdateSettings();
             _completionHandled = false;
             snapshot = CaptureSnapshot();
             SetSnapshot(snapshot);
@@ -190,6 +200,7 @@ public sealed class PlaybackSessionService(
         catch
         {
             await StopAfterFailureAsync();
+            UpdateSettings();
             snapshot = CaptureSnapshot();
             SetSnapshot(snapshot);
             throw;
@@ -224,9 +235,8 @@ public sealed class PlaybackSessionService(
             ResetRestoredState();
             queue.SetRequest(request ?? new PlaybackRequest());
             PublishSelectedTrack();
-            await repository.SaveAsync(queue.Snapshot() with { Volume = Volume }, cancellationToken);
             await resolver.PlayAsync(queue.CurrentItem!.Track, queue.Request, cancellationToken);
-            await SaveSessionStateAsync(cancellationToken);
+            UpdateSettings();
             _completionHandled = false;
             snapshot = CaptureSnapshot();
             SetSnapshot(snapshot);
@@ -234,6 +244,7 @@ public sealed class PlaybackSessionService(
         catch
         {
             await StopAfterFailureAsync();
+            UpdateSettings();
             snapshot = CaptureSnapshot();
             SetSnapshot(snapshot);
             throw;
@@ -294,7 +305,7 @@ public sealed class PlaybackSessionService(
                 }
             }
             ResetRestoredState();
-            await SaveSessionStateAsync(cancellationToken);
+            UpdateSettings();
             _completionHandled = false;
             snapshot = CaptureSnapshot();
             SetSnapshot(snapshot);
@@ -302,6 +313,7 @@ public sealed class PlaybackSessionService(
         catch
         {
             await StopAfterFailureAsync();
+            UpdateSettings();
             snapshot = CaptureSnapshot();
             SetSnapshot(snapshot);
             throw;
@@ -355,7 +367,7 @@ public sealed class PlaybackSessionService(
         {
             EnsureReady();
             await resolver.SetVolumeAsync(volume, cancellationToken);
-            await SaveSessionStateAsync(cancellationToken);
+            UpdateSettings(captureQueue: false);
         }
         finally { _gate.Release(); }
         Raise(VolumeChanged, EventArgs.Empty);
@@ -375,7 +387,7 @@ public sealed class PlaybackSessionService(
             if (duration is { } end && position > end) position = end;
             await player.SeekAsync(position, cancellationToken);
             _completionHandled = false;
-            await SaveSessionStateAsync(cancellationToken);
+            UpdateSettings(captureQueue: false);
             snapshot = CaptureSnapshot();
             SetSnapshot(snapshot);
         }
@@ -398,7 +410,7 @@ public sealed class PlaybackSessionService(
         {
             EnsureReady();
             queue.SetMode(mode);
-            await SaveSessionStateAsync(cancellationToken);
+            UpdateSettings();
             snapshot = CaptureSnapshot();
             SetSnapshot(snapshot);
         }
@@ -420,7 +432,7 @@ public sealed class PlaybackSessionService(
             await resolver.StopAsync(cancellationToken);
             queue.Clear();
             ResetRestoredState();
-            await SaveSessionStateAsync(cancellationToken);
+            UpdateSettings();
             _completionHandled = false;
             snapshot = CaptureSnapshot();
             SetSnapshot(snapshot);
@@ -433,13 +445,13 @@ public sealed class PlaybackSessionService(
         Raise(StateChanged, new PlaybackSessionChangedEventArgs(snapshot));
     }
 
-    public async Task SaveAsync(CancellationToken cancellationToken = default)
+    public async Task CaptureStateAsync(CancellationToken cancellationToken = default)
     {
         await _gate.WaitAsync(cancellationToken);
         try
         {
             EnsureReady();
-            await SaveSessionStateAsync(cancellationToken);
+            UpdateSettings();
         }
         finally
         {
@@ -463,7 +475,6 @@ public sealed class PlaybackSessionService(
             {
                 ResetRestoredState();
                 PublishSelectedTrack();
-                await repository.SaveAsync(queue.Snapshot() with { Volume = Volume }, cancellationToken);
             }
             if (item is null && stopWhenUnavailable)
             {
@@ -474,7 +485,7 @@ public sealed class PlaybackSessionService(
                 await resolver.PlayAsync(item.Track, queue.Request, cancellationToken);
             }
 
-            await SaveSessionStateAsync(cancellationToken);
+            UpdateSettings();
 
             _completionHandled = false;
             snapshot = CaptureSnapshot();
@@ -483,6 +494,7 @@ public sealed class PlaybackSessionService(
         catch
         {
             await StopAfterFailureAsync();
+            UpdateSettings();
             snapshot = CaptureSnapshot();
             SetSnapshot(snapshot);
             throw;
@@ -508,7 +520,7 @@ public sealed class PlaybackSessionService(
             EnsureReady();
             await change(cancellationToken);
             if (discardRestoredState) ResetRestoredState();
-            await SaveSessionStateAsync(cancellationToken);
+            UpdateSettings(captureQueue: false);
             snapshot = CaptureSnapshot();
             SetSnapshot(snapshot);
         }
@@ -592,16 +604,13 @@ public sealed class PlaybackSessionService(
                     }
                 }
 
-                await SaveSessionStateAsync(cancellationToken);
+                UpdateSettings();
             }
 
             previous = Snapshot;
             snapshot = CaptureSnapshot();
             SetSnapshot(snapshot);
-            if (snapshot.State == PlayerState.Playing && DateTimeOffset.UtcNow - _lastSavedAt >= TimeSpan.FromSeconds(5))
-            {
-                await SaveSessionStateAsync(cancellationToken);
-            }
+            UpdateSettings(captureQueue: false);
         }
         finally
         {
@@ -651,30 +660,35 @@ public sealed class PlaybackSessionService(
         _restoredStatus = null;
     }
 
-    private async Task SaveSessionStateAsync(CancellationToken cancellationToken = default)
+    private void UpdateSettings(bool captureQueue = true)
     {
-        if (queue.CurrentItem is { } item && resolver.CurrentQueueTrack is { } resolved &&
+        if (captureQueue && queue.CurrentItem is { } item && resolver.CurrentQueueTrack is { } resolved &&
             item.Track.Id == resolved.Id)
         {
-            // Retain discovered cache aliases in both the live queue and its saved snapshot.
             var identifiers = MusicCacheIdentity.GetIdentifiers(item.Track.ExternalIds.Concat(resolved.ExternalIds));
             if (!item.Track.ExternalIds.SequenceEqual(identifiers))
                 queue.UpdateTrack(item.Id, item.Track with { ExternalIds = identifiers });
         }
+        if (captureQueue) UpdateQueueSettings();
         var snapshot = CaptureSnapshot();
-        var state = queue.Snapshot() with
+        var status = snapshot.RestoredStatus ?? snapshot.State switch
         {
-            Volume = Volume,
-            Position = snapshot.Timeline.Position,
-            Status = snapshot.RestoredStatus ?? snapshot.State switch
-            {
-                PlayerState.Playing => PlaybackStatus.Playing,
-                PlayerState.Paused => PlaybackStatus.Paused,
-                _ => PlaybackStatus.Stopped
-            }
+            PlayerState.Playing => PlaybackStatus.Playing,
+            PlayerState.Paused => PlaybackStatus.Paused,
+            _ => PlaybackStatus.Stopped
         };
-        await repository.SaveAsync(state, cancellationToken);
-        _lastSavedAt = DateTimeOffset.UtcNow;
+        _settings.Apply<PlaybackResumeState>(_ => new(queue.CurrentItem?.Id, snapshot.Timeline.Position, status));
+        _settings.Apply<PlaybackPreferences>(current => current with { Volume = Volume });
+    }
+
+    private void UpdateQueueSettings()
+    {
+        var state = queue.Snapshot();
+        _settings.Apply<PlaybackQueueState>(current =>
+            current.CurrentItemId == state.CurrentItemId && current.Mode == state.Mode &&
+            current.ShuffleCursor == state.ShuffleCursor && current.Request == state.Request &&
+            current.Items.SequenceEqual(state.Items) && current.ShuffleOrder.SequenceEqual(state.ShuffleOrder)
+                ? current : state);
     }
 
     private void PublishSelectedTrack()
@@ -693,6 +707,7 @@ public sealed class PlaybackSessionService(
             null,
             queue.Request.RequiredSourceProviderId,
             _restoredStatus);
+        UpdateQueueSettings();
         SetSnapshot(snapshot, useActivePlayer: false);
         Raise(StateChanged, new PlaybackSessionChangedEventArgs(snapshot));
     }
@@ -741,7 +756,7 @@ public sealed class PlaybackSessionService(
 
     private void EnsureReady()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(_disposed || _preparedForShutdown, this);
         if (!_initialized)
         {
             throw new InvalidOperationException("PlaybackSessionService has not been initialized.");
@@ -760,40 +775,36 @@ public sealed class PlaybackSessionService(
         }
     }
 
-    public async ValueTask DisposeAsync()
+    /// <summary>Stops state producers and captures the final state before plugins or the player close.</summary>
+    public async Task PrepareForShutdownAsync()
     {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
+        if (_preparedForShutdown) return;
         await _monitorCancellation.CancelAsync();
-        if (_monitorTask is not null)
-        {
-            try
-            {
-                await _monitorTask;
-            }
-            catch (OperationCanceledException)
-            {
-            }
-        }
-
+        if (_monitorTask is not null) await _monitorTask;
         await _gate.WaitAsync();
         try
         {
+            if (_preparedForShutdown) return;
             if (_initialized)
             {
-                await SaveSessionStateAsync();
+                UpdateSettings();
+                _preparedForShutdown = true;
                 await resolver.StopAsync();
+                SetSnapshot(Snapshot, useActivePlayer: false);
             }
+            _preparedForShutdown = true;
         }
-        finally
-        {
-            _gate.Release();
-            _gate.Dispose();
-            _monitorCancellation.Dispose();
-        }
+        finally { _gate.Release(); }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        await PrepareForShutdownAsync();
+        _disposed = true;
+        await _gate.WaitAsync();
+        _gate.Release();
+        _gate.Dispose();
+        _monitorCancellation.Dispose();
     }
 }

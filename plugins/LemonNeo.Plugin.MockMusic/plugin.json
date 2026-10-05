@@ -1,5 +1,5 @@
 {
-  "id": "org.lemonneo.mockmusic",
+  "id": "LemonNeo.Plugin.MockMusic",
   "name": "Mock Music",
   "version": "1.0.0",
   "entryAssembly": "LemonNeo.Plugin.MockMusic.dll",

@@ -27,6 +27,7 @@ internal sealed partial class CommandProcessor(
     PlaybackSourceDiscoveryService sourceDiscovery,
     SyncService sync,
     StartupCommands startup,
+    IAppSettingsService appSettings,
     CommandCompletionService completions,
     CommandHistory history)
 {
@@ -77,8 +78,6 @@ internal sealed partial class CommandProcessor(
 
             if (line is null)
             {
-                await library.SaveAsync(cancellationToken);
-                await playback.SaveAsync(cancellationToken);
                 return;
             }
 
@@ -344,13 +343,12 @@ internal sealed partial class CommandProcessor(
                 break;
             case "save":
                 await library.SaveAsync(cancellationToken);
-                await playback.SaveAsync(cancellationToken);
+                await playback.CaptureStateAsync(cancellationToken);
+                await appSettings.SaveAsync(cancellationToken);
                 _output.WriteLine("Library saved.");
                 break;
             case "exit":
             case "quit":
-                await library.SaveAsync(cancellationToken);
-                await playback.SaveAsync(cancellationToken);
                 return false;
             default:
                 _output.WriteLine($"Unknown command '{arguments[0]}'. Type 'help' for commands.");
@@ -468,7 +466,7 @@ internal sealed partial class CommandProcessor(
     private void PrintPaths()
     {
         _output.WriteLine($"Configuration: {appPaths.ConfigurationDirectory}");
-        _output.WriteLine($"App settings: {appPaths.AppConfigurationFile}");
+        _output.WriteLine($"App settings: {appPaths.GetPackageConfigurationDirectory(PackageNames.Application)}");
         _output.WriteLine($"Data: {appPaths.DataDirectory}");
         _output.WriteLine($"Command history: {history.FilePath}");
         _output.WriteLine($"Cache: {appPaths.CacheDirectory}");

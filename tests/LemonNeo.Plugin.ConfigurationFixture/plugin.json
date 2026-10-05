@@ -1,0 +1,7 @@
+{
+  "id": "LemonNeo.Plugin.ConfigurationFixture",
+  "name": "Configuration acceptance fixture",
+  "version": "1.0.0",
+  "minimumHostVersion": "0.1.0",
+  "entryAssembly": "LemonNeo.Plugin.ConfigurationFixture.dll"
+}

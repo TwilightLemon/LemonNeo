@@ -13,7 +13,7 @@ public sealed class BassPlayerPlugin : ILemonPlugin, IPlayerProvider
     private BassPlayer? _player;
 
     public PluginDescriptor Descriptor { get; } = new(
-        "org.lemonneo.bass",
+        "LemonNeo.Plugin.Bass",
         "BASS Player",
         "1.1.0");
 

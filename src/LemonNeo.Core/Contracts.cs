@@ -6,12 +6,6 @@ public interface ILibraryRepository
     Task SaveAsync(MusicLibrary library, CancellationToken cancellationToken = default);
 }
 
-public interface IPlaybackStateRepository
-{
-    Task<PlaybackQueueState> LoadAsync(CancellationToken cancellationToken = default);
-    Task SaveAsync(PlaybackQueueState state, CancellationToken cancellationToken = default);
-}
-
 public interface IPlaylistOrderingService
 {
     string GetKeyForEnd(IReadOnlyCollection<PlaylistItem> items);

@@ -16,7 +16,7 @@ public sealed class ThemeColorService : IDisposable
     private readonly Stopwatch _clock = new();
     private IReadOnlyDictionary<string, Color> _from;
     private IReadOnlyDictionary<string, Color> _target;
-    private UiPreferences _preferences = new();
+    private AppearancePreferences _preferences = new();
     private Color? _artworkColor;
     private bool _applyingPreferences;
     private bool _disposed;
@@ -36,7 +36,7 @@ public sealed class ThemeColorService : IDisposable
     public bool IsUsingArtwork => _preferences.UseArtworkColors && _artworkColor.HasValue;
     public event EventHandler? Changed;
 
-    public void ApplyPreferences(UiPreferences preferences, bool animate)
+    public void ApplyPreferences(AppearancePreferences preferences, bool animate)
     {
         if (_disposed) return;
         _preferences = preferences;

@@ -147,7 +147,7 @@ public sealed class PlaybackViewModel : PageViewModel
         SetError(null);
         try
         {
-            // Coalesce slider input while the decoder or persistence is still processing it.
+            // Coalesce slider input while an asynchronous decoder call is still processing it.
             // Accepted changes finish during shutdown without entering the page's busy state.
             while (_volumeUpdatePending)
             {

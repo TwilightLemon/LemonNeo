@@ -10,8 +10,11 @@ Enable **Follow the playing track's artwork** to derive colors from the current
 cover. Missing, failed, transparent, or unreadable artwork falls back to the selected
 built-in palette. Choosing another built-in palette while artwork colors are active
 updates the fallback. Disabling artwork colors immediately restores that palette.
-The two choices are saved in `desktop.ui` as `themeColor` and `useArtworkColors`;
-older settings retain the classic palette and leave artwork colors disabled.
+The two choices belong to `AppearancePreferences`, stored at
+`<ConfigurationDirectory>/LemonNeo.Desktop/AppearancePreferences.json` as
+`themeColor` and `useArtworkColors`. Changes apply immediately in memory; Runtime
+saves changed entities periodically and on exit. A missing file uses the classic
+palette and leaves artwork colors disabled. See [configuration persistence](persistence-design.md).
 
 Colors transition together over 420 ms. Rapid changes continue from the visible
 frame. **Reduce animations** completes transitions immediately, including a
@@ -22,7 +25,6 @@ transition already in progress. Startup restores preferences without animating.
 - `ThemePalette` owns the reference colors and builds semantic colors for each
   brightness mode. Primary text targets 7:1 contrast; secondary text and accent
   colors have extra contrast headroom for intermediate frames and hover states.
-  Tests require at least 4.5:1 for normal text and button labels.
 - `ThemeResources` replaces the old fixed XAML palette with shared, mutable
   `Brush.*` resources. Views and templates continue using `DynamicResource`.
 - `ThemeColorService` combines brightness, fallback, and cached artwork color.
@@ -52,20 +54,11 @@ Fluent's supported dynamic palette input is `Accent`; see the
 ## Verification
 
 ```sh
-dotnet test tests/LemonNeo.Desktop.Tests/LemonNeo.Desktop.Tests.csproj -c Release -p:SkipDesktopPlugins=true
+dotnet test tests/LemonNeo.Runtime.Tests/LemonNeo.Runtime.Tests.csproj -p:SkipDesktopPlugins=true --filter FullyQualifiedName~DesktopConfigurationTests
 ```
 
-The suite verifies both brightness modes, extreme and random artwork colors,
-intermediate built-in palette colors, alpha conversion, monochrome/transparent
-covers, preference persistence and legacy defaults, failed saves, animated
-retargeting, reduced motion, actual settings controls, and delayed/invalid cover
-requests. A rendered lyric test also checks that a paused highlight updates when
-its shared theme brush changes. Tests use temporary configuration and library
-directories.
-
-To save rendered settings previews for all eighteen palette/mode combinations:
-
-```powershell
-$env:LEMONNEO_THEME_PREVIEW_DIR = Join-Path (Get-Location) 'artifacts/theme-preview'
-dotnet test tests/LemonNeo.Desktop.Tests/LemonNeo.Desktop.Tests.csproj -c Release -p:SkipDesktopPlugins=true --filter FullyQualifiedName~SettingsViewTests
-```
+The current acceptance tests verify immediate preferences, normalization, and
+notification isolation across appearance, language, and lyrics. They also render
+the main window and check that changing desktop lyric font size keeps existing
+playlist rows and loaded artwork. These tests use temporary configuration and
+library directories. Palette extraction and contrast are outside this suite.

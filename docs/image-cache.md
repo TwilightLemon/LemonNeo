@@ -48,19 +48,11 @@ or loading artwork displays the control's themed music placeholder.
 ## Verification
 
 ```powershell
-dotnet test tests/LemonNeo.Desktop.Tests/LemonNeo.Desktop.Tests.csproj -p:SkipDesktopPlugins=true
+dotnet test tests/LemonNeo.Runtime.Tests/LemonNeo.Runtime.Tests.csproj -p:SkipDesktopPlugins=true --filter FullyQualifiedName~DesktopLyricsFontChanges
 ```
 
-`ImageCacheTests` verifies tier order, restart/offline reuse, the memory budget,
-shared requests and independent cancellation, shutdown, URL separation, source
-failures, write failures, local files, corrupt entries, and bitmap ownership.
-`TrackArtworkTests` renders the playlist, library, search, and queue views to check
-actual covers, rounded clipping, placeholders, and detach/rebind behavior. Existing
-playback artwork tests also use the shared cache.
-
-To save the four rendered list previews:
-
-```powershell
-$env:LEMONNEO_ARTWORK_PREVIEW_DIR = Join-Path (Get-Location) 'artifacts/artwork-preview'
-dotnet test tests/LemonNeo.Desktop.Tests/LemonNeo.Desktop.Tests.csproj -p:SkipDesktopPlugins=true --filter FullyQualifiedName~TrackArtworkTests
-```
+The configuration acceptance test loads an actual local cover in the main window,
+then changes desktop lyric font size repeatedly. It verifies that the row, selected
+item, artwork control, and decoded bitmap remain the same, with no list reset or
+image reload. It uses temporary library and cache directories. General image-cache
+behavior is outside the current configuration acceptance suite.

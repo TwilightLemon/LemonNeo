@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using LemonNeo.Application;
 using LemonNeo.Core;
+using LemonNeo.Plugin.Abstractions;
 
 namespace LemonNeo.Desktop.Infrastructure;
 
@@ -11,6 +12,7 @@ public sealed class DesktopContext(DesktopRuntime runtime, LocalizationService t
     private bool _initialized;
     public DesktopRuntime Runtime { get; } = runtime;
     public LocalizationService Text { get; } = text;
+    public ISettingsScope Settings { get; } = runtime.Settings.ForPackage(PackageNames.Desktop);
     public AppearanceService Appearance { get; } = appearance;
     public ObservableCollection<Playlist> Playlists { get; } = [];
     public bool IsInitialized { get => _initialized; internal set => SetProperty(ref _initialized, value); }

@@ -169,7 +169,7 @@ public sealed class MainViewModel : PageViewModel
 
     public Task InitializeAsync() => RunOperationAsync(async ct =>
     {
-        await Context.Appearance.LoadAsync(ct);
+        await _runtime.Settings.LoadAsync(ct);
         await Task.Run(() => _runtime.InitializeAsync(ct), ct);
         ct.ThrowIfCancellationRequested();
         Context.IsInitialized = true;
@@ -192,10 +192,5 @@ public sealed class MainViewModel : PageViewModel
         if (QueueDrawer is not null) await QueueDrawer.DisposeAsync();
         await Navigation.DisposeAsync();
         await Playback.DisposeAsync();
-        if (Context.IsInitialized)
-        {
-            await _runtime.Get<LibraryService>().SaveAsync();
-            await _runtime.Get<PlaybackSessionService>().SaveAsync();
-        }
     }
 }

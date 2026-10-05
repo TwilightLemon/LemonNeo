@@ -52,7 +52,7 @@ public sealed class LyricifyMetadataPlugin :
     private ILogger<LyricifyMetadataPlugin>? _logger;
 
     public PluginDescriptor Descriptor { get; } = new(
-        "org.lemonneo.lyricify",
+        "LemonNeo.Plugin.Lyricify",
         "Lyricify Metadata & Lyrics",
         "1.0.0");
 

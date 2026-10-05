@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace LemonNeo.Core;
 
 public readonly record struct MusicItemId(string ProviderId, string RemoteId)
@@ -132,17 +134,19 @@ public enum PlaybackStatus
 public sealed record PlaybackQueueState
 {
     public int FormatVersion { get; init; } = 1;
-    public List<PlaybackQueueItem> Items { get; init; } = [];
+    public ImmutableArray<PlaybackQueueItem> Items { get; init; } = [];
     public Guid? CurrentItemId { get; init; }
     public PlaybackMode Mode { get; init; }
-    public List<Guid> ShuffleOrder { get; init; } = [];
+    public ImmutableArray<Guid> ShuffleOrder { get; init; } = [];
     public int ShuffleCursor { get; init; } = -1;
     public PlaybackRequest Request { get; init; } = new();
-    public TimeSpan Position { get; init; }
-    public PlaybackStatus Status { get; init; }
-    public double Volume { get; init; } = 1;
     public DateTimeOffset UpdatedAt { get; init; } = DateTimeOffset.UtcNow;
 }
+
+public sealed record PlaybackResumeState(Guid? ItemId = null, TimeSpan Position = default,
+    PlaybackStatus Status = PlaybackStatus.Stopped);
+
+public sealed record PlaybackPreferences(double Volume = 1);
 
 public sealed class Playlist
 {

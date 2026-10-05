@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Collections.Immutable;
 using LemonNeo.Core;
 using LemonNeo.Plugin.Abstractions;
 
@@ -129,10 +130,10 @@ public sealed class PlaybackQueue : IPlaybackQueue
         {
             return new PlaybackQueueState
             {
-                Items = _items.ToList(),
+                Items = _items.ToImmutableArray(),
                 CurrentItemId = _currentItemId,
                 Mode = _mode,
-                ShuffleOrder = _shuffleOrder.ToList(),
+                ShuffleOrder = _shuffleOrder.ToImmutableArray(),
                 ShuffleCursor = _shuffleCursor,
                 Request = _request,
                 UpdatedAt = DateTimeOffset.UtcNow

@@ -39,6 +39,7 @@ internal sealed partial class CommandProcessor
         {
             throw new ArgumentException("Usage: startup [show|set <file>|reset]");
         }
+        await appSettings.SaveAsync(cancellationToken);
         _output.WriteLine($"Startup commands saved to {startup.FilePath}. They run on the next launch.");
     }
 

@@ -19,12 +19,6 @@ public sealed class PluginDataStoreFactory : IPluginDataStoreFactory
             builder => builder.SetApplicationName("LemonNeo"));
     }
 
-    public IPluginStorage CreateStorage(string pluginId)
-    {
-        var directory = _paths.GetPluginConfigurationDirectory(pluginId);
-        return new JsonPluginStorage(Path.Combine(directory, "settings.json"));
-    }
-
     public ICredentialVault CreateCredentialVault(string pluginId)
     {
         var directory = _paths.GetPluginCredentialDirectory(pluginId);

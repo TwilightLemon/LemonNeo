@@ -24,19 +24,22 @@ public sealed partial class ToolsViewModel : PageViewModel
         SaveCommand = new(() => ExecuteAsync(async ct =>
         {
             await _runtime.Get<LibraryService>().SaveAsync(ct);
-            await _session.SaveAsync(ct);
+            await _session.CaptureStateAsync(ct);
+            await _runtime.Settings.SaveAsync(ct);
             SetStatus("LibrarySaved");
         }));
         SyncCommand = new(action => SynchronizeAsync(action ?? "status"));
         SaveStartupCommand = new(() => ExecuteAsync(async ct =>
         {
             await _runtime.Get<StartupCommands>().WriteAsync(StartupScript, ct);
+            await _runtime.Settings.SaveAsync(ct);
             SetStatus("StartupScriptSaved");
         }));
         ReloadStartupCommand = new(() => ExecuteAsync(LoadStartupScriptCoreAsync));
         ResetStartupCommand = new(() => ExecuteAsync(async ct =>
         {
             await _runtime.Get<StartupCommands>().WriteAsync(StartupCommands.DefaultScript, ct);
+            await _runtime.Settings.SaveAsync(ct);
             await LoadStartupScriptCoreAsync(ct);
             SetStatus("StartupScriptSaved");
         }));
@@ -57,8 +60,8 @@ public sealed partial class ToolsViewModel : PageViewModel
     public string Diagnostics => BuildDiagnostics();
     public string PathDetails => string.Join(Environment.NewLine, new[]
     {
-        $"{_text["ConfigurationPath"]}: {ConfigurationPath}", $"{_text["AppSettingsPath"]}: {_runtime.Paths.AppConfigurationFile}",
-        $"{_text["DataPath"]}: {DataPath}", $"{_text["HistoryPath"]}: {Path.Combine(DataPath, "command-history.json")}",
+        $"{_text["ConfigurationPath"]}: {ConfigurationPath}", $"{_text["AppSettingsPath"]}: {_runtime.Paths.GetPackageConfigurationDirectory(PackageNames.Application)}",
+        $"{_text["DataPath"]}: {DataPath}", $"{_text["HistoryPath"]}: {_runtime.Paths.GetEntityConfigurationFile(PackageNames.Console, "CommandHistoryState")}",
         $"{_text["CachePath"]}: {CachePath}", $"{_text["LyricsCachePath"]}: {Path.Combine(CachePath, "Lyrics")}",
         $"{_text["ImageCachePath"]}: {_runtime.Get<ImageCache>().DirectoryPath}",
         $"{_text["LibraryPath"]}: {LibraryPath}", $"{_text["PluginPath"]}: {PluginPath}", $"{_text["StartupPath"]}: {StartupPath}"
@@ -84,6 +87,7 @@ public sealed partial class ToolsViewModel : PageViewModel
     {
         var script = await File.ReadAllTextAsync(path, ct);
         await _runtime.Get<StartupCommands>().WriteAsync(script, ct);
+        await _runtime.Settings.SaveAsync(ct);
         StartupScript = script;
         SetStatus("StartupScriptSaved");
     });

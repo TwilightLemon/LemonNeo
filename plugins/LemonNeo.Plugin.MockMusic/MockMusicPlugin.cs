@@ -89,7 +89,7 @@ public sealed class MockMusicPlugin :
         };
 
     public PluginDescriptor Descriptor { get; } = new(
-        "org.lemonneo.mockmusic",
+        "LemonNeo.Plugin.MockMusic",
         "Mock Music",
         "1.0.0");
 

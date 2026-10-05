@@ -17,19 +17,22 @@ public sealed class LyricsViewModel : PageViewModel
     private Track? _lyricsTrack;
     private string _lyricsStatusKey = "NoLyrics";
     private IReadOnlyList<LyricsLine> _lyricLines = [];
-    private UiPreferences _preferences;
-    private int _pendingPreferenceSaves;
-    private readonly List<Task> _preferenceTasks = [];
+    private LyricsPreferences _lyricsPreferences => Context.Settings.Get<LyricsPreferences>();
+    private DesktopLyricsPreferences _desktopPreferences => Context.Settings.Get<DesktopLyricsPreferences>();
+    private readonly IDisposable _lyricsSubscription;
+    private readonly IDisposable _desktopSubscription;
+    private readonly IDisposable _appearanceSubscription;
     public LyricsViewModel(DesktopContext context, PlaybackViewModel playback) : base(context, DesktopRoutes.Lyrics)
     {
         Playback = playback; _snapshot = playback.Snapshot;
-        _preferences = context.Appearance.Current;
         AlignLeftCommand = new(() => SetAlignment(LyricAlignment.Left));
         AlignCenterCommand = new(() => SetAlignment(LyricAlignment.Center));
         SingleDesktopLineCommand = new(() => DesktopLyricLineCount = 1);
         TwoDesktopLinesCommand = new(() => DesktopLyricLineCount = 2);
         SeekLyricCommand = new(position => Playback.SeekAsync(position / 1000), position => position >= 0 && Playback.CanSeek);
-        Context.Appearance.Changed += OnAppearanceChanged;
+        _lyricsSubscription = Context.Settings.Subscribe<LyricsPreferences>(_ => RefreshLyricsPreferenceProperties());
+        _desktopSubscription = Context.Settings.Subscribe<DesktopLyricsPreferences>(_ => RefreshDesktopPreferenceProperties());
+        _appearanceSubscription = Context.Settings.Subscribe<AppearancePreferences>(_ => OnPropertyChanged(nameof(ReduceMotion)));
         Playback.Changed += OnPlaybackChanged;
         UpdateSnapshot();
     }
@@ -47,149 +50,115 @@ public sealed class LyricsViewModel : PageViewModel
     public bool IsTwoDesktopLines => DesktopLyricLineCount == 2;
     public int DesktopLyricLineCount
     {
-        get => _preferences.DesktopLyricLineCount;
+        get => _desktopPreferences.LineCount;
         set
         {
             var count = Math.Clamp(value, 1, 2);
             if (count == DesktopLyricLineCount) return;
-            _preferences = _preferences with { DesktopLyricLineCount = count };
-            RefreshPreferenceProperties();
-            QueuePreferenceSave(p => p with { DesktopLyricLineCount = count });
+            ApplyDesktopPreferences(p => p with { LineCount = count });
         }
     }
     public AsyncRelayCommand<double> SeekLyricCommand { get; }
-    public double DesktopLyricWindowWidth => _preferences.DesktopLyricWindowWidth;
-    public double DesktopLyricWindowHeight => _preferences.DesktopLyricWindowHeight;
+    public double DesktopLyricWindowWidth => _desktopPreferences.WindowWidth;
+    public double DesktopLyricWindowHeight => _desktopPreferences.WindowHeight;
     public void SaveDesktopWindowSize(double width, double height)
     {
         if (!double.IsFinite(width) || !double.IsFinite(height) || width <= 0 || height <= 0) return;
         if (width == DesktopLyricWindowWidth && height == DesktopLyricWindowHeight) return;
-        _preferences = _preferences with { DesktopLyricWindowWidth = width, DesktopLyricWindowHeight = height };
-        QueuePreferenceSave(p => p with { DesktopLyricWindowWidth = width, DesktopLyricWindowHeight = height });
+        ApplyDesktopPreferences(p => p with { WindowWidth = width, WindowHeight = height });
     }
     public double DesktopLyricFontSize
     {
-        get => _preferences.DesktopLyricFontSize;
+        get => _desktopPreferences.FontSize;
         set
         {
             var size = double.IsFinite(value) ? Math.Clamp(Math.Round(value), 16, 48) : 28;
             if (size == DesktopLyricFontSize) return;
-            _preferences = _preferences with { DesktopLyricFontSize = size };
-            RefreshPreferenceProperties();
-            QueuePreferenceSave(p => p with { DesktopLyricFontSize = size });
+            ApplyDesktopPreferences(p => p with { FontSize = size });
         }
     }
     public bool DesktopShowRomanization
     {
-        get => _preferences.DesktopShowRomanization;
+        get => _desktopPreferences.ShowRomanization;
         set
         {
             if (value == DesktopShowRomanization) return;
-            _preferences = _preferences with { DesktopShowRomanization = value };
-            RefreshPreferenceProperties();
-            QueuePreferenceSave(p => p with { DesktopShowRomanization = value });
+            ApplyDesktopPreferences(p => p with { ShowRomanization = value });
         }
     }
     public bool DesktopShowTranslation
     {
-        get => _preferences.DesktopShowTranslation;
+        get => _desktopPreferences.ShowTranslation;
         set
         {
             if (value == DesktopShowTranslation) return;
-            _preferences = _preferences with { DesktopShowTranslation = value };
-            RefreshPreferenceProperties();
-            QueuePreferenceSave(p => p with { DesktopShowTranslation = value });
+            ApplyDesktopPreferences(p => p with { ShowTranslation = value });
         }
     }
-    public bool IsLeftAligned => _preferences.LyricAlignment == LyricAlignment.Left;
+    public bool IsLeftAligned => _lyricsPreferences.Alignment == LyricAlignment.Left;
     public bool IsCenterAligned => !IsLeftAligned;
     public TextAlignment LyricTextAlignment => IsLeftAligned ? TextAlignment.Left : TextAlignment.Center;
     public double LyricFontSize
     {
-        get => _preferences.LyricFontSize;
+        get => _lyricsPreferences.FontSize;
         set
         {
             var size = double.IsFinite(value) ? Math.Clamp(Math.Round(value), 16, 48) : 24;
             if (size == LyricFontSize) return;
-            _preferences = _preferences with { LyricFontSize = size };
-            RefreshPreferenceProperties();
-            QueuePreferenceSave(p => p with { LyricFontSize = size });
+            ApplyLyricsPreferences(p => p with { FontSize = size });
         }
     }
     public bool ShowRomanization
     {
-        get => _preferences.ShowRomanization;
+        get => _lyricsPreferences.ShowRomanization;
         set
         {
             if (value == ShowRomanization) return;
-            _preferences = _preferences with { ShowRomanization = value };
-            RefreshPreferenceProperties();
-            QueuePreferenceSave(p => p with { ShowRomanization = value });
+            ApplyLyricsPreferences(p => p with { ShowRomanization = value });
         }
     }
     public bool ShowTranslation
     {
-        get => _preferences.ShowTranslation;
+        get => _lyricsPreferences.ShowTranslation;
         set
         {
             if (value == ShowTranslation) return;
-            _preferences = _preferences with { ShowTranslation = value };
-            RefreshPreferenceProperties();
-            QueuePreferenceSave(p => p with { ShowTranslation = value });
+            ApplyLyricsPreferences(p => p with { ShowTranslation = value });
         }
     }
     public bool BoldLyrics
     {
-        get => _preferences.BoldLyrics;
+        get => _lyricsPreferences.Bold;
         set
         {
             if (value == BoldLyrics) return;
-            _preferences = _preferences with { BoldLyrics = value };
-            RefreshPreferenceProperties();
-            QueuePreferenceSave(p => p with { BoldLyrics = value });
+            ApplyLyricsPreferences(p => p with { Bold = value });
         }
     }
 
     private void SetAlignment(LyricAlignment alignment)
     {
-        if (_preferences.LyricAlignment == alignment) return;
-        _preferences = _preferences with { LyricAlignment = alignment };
-        RefreshPreferenceProperties();
-        QueuePreferenceSave(p => p with { LyricAlignment = alignment });
+        if (_lyricsPreferences.Alignment == alignment) return;
+        ApplyLyricsPreferences(p => p with { Alignment = alignment });
     }
-    private void QueuePreferenceSave(Func<UiPreferences, UiPreferences> update)
+    private void ApplyLyricsPreferences(Func<LyricsPreferences, LyricsPreferences> update)
     {
-        if (_pendingPreferenceSaves == 0) SetError(null);
-        _preferenceTasks.RemoveAll(t => t.IsCompleted);
-        _preferenceTasks.Add(SavePreferenceAsync(update));
+        if (!_lifetime.IsCancellationRequested) Context.Settings.Apply(update);
     }
-    private async Task SavePreferenceAsync(Func<UiPreferences, UiPreferences> update)
+    private void ApplyDesktopPreferences(Func<DesktopLyricsPreferences, DesktopLyricsPreferences> update)
     {
-        _pendingPreferenceSaves++;
-        try { await Context.Appearance.UpdateAsync(update, _lifetime.Token); }
-        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
-        catch (Exception exception) { SetError("OperationFailed", [exception.Message]); }
-        finally
-        {
-            if (--_pendingPreferenceSaves == 0)
-            {
-                _preferences = Context.Appearance.Current;
-                RefreshPreferenceProperties();
-            }
-        }
+        if (!_lifetime.IsCancellationRequested) Context.Settings.Apply(update);
     }
-    private void OnAppearanceChanged(object? sender, EventArgs args)
-    {
-        if (_pendingPreferenceSaves == 0) _preferences = Context.Appearance.Current;
-        RefreshPreferenceProperties();
-    }
-    private void RefreshPreferenceProperties()
+    private void RefreshLyricsPreferenceProperties()
     {
         foreach (var name in new[] { nameof(LyricFontSize), nameof(ShowRomanization), nameof(ShowTranslation), nameof(BoldLyrics),
-                     nameof(IsLeftAligned), nameof(IsCenterAligned), nameof(LyricTextAlignment), nameof(ReduceMotion),
-                     nameof(DesktopLyricLineCount), nameof(IsSingleDesktopLine), nameof(IsTwoDesktopLines),
-                     nameof(DesktopLyricFontSize), nameof(DesktopShowRomanization), nameof(DesktopShowTranslation) })
-            OnPropertyChanged(name);
+                     nameof(IsLeftAligned), nameof(IsCenterAligned), nameof(LyricTextAlignment) }) OnPropertyChanged(name);
+    }
+    private void RefreshDesktopPreferenceProperties()
+    {
+        foreach (var name in new[] { nameof(DesktopLyricLineCount), nameof(IsSingleDesktopLine), nameof(IsTwoDesktopLines),
+                     nameof(DesktopLyricFontSize), nameof(DesktopShowRomanization), nameof(DesktopShowTranslation),
+                     nameof(DesktopLyricWindowWidth), nameof(DesktopLyricWindowHeight) }) OnPropertyChanged(name);
     }
     public string LyricsText => string.IsNullOrWhiteSpace(_lyrics?.Text) ? _text[_lyricsStatusKey] : _lyrics.Text;
     public string CurrentLyric { get; private set; } = "";
@@ -280,9 +249,9 @@ public sealed class LyricsViewModel : PageViewModel
     public override async ValueTask DisposeAsync()
     {
         Playback.Changed -= OnPlaybackChanged;
-        Context.Appearance.Changed -= OnAppearanceChanged;
-        // Finish accepted preference writes before cancelling lyric requests on shutdown.
-        await Task.WhenAll(_preferenceTasks);
+        _lyricsSubscription.Dispose();
+        _desktopSubscription.Dispose();
+        _appearanceSubscription.Dispose();
         await _lifetime.CancelAsync(); await base.DisposeAsync(); await Task.WhenAll(_lyricsTasks);
         _lyricsCancellation?.Dispose(); _lifetime.Dispose();
     }
