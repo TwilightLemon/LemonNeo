@@ -9,6 +9,22 @@ An Avalonia UI 12 desktop host is also available:
 dotnet run --project src/LemonNeo.Desktop
 ```
 
+Self-contained desktop publish profiles are available for `win-x64`, `linux-x64`,
+and `osx-arm64`. From the repository root, publish with:
+
+```sh
+dotnet publish src/LemonNeo.Desktop/LemonNeo.Desktop.csproj -c Release -p:PublishProfile=win-x64
+dotnet publish src/LemonNeo.Desktop/LemonNeo.Desktop.csproj -c Release -p:PublishProfile=linux-x64
+dotnet publish src/LemonNeo.Desktop/LemonNeo.Desktop.csproj -c Release -p:PublishProfile=osx-arm64
+```
+
+Output is written to `artifacts/publish/LemonNeo.Desktop/<runtime-identifier>/`.
+Distribute the entire directory, including `plugins/`; the .NET and ASP.NET Core
+runtimes are included, so users do not need to install them. Trimming and
+single-file bundling are disabled to preserve dynamic plugin loading. Publish on
+the target operating system to include its native media-control plugin; the
+macOS plugin also requires Xcode command-line tools during the build.
+
 It provides a two-column music UI, light/dark/system themes, live Chinese/English
 localization, reusable component styles and templates, online search and playlist
 imports, account login, full playlist/track editing, metadata/source inspection,

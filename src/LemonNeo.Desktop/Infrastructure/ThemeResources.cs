@@ -9,7 +9,7 @@ public sealed class ThemeResources : ResourceDictionary
     private readonly Dictionary<string, SolidColorBrush> _brushes = [];
     private readonly GradientStop _glowStart = new() { Offset = 0 };
     private readonly GradientStop _glowEnd = new() { Offset = 1 };
-    private readonly SolidColorBrush _playbackSurface = new() { Opacity = .78 };
+    private readonly SolidColorBrush _playbackSurface = new() { Opacity = .42 };
 
     public ThemeResources()
     {
