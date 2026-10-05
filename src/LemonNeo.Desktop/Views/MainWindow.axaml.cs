@@ -63,6 +63,13 @@ public partial class MainWindow : Window
 
     public void CloseDesktopLyrics() => _desktopLyrics?.Close();
 
+    private void OnPlaybackBarSizeChanged(object? sender, SizeChangedEventArgs args)
+    {
+        var inset = args.NewSize.Height + PlaybackBar.Margin.Bottom + 12;
+        Resources["Space.PlaybackInset"] = new Thickness(0, 0, 0, inset);
+        Resources["Space.PlaybackFooterInset"] = new Thickness(0, 12, 0, inset);
+    }
+
     private async void OnQueueOpened(object? sender, EventArgs args)
     {
         _queueAnimation?.Cancel();

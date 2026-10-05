@@ -69,7 +69,7 @@
             </ListBox.ItemTemplate>
           </ListBox>
         </Grid>
-        <Border Name="PlaylistImportBar" Grid.Row="1" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,12,0,0"
+        <Border Name="PlaylistImportBar" Grid.Row="1" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="{DynamicResource Space.PlaybackFooterInset}"
                 IsVisible="{Binding HasSelectedRemotePlaylist}">
           <Grid ColumnDefinitions="*,Auto">
             <StackPanel Spacing="4" VerticalAlignment="Center" Margin="0,0,12,0">

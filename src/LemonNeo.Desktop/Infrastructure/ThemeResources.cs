@@ -9,6 +9,7 @@ public sealed class ThemeResources : ResourceDictionary
     private readonly Dictionary<string, SolidColorBrush> _brushes = [];
     private readonly GradientStop _glowStart = new() { Offset = 0 };
     private readonly GradientStop _glowEnd = new() { Offset = 1 };
+    private readonly SolidColorBrush _playbackSurface = new() { Opacity = .78 };
 
     public ThemeResources()
     {
@@ -18,6 +19,7 @@ public sealed class ThemeResources : ResourceDictionary
             _brushes.Add(role, brush);
             this[$"Brush.{role}"] = brush;
         }
+        this["Brush.PlaybackSurface"] = _playbackSurface;
         this["Brush.NowPlayingGlow"] = new RadialGradientBrush
         {
             Center = new(0, 1, Avalonia.RelativeUnit.Relative),
@@ -33,6 +35,7 @@ public sealed class ThemeResources : ResourceDictionary
     public void Apply(IReadOnlyDictionary<string, Color> colors)
     {
         foreach (var (role, color) in colors) _brushes[role].Color = color;
+        _playbackSurface.Color = colors["Surface"];
         var glow = colors["Accent"];
         _glowStart.Color = Color.FromArgb(30, glow.R, glow.G, glow.B);
         _glowEnd.Color = Color.FromArgb(0, glow.R, glow.G, glow.B);

@@ -64,7 +64,7 @@
     <Grid Grid.Row="2">
       <controls:EmptyState IsVisible="{Binding !Playback.HasCurrentTrack}" Title="{Translate {x:Static i18n:LanguageManager+Keys.NoTrack}}"
                            Description="{Translate {x:Static i18n:LanguageManager+Keys.NoTrackDescription}}" Icon="{StaticResource Icon.Music}" />
-      <Grid Name="ListeningGrid" IsVisible="{Binding Playback.HasCurrentTrack}" ColumnDefinitions="0.9*,1.25*">
+      <Grid Name="ListeningGrid" IsVisible="{Binding Playback.HasCurrentTrack}" ColumnDefinitions="0.9*,1.25*" Margin="{DynamicResource Space.PlaybackInset}">
         <Border Name="CoverArea" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,0,28,0"
                 CornerRadius="24" BoxShadow="0 12 32 0 #24000000">
           <controls:Artwork Name="NowPlayingCover" Width="300" Height="300" CornerRadius="24" Source="{Binding Playback.NowArtwork}"
