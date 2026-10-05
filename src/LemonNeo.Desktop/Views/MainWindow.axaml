@@ -428,6 +428,7 @@
                   <Viewbox
                     Height="20"
                     MaxWidth="22"
+                    Margin="4,0,0,0"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center"
                     IsVisible="{Binding !Playback.IsPlaying}">
@@ -559,6 +560,7 @@
           VerticalAlignment="Top"
           AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Seek}}"
           IsEnabled="{Binding Playback.CanSeek}"
+          IsVisible="{Binding !Playback.IsBusy}"
           Maximum="{Binding Playback.DurationSeconds}"
           Minimum="0"
           Theme="{StaticResource PlaybackTimeline}"
