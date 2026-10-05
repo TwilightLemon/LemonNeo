@@ -134,7 +134,8 @@
               Click="OnCreatePlaylist"
               IsEnabled="{Binding SharedContext.IsInitialized}"
               ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.CreatePlaylist}}">
-              <Path Classes="icon" Data="{StaticResource Icon.Add}" />
+              <Path Classes="icon" Data="{StaticResource Icon.Add}"
+                    Stretch="Fill" Width="14" Height="14" />
             </Button>
           </Grid>
           <ListBox

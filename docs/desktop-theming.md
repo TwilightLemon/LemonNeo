@@ -28,10 +28,16 @@ transition already in progress. Startup restores preferences without animating.
 - `ThemeColorService` combines brightness, fallback, and cached artwork color.
   It listens for effective application theme changes and updates brushes and
   Fluent accents on one UI dispatcher timer. Its lifetime ends at app shutdown.
-- `ArtworkColorExtractor` samples decoded artwork at up to 64 × 64 pixels,
-  converts to unpremultiplied BGRA, and ranks substantial color histogram bins.
-  Transparent pixels and tiny bright details are ignored; monochrome covers stay
-  neutral. Saturation and brightness are adapted before colors reach the UI.
+- `ArtworkColorExtractor` follows LemonLite's `ImageHelper.GetMajorColor`: sample
+  decoded pixels at a stride of `max(1, min(width, height) / 100)`, group RGB values
+  in sixteen-value bins, and exclude mean channel intensities below 24 or above
+  230. Bins are ranked by `population × saturation × (1 - abs(lightness - 0.6) × 1.8)`.
+  Direct sampling preserves colors that an extra resize would blend. Avalonia
+  converts pixels to unpremultiplied BGRA; alpha weights the population and pixels
+  with alpha below 128 are ignored. Fully transparent samples return no color;
+  visible artwork with only extreme black/white samples uses neutral gray. Equal
+  saturation scores favor the largest region, including on grayscale covers.
+  Saturation and brightness are adapted before colors reach the UI.
 - `PlaybackViewModel` reuses the existing cover request and extracts its color
   off the UI thread. Cancellation and URI checks prevent late requests from
   changing a newer track's cover or theme. There is no second artwork download.
