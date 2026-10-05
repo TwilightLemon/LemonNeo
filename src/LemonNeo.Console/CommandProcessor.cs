@@ -1018,6 +1018,7 @@ internal sealed partial class CommandProcessor(
         CancellationToken cancellationToken)
     {
         ValidatePlaybackSourceProvider(requiredSourceProviderId);
+        await playback.StopAsync(cancellationToken);
         var track = await GetTrackAsync(providerId, trackId, cancellationToken);
         await playback.PlayTrackAsync(
             track,

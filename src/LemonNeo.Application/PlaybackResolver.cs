@@ -22,6 +22,9 @@ public sealed class PlaybackResolver(
     {
         try
         {
+            // Stop the previous track before cache reads or source resolution,
+            // which may take time or fail before the next player is selected.
+            await StopAsync(cancellationToken);
             var playbackRequest = request ?? new PlaybackRequest();
             // A persisted queue snapshot is sufficient for offline playback.
             // Check before provider validation, ID discovery, and URL resolution.
@@ -117,7 +120,6 @@ public sealed class PlaybackResolver(
         CancellationToken cancellationToken)
     {
         var player = players.GetRequiredPlayer(source);
-        await StopAsync(cancellationToken);
         try
         {
             if (source is HttpPlaybackSource { IsDirectAudio: true } http && player.Player is IStreamingPlayer streaming)
