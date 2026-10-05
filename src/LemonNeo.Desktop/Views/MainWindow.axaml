@@ -340,7 +340,7 @@
           <Grid Grid.Row="1" ColumnDefinitions="*,Auto,*">
             <Button
               Name="NowPlayingButton"
-              Margin="0,0,20,0"
+              Margin="0,0,76,0"
               Padding="8,0"
               HorizontalContentAlignment="Stretch"
               AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Lyrics}}"
@@ -374,6 +374,19 @@
                     ToolTip.Tip="{Binding Playback.NowArtist}" />
                 </StackPanel>
               </Grid>
+            </Button>
+            <Button
+              Name="DesktopLyricsButton"
+              Margin="0,0,16,0"
+              Padding="0"
+              HorizontalAlignment="Right"
+              VerticalAlignment="Center"
+              AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DesktopLyrics}}"
+              Classes="ghost icon"
+              Classes.active="{Binding #DesktopWindow.IsDesktopLyricsOpen}"
+              Click="OnToggleDesktopLyrics"
+              ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.DesktopLyrics}}">
+              <Path Classes="icon" Data="{StaticResource Icon.DesktopLyrics}" />
             </Button>
             <StackPanel
               Name="PlaybackControls"

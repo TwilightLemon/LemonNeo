@@ -16,7 +16,13 @@ public sealed record UiPreferences(
     LyricAlignment LyricAlignment = LyricAlignment.Center,
     bool BoldLyrics = false,
     ThemeColorPreset ThemeColor = ThemeColorPreset.Classic,
-    bool UseArtworkColors = false);
+    bool UseArtworkColors = false,
+    int DesktopLyricLineCount = 2,
+    double DesktopLyricFontSize = 28,
+    bool DesktopShowRomanization = true,
+    bool DesktopShowTranslation = true,
+    double DesktopLyricWindowWidth = 760,
+    double DesktopLyricWindowHeight = 300);
 
 /// <summary>Owns live UI preferences. The default follows the operating system.</summary>
 public sealed class AppearanceService(
@@ -58,7 +64,11 @@ public sealed class AppearanceService(
         Language = Enum.IsDefined(value.Language) ? value.Language : LanguagePreference.System,
         LyricFontSize = double.IsFinite(value.LyricFontSize) ? Math.Clamp(value.LyricFontSize, 16, 48) : 24,
         LyricAlignment = Enum.IsDefined(value.LyricAlignment) ? value.LyricAlignment : LyricAlignment.Center,
-        ThemeColor = Enum.IsDefined(value.ThemeColor) ? value.ThemeColor : ThemeColorPreset.Classic
+        ThemeColor = Enum.IsDefined(value.ThemeColor) ? value.ThemeColor : ThemeColorPreset.Classic,
+        DesktopLyricLineCount = Math.Clamp(value.DesktopLyricLineCount, 1, 2),
+        DesktopLyricFontSize = double.IsFinite(value.DesktopLyricFontSize) ? Math.Clamp(value.DesktopLyricFontSize, 16, 48) : 28,
+        DesktopLyricWindowWidth = double.IsFinite(value.DesktopLyricWindowWidth) ? Math.Clamp(value.DesktopLyricWindowWidth, 320, 3000) : 760,
+        DesktopLyricWindowHeight = double.IsFinite(value.DesktopLyricWindowHeight) ? Math.Clamp(value.DesktopLyricWindowHeight, 110, 1200) : 300
     };
 
     public void SetArtworkColor(Color? color) => Colors.SetArtworkColor(color);

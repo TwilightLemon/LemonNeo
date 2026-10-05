@@ -14,11 +14,17 @@ namespace LemonNeo.Desktop.Views;
 
 public partial class MainWindow : Window
 {
+    public static readonly StyledProperty<bool> IsDesktopLyricsOpenProperty =
+        AvaloniaProperty.Register<MainWindow, bool>(nameof(IsDesktopLyricsOpen));
+    public bool IsDesktopLyricsOpen { get => GetValue(IsDesktopLyricsOpenProperty); private set => SetValue(IsDesktopLyricsOpenProperty, value); }
+    private DesktopLyricsWindow? _desktopLyrics;
+    private PixelPoint? _desktopLyricsPosition;
     private bool _seeking;
     private CancellationTokenSource? _queueAnimation;
     public MainWindow()
     {
         InitializeComponent();
+        Closed += (_, _) => CloseDesktopLyrics();
         // Avalonia draws Windows captions and preserves native macOS traffic lights.
         // Keep system decorations on Linux, where client-area extension varies by window manager.
         ExtendClientAreaToDecorationsHint = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS();
@@ -38,6 +44,24 @@ public partial class MainWindow : Window
         KeyBindings.Add(new KeyBinding { Gesture = new KeyGesture(Key.Right, KeyModifiers.Alt),
             Command = new CommunityToolkit.Mvvm.Input.AsyncRelayCommand(() => (DataContext as MainViewModel)?.Navigation.GoForwardAsync() ?? Task.CompletedTask) });
     }
+
+    private void OnToggleDesktopLyrics(object? sender, RoutedEventArgs args)
+    {
+        if (_desktopLyrics is not null) { CloseDesktopLyrics(); return; }
+        if (DataContext is not MainViewModel vm) return;
+        var window = new DesktopLyricsWindow { DataContext = vm.Lyrics };
+        _desktopLyrics = window;
+        window.Closed += (_, _) =>
+        {
+            _desktopLyricsPosition = window.Position;
+            _desktopLyrics = null;
+            IsDesktopLyricsOpen = false;
+        };
+        window.ShowNear(this, _desktopLyricsPosition);
+        IsDesktopLyricsOpen = true;
+    }
+
+    public void CloseDesktopLyrics() => _desktopLyrics?.Close();
 
     private async void OnQueueOpened(object? sender, EventArgs args)
     {

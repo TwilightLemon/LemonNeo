@@ -46,6 +46,8 @@
   <Style Selector="Button.primary Path.icon"><Setter Property="Fill" Value="{DynamicResource Brush.OnAccent}" /></Style>
   <Style Selector="Button.primary TextBlock"><Setter Property="Foreground" Value="{DynamicResource Brush.OnAccent}" /></Style>
   <Style Selector="Button.nav.active Path.icon"><Setter Property="Fill" Value="{DynamicResource Brush.AccentText}" /></Style>
+  <Style Selector="Button#DesktopLyricsButton.active"><Setter Property="Background" Value="{DynamicResource Brush.AccentSoft}" /></Style>
+  <Style Selector="Button#DesktopLyricsButton.active Path.icon"><Setter Property="Fill" Value="{DynamicResource Brush.AccentText}" /></Style>
   <Style Selector="TextBox">
     <Setter Property="CornerRadius" Value="{DynamicResource Radius.Control}" />
     <Setter Property="Background" Value="{DynamicResource Brush.Surface}" />

@@ -26,6 +26,8 @@ public sealed class LyricsViewModel : PageViewModel
         _preferences = context.Appearance.Current;
         AlignLeftCommand = new(() => SetAlignment(LyricAlignment.Left));
         AlignCenterCommand = new(() => SetAlignment(LyricAlignment.Center));
+        SingleDesktopLineCommand = new(() => DesktopLyricLineCount = 1);
+        TwoDesktopLinesCommand = new(() => DesktopLyricLineCount = 2);
         SeekLyricCommand = new(position => Playback.SeekAsync(position / 1000), position => position >= 0 && Playback.CanSeek);
         Context.Appearance.Changed += OnAppearanceChanged;
         Playback.Changed += OnPlaybackChanged;
@@ -34,11 +36,71 @@ public sealed class LyricsViewModel : PageViewModel
     public PlaybackViewModel Playback { get; }
     public Lyrics? Document => _lyrics;
     public double PositionMilliseconds => _snapshot.Timeline.Position.TotalMilliseconds;
+    public double DurationMilliseconds => _snapshot.Timeline.Duration?.TotalMilliseconds ?? 0;
     public bool IsStopped => _snapshot.State == PlayerState.Stopped;
     public bool ReduceMotion => Context.Appearance.Current.ReduceMotion;
     public RelayCommand AlignLeftCommand { get; }
     public RelayCommand AlignCenterCommand { get; }
+    public RelayCommand SingleDesktopLineCommand { get; }
+    public RelayCommand TwoDesktopLinesCommand { get; }
+    public bool IsSingleDesktopLine => DesktopLyricLineCount == 1;
+    public bool IsTwoDesktopLines => DesktopLyricLineCount == 2;
+    public int DesktopLyricLineCount
+    {
+        get => _preferences.DesktopLyricLineCount;
+        set
+        {
+            var count = Math.Clamp(value, 1, 2);
+            if (count == DesktopLyricLineCount) return;
+            _preferences = _preferences with { DesktopLyricLineCount = count };
+            RefreshPreferenceProperties();
+            QueuePreferenceSave(p => p with { DesktopLyricLineCount = count });
+        }
+    }
     public AsyncRelayCommand<double> SeekLyricCommand { get; }
+    public double DesktopLyricWindowWidth => _preferences.DesktopLyricWindowWidth;
+    public double DesktopLyricWindowHeight => _preferences.DesktopLyricWindowHeight;
+    public void SaveDesktopWindowSize(double width, double height)
+    {
+        if (!double.IsFinite(width) || !double.IsFinite(height) || width <= 0 || height <= 0) return;
+        if (width == DesktopLyricWindowWidth && height == DesktopLyricWindowHeight) return;
+        _preferences = _preferences with { DesktopLyricWindowWidth = width, DesktopLyricWindowHeight = height };
+        QueuePreferenceSave(p => p with { DesktopLyricWindowWidth = width, DesktopLyricWindowHeight = height });
+    }
+    public double DesktopLyricFontSize
+    {
+        get => _preferences.DesktopLyricFontSize;
+        set
+        {
+            var size = double.IsFinite(value) ? Math.Clamp(Math.Round(value), 16, 48) : 28;
+            if (size == DesktopLyricFontSize) return;
+            _preferences = _preferences with { DesktopLyricFontSize = size };
+            RefreshPreferenceProperties();
+            QueuePreferenceSave(p => p with { DesktopLyricFontSize = size });
+        }
+    }
+    public bool DesktopShowRomanization
+    {
+        get => _preferences.DesktopShowRomanization;
+        set
+        {
+            if (value == DesktopShowRomanization) return;
+            _preferences = _preferences with { DesktopShowRomanization = value };
+            RefreshPreferenceProperties();
+            QueuePreferenceSave(p => p with { DesktopShowRomanization = value });
+        }
+    }
+    public bool DesktopShowTranslation
+    {
+        get => _preferences.DesktopShowTranslation;
+        set
+        {
+            if (value == DesktopShowTranslation) return;
+            _preferences = _preferences with { DesktopShowTranslation = value };
+            RefreshPreferenceProperties();
+            QueuePreferenceSave(p => p with { DesktopShowTranslation = value });
+        }
+    }
     public bool IsLeftAligned => _preferences.LyricAlignment == LyricAlignment.Left;
     public bool IsCenterAligned => !IsLeftAligned;
     public TextAlignment LyricTextAlignment => IsLeftAligned ? TextAlignment.Left : TextAlignment.Center;
@@ -124,7 +186,9 @@ public sealed class LyricsViewModel : PageViewModel
     private void RefreshPreferenceProperties()
     {
         foreach (var name in new[] { nameof(LyricFontSize), nameof(ShowRomanization), nameof(ShowTranslation), nameof(BoldLyrics),
-                     nameof(IsLeftAligned), nameof(IsCenterAligned), nameof(LyricTextAlignment), nameof(ReduceMotion) })
+                     nameof(IsLeftAligned), nameof(IsCenterAligned), nameof(LyricTextAlignment), nameof(ReduceMotion),
+                     nameof(DesktopLyricLineCount), nameof(IsSingleDesktopLine), nameof(IsTwoDesktopLines),
+                     nameof(DesktopLyricFontSize), nameof(DesktopShowRomanization), nameof(DesktopShowTranslation) })
             OnPropertyChanged(name);
     }
     public string LyricsText => string.IsNullOrWhiteSpace(_lyrics?.Text) ? _text[_lyricsStatusKey] : _lyrics.Text;
@@ -179,6 +243,7 @@ public sealed class LyricsViewModel : PageViewModel
     private void UpdateLyricsPosition()
     {
         OnPropertyChanged(nameof(PositionMilliseconds));
+        OnPropertyChanged(nameof(DurationMilliseconds));
         OnPropertyChanged(nameof(IsStopped));
         var milliseconds = _snapshot.Timeline.Position.TotalMilliseconds;
         var index = -1;

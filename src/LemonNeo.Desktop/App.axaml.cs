@@ -36,6 +36,7 @@ public partial class App : Avalonia.Application
                 if (shutdownStarted) return;
                 shutdownStarted = true;
                 window.IsEnabled = false;
+                window.CloseDesktopLyrics();
                 try
                 {
                     await viewModel.DisposeAsync();
