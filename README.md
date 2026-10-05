@@ -21,6 +21,12 @@ from the playing track's artwork with a selected fallback, and smooth transition
 in light and dark mode. See [desktop theme colors](docs/desktop-theming.md) for
 settings, implementation, and regression tests.
 
+Track rows in playlists, search results, the music library, and the queue display
+rounded artwork from `Track.ArtworkUri`, with a placeholder for missing or failed
+covers. A shared three-tier image service reads memory, then disk, then the source
+URL or local file. Disk images use the unified cache directory's `Images` subfolder.
+See [image caching](docs/image-cache.md) for limits, ownership, and verification.
+
 Build and start the interactive host:
 
 ```powershell

@@ -30,7 +30,8 @@ public sealed class PlaybackArtworkTests
         await session.InitializeAsync();
         using var handler = new DelayedArtworkHandler(CreatePng(Colors.Red), CreatePng(Colors.Teal));
         using var client = new HttpClient(handler);
-        var artwork = new ArtworkService(client, NullLogger<ArtworkService>.Instance);
+        await using var cache = new ImageCache(paths.CacheDirectory, client, NullLogger<ImageCache>.Instance);
+        var artwork = new ArtworkService(cache, NullLogger<ArtworkService>.Instance);
         await using var playback = new PlaybackViewModel(context, artwork);
         var queue = runtime.Get<IPlaybackQueue>();
         async Task SelectAsync(string id, Uri? uri)

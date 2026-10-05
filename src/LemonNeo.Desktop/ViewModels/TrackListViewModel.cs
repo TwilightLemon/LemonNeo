@@ -50,7 +50,8 @@ public abstract class TrackListViewModel : PageViewModel
             values = values.Where(t => $"{t.Track.Title} {string.Join(' ', t.Track.Artists.Select(a => a.Name))} {t.Track.Album?.Title}"
                 .Contains(Filter.Trim(), StringComparison.CurrentCultureIgnoreCase));
         Tracks.Clear();
-        foreach (var track in values) Tracks.Add(track);
+        var artwork = _runtime.Get<ArtworkService>();
+        foreach (var track in values) Tracks.Add(track with { ArtworkLoader = artwork });
         SelectedTrack = Tracks.FirstOrDefault(t => selected?.PlaylistItemId is { } itemId ? t.PlaylistItemId == itemId
             : selected?.QueueItemId is { } queueId ? t.QueueItemId == queueId : t.Track.Id == selected?.Track.Id);
         OnPropertyChanged(nameof(HasTracks)); OnPropertyChanged(nameof(TrackSummary)); OnPropertyChanged(nameof(PageSummary));

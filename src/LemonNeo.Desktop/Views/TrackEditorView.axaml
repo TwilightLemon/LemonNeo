@@ -80,7 +80,6 @@
               <StackPanel Spacing="14" Margin="0,16,12,16" IsEnabled="{Binding CanInteract}">
                 <StackPanel Spacing="6">
                   <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.MetadataSearchSources}}" Classes="caption" TextWrapping="Wrap" />
-                  <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.MetadataSourceSelectionHint}}" Classes="muted" TextWrapping="Wrap" IsVisible="{Binding HasMetadataSources}" />
                   <ItemsControl Name="MetadataSourceSelector" ItemsSource="{Binding MetadataSources}" IsVisible="{Binding HasMetadataSources}">
                     <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
@@ -100,7 +99,6 @@
                     <Button Name="FindMetadataMatchesButton" Grid.Column="2" Classes="primary" Content="{Translate {x:Static i18n:LanguageManager+Keys.MetadataLookup}}" Command="{Binding MetadataCommand}" Margin="10,0,0,0" />
                   </Grid>
                 </StackPanel>
-                <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.MetadataMatchActionsHint}}" Classes="caption" TextWrapping="Wrap" />
                 <ItemsControl Name="MetadataMatchesList" ItemsSource="{Binding MetadataMatches}" ItemTemplate="{StaticResource MetadataMatchTemplate}" />
               </StackPanel>
             </ScrollViewer>

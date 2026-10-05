@@ -49,7 +49,9 @@ public sealed class DesktopRuntime : IAsyncDisposable
         services.AddSingleton(new StartupCommands(options.StartupFile ?? Path.Combine(paths.ConfigurationDirectory, "startup.txt")));
         services.AddLogging(builder => builder.AddDebug());
         services.AddHttpClient();
-        services.AddHttpClient<ArtworkService>();
+        services.AddSingleton(p => new ImageCache(paths.CacheDirectory,
+            p.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(ImageCache)), p.GetRequiredService<ILogger<ImageCache>>()));
+        services.AddSingleton<ArtworkService>();
         services.AddSingleton(paths);
         services.AddSingleton<IAppConfigurationStore, JsonAppConfigurationStore>();
         services.AddSingleton<IPluginDataStoreFactory, PluginDataStoreFactory>();

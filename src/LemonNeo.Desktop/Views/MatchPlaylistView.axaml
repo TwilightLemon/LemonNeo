@@ -27,7 +27,6 @@
       <StackPanel Spacing="18" Margin="0,0,12,16">
         <StackPanel Spacing="10" IsEnabled="{Binding CanInteract}">
           <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.MetadataTargets}}" Classes="section" />
-          <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.MetadataSourceSelectionHint}}" Classes="muted" TextWrapping="Wrap" IsVisible="{Binding HasMetadataSources}" />
           <ItemsControl Name="MetadataSourceSelector" ItemsSource="{Binding MetadataSources}" IsVisible="{Binding HasMetadataSources}">
             <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>

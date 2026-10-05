@@ -155,6 +155,8 @@ public sealed record RemotePlaylistRow(string ProviderId, string? Id, string Nam
 public sealed record MetadataMatchRow(MetadataMatch Match, LocalizationService Text,
     RelayCommand<MetadataMatchRow> ReplaceMetadataCommand, RelayCommand<MetadataMatchRow> AddExternalIdsCommand)
 {
+    public Uri? ArtworkUri => Match.Metadata.ArtworkUri;
+    public ArtworkService? ArtworkLoader { get; init; }
     public string Source => $"{Match.MetadataProviderId} / {Match.SourceNamespace}";
     public string Title => Match.Metadata.Title;
     public string Artists => string.Join(" / ", Match.Metadata.Artists);

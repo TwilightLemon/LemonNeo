@@ -52,7 +52,7 @@ public sealed class PlaybackQueueViewModel : PageViewModel
         var items = _session.Queue.Items;
         if (!_rows.Select(r => r.Id).SequenceEqual(items.Select(i => i.Id)))
         {
-            _rows = items.Select((item, index) => new QueueTrackViewModel(item, index + 1, _text)).ToArray();
+            _rows = items.Select((item, index) => new QueueTrackViewModel(item, index + 1, _text, _runtime.Get<ArtworkService>())).ToArray();
             RefreshTracks();
             OnPropertyChanged(nameof(TrackCount));
         }
@@ -93,11 +93,11 @@ public sealed class PlaybackQueueViewModel : PageViewModel
     }
 }
 
-public sealed class QueueTrackViewModel(PlaybackQueueItem item, int number, LocalizationService text) : ObservableObject
+public sealed class QueueTrackViewModel(PlaybackQueueItem item, int number, LocalizationService text, ArtworkService? artwork = null) : ObservableObject
 {
     private bool _isCurrent;
     public Guid Id { get; } = item.Id;
-    public TrackRow Row { get; } = new(item.Track, number, text, QueueItemId: item.Id);
+    public TrackRow Row { get; } = new(item.Track, number, text, QueueItemId: item.Id) { ArtworkLoader = artwork };
     public bool IsCurrent { get => _isCurrent; internal set => SetProperty(ref _isCurrent, value); }
     public string Description => $"{Row.Artists} · {Row.Album}";
     internal void RefreshLocalizedProperties() { OnPropertyChanged(nameof(Row)); OnPropertyChanged(nameof(Description)); }

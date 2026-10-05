@@ -60,6 +60,7 @@ public sealed partial class ToolsViewModel : PageViewModel
         $"{_text["ConfigurationPath"]}: {ConfigurationPath}", $"{_text["AppSettingsPath"]}: {_runtime.Paths.AppConfigurationFile}",
         $"{_text["DataPath"]}: {DataPath}", $"{_text["HistoryPath"]}: {Path.Combine(DataPath, "command-history.json")}",
         $"{_text["CachePath"]}: {CachePath}", $"{_text["LyricsCachePath"]}: {Path.Combine(CachePath, "Lyrics")}",
+        $"{_text["ImageCachePath"]}: {_runtime.Get<ImageCache>().DirectoryPath}",
         $"{_text["LibraryPath"]}: {LibraryPath}", $"{_text["PluginPath"]}: {PluginPath}", $"{_text["StartupPath"]}: {StartupPath}"
     });
     public string MetadataNamespaces => string.Join(", ", _runtime.Get<IProviderRegistry>().Providers.OfType<IMetadataProvider>()

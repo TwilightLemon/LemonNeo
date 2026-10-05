@@ -120,7 +120,8 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
             minimumConfidence: 0, cancellationToken: ct, searchKeyword: query), ct);
         ct.ThrowIfCancellationRequested();
         MetadataMatches.Clear();
-        foreach (var match in result.Matches) MetadataMatches.Add(new(match, _text, ReplaceMatchMetadataCommand, AddMatchExternalIdsCommand));
+        foreach (var match in result.Matches) MetadataMatches.Add(new(match, _text, ReplaceMatchMetadataCommand, AddMatchExternalIdsCommand)
+            { ArtworkLoader = _runtime.Get<ArtworkService>() });
         RefreshMetadataCommands();
         InspectionMessages = FormatErrors(result.SourceErrors);
         SetStatus("MetadataCompleted", result.Matches.Count);
@@ -182,7 +183,8 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
     {
         base.RefreshLocalizedProperties();
         if (_inspectedLyrics is { } result) LyricsDetails = result.Lyrics is { } lyrics ? FormatLyricsDetails(lyrics, result.ProviderId) : _text["NoLyrics"];
-        for (var i = 0; i < MetadataMatches.Count; i++) MetadataMatches[i] = new(MetadataMatches[i].Match, _text, ReplaceMatchMetadataCommand, AddMatchExternalIdsCommand);
+        for (var i = 0; i < MetadataMatches.Count; i++) MetadataMatches[i] = new(MetadataMatches[i].Match, _text, ReplaceMatchMetadataCommand, AddMatchExternalIdsCommand)
+            { ArtworkLoader = _runtime.Get<ArtworkService>() };
         for (var i = 0; i < DiscoveredSources.Count; i++) DiscoveredSources[i] = new(DiscoveredSources[i].Candidate, _text);
     }
     public override async ValueTask DisposeAsync()

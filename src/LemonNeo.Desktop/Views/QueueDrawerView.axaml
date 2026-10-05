@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:LemonNeo.Desktop.ViewModels" xmlns:i18n="using:LemonNeo.Desktop.Infrastructure"
+             xmlns:controls="using:LemonNeo.Desktop.Controls"
              x:Class="LemonNeo.Desktop.Views.QueueDrawerView" x:DataType="vm:PlaybackQueueViewModel">
   <Grid RowDefinitions="Auto,Auto,*,Auto">
     <StackPanel Spacing="6" Margin="0,0,40,0">
@@ -20,13 +21,15 @@
       <ListBox.ItemTemplate>
         <DataTemplate x:DataType="vm:QueueTrackViewModel">
           <Border Classes="queueTrack" Classes.current="{Binding IsCurrent}" CornerRadius="10" Padding="8,12" MinHeight="64" ToolTip.Tip="{Binding Row.Title}">
-            <Grid ColumnDefinitions="4,*,Auto">
+            <Grid ColumnDefinitions="4,56,*,Auto">
               <Border IsVisible="{Binding IsCurrent}" Width="3" Height="24" CornerRadius="2" Background="{DynamicResource Brush.AccentText}" VerticalAlignment="Center" />
-              <StackPanel Grid.Column="1" Spacing="5" Margin="8,0,8,0">
+              <controls:Artwork Name="QueueTrackArtwork" Grid.Column="1" Width="40" Height="40" CornerRadius="8"
+                                VerticalAlignment="Center" SourceUri="{Binding Row.ArtworkUri}" Loader="{Binding Row.ArtworkLoader}" />
+              <StackPanel Grid.Column="2" Spacing="5" Margin="8,0,8,0">
                 <TextBlock Text="{Binding Row.Title}" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
                 <TextBlock Classes="caption" Text="{Binding Description}" TextTrimming="CharacterEllipsis" />
               </StackPanel>
-              <TextBlock Grid.Column="2" Classes="caption" Text="{Binding Row.Duration}" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="3" Classes="caption" Text="{Binding Row.Duration}" VerticalAlignment="Center" />
             </Grid>
           </Border>
         </DataTemplate>
