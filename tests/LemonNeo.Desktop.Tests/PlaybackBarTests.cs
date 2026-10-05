@@ -83,7 +83,7 @@ public sealed class PlaybackBarTests
             Assert.Equal(root.Bounds.Height, page.TranslatePoint(default, root)!.Value.Y + page.Bounds.Height, precision: 1);
             Assert.True(page.Bounds.Height > bar.Bounds.Height);
             Assert.True(bar.Bounds.Right < root.Bounds.Width);
-            foreach (var name in new[] { "NowPlayingButton", "PreviousButton", "PlayPauseButton", "NextButton", "PlaybackModeButton", "QueueButton" })
+            foreach (var name in new[] { "NowPlayingButton", "PreviousButton", "PlayPauseButton", "NextButton", "PlaybackModeButton", "VolumeButton", "QueueButton" })
             {
                 var button = window.FindControl<Button>(name)!;
                 var position = button.TranslatePoint(default, bar)!.Value;
@@ -100,17 +100,47 @@ public sealed class PlaybackBarTests
             }
 
             var finishLoading = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var busyShown = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            void OnPlaybackPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
+            {
+                if (args.PropertyName == nameof(shell.Playback.IsBusy) && shell.Playback.IsBusy) busyShown.TrySetResult();
+            }
+            shell.Playback.PropertyChanged += OnPlaybackPropertyChanged;
             var loading = shell.Playback.ExecutePlaybackAsync(_ => finishLoading.Task);
             try
             {
+                Assert.False(shell.Playback.IsBusy);
+                Assert.True(shell.Playback.CanInteract);
+                await busyShown.Task.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
                 using var loadingFrame = Capture(window);
-                Assert.False(window.FindControl<Slider>("Timeline")!.IsVisible);
+                Assert.True(window.FindControl<Slider>("Timeline")!.IsVisible);
                 Assert.True(window.FindControl<ProgressBar>("PlaybackLoading")!.IsVisible);
+                Assert.False(shell.IsBusy);
             }
-            finally { finishLoading.TrySetResult(); await loading; }
+            finally
+            {
+                shell.Playback.PropertyChanged -= OnPlaybackPropertyChanged;
+                finishLoading.TrySetResult();
+                await loading;
+            }
             using var loadedFrame = Capture(window);
             Assert.True(window.FindControl<Slider>("Timeline")!.IsVisible);
             Assert.False(window.FindControl<ProgressBar>("PlaybackLoading")!.IsVisible);
+
+            var busyChanges = 0;
+            void CountBusyChanges(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
+            {
+                if (args.PropertyName == nameof(shell.Playback.IsBusy)) busyChanges++;
+            }
+            shell.Playback.PropertyChanged += CountBusyChanges;
+            try
+            {
+                await shell.Playback.ExecutePlaybackAsync(_ => Task.CompletedTask);
+                await Task.Delay(300, TestContext.Current.CancellationToken);
+                Assert.Equal(0, busyChanges);
+                Assert.True(shell.Playback.CanInteract);
+            }
+            finally { shell.Playback.PropertyChanged -= CountBusyChanges; }
 
             await shell.Playback.ExecutePlaybackAsync(_ => Task.FromException(new InvalidOperationException("Source unavailable")));
             using var failedFrame = Capture(window);
@@ -138,6 +168,43 @@ public sealed class PlaybackBarTests
             var finalBottom = finalSection.TranslatePoint(default, root)!.Value.Y + finalSection.Bounds.Height;
             Assert.True(finalBottom <= barTop - 8,
                 $"Bottom={finalBottom}, bar={barTop}, padding={settingsScroll.Padding}, extent={settingsScroll.Extent}, viewport={settingsScroll.Viewport}, offset={settingsScroll.Offset}");
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaTheory]
+    [InlineData(1180, 790)]
+    [InlineData(880, 620)]
+    public void MainContentFadesToTheCanvasAtTheBottomAndKeepsItsFadeDistanceAfterResizing(int width, int height)
+    {
+        var window = new MainWindow { Width = width, Height = height };
+        window.Resources["Brush.Canvas"] = Brushes.Black;
+        var page = window.FindControl<ContentControl>("PageContent")!;
+        page.Content = new Border { Background = Brushes.White };
+        var bar = window.FindControl<Border>("PlaybackBar")!;
+        bar.IsVisible = false;
+        window.Show();
+        try
+        {
+            void AssertFade()
+            {
+                using var frame = Capture(window);
+                byte Brightness(double distanceFromBottom)
+                {
+                    var point = page.TranslatePoint(new Point(page.Bounds.Width / 2, page.Bounds.Height - distanceFromBottom), window)!.Value;
+                    return frame.GetPixel((int)point.X, (int)point.Y).Red;
+                }
+                Assert.InRange(Brightness(80), (byte)245, (byte)255);
+                Assert.InRange(Brightness(32), (byte)112, (byte)144);
+                Assert.InRange(Brightness(2), (byte)0, (byte)16);
+                Assert.True(page.IsEffectivelyVisible);
+                Assert.True(page.IsHitTestVisible);
+                Assert.Null(bar.OpacityMask);
+                Assert.Null(window.FindControl<Border>("Sidebar")!.OpacityMask);
+            }
+            AssertFade();
+            window.Height += 140;
+            AssertFade();
         }
         finally { window.Close(); }
     }

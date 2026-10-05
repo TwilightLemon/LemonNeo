@@ -24,7 +24,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        Closed += (_, _) => CloseDesktopLyrics();
+        Closed += (_, _) => { VolumePopup.IsOpen = false; CloseDesktopLyrics(); };
         // Avalonia draws Windows captions and preserves native macOS traffic lights.
         // Keep system decorations on Linux, where client-area extension varies by window manager.
         ExtendClientAreaToDecorationsHint = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS();
@@ -63,6 +63,28 @@ public partial class MainWindow : Window
 
     public void CloseDesktopLyrics() => _desktopLyrics?.Close();
 
+    private void OnToggleVolume(object? sender, RoutedEventArgs args)
+    {
+        if (DataContext is not MainViewModel { Playback.CanAdjustVolume: true } vm) return;
+        if (!VolumePopup.IsOpen) vm.CloseQueueCommand.Execute(null);
+        VolumePopup.IsOpen = !VolumePopup.IsOpen;
+    }
+
+    private async void OnVolumeOpened(object? sender, EventArgs args)
+    {
+        VolumeSlider.Focus();
+        if (DataContext is MainViewModel vm) await vm.Playback.RefreshVolumeAsync();
+    }
+
+    private void OnVolumeClosed(object? sender, EventArgs args) => VolumeButton.Focus();
+
+    private void OnVolumeKeyDown(object? sender, KeyEventArgs args)
+    {
+        if (args.Key != Key.Escape) return;
+        VolumePopup.IsOpen = false;
+        args.Handled = true;
+    }
+
     private void OnPlaybackBarSizeChanged(object? sender, SizeChangedEventArgs args)
     {
         var inset = args.NewSize.Height + PlaybackBar.Margin.Bottom + 12;
@@ -70,8 +92,18 @@ public partial class MainWindow : Window
         Resources["Space.PlaybackFooterInset"] = new Thickness(0, 12, 0, inset);
     }
 
+    private void OnPageContentSizeChanged(object? sender, SizeChangedEventArgs args)
+    {
+        // A fixed fade distance keeps the transition consistent when the window is resized.
+        var height = args.NewSize.Height;
+        if (height <= 0 || PageContent.OpacityMask is not LinearGradientBrush fade) return;
+        fade.StartPoint = new RelativePoint(0, Math.Max(0, height - 64), RelativeUnit.Absolute);
+        fade.EndPoint = new RelativePoint(0, height, RelativeUnit.Absolute);
+    }
+
     private async void OnQueueOpened(object? sender, EventArgs args)
     {
+        VolumePopup.IsOpen = false;
         _queueAnimation?.Cancel();
         QueueCard.Focus();
         if (DataContext is not MainViewModel vm || vm.SharedContext.Appearance.Current.ReduceMotion) return;

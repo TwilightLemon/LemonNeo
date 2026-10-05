@@ -12,8 +12,41 @@ public sealed class PlaybackResolver(
     PlaybackAudioCache audioCache)
 {
     private IPlaybackDownloadSink? _download;
+    private double _volume = 1;
     public IPlayerProvider? ActivePlayer { get; private set; }
     public Track? CurrentQueueTrack { get; private set; }
+    public double Volume => _volume;
+    public bool CanAdjustVolume => ActivePlayer is { } active
+        ? active.Player is IVolumePlayer
+        : players.Players.Any(player => player.Player is IVolumePlayer);
+
+    public async Task<double> GetVolumeAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (ActivePlayer?.Player is IVolumePlayer player)
+        {
+            var volume = await player.GetVolumeAsync(cancellationToken);
+            ValidateVolume(volume);
+            _volume = volume;
+        }
+        return _volume;
+    }
+
+    public async Task SetVolumeAsync(double volume, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ValidateVolume(volume);
+        if (ActivePlayer?.Player is IVolumePlayer player)
+            await player.SetVolumeAsync(volume, cancellationToken);
+        // Retain the preference before a player is selected and across decoder switches.
+        _volume = volume;
+    }
+
+    private static void ValidateVolume(double volume)
+    {
+        if (!double.IsFinite(volume) || volume is < 0 or > 1)
+            throw new ArgumentOutOfRangeException(nameof(volume), "Volume must be between 0 and 1.");
+    }
 
     public async Task<PlaybackSource> PlayAsync(
         Track track,
@@ -122,6 +155,8 @@ public sealed class PlaybackResolver(
         var player = players.GetRequiredPlayer(source);
         try
         {
+            if (player.Player is IVolumePlayer volumePlayer)
+                await volumePlayer.SetVolumeAsync(_volume, cancellationToken);
             if (source is HttpPlaybackSource { IsDirectAudio: true } http && player.Player is IStreamingPlayer streaming)
             {
                 // Original and discovered external IDs are aliases for this download.

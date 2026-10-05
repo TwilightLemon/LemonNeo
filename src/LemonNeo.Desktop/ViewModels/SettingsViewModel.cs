@@ -7,10 +7,17 @@ namespace LemonNeo.Desktop.ViewModels;
 public sealed class SettingsViewModel : PageViewModel
 {
     private AppearanceService _appearance => Context.Appearance;
+    private UiPreferences _preferences;
+    private int _pendingPreferenceSaves;
+    private readonly List<Task> _preferenceTasks = [];
+    private bool _closing;
     public SettingsViewModel(DesktopContext context) : base(context, DesktopRoutes.Settings)
     {
-        ThemeCommand = new(p => SavePreferencesAsync(current => current with { Theme = Enum.Parse<ThemePreference>(p!) }));
-        LanguageCommand = new(p => SavePreferencesAsync(current => current with { Language = Enum.Parse<LanguagePreference>(p!) }));
+        _preferences = _appearance.Current;
+        ThemeCommand = new(p => SavePreferencesAsync(current => current with { Theme = Enum.Parse<ThemePreference>(p!) }),
+            AsyncRelayCommandOptions.AllowConcurrentExecutions);
+        LanguageCommand = new(p => SavePreferencesAsync(current => current with { Language = Enum.Parse<LanguagePreference>(p!) }),
+            AsyncRelayCommandOptions.AllowConcurrentExecutions);
         ThemeColors = ThemePalette.BuiltIn.Select(p => new ThemeColorOption(p, _appearance, _text,
             id => SavePreferencesAsync(current => current with { ThemeColor = id }))).ToArray();
         _appearance.Changed += OnAppearanceChanged;
@@ -21,8 +28,15 @@ public sealed class SettingsViewModel : PageViewModel
     public IReadOnlyList<ThemeColorOption> ThemeColors { get; }
     public bool UseArtworkColors
     {
-        get => _appearance.Current.UseArtworkColors;
-        set { if (value != UseArtworkColors) _ = SavePreferencesAsync(current => current with { UseArtworkColors = value }); }
+        get => _preferences.UseArtworkColors;
+        set
+        {
+            if (_closing || value == UseArtworkColors) return;
+            _preferences = _preferences with { UseArtworkColors = value };
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ThemeColorStatus));
+            _ = SavePreferencesAsync(current => current with { UseArtworkColors = value });
+        }
     }
     public string ThemeColorStatus => _appearance.Colors.IsUsingArtwork
         ? _text["ThemeColorUsingArtwork"]
@@ -36,25 +50,51 @@ public sealed class SettingsViewModel : PageViewModel
     public bool IsLanguageEnglish => _appearance.Current.Language == LanguagePreference.English;
     public bool ReduceMotion
     {
-        get => _appearance.Current.ReduceMotion;
-        set { if (value != ReduceMotion) _ = SavePreferencesAsync(current => current with { ReduceMotion = value }); }
+        get => _preferences.ReduceMotion;
+        set
+        {
+            if (_closing || value == ReduceMotion) return;
+            _preferences = _preferences with { ReduceMotion = value };
+            OnPropertyChanged();
+            _ = SavePreferencesAsync(current => current with { ReduceMotion = value });
+        }
     }
     public string PluginSummary => _text.Format("PluginCount", _runtime.Get<PluginLoader>().Loaded.Count);
     public string LibraryPath => _runtime.Get<DesktopOptions>().LibraryDirectory;
     public string ConfigurationPath => _runtime.Paths.ConfigurationDirectory;
     public string CachePath => _runtime.Paths.CacheDirectory;
 
-    private Task SavePreferencesAsync(Func<UiPreferences, UiPreferences> update) => RunOperationAsync(async ct =>
+    private Task SavePreferencesAsync(Func<UiPreferences, UiPreferences> update)
+    {
+        if (_closing) return Task.CompletedTask;
+        if (_pendingPreferenceSaves == 0) SetError(null);
+        _pendingPreferenceSaves++;
+        _preferenceTasks.RemoveAll(task => task.IsCompleted);
+        var save = SavePreferencesCoreAsync(update);
+        _preferenceTasks.Add(save);
+        return save;
+    }
+
+    private async Task SavePreferencesCoreAsync(Func<UiPreferences, UiPreferences> update)
     {
         try
         {
-            await _appearance.UpdateAsync(update, ct);
-            SetStatus("Saved");
+            // AppearanceService serializes updates against the latest saved preferences.
+            await _appearance.UpdateAsync(update);
         }
-        finally { RefreshAppearanceProperties(); }
-    }, allowUninitialized: true);
+        catch (Exception exception) { SetError("OperationFailed", [exception.Message]); }
+        finally
+        {
+            if (--_pendingPreferenceSaves == 0) _preferences = _appearance.Current;
+            RefreshAppearanceProperties();
+        }
+    }
 
-    private void OnAppearanceChanged(object? sender, EventArgs args) => RefreshAppearanceProperties();
+    private void OnAppearanceChanged(object? sender, EventArgs args)
+    {
+        if (_pendingPreferenceSaves == 0) _preferences = _appearance.Current;
+        RefreshAppearanceProperties();
+    }
     private void OnColorChanged(object? sender, EventArgs args) => OnPropertyChanged(nameof(ThemeColorStatus));
     private void RefreshAppearanceProperties()
     {
@@ -64,6 +104,8 @@ public sealed class SettingsViewModel : PageViewModel
     protected override void RefreshLocalizedProperties() { base.RefreshLocalizedProperties(); RefreshAppearanceProperties(); }
     public override async ValueTask DisposeAsync()
     {
+        _closing = true;
+        await Task.WhenAll(_preferenceTasks);
         _appearance.Changed -= OnAppearanceChanged;
         _appearance.Colors.Changed -= OnColorChanged;
         await base.DisposeAsync();

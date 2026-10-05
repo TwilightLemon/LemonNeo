@@ -19,7 +19,7 @@ public sealed class PlaybackQueueViewModel : PageViewModel
     {
         Playback = playback;
         _session = _runtime.Get<PlaybackSessionService>();
-        PlayTrackCommand = new(PlayTrackAsync, row => CanPlay && row is not null);
+        PlayTrackCommand = new(PlayTrackAsync, row => CanPlay && row is not null, AsyncRelayCommandOptions.AllowConcurrentExecutions);
         Playback.Changed += OnPlaybackChanged;
         Playback.PropertyChanged += OnPlaybackPropertyChanged;
         RefreshQueue();

@@ -25,7 +25,7 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
     {
         Context = context;
         Route = route;
-        CancelOperationCommand = new(() => _operationCancellation?.Cancel(), () => IsBusy);
+        CancelOperationCommand = new(() => _operationCancellation?.Cancel(), () => _operationCancellation is not null);
         DismissErrorCommand = new(() => SetError(null));
         Context.PropertyChanged += OnContextChanged;
         _text.Changed += OnLanguageChanged;
@@ -36,7 +36,7 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
     public virtual string PageDescription => _text[$"{Route}Description"];
     public virtual string? PageSummary => null;
     public bool IsBusy { get => _isBusy; private set => SetProperty(ref _isBusy, value); }
-    public bool CanInteract => !IsBusy && Context.IsInitialized && !_closing;
+    public virtual bool CanInteract => _operationCancellation is null && Context.IsInitialized && !_closing;
     public bool HasStatus => _statusKey != "Ready";
     public string Status => HasStatus ? _text.Format(_statusKey, _statusArguments) : "";
     public string? Error => _errorKey is null ? null : _text.Format(_errorKey, _errorArguments) +
@@ -47,39 +47,59 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
     public virtual Task ActivateAsync() => Task.CompletedTask;
 
     protected Task ExecuteAsync(Func<CancellationToken, Task> action) => RunOperationAsync(action);
-    protected Task RunOperationAsync(Func<CancellationToken, Task> action, string status = "Working", bool allowUninitialized = false)
+    protected Task RunOperationAsync(Func<CancellationToken, Task> action, string status = "Working", bool allowUninitialized = false,
+        bool showBusy = true, TimeSpan? busyDelay = null)
     {
-        if (IsBusy || _closing || !Context.IsInitialized && !allowUninitialized) return Task.CompletedTask;
+        // Operation ownership controls reentrancy; IsBusy only controls visible progress.
+        if (_operationCancellation is not null || _closing || !Context.IsInitialized && !allowUninitialized) return Task.CompletedTask;
         var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
         _operationCancellation = cancellation;
-        _operation = RunCoreAsync(action, status, cancellation);
+        _operation = RunCoreAsync(action, status, cancellation, showBusy, busyDelay ?? TimeSpan.Zero);
         return _operation;
     }
 
-    private async Task RunCoreAsync(Func<CancellationToken, Task> action, string status, CancellationTokenSource cancellation)
+    private async Task RunCoreAsync(Func<CancellationToken, Task> action, string status, CancellationTokenSource cancellation,
+        bool showBusy, TimeSpan busyDelay)
     {
-        IsBusy = true;
+        using var progressCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
+        var progress = showBusy ? ShowBusyAsync(busyDelay, progressCancellation.Token) : Task.CompletedTask;
         RaiseInteractionProperties();
         SetError(null);
-        SetStatus(status);
+        if (showBusy) SetStatus(status);
         try
         {
             await action(cancellation.Token);
-            if (_statusKey == status) SetStatus("Ready");
+            if (showBusy && _statusKey == status) SetStatus("Ready");
         }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { SetStatus("Cancelled"); }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            if (showBusy) SetStatus("Cancelled");
+        }
         catch (Exception exception)
         {
             SetError(Context.IsInitialized ? "OperationFailed" : "StartupFailed", [exception.Message]);
-            SetStatus("Ready");
+            if (showBusy) SetStatus("Ready");
         }
         finally
         {
+            progressCancellation.Cancel();
+            await progress;
             IsBusy = false;
             _operationCancellation = null;
             cancellation.Dispose();
             RaiseInteractionProperties();
         }
+    }
+
+    private async Task ShowBusyAsync(TimeSpan delay, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (delay > TimeSpan.Zero) await Task.Delay(delay, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            IsBusy = true;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
     }
 
     protected void SetStatus(string key, params object?[] arguments)

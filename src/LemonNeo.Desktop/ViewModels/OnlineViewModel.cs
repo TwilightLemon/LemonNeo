@@ -205,7 +205,7 @@ public sealed partial class OnlineViewModel : PageViewModel
     private void OnAuthenticationChanged(string providerId)
     {
         if (SelectedService?.Id != providerId) return;
-        if (IsBusy) CancelOperationCommand.Execute(null);
+        if (CancelOperationCommand.CanExecute(null)) CancelOperationCommand.Execute(null);
         ResetRemotePlaylists();
         SetError(null);
         SetStatus("Ready");

@@ -287,3 +287,13 @@ public interface ISeekablePlayer : IPlayer
 {
     Task SeekAsync(TimeSpan position, CancellationToken cancellationToken = default);
 }
+
+/// <summary>Optional capability for application volume, independent of the system volume.</summary>
+public interface IVolumePlayer : IPlayer
+{
+    /// <summary>Returns volume from 0 (muted) to 1 (full volume), including while stopped.</summary>
+    Task<double> GetVolumeAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Sets a finite volume between 0 and 1 and retains it for subsequent streams.</summary>
+    Task SetVolumeAsync(double volume, CancellationToken cancellationToken = default);
+}

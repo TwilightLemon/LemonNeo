@@ -128,6 +128,58 @@ public sealed class PlaylistViewTests
         finally { window.Close(); }
     }
 
+    [AvaloniaFact]
+    public async Task SidebarSelectionFollowsTheCurrentPageAndBackForwardHistory()
+    {
+        using var paths = new TestPaths();
+        await using var runtime = new DesktopRuntime(paths,
+            new DesktopOptions(Path.Combine(paths.DataDirectory, "plugins"), paths.MusicLibraryDirectory));
+        var text = new LocalizationService();
+        using var appearance = new AppearanceService(Avalonia.Application.Current!, text, new AppearanceTests.MemoryStore());
+        await appearance.SetAsync(new UiPreferences(ReduceMotion: true));
+        await using var shell = new MainViewModel(runtime, text, appearance, runtime.Get<ArtworkService>());
+        await shell.InitializeAsync();
+        var playlists = runtime.Get<PlaylistService>();
+        var playlist = playlists.Create("Selected playlist");
+        shell.SharedContext.RefreshLibrary();
+        var selected = Assert.Single(shell.Playlists);
+        var window = new MainWindow { DataContext = shell };
+        window.Show();
+        try
+        {
+            var list = window.FindControl<ListBox>("PlaylistList")!;
+            foreach (var route in new[] { DesktopRoutes.Settings, DesktopRoutes.Tools, DesktopRoutes.Search, DesktopRoutes.Queue, DesktopRoutes.Lyrics, DesktopRoutes.Library })
+            {
+                // Selecting the same menu item again after leaving its page must navigate again.
+                list.SelectedItem = selected;
+                await shell.Navigation.NavigateAsync(DesktopRoutes.Library, playlist.Id);
+                Dispatcher.UIThread.RunJobs();
+                Assert.Same(selected, shell.SelectedPlaylist);
+                Assert.Same(selected, list.SelectedItem);
+                var page = shell.Navigation.Current;
+                await shell.Navigation.NavigateAsync(route);
+                Dispatcher.UIThread.RunJobs();
+                Assert.Null(shell.SelectedPlaylist);
+                Assert.Null(list.SelectedItem);
+                Assert.False(Assert.IsType<ListBoxItem>(list.ContainerFromIndex(shell.Playlists.IndexOf(selected))).IsSelected);
+                shell.SharedContext.RefreshLibrary();
+                Assert.Null(shell.SelectedPlaylist);
+                Assert.Equal(route, shell.Navigation.Current.Route);
+                await shell.Navigation.GoBackAsync();
+                Dispatcher.UIThread.RunJobs();
+                Assert.Same(page, shell.Navigation.Current);
+                Assert.Same(selected, shell.SelectedPlaylist);
+                Assert.Same(selected, list.SelectedItem);
+                await shell.Navigation.GoForwardAsync();
+                Dispatcher.UIThread.RunJobs();
+                Assert.Equal(route, shell.Navigation.Current.Route);
+                Assert.Null(shell.SelectedPlaylist);
+                Assert.Null(list.SelectedItem);
+            }
+        }
+        finally { window.Close(); }
+    }
+
     private static Track Track(string id, int? seconds) => new()
     {
         Id = new("test", id), Title = id,

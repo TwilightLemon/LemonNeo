@@ -13,7 +13,7 @@ public sealed class ThemeColorOption(ThemeColorDefinition definition, Appearance
     public IBrush Accent { get; } = new SolidColorBrush(definition.Accent);
     public IBrush Dark { get; } = new SolidColorBrush(definition.DarkBase);
     public IBrush Light { get; } = new SolidColorBrush(definition.LightBase);
-    public AsyncRelayCommand SelectCommand { get; } = new(() => select(definition.Id));
+    public AsyncRelayCommand SelectCommand { get; } = new(() => select(definition.Id), AsyncRelayCommandOptions.AllowConcurrentExecutions);
 
     public void Refresh()
     {

@@ -329,6 +329,7 @@
   "HelpText": "Search music or find a track by native ID, then play it or add it to a local playlist.\nAccounts lets you sign in with a site cookie. Import playlists lets you browse and import your remote playlists.\nSelect a playlist to edit its name or description, create tracks, remove items, reorder them, or match metadata.\nTrack details edits the selected playlist item independently. Preview matching metadata and apply it before saving. External IDs identify a namespace, optional kind and value.\nNow playing follows main lyrics, romanization and translation. Reached words remain highlighted while paused; stop clears the active rows.\nPlayback source selection applies when starting a track or playlist. Existing queue selections retain their chosen source.\nChanges are saved after each edit and when closing. Tools includes diagnostics, shared paths, sync and the Console startup script.\nImport shortcut: Command+O on macOS, Ctrl+O on Windows and Linux.",
   "FolderPlaylistName": "Imported playlist name (empty = folder name)",
   "CancelOperation": "Cancel action",
+  "Volume": "Volume",
   "NoMatchesYet": "No results yet",
   "NoMatchesDescription": "Run a lookup to see results here."
 }

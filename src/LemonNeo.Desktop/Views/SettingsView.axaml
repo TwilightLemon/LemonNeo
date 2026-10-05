@@ -2,14 +2,7 @@
              xmlns:controls="using:LemonNeo.Desktop.Controls" xmlns:vm="using:LemonNeo.Desktop.ViewModels" xmlns:i18n="using:LemonNeo.Desktop.Infrastructure"
              x:Class="LemonNeo.Desktop.Views.SettingsView" x:DataType="vm:SettingsViewModel">
   <Grid RowDefinitions="Auto,Auto,*">
-    <controls:PageHeader Title="{Binding PageTitle}" Summary="{Binding PageSummary}">
-      <controls:PageHeader.Actions>
-        <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsBusy}" ToolTip.Tip="{Binding Status}">
-          <ProgressBar IsIndeterminate="True" Width="60" Height="3" VerticalAlignment="Center" AutomationProperties.Name="{Binding Status}" />
-          <Button Classes="ghost" Command="{Binding CancelOperationCommand}" Content="{Translate {x:Static i18n:LanguageManager+Keys.CancelOperation}}" />
-        </StackPanel>
-      </controls:PageHeader.Actions>
-    </controls:PageHeader>
+    <controls:PageHeader Title="{Binding PageTitle}" Summary="{Binding PageSummary}" />
     <Border Grid.Row="1" IsVisible="{Binding HasError}" Background="{DynamicResource Brush.DangerSoft}" CornerRadius="10" Padding="14" Margin="0,0,0,12">
       <Grid ColumnDefinitions="*,Auto">
         <TextBlock Text="{Binding Error}" Foreground="{DynamicResource Brush.Danger}" TextWrapping="Wrap" MaxHeight="90" />
@@ -20,7 +13,7 @@
       <ScrollViewer HorizontalScrollBarVisibility="Disabled">
         <StackPanel Spacing="18">
           <Border Classes="card">
-            <StackPanel Spacing="16" IsEnabled="{Binding !IsBusy}">
+            <StackPanel Spacing="16">
               <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.Appearance}}" />
               <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Translate {x:Static i18n:LanguageManager+Keys.AppearanceDescription}}" />
               <WrapPanel Orientation="Horizontal">
@@ -58,7 +51,7 @@
             </StackPanel>
           </Border>
           <Border Classes="card">
-            <StackPanel Spacing="16" IsEnabled="{Binding !IsBusy}">
+            <StackPanel Spacing="16">
               <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.Language}}" />
               <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Translate {x:Static i18n:LanguageManager+Keys.LanguageDescription}}" />
               <WrapPanel Orientation="Horizontal">
@@ -69,7 +62,7 @@
             </StackPanel>
           </Border>
           <Border Classes="card">
-            <StackPanel Spacing="14" IsEnabled="{Binding !IsBusy}">
+            <StackPanel Spacing="14">
               <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.Motion}}" />
               <ToggleSwitch IsChecked="{Binding ReduceMotion}" Content="{Translate {x:Static i18n:LanguageManager+Keys.ReduceMotion}}" />
               <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Translate {x:Static i18n:LanguageManager+Keys.MotionDescription}}" />

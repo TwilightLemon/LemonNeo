@@ -140,6 +140,7 @@ public sealed record PlaybackQueueState
     public PlaybackRequest Request { get; init; } = new();
     public TimeSpan Position { get; init; }
     public PlaybackStatus Status { get; init; }
+    public double Volume { get; init; } = 1;
     public DateTimeOffset UpdatedAt { get; init; } = DateTimeOffset.UtcNow;
 }
 

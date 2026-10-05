@@ -20,6 +20,11 @@ public sealed class PlaybackViewModel : PageViewModel
     private Uri? _artworkUri;
     private Bitmap? _nowArtwork;
     private PlaybackSessionSnapshot _snapshot;
+    private double _volumePercent;
+    private bool _isUpdatingVolume;
+    private bool _volumeUpdatePending;
+    private Task _volumeUpdateTask = Task.CompletedTask;
+    private Task _volumeReadTask = Task.CompletedTask;
     private bool _closing;
     public bool IsSeeking { get; set; }
     public PlaybackSessionSnapshot Snapshot => _snapshot;
@@ -31,15 +36,20 @@ public sealed class PlaybackViewModel : PageViewModel
         _interaction = _runtime.Get<IPlaybackInteraction>();
         _artwork = artwork;
         _snapshot = _session.Snapshot;
-        TogglePlaybackCommand = new(() => ExecutePlaybackAsync(ct => _interaction.ExecuteAsync(PlaybackCommand.TogglePlayPause, cancellationToken: ct)));
-        PreviousCommand = new(() => ExecutePlaybackAsync(ct => _interaction.ExecuteAsync(PlaybackCommand.Previous, cancellationToken: ct)));
-        NextCommand = new(() => ExecutePlaybackAsync(ct => _interaction.ExecuteAsync(PlaybackCommand.Next, cancellationToken: ct)));
-        StopCommand = new(() => ExecutePlaybackAsync(ct => _session.StopAsync(ct)));
-        ClearQueueCommand = new(() => ExecutePlaybackAsync(ct => _session.ClearQueueAsync(ct)));
-        CycleModeCommand = new(() => ExecutePlaybackAsync(ct => _session.SetModeAsync((PlaybackMode)(((int)_snapshot.Mode + 1) % 3), ct)));
-        ModeCommand = new(mode => ExecutePlaybackAsync(ct => _session.SetModeAsync(Enum.Parse<PlaybackMode>(mode!), ct)));
+        _volumePercent = _session.Volume * 100;
+        // The shared operation gate rejects duplicate input without dimming command buttons.
+        const AsyncRelayCommandOptions commandOptions = AsyncRelayCommandOptions.AllowConcurrentExecutions;
+        TogglePlaybackCommand = new(() => ExecutePlaybackAsync(ct => _interaction.ExecuteAsync(PlaybackCommand.TogglePlayPause, cancellationToken: ct),
+            showBusy: _snapshot.State == PlayerState.Stopped), commandOptions);
+        PreviousCommand = new(() => ExecutePlaybackAsync(ct => _interaction.ExecuteAsync(PlaybackCommand.Previous, cancellationToken: ct)), commandOptions);
+        NextCommand = new(() => ExecutePlaybackAsync(ct => _interaction.ExecuteAsync(PlaybackCommand.Next, cancellationToken: ct)), commandOptions);
+        StopCommand = new(() => ExecutePlaybackAsync(ct => _session.StopAsync(ct), showBusy: false), commandOptions);
+        ClearQueueCommand = new(() => ExecutePlaybackAsync(ct => _session.ClearQueueAsync(ct), showBusy: false), commandOptions);
+        CycleModeCommand = new(() => ExecutePlaybackAsync(ct => _session.SetModeAsync((PlaybackMode)(((int)_snapshot.Mode + 1) % 3), ct), showBusy: false), commandOptions);
+        ModeCommand = new(mode => ExecutePlaybackAsync(ct => _session.SetModeAsync(Enum.Parse<PlaybackMode>(mode!), ct), showBusy: false), commandOptions);
         _session.StateChanged += OnPlaybackChanged;
         _session.TimelineChanged += OnPlaybackChanged;
+        _session.VolumeChanged += OnVolumeChanged;
     }
     public AsyncRelayCommand TogglePlaybackCommand { get; }
     public AsyncRelayCommand PreviousCommand { get; }
@@ -48,6 +58,8 @@ public sealed class PlaybackViewModel : PageViewModel
     public AsyncRelayCommand ClearQueueCommand { get; }
     public AsyncRelayCommand CycleModeCommand { get; }
     public AsyncRelayCommand<string> ModeCommand { get; }
+    // Playback execution is exclusive, but its progress must not disable the whole control bar.
+    public override bool CanInteract => Context.IsInitialized && !_closing;
     private bool CanControlPlayback => CanInteract;
     public string NowTitle => _snapshot.CurrentTrack?.Title ?? _text["NoTrack"];
     public string NowArtist => _snapshot.CurrentTrack is { } track
@@ -66,15 +78,29 @@ public sealed class PlaybackViewModel : PageViewModel
     public bool CanNext => CanControlPlayback && _interaction.Snapshot.Controls.HasFlag(PlaybackControls.Next);
     public bool CanTogglePlayback => CanControlPlayback && HasCurrentTrack;
     public bool CanSeek => CanControlPlayback && _interaction.Snapshot.Controls.HasFlag(PlaybackControls.Seek) && _snapshot.Timeline.Duration is { Ticks: > 0 };
+    public bool CanAdjustVolume => CanInteract && _session.CanAdjustVolume;
+    public double VolumePercent
+    {
+        get => _volumePercent;
+        set
+        {
+            if (!CanAdjustVolume || !double.IsFinite(value)) return;
+            if (!SetDisplayedVolume(Math.Clamp(value, 0, 100))) return;
+            _volumeUpdatePending = true;
+            if (!_isUpdatingVolume) _volumeUpdateTask = ApplyVolumeAsync();
+        }
+    }
+    public string VolumeLabel => $"{Math.Round(VolumePercent)}%";
+    public bool IsMuted => VolumePercent <= 0;
     public double PositionSeconds => _snapshot.Timeline.Position.TotalSeconds;
     public double DurationSeconds => Math.Max(1, _snapshot.Timeline.Duration?.TotalSeconds ?? 1);
     public string PositionText => TrackRow.FormatTime(_snapshot.Timeline.Position);
     public string DurationText => _snapshot.Timeline.Duration is { } duration ? TrackRow.FormatTime(duration) : "—";
-    public string TimeLabel => $"{PositionText}/{DurationText}";
+    public string TimeLabel => $"{PositionText} / {DurationText}";
     public string PlaybackDetails => _text.Format("PlaybackDetailsFormat", _snapshot.CurrentTrack?.Id.ToString() ?? "—",
         _snapshot.CurrentIndex + 1, _snapshot.QueueCount, _snapshot.PlayerId ?? "—", _snapshot.RequiredSourceProviderId ?? _text["Automatic"]);
     public Task SeekAsync(double seconds) => CanSeek
-        ? ExecutePlaybackAsync(ct => _session.SeekAsync(TimeSpan.FromSeconds(Math.Clamp(seconds, 0, DurationSeconds)), ct))
+        ? ExecutePlaybackAsync(ct => _session.SeekAsync(TimeSpan.FromSeconds(Math.Clamp(seconds, 0, DurationSeconds)), ct), showBusy: false)
         : Task.CompletedTask;
 
     public void EndSeek()
@@ -83,18 +109,73 @@ public sealed class PlaybackViewModel : PageViewModel
         OnPropertyChanged(nameof(PositionSeconds));
     }
 
-    public Task ExecutePlaybackAsync(Func<CancellationToken, Task> action) => ExecuteAsync(async ct =>
+    public Task ExecutePlaybackAsync(Func<CancellationToken, Task> action, bool showBusy = true) => RunOperationAsync(async ct =>
     {
         try { await Task.Run(() => action(ct), ct); }
         finally { UpdateSnapshot(); }
-    });
+    }, showBusy: showBusy, busyDelay: TimeSpan.FromMilliseconds(250));
     private void OnPlaybackChanged(object? sender, PlaybackSessionChangedEventArgs args) =>
         Dispatcher.UIThread.Post(() => { if (Context.IsInitialized && !_closing) UpdateSnapshot(); });
     public void UpdateSnapshot()
     {
         _snapshot = _session.GetCurrentSnapshot();
+        if (!_isUpdatingVolume) SetDisplayedVolume(_session.Volume * 100);
         UpdateArtwork(); RaisePlaybackProperties(); Changed?.Invoke(this, EventArgs.Empty);
     }
+
+    public Task RefreshVolumeAsync()
+    {
+        if (!CanAdjustVolume) return Task.CompletedTask;
+        if (_volumeReadTask.IsCompleted) _volumeReadTask = ReadVolumeAsync();
+        return _volumeReadTask;
+    }
+
+    private async Task ReadVolumeAsync()
+    {
+        try
+        {
+            await Task.Run(() => _session.GetVolumeAsync(_lifetime.Token), _lifetime.Token);
+            if (!_closing && !_isUpdatingVolume) SetDisplayedVolume(_session.Volume * 100);
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { SetError("OperationFailed", [exception.Message]); }
+    }
+
+    private async Task ApplyVolumeAsync()
+    {
+        _isUpdatingVolume = true;
+        SetError(null);
+        try
+        {
+            // Coalesce slider input while the decoder or persistence is still processing it.
+            // Accepted changes finish during shutdown without entering the page's busy state.
+            while (_volumeUpdatePending)
+            {
+                _volumeUpdatePending = false;
+                var volume = _volumePercent / 100;
+                try { await Task.Run(() => _session.SetVolumeAsync(volume)); }
+                catch (Exception exception) { SetError("OperationFailed", [exception.Message]); }
+            }
+        }
+        finally
+        {
+            _isUpdatingVolume = false;
+            SetDisplayedVolume(_session.Volume * 100);
+        }
+    }
+
+    private bool SetDisplayedVolume(double percent)
+    {
+        if (!SetProperty(ref _volumePercent, percent, nameof(VolumePercent))) return false;
+        OnPropertyChanged(nameof(VolumeLabel));
+        OnPropertyChanged(nameof(IsMuted));
+        return true;
+    }
+
+    private void OnVolumeChanged(object? sender, EventArgs args) => Dispatcher.UIThread.Post(() =>
+    {
+        if (!_closing && !_isUpdatingVolume) SetDisplayedVolume(_session.Volume * 100);
+    });
     private void UpdateArtwork()
     {
         var uri = _snapshot.CurrentTrack?.ArtworkUri;
@@ -142,7 +223,7 @@ public sealed class PlaybackViewModel : PageViewModel
 
     private void RaisePlaybackProperties()
     {
-        foreach (var name in new[] { nameof(NowTitle), nameof(NowArtist), nameof(HasCurrentTrack), nameof(IsPlaying), nameof(PlayLabel), nameof(PlaybackLabel), nameof(ModeLabel), nameof(IsSequential), nameof(IsRepeatAll), nameof(IsShuffle), nameof(CanPrevious), nameof(CanNext), nameof(CanTogglePlayback), nameof(CanSeek), nameof(DurationSeconds), nameof(PositionText), nameof(DurationText) }) OnPropertyChanged(name);
+        foreach (var name in new[] { nameof(NowTitle), nameof(NowArtist), nameof(HasCurrentTrack), nameof(IsPlaying), nameof(PlayLabel), nameof(PlaybackLabel), nameof(ModeLabel), nameof(IsSequential), nameof(IsRepeatAll), nameof(IsShuffle), nameof(CanPrevious), nameof(CanNext), nameof(CanTogglePlayback), nameof(CanSeek), nameof(CanAdjustVolume), nameof(DurationSeconds), nameof(PositionText), nameof(DurationText) }) OnPropertyChanged(name);
         if (!IsSeeking) OnPropertyChanged(nameof(PositionSeconds));
         OnPropertyChanged(nameof(PlaybackDetails)); OnPropertyChanged(nameof(TimeLabel));
     }
@@ -153,8 +234,10 @@ public sealed class PlaybackViewModel : PageViewModel
     {
         _closing = true;
         _session.StateChanged -= OnPlaybackChanged; _session.TimelineChanged -= OnPlaybackChanged;
+        _session.VolumeChanged -= OnVolumeChanged;
         await _lifetime.CancelAsync();
         await base.DisposeAsync();
+        await Task.WhenAll(_volumeUpdateTask, _volumeReadTask);
         await Task.WhenAll(_artworkTasks);
         SetArtwork(null); _artworkCancellation?.Dispose(); _lifetime.Dispose();
     }

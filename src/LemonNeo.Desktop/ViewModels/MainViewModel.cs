@@ -62,7 +62,7 @@ public sealed class MainViewModel : PageViewModel
             SearchCommand.NotifyCanExecuteChanged();
         }
     }
-    public bool CanSearch => Context.IsInitialized && !string.IsNullOrWhiteSpace(SearchQuery) && _searchPage?.IsBusy != true;
+    public bool CanSearch => Context.IsInitialized && !string.IsNullOrWhiteSpace(SearchQuery) && _searchPage?.CanInteract != false;
     public AsyncRelayCommand SearchCommand { get; }
     public PlaybackQueueViewModel? QueueDrawer { get => _queueDrawer; private set => SetProperty(ref _queueDrawer, value); }
     public bool IsQueueOpen
@@ -104,7 +104,7 @@ public sealed class MainViewModel : PageViewModel
     {
         if (args.PropertyName == nameof(SearchViewModel.SearchQuery) && ReferenceEquals(Navigation.Current, _searchPage))
             SearchQuery = _searchPage!.SearchQuery;
-        if (args.PropertyName == nameof(SearchViewModel.IsBusy))
+        if (args.PropertyName == nameof(SearchViewModel.CanInteract))
         {
             OnPropertyChanged(nameof(CanSearch));
             SearchCommand.NotifyCanExecuteChanged();
@@ -137,14 +137,19 @@ public sealed class MainViewModel : PageViewModel
     {
         if (args.PropertyName != nameof(DesktopNavigation.Current)) return;
         IsQueueOpen = false;
-        if (Navigation.Current is LibraryViewModel { IsLibrary: true } library)
-            SetProperty(ref _selectedPlaylist, Playlists.FirstOrDefault(p => p.Id == library.SelectedPlaylist?.Id), nameof(SelectedPlaylist));
+        SyncPlaylistSelection();
         if (Navigation.Current is SearchViewModel search) SearchQuery = search.SearchQuery;
+    }
+
+    private void SyncPlaylistSelection()
+    {
+        var playlistId = Navigation.Current is LibraryViewModel { IsLibrary: true } library
+            ? library.SelectedPlaylist?.Id : null;
+        SetProperty(ref _selectedPlaylist, Playlists.FirstOrDefault(p => p.Id == playlistId), nameof(SelectedPlaylist));
     }
 
     private void OnLibraryChanged(object? sender, EventArgs args)
     {
-        var selectedId = _selectedPlaylist?.Id;
         var values = Context.Playlists;
         for (var i = Playlists.Count - 1; i >= 0; i--)
             if (!values.Any(p => p.Id == Playlists[i].Id)) Playlists.RemoveAt(i);
@@ -159,7 +164,7 @@ public sealed class MainViewModel : PageViewModel
                 if (index != i) Playlists.Move(index, i);
             }
         }
-        SetProperty(ref _selectedPlaylist, Playlists.FirstOrDefault(p => p.Id == selectedId), nameof(SelectedPlaylist));
+        SyncPlaylistSelection();
     }
 
     public Task InitializeAsync() => RunOperationAsync(async ct =>

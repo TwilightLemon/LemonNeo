@@ -68,6 +68,18 @@
     <Setter Property="OffContent" Value="{Translate {x:Static i18n:LanguageManager+Keys.Off}}" />
   </Style>
   <Style Selector="ListBox"><Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /></Style>
+  <Style Selector="ListBox /template/ ScrollViewer#PART_ScrollViewer">
+    <Setter Property="AllowAutoHide" Value="False" />
+  </Style>
+  <!-- Keep the viewport stable while hiding scrollbars outside the hovered list. -->
+  <Style Selector="ListBox:not(:pointerover) /template/ ScrollViewer#PART_ScrollViewer /template/ ScrollBar">
+    <Setter Property="Opacity" Value="0" />
+    <Setter Property="IsHitTestVisible" Value="False" />
+  </Style>
+  <Style Selector="ListBox:pointerover /template/ ScrollViewer#PART_ScrollViewer /template/ ScrollBar">
+    <Setter Property="Opacity" Value="1" />
+    <Setter Property="IsHitTestVisible" Value="True" />
+  </Style>
   <Style Selector="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="Padding" Value="12,10" /><Setter Property="Margin" Value="0,2" /><Setter Property="CornerRadius" Value="{DynamicResource Radius.Control}" /></Style>
   <Style Selector="ListBoxItem:selected /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource Brush.AccentSoft}" /></Style>
   <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource Brush.Hover}" /></Style>

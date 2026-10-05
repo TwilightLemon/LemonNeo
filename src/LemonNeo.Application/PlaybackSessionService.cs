@@ -68,9 +68,12 @@ public sealed class PlaybackSessionService(
 
     public event EventHandler<PlaybackSessionChangedEventArgs>? StateChanged;
     public event EventHandler<PlaybackSessionChangedEventArgs>? TimelineChanged;
+    public event EventHandler<EventArgs>? VolumeChanged;
     public event EventHandler<PlaybackCompletedEventArgs>? PlaybackCompleted;
 
     public IPlaybackQueue Queue => queue;
+    public double Volume => resolver.Volume;
+    public bool CanAdjustVolume => resolver.CanAdjustVolume;
 
     public PlaybackSessionSnapshot Snapshot
     {
@@ -137,6 +140,7 @@ public sealed class PlaybackSessionService(
 
             var saved = await repository.LoadAsync(cancellationToken);
             queue.Restore(saved);
+            await resolver.SetVolumeAsync(double.IsFinite(saved.Volume) ? Math.Clamp(saved.Volume, 0, 1) : 1, cancellationToken);
             if (queue.CurrentItem is { } restoredItem && restoredItem.Id == saved.CurrentItemId)
             {
                 _restoredItemId = saved.CurrentItemId;
@@ -175,7 +179,8 @@ public sealed class PlaybackSessionService(
             queue.Replace([track]);
             ResetRestoredState();
             queue.SetRequest(request ?? new PlaybackRequest());
-            await repository.SaveAsync(queue.Snapshot(), cancellationToken);
+            PublishSelectedTrack();
+            await repository.SaveAsync(queue.Snapshot() with { Volume = Volume }, cancellationToken);
             await resolver.PlayAsync(track, queue.Request, cancellationToken);
             await SaveSessionStateAsync(cancellationToken);
             _completionHandled = false;
@@ -218,7 +223,8 @@ public sealed class PlaybackSessionService(
             queue.Replace(values, startIndex);
             ResetRestoredState();
             queue.SetRequest(request ?? new PlaybackRequest());
-            await repository.SaveAsync(queue.Snapshot(), cancellationToken);
+            PublishSelectedTrack();
+            await repository.SaveAsync(queue.Snapshot() with { Volume = Volume }, cancellationToken);
             await resolver.PlayAsync(queue.CurrentItem!.Track, queue.Request, cancellationToken);
             await SaveSessionStateAsync(cancellationToken);
             _completionHandled = false;
@@ -273,6 +279,7 @@ public sealed class PlaybackSessionService(
                 return null;
             }
 
+            PublishSelectedTrack();
             await resolver.PlayAsync(item.Track, queue.Request, cancellationToken);
             if (_restoredItemId == item.Id && _restoredPosition > TimeSpan.Zero)
             {
@@ -329,6 +336,30 @@ public sealed class PlaybackSessionService(
     }
 
     public bool CanSeek => resolver.ActivePlayer?.Player is ISeekablePlayer;
+
+    public async Task<double> GetVolumeAsync(CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            EnsureReady();
+            return await resolver.GetVolumeAsync(cancellationToken);
+        }
+        finally { _gate.Release(); }
+    }
+
+    public async Task SetVolumeAsync(double volume, CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            EnsureReady();
+            await resolver.SetVolumeAsync(volume, cancellationToken);
+            await SaveSessionStateAsync(cancellationToken);
+        }
+        finally { _gate.Release(); }
+        Raise(VolumeChanged, EventArgs.Empty);
+    }
 
     public async Task SeekAsync(TimeSpan position, CancellationToken cancellationToken = default)
     {
@@ -431,7 +462,8 @@ public sealed class PlaybackSessionService(
             if (item is not null || stopWhenUnavailable)
             {
                 ResetRestoredState();
-                await repository.SaveAsync(queue.Snapshot(), cancellationToken);
+                PublishSelectedTrack();
+                await repository.SaveAsync(queue.Snapshot() with { Volume = Volume }, cancellationToken);
             }
             if (item is null && stopWhenUnavailable)
             {
@@ -538,6 +570,7 @@ public sealed class PlaybackSessionService(
                 var next = queue.MoveNext();
                 ResetRestoredState();
                 nextTrack = next?.Track;
+                PublishSelectedTrack();
                 if (next is null)
                 {
                     await resolver.StopAsync(cancellationToken);
@@ -631,6 +664,7 @@ public sealed class PlaybackSessionService(
         var snapshot = CaptureSnapshot();
         var state = queue.Snapshot() with
         {
+            Volume = Volume,
             Position = snapshot.Timeline.Position,
             Status = snapshot.RestoredStatus ?? snapshot.State switch
             {
@@ -643,12 +677,32 @@ public sealed class PlaybackSessionService(
         _lastSavedAt = DateTimeOffset.UtcNow;
     }
 
-    private void SetSnapshot(PlaybackSessionSnapshot snapshot)
+    private void PublishSelectedTrack()
+    {
+        // Queue metadata is available before persistence, source discovery, or decoder startup.
+        // Detach the previous player so UI reads cannot mix its timeline with the new track
+        // or wait on the decoder while it opens a network stream.
+        var track = queue.CurrentItem?.Track;
+        var snapshot = new PlaybackSessionSnapshot(
+            PlayerState.Stopped,
+            track,
+            new PlaybackTimelineInfo(_restoredItemId == queue.CurrentItem?.Id ? _restoredPosition : TimeSpan.Zero, track?.Duration),
+            queue.Mode,
+            queue.CurrentIndex,
+            queue.Items.Count,
+            null,
+            queue.Request.RequiredSourceProviderId,
+            _restoredStatus);
+        SetSnapshot(snapshot, useActivePlayer: false);
+        Raise(StateChanged, new PlaybackSessionChangedEventArgs(snapshot));
+    }
+
+    private void SetSnapshot(PlaybackSessionSnapshot snapshot, bool useActivePlayer = true)
     {
         lock (_snapshotGate)
         {
             _snapshot = snapshot;
-            _snapshotPlayer = resolver.ActivePlayer?.Player;
+            _snapshotPlayer = useActivePlayer ? resolver.ActivePlayer?.Player : null;
             _snapshotPlayerTrackId = _snapshotPlayer?.CurrentTrack?.Id;
         }
     }

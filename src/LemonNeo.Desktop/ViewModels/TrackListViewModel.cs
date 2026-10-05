@@ -16,8 +16,8 @@ public abstract class TrackListViewModel : PageViewModel
     protected TrackListViewModel(DesktopContext context, DesktopNavigation navigation, PlaybackViewModel playback, string route) : base(context, route)
     {
         Navigation = navigation; Playback = playback;
-        PlayAllCommand = new(() => PlayAsync());
-        PlaySelectedCommand = new(() => PlayAsync(SelectedTrack));
+        PlayAllCommand = new(() => PlayAsync(), AsyncRelayCommandOptions.AllowConcurrentExecutions);
+        PlaySelectedCommand = new(() => PlayAsync(SelectedTrack), AsyncRelayCommandOptions.AllowConcurrentExecutions);
         InspectTrackCommand = new(() => { if (CanInspectTrack && SelectedTrack is { } row) _ = Navigation.OpenEditorAsync(row); });
         AddToPlaylistCommand = new(() => SelectedTrack is { } row && TargetPlaylist is { } target ? AddTrackAsync(target.Id, row.Track) : Task.CompletedTask);
         Context.LibraryChanged += OnLibraryChanged;

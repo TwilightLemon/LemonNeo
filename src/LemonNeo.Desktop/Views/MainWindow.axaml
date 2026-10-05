@@ -317,9 +317,17 @@
       <ContentControl
         Name="PageContent"
         Grid.Row="1"
+        SizeChanged="OnPageContentSizeChanged"
         HorizontalContentAlignment="Stretch"
         VerticalContentAlignment="Stretch"
-        Content="{Binding Navigation.Host}" />
+        Content="{Binding Navigation.Host}">
+        <ContentControl.OpacityMask>
+          <LinearGradientBrush StartPoint="0%,90%" EndPoint="0%,100%">
+            <GradientStop Offset="0" Color="White" />
+            <GradientStop Offset="1" Color="Transparent" />
+          </LinearGradientBrush>
+        </ContentControl.OpacityMask>
+      </ContentControl>
     </Grid>
     <Border
       Name="PlaybackBar"
@@ -330,14 +338,14 @@
       Margin="20,0,20,20"
       VerticalAlignment="Bottom"
       Background="Transparent"
+      BorderBrush="{DynamicResource Brush.Border}"
+      BorderThickness="1"
       BoxShadow="0 8 28 0 #24000000"
-      CornerRadius="24"
+      CornerRadius="20"
       SizeChanged="OnPlaybackBarSizeChanged">
       <Grid>
         <controls:FrostedGlass
           Background="{DynamicResource Brush.PlaybackSurface}"
-          BorderBrush="{DynamicResource Brush.Border}"
-          BorderThickness="1"
           CornerRadius="20"
           IsHitTestVisible="False" />
         <Grid Margin="16,24,16,16" RowDefinitions="Auto,*">
@@ -546,7 +554,7 @@
                 Grid.Column="1"
                 Margin="8,0,0,0"
                 VerticalAlignment="Center"
-                ColumnDefinitions="*,Auto">
+                ColumnDefinitions="*,Auto,Auto">
                 <TextBlock
                   HorizontalAlignment="Right"
                   VerticalAlignment="Center"
@@ -554,8 +562,27 @@
                   Text="{Binding Playback.TimeLabel}"
                   TextTrimming="CharacterEllipsis" />
                 <Button
-                  Name="QueueButton"
+                  Name="VolumeButton"
                   Grid.Column="1"
+                  Margin="8,0,0,0"
+                  Padding="0"
+                  AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Volume}}"
+                  Classes="ghost icon"
+                  Click="OnToggleVolume"
+                  IsEnabled="{Binding Playback.CanAdjustVolume}"
+                  ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Volume}}">
+                  <Grid>
+                    <Viewbox Height="18" MaxWidth="20" IsVisible="{Binding !Playback.IsMuted}">
+                      <Path Data="{StaticResource Icon.Volume}" Fill="{DynamicResource Brush.TextSecondary}" Stretch="Uniform" />
+                    </Viewbox>
+                    <Viewbox Height="18" MaxWidth="20" IsVisible="{Binding Playback.IsMuted}">
+                      <Path Data="{StaticResource Icon.VolumeMuted}" Fill="{DynamicResource Brush.TextSecondary}" Stretch="Uniform" />
+                    </Viewbox>
+                  </Grid>
+                </Button>
+                <Button
+                  Name="QueueButton"
+                  Grid.Column="2"
                   Margin="8,0,0,0"
                   Padding="0"
                   AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Queue}}"
@@ -592,7 +619,7 @@
           Name="PlaybackLoading"
           Height="2"
           MinHeight="0"
-          Margin="20,11,20,0"
+          Margin="20,10,20,0"
           VerticalAlignment="Top"
           AutomationProperties.Name="{Binding Playback.Status}"
           Background="Transparent"
@@ -602,6 +629,42 @@
           IsVisible="{Binding Playback.IsBusy}" />
       </Grid>
     </Border>
+    <Popup
+      Name="VolumePopup"
+      Closed="OnVolumeClosed"
+      Opened="OnVolumeOpened"
+      IsLightDismissEnabled="True"
+      OverlayDismissEventPassThrough="False"
+      Placement="TopEdgeAlignedRight"
+      PlacementTarget="VolumeButton"
+      VerticalOffset="-8"
+      ShouldUseOverlayLayer="True">
+      <Border
+        Width="220"
+        Padding="16"
+        Background="{DynamicResource Brush.SurfaceRaised}"
+        BorderBrush="{DynamicResource Brush.Border}"
+        BorderThickness="1"
+        CornerRadius="16"
+        BoxShadow="0 4 20 0 #26000000"
+        KeyDown="OnVolumeKeyDown">
+        <StackPanel Spacing="12">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Volume}}" />
+            <TextBlock Grid.Column="1" Classes="caption" Text="{Binding Playback.VolumeLabel}" />
+          </Grid>
+          <Slider
+            Name="VolumeSlider"
+            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Volume}}"
+            Minimum="0"
+            Maximum="100"
+            SmallChange="1"
+            LargeChange="10"
+            IsEnabled="{Binding Playback.CanAdjustVolume}"
+            Value="{Binding Playback.VolumePercent, Mode=TwoWay}" />
+        </StackPanel>
+      </Border>
+    </Popup>
     <Popup
       Name="QueuePopup"
       Closed="OnQueueClosed"
@@ -619,15 +682,19 @@
         Name="QueueCard"
         Width="380"
         Height="{Binding #ShellRoot.Bounds.Height}"
-        Padding="20,24,20,16"
-        Background="{DynamicResource Brush.Surface}"
+        Background="Transparent"
         BorderBrush="{DynamicResource Brush.Border}"
         BorderThickness="1,0,0,0"
         CornerRadius="16,0,0,16"
         Focusable="True"
         KeyDown="OnQueueKeyDown">
         <Grid>
+          <controls:FrostedGlass
+          Background="{DynamicResource Brush.PlaybackSurface}"
+          CornerRadius="16"
+          IsHitTestVisible="False" />
           <ContentControl
+            Padding="20,24,20,16"
             HorizontalContentAlignment="Stretch"
             VerticalContentAlignment="Stretch"
             Content="{Binding QueueDrawer}">

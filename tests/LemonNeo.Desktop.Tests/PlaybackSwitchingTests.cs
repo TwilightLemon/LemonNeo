@@ -1,8 +1,15 @@
 using LemonNeo.Application;
+using Avalonia.Controls;
+using Avalonia.Headless.XUnit;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
 using LemonNeo.Core;
 using LemonNeo.Playback;
 using LemonNeo.Plugin.Abstractions;
 using LemonNeo.Plugin.Runtime;
+using LemonNeo.Desktop.Infrastructure;
+using LemonNeo.Desktop.ViewModels;
+using LemonNeo.Desktop.Views;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -33,12 +40,16 @@ public sealed class PlaybackSwitchingTests
         await session.InitializeAsync(cancellationToken);
         await session.PlayPlaylistAsync([First, Second], command == "previous" ? 1 : 0,
             cancellationToken: cancellationToken);
+        var expected = command == "previous" || command == "current" ? First : Second;
 
         provider.Resolve = (_, _) =>
         {
             Assert.Equal(PlayerState.Stopped, player.State);
             Assert.Null(resolver.ActivePlayer);
             Assert.Null(resolver.CurrentQueueTrack);
+            Assert.Equal(expected, session.Snapshot.CurrentTrack);
+            Assert.Equal(PlayerState.Stopped, session.Snapshot.State);
+            Assert.Equal(TimeSpan.Zero, session.GetCurrentSnapshot().Timeline.Position);
             return Task.FromResult<PlaybackSource?>(Source);
         };
 
@@ -55,6 +66,103 @@ public sealed class PlaybackSwitchingTests
         Assert.Equal(1, player.Stops);
         Assert.Equal(PlayerState.Playing, session.Snapshot.State);
         Assert.Equal(command == "previous" || command == "current" ? First : Second, player.CurrentTrack);
+    }
+
+    [Theory]
+    [InlineData("save")]
+    [InlineData("stop")]
+    [InlineData("source")]
+    [InlineData("decoder")]
+    public async Task MetadataIsPublishedBeforeSlowPlaybackWorkAndNeverReadsTheOldTimeline(string stage)
+    {
+        using var paths = new TestPaths();
+        var player = new Player();
+        var provider = new SourceProvider();
+        var repository = new Repository();
+        await using var session = new PlaybackSessionService(Resolver(paths, provider, player), new PlaybackQueue(), repository,
+            NullLogger<PlaybackSessionService>.Instance);
+        var token = TestContext.Current.CancellationToken;
+        await session.InitializeAsync(token);
+        var second = Second with { Artists = [new ArtistRef { Name = "Second Artist" }], Duration = TimeSpan.FromMinutes(4), ArtworkUri = new("https://artwork.test/second") };
+        await session.PlayPlaylistAsync([First, second], cancellationToken: token);
+        player.CurrentTimeline = new(TimeSpan.FromSeconds(95), TimeSpan.FromMinutes(3));
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task Delay(CancellationToken cancellationToken)
+        {
+            started.TrySetResult();
+            return release.Task.WaitAsync(cancellationToken);
+        }
+        switch (stage)
+        {
+            case "save": repository.Save = Delay; break;
+            case "stop": player.Stop = Delay; break;
+            case "source": provider.Resolve = async (_, ct) => { await Delay(ct); return Source; }; break;
+            case "decoder": player.Play = Delay; break;
+        }
+        var changes = new List<PlaybackSessionSnapshot>();
+        session.StateChanged += (_, args) => changes.Add(args.Snapshot);
+        var switching = session.NextAsync(token);
+        try
+        {
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(3), token);
+            player.ThrowOnTimelineRead = true;
+            var pending = session.GetCurrentSnapshot();
+            Assert.False(switching.IsCompleted);
+            Assert.Equal(second, pending.CurrentTrack);
+            Assert.Equal(1, pending.CurrentIndex);
+            Assert.Equal(TimeSpan.Zero, pending.Timeline.Position);
+            Assert.Equal(second.Duration, pending.Timeline.Duration);
+            Assert.Equal(PlayerState.Stopped, pending.State);
+            Assert.Null(pending.PlayerId);
+            Assert.Contains(changes, snapshot => snapshot.CurrentTrack == second && snapshot.State == PlayerState.Stopped);
+        }
+        finally
+        {
+            player.ThrowOnTimelineRead = false;
+            release.TrySetResult();
+            await switching;
+        }
+        Assert.Equal(second, session.Snapshot.CurrentTrack);
+        Assert.Equal(PlayerState.Playing, session.Snapshot.State);
+    }
+
+    [AvaloniaFact]
+    public async Task DesktopPlaybackBarShowsTheSelectedMetadataWhileTheSourceIsStillResolving()
+    {
+        using var paths = new TestPaths();
+        var provider = new SourceProvider();
+        var player = new Player();
+        await using var runtime = new DesktopRuntime(paths, new DesktopOptions(Path.Combine(paths.DataDirectory, "plugins"), paths.MusicLibraryDirectory),
+            hostPlayers: [new PlayerProvider(player)], hostProviders: [provider]);
+        var text = new LocalizationService();
+        using var appearance = new AppearanceService(Avalonia.Application.Current!, text, new AppearanceTests.MemoryStore());
+        await using var shell = new MainViewModel(runtime, text, appearance, runtime.Get<ArtworkService>());
+        await shell.InitializeAsync();
+        var session = runtime.Get<PlaybackSessionService>();
+        var second = Second with { Artists = [new ArtistRef { Name = "Second Artist" }], Duration = TimeSpan.FromMinutes(4) };
+        await session.PlayPlaylistAsync([First, second]);
+        shell.Playback.UpdateSnapshot();
+        var window = new MainWindow { DataContext = shell };
+        window.Show();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        provider.Resolve = async (_, ct) => { started.TrySetResult(); await release.Task.WaitAsync(ct); return Source; };
+        var switching = shell.Playback.NextCommand.ExecuteAsync(null);
+        try
+        {
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal("Second", shell.Playback.NowTitle);
+            Assert.Equal("Second Artist", shell.Playback.NowArtist);
+            Assert.Equal("4:00", shell.Playback.DurationText);
+            Assert.Equal(0, shell.Playback.PositionSeconds);
+            Assert.False(shell.Playback.IsPlaying);
+            var bar = window.FindControl<Border>("PlaybackBar")!;
+            Assert.Contains("Second", bar.GetVisualDescendants().OfType<TextBlock>().Select(control => control.Text));
+        }
+        finally { release.TrySetResult(); await switching; window.Close(); }
+        Assert.True(shell.Playback.IsPlaying);
     }
 
     [Fact]
@@ -158,14 +266,18 @@ public sealed class PlaybackSwitchingTests
     {
         public PlayerState State { get; private set; }
         public Track? CurrentTrack { get; private set; }
-        public PlayerTimeline Timeline => new(TimeSpan.Zero, null);
+        public PlayerTimeline CurrentTimeline { get; set; } = new(TimeSpan.Zero, null);
+        public bool ThrowOnTimelineRead { get; set; }
+        public PlayerTimeline Timeline => ThrowOnTimelineRead ? throw new InvalidOperationException("The decoder is busy opening a stream.") : CurrentTimeline;
         public int Stops { get; private set; }
         public Func<CancellationToken, Task>? Stop { get; set; }
-        public Task PlayAsync(Track track, PlaybackSource source, CancellationToken cancellationToken = default)
+        public Func<CancellationToken, Task>? Play { get; set; }
+        public async Task PlayAsync(Track track, PlaybackSource source, CancellationToken cancellationToken = default)
         {
+            if (Play is not null) await Play(cancellationToken);
             CurrentTrack = track;
+            CurrentTimeline = new(TimeSpan.Zero, track.Duration);
             State = PlayerState.Playing;
-            return Task.CompletedTask;
         }
         public Task PauseAsync(CancellationToken cancellationToken = default)
         {
@@ -188,8 +300,9 @@ public sealed class PlaybackSwitchingTests
 
     private sealed class Repository : IPlaybackStateRepository
     {
+        public Func<CancellationToken, Task>? Save { get; set; }
         public Task<PlaybackQueueState> LoadAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(new PlaybackQueueState());
-        public Task SaveAsync(PlaybackQueueState state, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task SaveAsync(PlaybackQueueState state, CancellationToken cancellationToken = default) => Save?.Invoke(cancellationToken) ?? Task.CompletedTask;
     }
 }
