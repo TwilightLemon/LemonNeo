@@ -70,7 +70,17 @@ src/
     AppHost.cs
     HostOptions.cs
     Registration/
-  LemonNeo.Desktop/         保留现有 Views、ViewModels、Controls 等目录
+  LemonNeo.Desktop/
+    DesktopHost.cs          桌面宿主装配
+    DesktopContext.cs       共享运行上下文
+    Services/              图片、主题、本地化与导航服务
+    Utils/                 取色与调色板计算
+    Config/                启动选项、配置实体与注册校验
+    Platform/              桌面歌词平台行为
+    Controls/              Shared、Lyrics、Navigation
+    ViewModels/            Shared 与各功能模块
+    Views/                 Shared 与对应功能模块
+    Resources/             主题与语言资源
   LemonNeo.Console/
     Commands/
     Input/
@@ -80,6 +90,8 @@ src/
 ```
 
 共享模块使用与目录一致的命名空间，例如 `LemonNeo.Core.Lyrics`、`LemonNeo.Abstractions.Plugins`、`LemonNeo.Application.Playback`。Console 内部按功能分类目录，沿用宿主命名空间 `LemonNeo.ConsoleApp`。
+
+Desktop 目录迁移也使用与目录一致的命名空间，具体文件归属及验证记录见 [Desktop 目录迁移方案](desktop-structure-migration-plan.md)。
 
 | 类型 | 归属与边界 |
 | --- | --- |

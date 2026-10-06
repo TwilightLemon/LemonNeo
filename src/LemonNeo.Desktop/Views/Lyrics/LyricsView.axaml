@@ -1,0 +1,83 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:lyricsVm="using:LemonNeo.Desktop.ViewModels.Lyrics" xmlns:i18n="using:LemonNeo.Desktop.Services"
+             xmlns:lyricsControls="using:LemonNeo.Desktop.Controls.Lyrics" xmlns:sharedControls="using:LemonNeo.Desktop.Controls.Shared"
+             x:Class="LemonNeo.Desktop.Views.Lyrics.LyricsView" x:DataType="lyricsVm:LyricsViewModel">
+  <Grid RowDefinitions="Auto,Auto,*" ClipToBounds="True">
+    <Border Grid.RowSpan="3" Background="{DynamicResource Brush.NowPlayingGlow}" IsHitTestVisible="False" CornerRadius="24" />
+    <Grid ColumnDefinitions="44,*,44" Margin="0,0,0,18">
+      <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
+        <TextBlock Text="{Binding Playback.NowTitle}" FontSize="22" FontWeight="Medium" TextAlignment="Center" TextTrimming="CharacterEllipsis" />
+        <TextBlock Text="{Binding Playback.NowArtist}" Classes="muted" TextAlignment="Center" TextTrimming="CharacterEllipsis" />
+      </StackPanel>
+      <Button Grid.Column="2" Name="LyricsSettingsButton" Classes="ghost icon" VerticalAlignment="Top"
+              ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.LyricsDisplaySettings}}"
+              AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.LyricsDisplaySettings}}">
+        <Path Classes="icon" Data="{StaticResource Icon.Settings}" />
+        <Button.Flyout>
+          <Flyout Placement="BottomEdgeAlignedRight">
+            <StackPanel Width="260" Spacing="18" Margin="8">
+              <StackPanel.Styles>
+                <Style Selector="Button.lyricAlignment">
+                  <Setter Property="HorizontalAlignment" Value="Stretch" />
+                  <Setter Property="Background" Value="{DynamicResource Brush.SurfaceRaised}" />
+                  <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}" />
+                </Style>
+                <Style Selector="Button.lyricAlignment:pointerover">
+                  <Setter Property="Background" Value="{DynamicResource Brush.Hover}" />
+                </Style>
+                <Style Selector="Button.lyricAlignment.active, Button.lyricAlignment.active:pointerover">
+                  <Setter Property="Background" Value="{DynamicResource Brush.Accent}" />
+                  <Setter Property="Foreground" Value="{DynamicResource Brush.OnAccent}" />
+                  <Setter Property="FontWeight" Value="SemiBold" />
+                </Style>
+              </StackPanel.Styles>
+              <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.LyricsDisplaySettings}}" />
+              <StackPanel Spacing="8">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.LyricsFontSize}}" />
+                  <TextBlock Grid.Column="1" Text="{Binding LyricFontSize, StringFormat={}{0:0}}" Classes="muted" />
+                </Grid>
+                <Slider Name="LyricsFontSizeSlider" Minimum="16" Maximum="48" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding LyricFontSize, Mode=TwoWay}"
+                        AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.LyricsFontSize}}" />
+              </StackPanel>
+              <ToggleSwitch Name="BoldLyricsToggle" IsChecked="{Binding BoldLyrics, Mode=TwoWay}" Content="{Translate {x:Static i18n:LanguageManager+Keys.BoldLyrics}}" />
+              <ToggleSwitch IsChecked="{Binding ShowRomanization, Mode=TwoWay}" Content="{Translate {x:Static i18n:LanguageManager+Keys.ShowRomanization}}" />
+              <ToggleSwitch IsChecked="{Binding ShowTranslation, Mode=TwoWay}" Content="{Translate {x:Static i18n:LanguageManager+Keys.ShowTranslation}}" />
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.LyricsAlignment}}" />
+                <Grid ColumnDefinitions="*,*">
+                  <Button Name="AlignLeftButton" Classes="lyricAlignment" Classes.active="{Binding IsLeftAligned}" Command="{Binding AlignLeftCommand}" Content="{Translate {x:Static i18n:LanguageManager+Keys.AlignLeft}}" Margin="0,0,4,0" />
+                  <Button Name="AlignCenterButton" Grid.Column="1" Classes="lyricAlignment" Classes.active="{Binding IsCenterAligned}" Command="{Binding AlignCenterCommand}" Content="{Translate {x:Static i18n:LanguageManager+Keys.AlignCenter}}" Margin="4,0,0,0" />
+                </Grid>
+              </StackPanel>
+            </StackPanel>
+          </Flyout>
+        </Button.Flyout>
+      </Button>
+    </Grid>
+    <Border Grid.Row="1" IsVisible="{Binding HasError}" Background="{DynamicResource Brush.DangerSoft}" CornerRadius="10" Padding="14" Margin="0,0,0,12">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Text="{Binding Error}" Foreground="{DynamicResource Brush.Danger}" TextWrapping="Wrap" MaxHeight="90" />
+        <Button Grid.Column="1" Classes="ghost" Content="×" Command="{Binding DismissErrorCommand}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}" />
+      </Grid>
+    </Border>
+    <Grid Grid.Row="2">
+      <sharedControls:EmptyState IsVisible="{Binding !Playback.HasCurrentTrack}" Title="{Translate {x:Static i18n:LanguageManager+Keys.NoTrack}}"
+                           Description="{Translate {x:Static i18n:LanguageManager+Keys.NoTrackDescription}}" Icon="{StaticResource Icon.Music}" />
+      <Grid Name="ListeningGrid" IsVisible="{Binding Playback.HasCurrentTrack}" ColumnDefinitions="0.9*,1.25*" Margin="{DynamicResource Space.PlaybackInset}">
+        <Border Name="CoverArea" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,0,28,0"
+                CornerRadius="24" BoxShadow="0 12 32 0 #24000000">
+          <sharedControls:Artwork Name="NowPlayingCover" Width="300" Height="300" CornerRadius="24" Source="{Binding Playback.NowArtwork}"
+                            AutomationProperties.Name="{Binding Playback.NowTitle}" />
+        </Border>
+        <lyricsControls:LyricsPresenter Name="LyricsTimeline" Grid.Column="1" Document="{Binding Document}" EmptyText="{Binding LyricsText}"
+                                  PositionMilliseconds="{Binding PositionMilliseconds}" IsPlaying="{Binding Playback.IsPlaying}" IsStopped="{Binding IsStopped}"
+                                  SeekCommand="{Binding SeekLyricCommand}" CanSeek="{Binding Playback.CanSeek}"
+                                  FontSize="{Binding LyricFontSize}" ShowRomanization="{Binding ShowRomanization}" ShowTranslation="{Binding ShowTranslation}" BoldLyrics="{Binding BoldLyrics}"
+                                  TextAlignment="{Binding LyricTextAlignment}" ReduceMotion="{Binding ReduceMotion}"
+                                  Foreground="{DynamicResource Brush.TextSecondary}" UnreachedBrush="{DynamicResource Brush.LyricText}" ReachedBrush="{DynamicResource Brush.LyricHighlight}"
+                                  FollowLabel="{Translate {x:Static i18n:LanguageManager+Keys.FollowCurrentLyric}}" />
+      </Grid>
+    </Grid>
+  </Grid>
+</UserControl>

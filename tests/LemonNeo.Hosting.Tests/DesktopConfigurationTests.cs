@@ -10,10 +10,12 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
-using LemonNeo.Desktop.Controls;
-using LemonNeo.Desktop.Infrastructure;
-using LemonNeo.Desktop.ViewModels;
-using LemonNeo.Desktop.Views;
+using LemonNeo.Desktop;
+using LemonNeo.Desktop.Config;
+using LemonNeo.Desktop.Controls.Shared;
+using LemonNeo.Desktop.Services;
+using LemonNeo.Desktop.ViewModels.Shell;
+using LemonNeo.Desktop.Views.Shell;
 using Xunit;
 
 [assembly: AvaloniaTestApplication(typeof(LemonNeo.Hosting.Tests.HeadlessApplication))]

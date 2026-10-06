@@ -1,5 +1,5 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:controls="using:LemonNeo.Desktop.Controls"
+                    xmlns:sharedControls="using:LemonNeo.Desktop.Controls.Shared"
                     xmlns:converters="using:Avalonia.Data.Converters">
   <ControlTheme x:Key="LemonButton" TargetType="Button">
     <Setter Property="Background" Value="{DynamicResource Brush.SurfaceRaised}" />
@@ -95,7 +95,7 @@
     </Style>
     <Style Selector="^:disabled /template/ Thumb#PlaybackSliderThumb"><Setter Property="Opacity" Value="0" /></Style>
   </ControlTheme>
-  <ControlTheme x:Key="{x:Type controls:PageHeader}" TargetType="controls:PageHeader">
+  <ControlTheme x:Key="{x:Type sharedControls:PageHeader}" TargetType="sharedControls:PageHeader">
     <Setter Property="Template">
       <ControlTemplate>
         <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,28">
@@ -112,7 +112,7 @@
       </ControlTemplate>
     </Setter>
   </ControlTheme>
-  <ControlTheme x:Key="{x:Type controls:EmptyState}" TargetType="controls:EmptyState">
+  <ControlTheme x:Key="{x:Type sharedControls:EmptyState}" TargetType="sharedControls:EmptyState">
     <Setter Property="Template">
       <ControlTemplate>
         <StackPanel Spacing="16" MaxWidth="400" HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -126,7 +126,7 @@
       </ControlTemplate>
     </Setter>
   </ControlTheme>
-  <ControlTheme x:Key="{x:Type controls:Artwork}" TargetType="controls:Artwork">
+  <ControlTheme x:Key="{x:Type sharedControls:Artwork}" TargetType="sharedControls:Artwork">
     <Setter Property="Background" Value="{DynamicResource Brush.Artwork}" />
     <Setter Property="CornerRadius" Value="{DynamicResource Radius.Card}" />
     <Setter Property="Template">

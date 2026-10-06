@@ -1,13 +1,13 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:vm="using:LemonNeo.Desktop.ViewModels" xmlns:core="using:LemonNeo.Core.Library"
-                    xmlns:i18n="using:LemonNeo.Desktop.Infrastructure" xmlns:controls="using:LemonNeo.Desktop.Controls">
-  <DataTemplate x:Key="ProviderOptionTemplate" x:DataType="vm:ProviderOption">
+                    xmlns:metadataVm="using:LemonNeo.Desktop.ViewModels.Metadata" xmlns:sharedVm="using:LemonNeo.Desktop.ViewModels.Shared" xmlns:core="using:LemonNeo.Core.Library"
+                    xmlns:i18n="using:LemonNeo.Desktop.Services" xmlns:sharedControls="using:LemonNeo.Desktop.Controls.Shared">
+  <DataTemplate x:Key="ProviderOptionTemplate" x:DataType="sharedVm:ProviderOption">
     <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
   </DataTemplate>
   <DataTemplate x:Key="PlaylistOptionTemplate" x:DataType="core:Playlist">
     <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
   </DataTemplate>
-  <DataTemplate x:Key="TrackRowTemplate" x:DataType="vm:TrackRow">
+  <DataTemplate x:Key="TrackRowTemplate" x:DataType="sharedVm:TrackRow">
     <Grid MinHeight="44" ToolTip.Tip="{Binding Identity}">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="38" />
@@ -17,7 +17,7 @@
         <ColumnDefinition Width="Auto" SharedSizeGroup="TrackDuration" />
       </Grid.ColumnDefinitions>
       <TextBlock Text="{Binding Number}" Classes="caption" VerticalAlignment="Center" />
-      <controls:Artwork Name="TrackArtwork" Grid.Column="1" Width="44" Height="44" CornerRadius="8"
+      <sharedControls:Artwork Name="TrackArtwork" Grid.Column="1" Width="44" Height="44" CornerRadius="8"
                         HorizontalAlignment="Left" VerticalAlignment="Center"
                         SourceUri="{Binding ArtworkUri}" Loader="{Binding ArtworkLoader}" />
       <StackPanel Grid.Column="2" Spacing="5" Margin="0,0,16,0">
@@ -28,11 +28,11 @@
       <TextBlock Grid.Column="4" Text="{Binding Duration}" Classes="caption" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="12,0,0,0" />
     </Grid>
   </DataTemplate>
-  <DataTemplate x:Key="MetadataMatchTemplate" x:DataType="vm:MetadataMatchRow">
+  <DataTemplate x:Key="MetadataMatchTemplate" x:DataType="metadataVm:MetadataMatchRow">
     <Border Background="{DynamicResource Brush.SurfaceRaised}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1" CornerRadius="12" Padding="16" Margin="0,8">
       <StackPanel Spacing="6">
         <Grid ColumnDefinitions="56,*">
-          <controls:Artwork Width="44" Height="44" CornerRadius="8" HorizontalAlignment="Left"
+          <sharedControls:Artwork Width="44" Height="44" CornerRadius="8" HorizontalAlignment="Left"
                             SourceUri="{Binding ArtworkUri}" Loader="{Binding ArtworkLoader}" />
           <StackPanel Grid.Column="1" Spacing="6">
             <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
@@ -53,7 +53,7 @@
       </StackPanel>
     </Border>
   </DataTemplate>
-  <DataTemplate x:Key="PlaybackSourceTemplate" x:DataType="vm:PlaybackSourceRow">
+  <DataTemplate x:Key="PlaybackSourceTemplate" x:DataType="metadataVm:PlaybackSourceRow">
     <StackPanel Spacing="6">
       <WrapPanel>
         <TextBlock Text="{Binding Provider}" FontWeight="SemiBold" Margin="0,0,16,0" />

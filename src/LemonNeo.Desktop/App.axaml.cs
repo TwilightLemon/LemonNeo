@@ -4,9 +4,10 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
-using LemonNeo.Desktop.Infrastructure;
-using LemonNeo.Desktop.ViewModels;
-using LemonNeo.Desktop.Views;
+using LemonNeo.Desktop.Config;
+using LemonNeo.Desktop.Services;
+using LemonNeo.Desktop.ViewModels.Shell;
+using LemonNeo.Desktop.Views.Shell;
 
 namespace LemonNeo.Desktop;
 
