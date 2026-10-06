@@ -1,5 +1,5 @@
+using LemonNeo.Abstractions.Providers;
 using CommunityToolkit.Mvvm.ComponentModel;
-using LemonNeo.Plugin.Abstractions;
 
 namespace LemonNeo.Desktop.ViewModels;
 

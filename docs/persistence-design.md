@@ -1,4 +1,4 @@
-# Runtime 统一配置与 Library 持久化
+# Hosting 统一配置与 Library 持久化
 
 本文描述已实现的结构。直接采用新配置目录与实体，不读取或迁移旧配置。
 这里的播放队列指当前播放会话；用户创建、导入的 Playlists 继续属于 Music Library。
@@ -8,7 +8,7 @@
 | 数据 | 管理者 | 存放位置 | 保存方式 |
 | --- | --- | --- | --- |
 | 用户歌单、索引和镜像关系 | `LibraryService`、`JsonLibraryRepository` | 独立 Library 目录 | 保留显式保存、同步和退出保存 |
-| Application、Desktop、Console、插件的普通配置 | Runtime 的 `AppSettingsService` | Configuration 下的包目录 | Apply 内存，固定周期与退出保存 |
+| Application、Desktop、Console、插件的普通配置 | Hosting 的 `AppSettingsService` | Configuration 下的包目录 | Apply 内存，固定周期与退出保存 |
 | 当前队列、恢复进度、音量 | `PlaybackSessionService` 负责业务，配置服务负责持久化 | Application 包配置目录 | 同上 |
 | 插件认证凭据 | `ICredentialVault` | Data/Credentials 下的包目录 | 保留加密与显式提交 |
 | 图片、歌词、音频和插件缓存 | 各缓存服务 | Cache 目录 | 保留现有机制 |
@@ -44,19 +44,19 @@ Library 的仓储和数据结构保持现状：`library.json`、`playlists/<id>.
 同名实体可以存在于不同包中，互不影响。账号 ID、昵称、头像等相关字段组成一个实体，不逐字段分配文件。
 包名规则见 [包名与配置实体命名](package-naming.md)。
 
-Configuration、Data、Cache 的平台默认根目录沿用 `AppPathProvider.CreateDefault()`。
+Configuration、Data、Cache 的平台默认根目录沿用 `AppHost.CreateDefaultPaths()`。
 可用 `LEMONNEO_CONFIG_HOME`、`LEMONNEO_DATA_HOME`、`LEMONNEO_CACHE_HOME`、`LEMONNEO_LIBRARY_HOME` 覆盖。
 Desktop 和 Console 的 `--library`、`--plugins` 继续选择 Library 和插件根目录。
 
 ## 依赖与生命周期
 
-`LemonNeo.Runtime.AppRuntime` 为 Desktop 和 Console 统一注册配置、插件、播放、Library 和缓存服务，管理启动与关闭顺序。
-`DesktopRuntime` 只补充桌面服务与宿主选项。Console 在共享 Runtime 上注册命令服务、启动脚本与宿主播放器。
-`StartupCommands` 与 `StartupPreferences` 属于 `LemonNeo.Console`；共享 Runtime 与 Desktop 不登记或读取启动脚本。
+`LemonNeo.Hosting.AppHost` 为 Desktop 和 Console 统一注册配置、插件、播放、Library 和缓存服务，管理启动与关闭顺序。
+`DesktopHost` 只补充桌面服务与宿主选项。Console 在共享 Hosting 上注册命令服务、启动脚本与宿主播放器。
+`StartupCommands` 与 `StartupPreferences` 属于 `LemonNeo.Console`；共享 Hosting 与 Desktop 不登记或读取启动脚本。
 
-`AppSettingsService` 的实现位于 `LemonNeo.Configuration`；`IAppSettingsService`、`ISettingsScope` 位于
-`LemonNeo.Plugin.Abstractions`，Application 和插件无需依赖 Desktop 或 JSON 实现。
-Runtime 持有唯一服务实例与保存循环。包入口只绑定包名，不创建计时器、写盘队列或保存任务。
+`AppSettingsService` 的实现位于 `LemonNeo.Infrastructure.Settings`；`IAppSettingsService`、`ISettingsScope` 位于
+`LemonNeo.Abstractions.Settings`，Application 和插件无需依赖 Desktop 或 JSON 实现。
+Hosting 持有唯一服务实例与保存循环。包入口只绑定包名，不创建计时器、写盘队列或保存任务。
 
 启动顺序：
 
@@ -70,13 +70,13 @@ Console 随后加载自己的启动脚本并执行命令，再进入交互；Des
 正常关闭顺序：
 
 1. 宿主停止交互并等待已接受操作，记录桌面歌词窗口尺寸。
-2. Runtime 停止配置保存循环，等待进行中的周期保存退出。
+2. Hosting 停止配置保存循环，等待进行中的周期保存退出。
 3. 停止播放监控，等待播放命令，捕获最终状态，再停止播放器。
 4. 执行插件关闭回调，允许回调更新其配置。
 5. 保存 Library，统一保存有变化的配置。
 6. 释放服务、插件配置注册、订阅与程序集。
 
-关闭保存不使用交互操作的取消令牌。Runtime 汇总关闭错误，并继续完成其他清理步骤。
+关闭保存不使用交互操作的取消令牌。Hosting 汇总关闭错误，并继续完成其他清理步骤。
 Desktop 将关闭错误写入诊断日志；Console 报告错误并返回失败退出码。
 
 ## 配置入口
@@ -87,7 +87,7 @@ Desktop 将关闭错误写入诊断日志；Console 报告错误并返回失败�
 类型重命名时可以保留原实体文件名。
 
 ```csharp
-var settings = runtime.Settings.ForPackage(PackageNames.Desktop);
+var settings = host.Settings.ForPackage(PackageNames.Desktop);
 
 await settings.RegisterAsync(
     "DesktopLyricsPreferences",
@@ -103,7 +103,7 @@ settings.Apply<DesktopLyricsPreferences>(current => current with { FontSize = 32
 `RegisterAsync<T>` 登记默认值与可选校验函数，并读取实体一次。`Get<T>` 随后只访问内存。
 缺失文件采用默认值；无效 JSON 或读取错误明确报错，实体不能 Apply，也不会用默认值覆盖原文件。
 
-需要在 UI 初始化期间绑定默认值时，可以先同步 `Register<T>`，之后由 Runtime 的 `LoadAsync` 加载。
+需要在 UI 初始化期间绑定默认值时，可以先同步 `Register<T>`，之后由 Hosting 的 `LoadAsync` 加载。
 加载完成前可 Get 和 Subscribe，不能 Apply。加载值与默认值不同时通知该实体的订阅者，但不标记用户修改。
 
 Apply 同步校验、比较、替换内存值并标记变化，然后在内存锁外通知订阅者。
@@ -129,7 +129,7 @@ Apply 同步校验、比较、替换内存值并标记变化，然后在内存�
 设置控件只 Apply。ViewModel 不维护保存队列、保存任务列表、配置防抖或保存完成回填。
 音量操作中的串行逻辑只协调异步播放器调用，配置变化本身立即进入内存。
 
-显式保存也统一调用 `runtime.Settings.SaveAsync()`。Console 的 `save` 同时保存 Library、捕获播放状态、刷新配置；
+显式保存也统一调用 `host.Settings.SaveAsync()`。Console 的 `save` 同时保存 Library、捕获播放状态、刷新配置；
 Console 的启动脚本保存命令也通过此入口。默认启动脚本存于 Console 包的 `StartupPreferences`；
 Console 的 `--startup <file>` 显式选择外部脚本时，继续直接读写该文件。Desktop 不提供启动脚本选项或编辑界面。
 Console 历史存于 `CommandHistoryState`，记录命令只更新内存，仍保留去重、1000 条上限与凭据命令过滤。
@@ -170,12 +170,12 @@ JSON 序列化元数据使用每次操作独立的选项，配置存储不长期
 
 ## 验收
 
-新验收项目为 `tests/LemonNeo.Runtime.Tests`，测试插件位于 `tests/LemonNeo.Plugin.ConfigurationFixture`。
+新验收项目为 `tests/LemonNeo.Hosting.Tests`，测试插件位于 `tests/LemonNeo.Plugin.ConfigurationFixture`。
 测试插件不会部署到正式 Desktop 插件目录。已删除的旧测试不再引用或恢复。
 
 ```sh
-dotnet build LemonNeo.slnx -p:SkipDesktopPlugins=true -p:SkipConsolePlugins=true --disable-build-servers -m:1
-dotnet test tests/LemonNeo.Runtime.Tests/LemonNeo.Runtime.Tests.csproj -p:SkipDesktopPlugins=true -p:SkipConsolePlugins=true --disable-build-servers -m:1
+dotnet build LemonNeo.slnx -p:SkipHostPlugins=true --disable-build-servers -m:1
+dotnet test tests/LemonNeo.Hosting.Tests/LemonNeo.Hosting.Tests.csproj -p:SkipHostPlugins=true --disable-build-servers -m:1
 ```
 
 覆盖包与实体隔离、通知范围、周期合并与重试、写入期间的新修改、取消与失败恢复、退出保存、

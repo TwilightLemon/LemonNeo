@@ -1,3 +1,5 @@
+using LemonNeo.Core.Library;
+using LemonNeo.Core.Lyrics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Avalonia.Controls;

@@ -1,12 +1,12 @@
+using LemonNeo.Abstractions.Settings;
+using LemonNeo.Hosting;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
-using LemonNeo.Configuration;
 using LemonNeo.Desktop.Infrastructure;
 using LemonNeo.Desktop.ViewModels;
 using LemonNeo.Desktop.Views;
-using LemonNeo.Plugin.Abstractions;
 
 namespace LemonNeo.Desktop;
 
@@ -19,13 +19,13 @@ public partial class App : Avalonia.Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             // Use platform window controls, menus, file pickers, and font fallback.
-            var paths = AppPathProvider.CreateDefault();
-            var runtime = new DesktopRuntime(paths, DesktopOptions.Parse(Program.Arguments, paths));
-            var settings = runtime.Settings.ForPackage(PackageNames.Desktop);
+            var paths = AppHost.CreateDefaultPaths();
+            var host = new DesktopHost(paths, DesktopOptions.Parse(Program.Arguments, paths));
+            var settings = host.Settings.ForPackage(PackageNames.Desktop);
             DesktopPreferences.Register(settings);
             var text = new LocalizationService(settings);
             var appearance = new AppearanceService(this, settings);
-            var viewModel = new MainViewModel(runtime, text, appearance, runtime.Get<ArtworkService>());
+            var viewModel = new MainViewModel(host, text, appearance, host.Get<ArtworkService>());
             var window = new MainWindow { DataContext = viewModel };
             desktop.MainWindow = window;
             window.Opened += async (_, _) => await viewModel.InitializeAsync();
@@ -50,7 +50,7 @@ public partial class App : Avalonia.Application
                 }
                 finally
                 {
-                    try { await runtime.DisposeAsync(); }
+                    try { await host.DisposeAsync(); }
                     catch (Exception exception)
                     {
                         System.Diagnostics.Trace.WriteLine($"Desktop plugin shutdown failed: {exception}");

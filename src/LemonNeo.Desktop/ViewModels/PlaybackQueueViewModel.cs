@@ -1,8 +1,9 @@
+using LemonNeo.Application.Playback;
+using LemonNeo.Core.Music;
+using LemonNeo.Core.Playback;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using LemonNeo.Application;
-using LemonNeo.Core;
 using LemonNeo.Desktop.Infrastructure;
 
 namespace LemonNeo.Desktop.ViewModels;
@@ -18,7 +19,7 @@ public sealed class PlaybackQueueViewModel : PageViewModel
     public PlaybackQueueViewModel(DesktopContext context, PlaybackViewModel playback) : base(context, DesktopRoutes.Queue)
     {
         Playback = playback;
-        _session = _runtime.Get<PlaybackSessionService>();
+        _session = _host.Get<PlaybackSessionService>();
         PlayTrackCommand = new(PlayTrackAsync, row => CanPlay && row is not null, AsyncRelayCommandOptions.AllowConcurrentExecutions);
         Playback.Changed += OnPlaybackChanged;
         Playback.PropertyChanged += OnPlaybackPropertyChanged;
@@ -52,7 +53,7 @@ public sealed class PlaybackQueueViewModel : PageViewModel
         var items = _session.Queue.Items;
         if (!_rows.Select(r => r.Id).SequenceEqual(items.Select(i => i.Id)))
         {
-            _rows = items.Select((item, index) => new QueueTrackViewModel(item, index + 1, _text, _runtime.Get<ArtworkService>())).ToArray();
+            _rows = items.Select((item, index) => new QueueTrackViewModel(item, index + 1, _text, _host.Get<ArtworkService>())).ToArray();
             RefreshTracks();
             OnPropertyChanged(nameof(TrackCount));
         }

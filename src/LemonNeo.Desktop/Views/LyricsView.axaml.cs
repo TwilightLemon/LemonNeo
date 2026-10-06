@@ -1,3 +1,4 @@
+using LemonNeo.Application.Lyrics;
 using Avalonia.Controls;
 using Avalonia;
 

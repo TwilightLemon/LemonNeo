@@ -1,9 +1,9 @@
+using LemonNeo.Abstractions.Providers;
+using LemonNeo.Application.Library;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using LemonNeo.Application;
 using LemonNeo.Desktop.Infrastructure;
-using LemonNeo.Plugin.Abstractions;
 
 namespace LemonNeo.Desktop.ViewModels;
 
@@ -68,7 +68,7 @@ public sealed partial class OnlineViewModel : PageViewModel
         }
     }
     public bool HasServices => Services.Count > 0;
-    private IMusicProvider? Service => SelectedService?.Id is { } id ? _runtime.Get<IProviderRegistry>().Get(id) : null;
+    private IMusicProvider? Service => SelectedService?.Id is { } id ? _host.Get<IProviderRegistry>().Get(id) : null;
     public bool SupportsPlaylists => Service is IPlaylistProvider;
     public bool HasRemotePlaylists => RemotePlaylists.Any(row => row.CanImport);
     public bool HasSelectedRemotePlaylist => SelectedRemotePlaylist is { CanImport: true };
@@ -87,7 +87,7 @@ public sealed partial class OnlineViewModel : PageViewModel
     public AsyncRelayCommand ImportRemoteCommand { get; }
     private void RefreshProviderOptions()
     {
-        var providers = _runtime.Get<IProviderRegistry>().Providers;
+        var providers = _host.Get<IProviderRegistry>().Providers;
         var options = providers.Where(p => p is IPlaylistProvider)
             .Select(p => new ProviderOption(p.Id, p.Descriptor.Name)).ToArray();
         var selectedId = SelectedService?.Id
@@ -142,11 +142,11 @@ public sealed partial class OnlineViewModel : PageViewModel
     private Task ImportRemoteAsync(string providerId, string id) => ExecuteAsync(async ct =>
     {
         if (string.IsNullOrWhiteSpace(id)) throw new ArgumentException(_text["RemotePlaylistUnavailable"]);
-        var importer = _runtime.Get<ImportService>();
+        var importer = _host.Get<ImportService>();
         var remote = await Task.Run(() => importer.GetRemotePlaylistAsync(providerId, id.Trim(), ct), ct);
         ct.ThrowIfCancellationRequested();
         var playlist = importer.ImportRemote(remote);
-        await _runtime.Get<LibraryService>().SaveAsync(ct);
+        await _host.Get<LibraryService>().SaveAsync(ct);
         Context.RefreshLibrary();
         SetStatus("RemoteImported", playlist.Name, playlist.Items.Count);
     });

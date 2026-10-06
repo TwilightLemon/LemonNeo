@@ -1,11 +1,12 @@
+using LemonNeo.Abstractions.Providers;
+using LemonNeo.Application.Playback;
+using LemonNeo.Core.Music;
+using LemonNeo.Core.Playback;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using LemonNeo.Application;
-using LemonNeo.Core;
 using LemonNeo.Desktop.Infrastructure;
-using LemonNeo.Plugin.Abstractions;
 
 namespace LemonNeo.Desktop.ViewModels;
 

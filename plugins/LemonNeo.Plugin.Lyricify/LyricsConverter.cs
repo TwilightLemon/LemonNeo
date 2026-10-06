@@ -1,10 +1,10 @@
+using LemonNeo.Core.Lyrics;
+using LemonNeo.Core.Music;
 using System.Text.RegularExpressions;
-using LemonNeo.Core;
-using LemonNeo.Plugin.Abstractions;
 using Lyricify.Lyrics.Helpers;
 using Lyricify.Lyrics.Models;
-using LemonLyrics = LemonNeo.Plugin.Abstractions.Lyrics;
-using LemonLyricsLine = LemonNeo.Plugin.Abstractions.LyricsLine;
+using LemonLyrics = LemonNeo.Core.Lyrics.Lyrics;
+using LemonLyricsLine = LemonNeo.Core.Lyrics.LyricsLine;
 
 namespace LemonNeo.Plugin.Lyricify;
 

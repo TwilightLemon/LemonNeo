@@ -1,5 +1,7 @@
-using LemonNeo.Core;
-using LemonNeo.Plugin.Abstractions;
+using LemonNeo.Abstractions.Playback;
+using LemonNeo.Abstractions.Plugins;
+using LemonNeo.Core.Music;
+using LemonNeo.Core.Playback;
 using Microsoft.Extensions.Logging;
 using System.Runtime.InteropServices;
 using System.Diagnostics;

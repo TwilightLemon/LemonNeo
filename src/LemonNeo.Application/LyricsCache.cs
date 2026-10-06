@@ -1,6 +1,8 @@
+using LemonNeo.Application.Lyrics;
+using LemonNeo.Core.Lyrics;
+using LyricsModel = LemonNeo.Core.Lyrics.Lyrics;
+using LemonNeo.Core.Music;
 using System.Text.Json;
-using LemonNeo.Core;
-using LemonNeo.Plugin.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace LemonNeo.Application;
@@ -64,7 +66,7 @@ public sealed class LyricsCache(string cacheDirectory, ILogger<LyricsCache> logg
         }
     }
 
-    public async Task StoreAsync(Track track, Lyrics lyrics, string providerId,
+    public async Task StoreAsync(Track track, LyricsModel lyrics, string providerId,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -76,7 +78,7 @@ public sealed class LyricsCache(string cacheDirectory, ILogger<LyricsCache> logg
             await StoreAsync(identifier, lyrics, providerId, cancellationToken);
     }
 
-    private async Task StoreAsync(ExternalMusicId identifier, Lyrics lyrics, string providerId,
+    private async Task StoreAsync(ExternalMusicId identifier, LyricsModel lyrics, string providerId,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -110,7 +112,7 @@ public sealed class LyricsCache(string cacheDirectory, ILogger<LyricsCache> logg
     private string GetPath(ExternalMusicId identifier) =>
         Path.Combine(_directory, MusicCacheIdentity.GetKey(identifier) + ".json");
 
-    private static bool IsValid(Lyrics? lyrics) => lyrics is not null && lyrics.Text is not null &&
+    private static bool IsValid(LyricsModel? lyrics) => lyrics is not null && lyrics.Text is not null &&
         (!string.IsNullOrWhiteSpace(lyrics.Text) || lyrics.Lines?.Any(line => !string.IsNullOrWhiteSpace(line?.Text)) == true) &&
         lyrics.Lines?.All(IsValidLine) != false && lyrics.TranslationLines?.All(IsValidLine) != false &&
         lyrics.RomanizationLines?.All(line => line is not null && line.Words is not null && line.Words.All(IsValidWord)) != false;
@@ -120,5 +122,5 @@ public sealed class LyricsCache(string cacheDirectory, ILogger<LyricsCache> logg
 
     private static bool IsValidWord(LyricsWord? word) => word is not null && word.Text is not null;
 
-    private sealed record CacheEntry(int FormatVersion, ExternalMusicId Identifier, string ProviderId, Lyrics Lyrics);
+    private sealed record CacheEntry(int FormatVersion, ExternalMusicId Identifier, string ProviderId, LyricsModel Lyrics);
 }

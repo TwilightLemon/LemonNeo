@@ -1,6 +1,8 @@
+using LemonNeo.Abstractions.Playback;
+using LemonNeo.Abstractions.Plugins;
+using LemonNeo.Core.Music;
 using System.Diagnostics;
 using System.Text.Json;
-using LemonNeo.Plugin.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace LemonNeo.Plugin.MacNowPlaying;

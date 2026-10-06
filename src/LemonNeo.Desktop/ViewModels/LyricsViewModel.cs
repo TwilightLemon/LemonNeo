@@ -1,9 +1,11 @@
+using LemonNeo.Abstractions.Playback;
+using LemonNeo.Application.Lyrics;
+using LemonNeo.Application.Playback;
+using LemonNeo.Core.Lyrics;
+using LemonNeo.Core.Music;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.Input;
-using LemonNeo.Application;
-using LemonNeo.Core;
 using LemonNeo.Desktop.Infrastructure;
-using LemonNeo.Plugin.Abstractions;
 
 namespace LemonNeo.Desktop.ViewModels;
 
@@ -196,7 +198,7 @@ public sealed class LyricsViewModel : PageViewModel
         if (track is null) return;
         try
         {
-            var result = await Task.Run(() => _runtime.Get<LyricsService>().GetLyricsAsync(track, cancellationToken), cancellationToken);
+            var result = await Task.Run(() => _host.Get<LyricsService>().GetLyricsAsync(track, cancellationToken), cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             if (!Equals(_snapshot.CurrentTrack, track)) return;
             _lyrics = result.Lyrics;

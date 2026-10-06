@@ -1,6 +1,6 @@
+using LemonNeo.Abstractions.Settings;
 using System.Globalization;
 using Irihi.Lingua;
-using LemonNeo.Plugin.Abstractions;
 
 namespace LemonNeo.Desktop.Infrastructure;
 

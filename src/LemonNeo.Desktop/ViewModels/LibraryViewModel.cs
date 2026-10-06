@@ -1,7 +1,9 @@
+using LemonNeo.Application.Library;
+using LemonNeo.Application.Playback;
+using LemonNeo.Core.Library;
+using LemonNeo.Core.Music;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using LemonNeo.Application;
-using LemonNeo.Core;
 using LemonNeo.Desktop.Infrastructure;
 
 namespace LemonNeo.Desktop.ViewModels;
@@ -49,7 +51,7 @@ public sealed partial class LibraryViewModel : TrackListViewModel
     public AsyncRelayCommand MatchPlaylistCommand { get; }
     public AsyncRelayCommand RefreshCommand { get; }
     protected override IEnumerable<TrackRow> GetTracks() => IsQueue
-        ? _runtime.Get<PlaybackSessionService>().Queue.Items.Select((i, index) => new TrackRow(i.Track, index + 1, _text, QueueItemId: i.Id))
+        ? _host.Get<PlaybackSessionService>().Queue.Items.Select((i, index) => new TrackRow(i.Track, index + 1, _text, QueueItemId: i.Id))
         : SelectedPlaylist is { } playlist
             ? playlist.Items.OrderBy(i => FractionalPlaylistOrderingService.Parse(i.SortKey)).ThenBy(i => i.Id)
                 .Select((i, index) => new TrackRow(i.Track, index + 1, _text, PlaylistId: playlist.Id, PlaylistItemId: i.Id))
@@ -57,7 +59,7 @@ public sealed partial class LibraryViewModel : TrackListViewModel
                 .Select((t, index) => new TrackRow(t, index + 1, _text));
     public override Task PlayAsync(TrackRow? selected = null) => Playback.ExecutePlaybackAsync(async ct =>
     {
-        var session = _runtime.Get<PlaybackSessionService>();
+        var session = _host.Get<PlaybackSessionService>();
         if (IsQueue)
         {
             if ((selected ?? Tracks.FirstOrDefault())?.QueueItemId is { } id) await session.PlayQueueItemAsync(id, ct);
@@ -69,24 +71,24 @@ public sealed partial class LibraryViewModel : TrackListViewModel
     });
     public Task ReloadLibraryAsync() => ExecuteAsync(async ct =>
     {
-        await _runtime.Get<LibraryService>().LoadAsync(ct); Context.RefreshLibrary();
+        await _host.Get<LibraryService>().LoadAsync(ct); Context.RefreshLibrary();
     });
     public Task CreatePlaylistAsync(string name, string? description = null, string? folderPath = null) => ExecuteAsync(async ct =>
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        var playlists = _runtime.Get<PlaylistService>();
+        var playlists = _host.Get<PlaylistService>();
         Playlist playlist;
         FolderImportResult? import = null;
         if (folderPath is null) playlist = playlists.Create(name, description);
         else
         {
-            var importer = _runtime.Get<FolderImportService>();
+            var importer = _host.Get<FolderImportService>();
             var scan = await Task.Run(() => importer.ScanAsync(folderPath, cancellationToken: ct), ct);
             ct.ThrowIfCancellationRequested();
             import = importer.ImportScan(scan, name);
             playlist = playlists.Update(import.Playlist.Id, name, description);
         }
-        await _runtime.Get<LibraryService>().SaveAsync(ct);
+        await _host.Get<LibraryService>().SaveAsync(ct);
         Context.RefreshLibrary();
         if (ReferenceEquals(Navigation.Current, this)) await Navigation.NavigateAsync(DesktopRoutes.Library, playlist.Id);
         if (import is null) SetStatus("PlaylistCreated", playlist.Name);
@@ -95,16 +97,16 @@ public sealed partial class LibraryViewModel : TrackListViewModel
 
     public Task UpdatePlaylistAsync(Guid id, string name, string? description) => ExecuteAsync(async ct =>
     {
-        _runtime.Get<PlaylistService>().Update(id, name, description);
-        await _runtime.Get<LibraryService>().SaveAsync(ct);
+        _host.Get<PlaylistService>().Update(id, name, description);
+        await _host.Get<LibraryService>().SaveAsync(ct);
         Context.RefreshLibrary();
         SetStatus("LibrarySaved");
     });
 
     public Task DeletePlaylistAsync(Guid id) => ExecuteAsync(async ct =>
     {
-        _runtime.Get<PlaylistService>().Delete(id);
-        await _runtime.Get<LibraryService>().SaveAsync(ct);
+        _host.Get<PlaylistService>().Delete(id);
+        await _host.Get<LibraryService>().SaveAsync(ct);
         if (ReferenceEquals(Navigation.Current, this) && SelectedPlaylist?.Id == id) await Navigation.NavigateAsync(DesktopRoutes.Library);
         Context.RefreshLibrary();
         SetStatus("LibrarySaved");
@@ -117,8 +119,8 @@ public sealed partial class LibraryViewModel : TrackListViewModel
         if (!CanEditTrack || SelectedTrack is not { PlaylistId: { } playlistId, PlaylistItemId: { } itemId }) return Task.CompletedTask;
         return ExecuteAsync(async ct =>
         {
-            _runtime.Get<PlaylistService>().Remove(playlistId, itemId);
-            await _runtime.Get<LibraryService>().SaveAsync(ct);
+            _host.Get<PlaylistService>().Remove(playlistId, itemId);
+            await _host.Get<LibraryService>().SaveAsync(ct);
             Context.RefreshLibrary();
             SetStatus("LibrarySaved");
         });
@@ -132,8 +134,8 @@ public sealed partial class LibraryViewModel : TrackListViewModel
 
     public Task MoveTrackAsync(Guid playlistId, Guid itemId, int position) => ExecuteAsync(async ct =>
     {
-        _runtime.Get<PlaylistService>().Move(playlistId, itemId, position);
-        await _runtime.Get<LibraryService>().SaveAsync(ct);
+        _host.Get<PlaylistService>().Move(playlistId, itemId, position);
+        await _host.Get<LibraryService>().SaveAsync(ct);
         Context.RefreshLibrary();
         SetStatus("LibrarySaved");
     });
@@ -141,7 +143,7 @@ public sealed partial class LibraryViewModel : TrackListViewModel
     private void OnPlaybackChanged(object? sender, EventArgs args)
     {
         if (!IsQueue) return;
-        var ids = _runtime.Get<PlaybackSessionService>().Queue.Items.Select(i => i.Id).ToArray();
+        var ids = _host.Get<PlaybackSessionService>().Queue.Items.Select(i => i.Id).ToArray();
         if (_queueIds.SequenceEqual(ids)) return;
         _queueIds = ids;
         RefreshTracks();

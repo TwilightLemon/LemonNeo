@@ -1,12 +1,17 @@
+using LemonNeo.Abstractions.Playback;
+using LemonNeo.Abstractions.Providers;
+using LemonNeo.Abstractions.Settings;
+using LemonNeo.Abstractions.Sync;
+using LemonNeo.Application;
+using LemonNeo.Application.Library;
+using LemonNeo.Application.Playback;
+using LemonNeo.Application.Sync;
+using LemonNeo.Core.Lyrics;
 using System.Collections.ObjectModel;
 using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using LemonNeo.Application;
 using LemonNeo.Desktop.Infrastructure;
-using LemonNeo.Plugin.Abstractions;
-using LemonNeo.Plugin.Runtime;
-using LemonNeo.Sync.Abstractions;
 
 namespace LemonNeo.Desktop.ViewModels;
 
@@ -15,18 +20,18 @@ public sealed partial class ToolsViewModel : PageViewModel
     private readonly PlaybackSessionService _session;
     public ToolsViewModel(DesktopContext context, DesktopNavigation navigation) : base(context, DesktopRoutes.Tools)
     {
-        _session = _runtime.Get<PlaybackSessionService>();
+        _session = _host.Get<PlaybackSessionService>();
         NavigateCommand = navigation.NavigateCommand;
-        RefreshCommand = new(() => ExecuteAsync(async ct => { await _runtime.Get<LibraryService>().LoadAsync(ct); Context.RefreshLibrary(); }));
+        RefreshCommand = new(() => ExecuteAsync(async ct => { await _host.Get<LibraryService>().LoadAsync(ct); Context.RefreshLibrary(); }));
         RefreshSyncProviders();
         SaveCommand = new(() => ExecuteAsync(async ct =>
         {
-            await _runtime.Get<LibraryService>().SaveAsync(ct);
+            await _host.Get<LibraryService>().SaveAsync(ct);
             await _session.CaptureStateAsync(ct);
-            await _runtime.Settings.SaveAsync(ct);
+            await _host.Settings.SaveAsync(ct);
             SetStatus("LibrarySaved");
         }));
-        SyncCommand = new(action => SynchronizeAsync(action ?? "status"));
+        SyncCommand = new(action => SynchronizeAsync(action ?? "status"), _ => SelectedSyncProvider is not null);
     }
 
     [ObservableProperty] private string _syncDetails = "";
@@ -34,27 +39,28 @@ public sealed partial class ToolsViewModel : PageViewModel
     private SyncResult? _syncResult;
     private MergeResult? _syncMerge;
     [ObservableProperty] private ProviderOption? _selectedSyncProvider;
+    partial void OnSelectedSyncProviderChanged(ProviderOption? value) => SyncCommand?.NotifyCanExecuteChanged();
     public ObservableCollection<ProviderOption> SyncProviders { get; } = [];
     public ObservableCollection<string> SyncConflicts { get; } = [];
     public string Version => $"Lemon Neo {typeof(ToolsViewModel).Assembly.GetName().Version?.ToString(3)}";
-    public string PluginPath => _runtime.Get<DesktopOptions>().PluginDirectory;
-    public string DataPath => _runtime.Paths.DataDirectory;
+    public string PluginPath => _host.Get<DesktopOptions>().PluginDirectory;
+    public string DataPath => _host.Paths.DataDirectory;
     public string Diagnostics => BuildDiagnostics();
     public string PathDetails => string.Join(Environment.NewLine, new[]
     {
-        $"{_text["ConfigurationPath"]}: {ConfigurationPath}", $"{_text["AppSettingsPath"]}: {_runtime.Paths.GetPackageConfigurationDirectory(PackageNames.Application)}",
-        $"{_text["DataPath"]}: {DataPath}", $"{_text["HistoryPath"]}: {_runtime.Paths.GetEntityConfigurationFile(PackageNames.Console, "CommandHistoryState")}",
+        $"{_text["ConfigurationPath"]}: {ConfigurationPath}", $"{_text["AppSettingsPath"]}: {_host.Paths.GetPackageConfigurationDirectory(PackageNames.Application)}",
+        $"{_text["DataPath"]}: {DataPath}", $"{_text["HistoryPath"]}: {_host.Paths.GetEntityConfigurationFile(PackageNames.Console, "CommandHistoryState")}",
         $"{_text["CachePath"]}: {CachePath}", $"{_text["LyricsCachePath"]}: {Path.Combine(CachePath, "Lyrics")}",
-        $"{_text["ImageCachePath"]}: {_runtime.Get<ImageCache>().DirectoryPath}",
+        $"{_text["ImageCachePath"]}: {_host.Get<ImageCache>().DirectoryPath}",
         $"{_text["LibraryPath"]}: {LibraryPath}", $"{_text["PluginPath"]}: {PluginPath}"
     });
-    public string MetadataNamespaces => string.Join(", ", _runtime.Get<IProviderRegistry>().Providers.OfType<IMetadataProvider>()
+    public string MetadataNamespaces => string.Join(", ", _host.Get<IProviderRegistry>().Providers.OfType<IMetadataProvider>()
         .SelectMany(p => p.MetadataNamespaces).Distinct(StringComparer.OrdinalIgnoreCase).Order());
 
     public string LibrarySummary => Context.LibrarySummary;
-    public string ConfigurationPath => _runtime.Paths.ConfigurationDirectory;
-    public string CachePath => _runtime.Paths.CacheDirectory;
-    public string LibraryPath => _runtime.Get<DesktopOptions>().LibraryDirectory;
+    public string ConfigurationPath => _host.Paths.ConfigurationDirectory;
+    public string CachePath => _host.Paths.CacheDirectory;
+    public string LibraryPath => _host.Get<DesktopOptions>().LibraryDirectory;
     public AsyncRelayCommand<string> NavigateCommand { get; }
     public AsyncRelayCommand RefreshCommand { get; }
     public AsyncRelayCommand SaveCommand { get; }
@@ -64,7 +70,7 @@ public sealed partial class ToolsViewModel : PageViewModel
     {
         var selectedId = SelectedSyncProvider?.Id;
         SyncProviders.Clear();
-        foreach (var id in _runtime.Get<SyncService>().ProviderIds) SyncProviders.Add(new(id, id));
+        foreach (var id in _host.Get<SyncService>().ProviderIds) SyncProviders.Add(new(id, id));
         SelectedSyncProvider = SyncProviders.FirstOrDefault(p => p.Id == selectedId) ?? SyncProviders.FirstOrDefault();
     }
 
@@ -76,11 +82,11 @@ public sealed partial class ToolsViewModel : PageViewModel
         switch (action)
         {
             case "status":
-                var status = await Task.Run(() => _runtime.Get<SyncService>().GetStatusAsync(id, ct), ct);
+                var status = await Task.Run(() => _host.Get<SyncService>().GetStatusAsync(id, ct), ct);
                 _syncStatus = status;
                 break;
             case "pull":
-                var sync = _runtime.Get<SyncService>();
+                var sync = _host.Get<SyncService>();
                 var remote = await Task.Run(() => sync.FetchRemoteAsync(id, ct), ct);
                 var pull = await sync.ApplyRemoteAsync(id, remote, ct);
                 _syncResult = pull.ProviderResult;
@@ -92,8 +98,8 @@ public sealed partial class ToolsViewModel : PageViewModel
                 }
                 break;
             case "push":
-                await _runtime.Get<LibraryService>().SaveAsync(ct);
-                var push = await Task.Run(() => _runtime.Get<SyncService>().PushRemoteAsync(id, ct), ct);
+                await _host.Get<LibraryService>().SaveAsync(ct);
+                var push = await Task.Run(() => _host.Get<SyncService>().PushRemoteAsync(id, ct), ct);
                 _syncResult = push;
                 if (!push.Success) throw new InvalidOperationException(push.Message);
                 break;
@@ -119,7 +125,7 @@ public sealed partial class ToolsViewModel : PageViewModel
     private string BuildDiagnostics()
     {
         var text = new StringBuilder(Version).AppendLine().AppendLine(LibrarySummary).AppendLine();
-        var loader = _runtime.Get<PluginLoader>();
+        var loader = _host.Plugins;
         foreach (var plugin in loader.Loaded)
         {
             var manifest = plugin.Manifest;
@@ -130,7 +136,7 @@ public sealed partial class ToolsViewModel : PageViewModel
                 .AppendLine($"{_text["Permissions"]}: {string.Join(", ", manifest.Permissions)}");
             if (plugin.IsInteractive) text.AppendLine(_text["InteractivePlugin"]);
         }
-        foreach (var provider in _runtime.Get<IProviderRegistry>().Providers)
+        foreach (var provider in _host.Get<IProviderRegistry>().Providers)
         {
             text.AppendLine().AppendLine($"{provider.Descriptor.Name} ({provider.Id})").AppendLine(provider.Descriptor.Description);
             var capabilities = new List<string>();
@@ -146,7 +152,7 @@ public sealed partial class ToolsViewModel : PageViewModel
             if (provider is ITrackIdResolverProvider resolver)
                 text.AppendLine($"{_text["AcceptedIds"]}: {string.Join(", ", resolver.AcceptedIdSchemes.Select(s => $"{s.Namespace}:{s.Kind ?? "-"}"))}");
         }
-        foreach (var player in _runtime.Get<IPlayerRegistry>().Players)
+        foreach (var player in _host.Get<IPlayerRegistry>().Players)
             text.AppendLine().AppendLine($"{_text["PlayerEngine"]}: {player.Descriptor.Name} ({player.Id}) · {_text["Priority"]} {player.Priority}")
                 .AppendLine(player.Descriptor.Description);
         foreach (var failure in loader.LastReport.Failures) text.AppendLine().AppendLine($"{failure.ManifestPath}: {failure.Error}");

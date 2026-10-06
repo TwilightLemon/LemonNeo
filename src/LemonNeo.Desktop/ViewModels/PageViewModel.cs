@@ -8,7 +8,7 @@ namespace LemonNeo.Desktop.ViewModels;
 public abstract class PageViewModel : ObservableObject, IAsyncDisposable
 {
     protected readonly DesktopContext Context;
-    protected DesktopRuntime _runtime => Context.Runtime;
+    protected DesktopHost _host => Context.Host;
     protected LocalizationService _text => Context.Text;
     private readonly CancellationTokenSource _lifetime = new();
     private CancellationTokenSource? _operationCancellation;

@@ -1,4 +1,4 @@
-> 早期原型设计记录。当前持久化实现以 [Runtime 统一配置与 Library 持久化](persistence-design.md) 为准。
+> 早期原型设计记录，以下项目结构和 MockGit 项目名称仅反映历史设计。当前模块结构以 [项目与模块结构](module-architecture-plan.md) 为准，持久化实现以 [Hosting 统一配置与 Library 持久化](persistence-design.md) 为准。
 
 # Lemon Neo Prototype
 

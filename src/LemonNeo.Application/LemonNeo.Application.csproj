@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="../LemonNeo.Core/LemonNeo.Core.csproj" />
-    <ProjectReference Include="../LemonNeo.Playback/LemonNeo.Playback.csproj" />
-    <ProjectReference Include="../LemonNeo.Plugin.Abstractions/LemonNeo.Plugin.Abstractions.csproj" />
-    <ProjectReference Include="../LemonNeo.Sync.Abstractions/LemonNeo.Sync.Abstractions.csproj" />
+    <ProjectReference Include="../LemonNeo.Abstractions/LemonNeo.Abstractions.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.0" />
   </ItemGroup>
 </Project>

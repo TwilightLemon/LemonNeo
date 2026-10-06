@@ -1,6 +1,5 @@
 using CommunityToolkit.Mvvm.Input;
 using LemonNeo.Desktop.Infrastructure;
-using LemonNeo.Plugin.Runtime;
 
 namespace LemonNeo.Desktop.ViewModels;
 
@@ -42,17 +41,17 @@ public sealed class SettingsViewModel : PageViewModel
     public string ThemeColorStatus => _appearance.Colors.IsUsingArtwork
         ? _text["ThemeColorUsingArtwork"]
         : _text.Format(UseArtworkColors ? "ThemeColorFallbackStatus" : "ThemeColorBuiltInStatus", _text[ThemePalette.Get(_appearance.Current.ThemeColor).NameKey]);
-    public IEnumerable<string> PluginDescriptions => _runtime.Get<PluginLoader>().Loaded.Select(value => $"{value.Manifest.Name}  ·  {value.Manifest.Version}");
+    public IEnumerable<string> PluginDescriptions => _host.Plugins.Loaded.Select(value => $"{value.Manifest.Name}  ·  {value.Manifest.Version}");
     public bool IsThemeSystem => _appearance.Current.Theme == ThemePreference.System;
     public bool IsThemeLight => _appearance.Current.Theme == ThemePreference.Light;
     public bool IsThemeDark => _appearance.Current.Theme == ThemePreference.Dark;
     public bool IsLanguageSystem => Context.Settings.Get<LanguagePreferences>().Language == LanguagePreference.System;
     public bool IsLanguageChinese => Context.Settings.Get<LanguagePreferences>().Language == LanguagePreference.Chinese;
     public bool IsLanguageEnglish => Context.Settings.Get<LanguagePreferences>().Language == LanguagePreference.English;
-    public string PluginSummary => _text.Format("PluginCount", _runtime.Get<PluginLoader>().Loaded.Count);
-    public string LibraryPath => _runtime.Get<DesktopOptions>().LibraryDirectory;
-    public string ConfigurationPath => _runtime.Paths.ConfigurationDirectory;
-    public string CachePath => _runtime.Paths.CacheDirectory;
+    public string PluginSummary => _text.Format("PluginCount", _host.Plugins.Loaded.Count);
+    public string LibraryPath => _host.Get<DesktopOptions>().LibraryDirectory;
+    public string ConfigurationPath => _host.Paths.ConfigurationDirectory;
+    public string CachePath => _host.Paths.CacheDirectory;
 
     private void ApplyAppearance(Func<AppearancePreferences, AppearancePreferences> update)
     {

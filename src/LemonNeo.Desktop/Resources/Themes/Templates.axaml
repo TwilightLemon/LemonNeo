@@ -1,5 +1,5 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:vm="using:LemonNeo.Desktop.ViewModels" xmlns:core="using:LemonNeo.Core"
+                    xmlns:vm="using:LemonNeo.Desktop.ViewModels" xmlns:core="using:LemonNeo.Core.Library"
                     xmlns:i18n="using:LemonNeo.Desktop.Infrastructure" xmlns:controls="using:LemonNeo.Desktop.Controls">
   <DataTemplate x:Key="ProviderOptionTemplate" x:DataType="vm:ProviderOption">
     <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />

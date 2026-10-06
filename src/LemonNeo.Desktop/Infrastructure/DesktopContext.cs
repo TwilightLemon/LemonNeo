@@ -1,18 +1,19 @@
+using LemonNeo.Abstractions.Settings;
+using LemonNeo.Application.Library;
+using LemonNeo.Core.Library;
+using LemonNeo.Core.Music;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
-using LemonNeo.Application;
-using LemonNeo.Core;
-using LemonNeo.Plugin.Abstractions;
 
 namespace LemonNeo.Desktop.Infrastructure;
 
 /// <summary>Shared services and persisted data, without page-specific interaction state.</summary>
-public sealed class DesktopContext(DesktopRuntime runtime, LocalizationService text, AppearanceService appearance) : ObservableObject
+public sealed class DesktopContext(DesktopHost host, LocalizationService text, AppearanceService appearance) : ObservableObject
 {
     private bool _initialized;
-    public DesktopRuntime Runtime { get; } = runtime;
+    public DesktopHost Host { get; } = host;
     public LocalizationService Text { get; } = text;
-    public ISettingsScope Settings { get; } = runtime.Settings.ForPackage(PackageNames.Desktop);
+    public ISettingsScope Settings { get; } = host.Settings.ForPackage(PackageNames.Desktop);
     public AppearanceService Appearance { get; } = appearance;
     public ObservableCollection<Playlist> Playlists { get; } = [];
     public bool IsInitialized { get => _initialized; internal set => SetProperty(ref _initialized, value); }
@@ -20,12 +21,12 @@ public sealed class DesktopContext(DesktopRuntime runtime, LocalizationService t
     public event Action<string>? AuthenticationChanged;
     public void NotifyAuthenticationChanged(string providerId) => AuthenticationChanged?.Invoke(providerId);
     public string LibrarySummary => Text.Format("LibraryStatistics", Playlists.Count,
-        Runtime.Get<LibraryService>().Current.Playlists.SelectMany(p => p.Items).DistinctBy(i => i.Track.Id).Count(),
-        Runtime.Get<LibraryService>().Current.Playlists.Sum(p => p.Items.Count));
+        Host.Get<LibraryService>().Current.Playlists.SelectMany(p => p.Items).DistinctBy(i => i.Track.Id).Count(),
+        Host.Get<LibraryService>().Current.Playlists.Sum(p => p.Items.Count));
 
     public void RefreshLibrary()
     {
-        var values = Runtime.Get<LibraryService>().Current.Playlists.OrderBy(p => p.Name, StringComparer.Create(Text.Culture, true)).ToArray();
+        var values = Host.Get<LibraryService>().Current.Playlists.OrderBy(p => p.Name, StringComparer.Create(Text.Culture, true)).ToArray();
         // Preserve the sidebar selection while refreshing existing playlist objects.
         for (var i = Playlists.Count - 1; i >= 0; i--)
             if (!values.Any(p => p.Id == Playlists[i].Id)) Playlists.RemoveAt(i);

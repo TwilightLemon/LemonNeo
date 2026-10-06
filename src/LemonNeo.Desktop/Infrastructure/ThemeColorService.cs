@@ -101,7 +101,7 @@ public sealed class ThemeColorService : IDisposable
     private void ApplyFrame(IReadOnlyDictionary<string, Color> colors)
     {
         _resources.Apply(colors);
-        // Fluent's Accent is its supported runtime palette input (checkboxes, switches, focus, etc.).
+        // Fluent's Accent is its supported host palette input (checkboxes, switches, focus, etc.).
         if (_fluent is null) return;
         foreach (var palette in _fluent.Palettes.Values) palette.Accent = colors["AccentText"];
     }

@@ -1,4 +1,5 @@
-using LemonNeo.Plugin.Abstractions;
+using LemonNeo.Abstractions.Plugins;
+using LemonNeo.Abstractions.Settings;
 
 namespace LemonNeo.Plugin.ConfigurationFixture;
 

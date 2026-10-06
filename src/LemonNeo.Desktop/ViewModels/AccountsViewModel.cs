@@ -1,9 +1,9 @@
+using LemonNeo.Abstractions.Providers;
 using System.Collections.ObjectModel;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LemonNeo.Desktop.Infrastructure;
-using LemonNeo.Plugin.Abstractions;
 
 namespace LemonNeo.Desktop.ViewModels;
 
@@ -19,7 +19,7 @@ public sealed partial class AccountsViewModel : PageViewModel
 
     public AccountsViewModel(DesktopContext context) : base(context, DesktopRoutes.Accounts)
     {
-        _artwork = _runtime.Get<ArtworkService>();
+        _artwork = _host.Get<ArtworkService>();
         LoginCommand = new(LoginAsync);
         LogoutCommand = new(LogoutAsync);
         RefreshServices();
@@ -48,7 +48,7 @@ public sealed partial class AccountsViewModel : PageViewModel
     public ObservableCollection<ProviderOption> Services { get; } = [];
     public bool HasServices => Services.Count > 0;
     private IAuthenticationProvider? Provider => SelectedService?.Id is { } id
-        ? _runtime.Get<IProviderRegistry>().Get(id) as IAuthenticationProvider : null;
+        ? _host.Get<IProviderRegistry>().Get(id) as IAuthenticationProvider : null;
     public bool IsAuthenticated => Provider?.State.IsAuthenticated == true;
     public string AuthenticationStatus => _text[IsAuthenticated ? "Authenticated" : "NotAuthenticated"];
     public string AccountName => Provider?.State is { IsAuthenticated: true } state
@@ -111,7 +111,7 @@ public sealed partial class AccountsViewModel : PageViewModel
 
     private void RefreshServices()
     {
-        var providers = _runtime.Get<IProviderRegistry>().Providers.Where(p => p is IAuthenticationProvider).ToArray();
+        var providers = _host.Get<IProviderRegistry>().Providers.Where(p => p is IAuthenticationProvider).ToArray();
         var options = providers.Select(p => new ProviderOption(p.Id, p.Descriptor.Name)).ToArray();
         var selectedId = SelectedService?.Id
             ?? providers.FirstOrDefault(p => p is IAuthenticationProvider { State.IsAuthenticated: true })?.Id;

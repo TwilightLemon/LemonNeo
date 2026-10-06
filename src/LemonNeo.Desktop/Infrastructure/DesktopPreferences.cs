@@ -1,4 +1,4 @@
-using LemonNeo.Plugin.Abstractions;
+using LemonNeo.Abstractions.Settings;
 
 namespace LemonNeo.Desktop.Infrastructure;
 
@@ -13,7 +13,7 @@ public sealed record LyricsPreferences(double FontSize = 24, bool ShowRomanizati
 public sealed record DesktopLyricsPreferences(int LineCount = 2, double FontSize = 28,
     bool ShowRomanization = true, bool ShowTranslation = true, double WindowWidth = 760, double WindowHeight = 300);
 
-/// <summary>Desktop owns entity defaults and validation; Runtime owns loading and persistence.</summary>
+/// <summary>Desktop owns entity defaults and validation; the host owns loading and persistence.</summary>
 public static class DesktopPreferences
 {
     public static void Register(ISettingsScope settings)

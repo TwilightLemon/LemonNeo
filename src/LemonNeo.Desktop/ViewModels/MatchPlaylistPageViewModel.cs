@@ -1,10 +1,12 @@
+using LemonNeo.Abstractions.Providers;
+using LemonNeo.Application.Library;
+using LemonNeo.Application.Providers;
+using LemonNeo.Core.Library;
+using LemonNeo.Core.Music;
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using LemonNeo.Application;
-using LemonNeo.Core;
 using LemonNeo.Desktop.Infrastructure;
-using LemonNeo.Plugin.Abstractions;
 
 namespace LemonNeo.Desktop.ViewModels;
 
@@ -19,7 +21,7 @@ public sealed partial class MatchPlaylistPageViewModel : PageViewModel
         _playlistId = playlistId;
         CloseCommand = new(navigation.GoBackAsync);
         MatchPlaylistCommand = new(MatchPlaylistAsync, () => CanMatchPlaylist);
-        MetadataSources = MetadataSourceOption.Create(_runtime.Get<IProviderRegistry>(), _runtime.Get<IPlaybackSourceProviderRegistry>());
+        MetadataSources = MetadataSourceOption.Create(_host.Get<IProviderRegistry>(), _host.Get<IPlaybackSourceProviderRegistry>());
         foreach (var source in MetadataSources) source.PropertyChanged += OnMetadataSourceChanged;
         Context.LibraryChanged += OnLibraryChanged;
     }
@@ -42,13 +44,13 @@ public sealed partial class MatchPlaylistPageViewModel : PageViewModel
         return ExecuteAsync(async ct =>
         {
             InspectionMessages = "";
-            var playlists = _runtime.Get<PlaylistService>();
+            var playlists = _host.Get<PlaylistService>();
             var tracks = playlists.GetRequired(_playlistId).Items.Select(item => item.Track).DistinctBy(track => track.Id).ToArray();
             using var concurrency = new SemaphoreSlim(3);
             var results = await Task.WhenAll(tracks.Select(async track =>
             {
                 await concurrency.WaitAsync(ct);
-                try { return (Original: track, Result: await Task.Run(() => _runtime.Get<MetadataService>().EnrichAsync(track, targets, ct), ct)); }
+                try { return (Original: track, Result: await Task.Run(() => _host.Get<MetadataService>().EnrichAsync(track, targets, ct), ct)); }
                 finally { concurrency.Release(); }
             }));
             ct.ThrowIfCancellationRequested();
@@ -62,7 +64,7 @@ public sealed partial class MatchPlaylistPageViewModel : PageViewModel
                 foreach (var item in items) playlists.UpdateTrack(_playlistId, item.Id, result.Result.Track);
                 if (items.Length > 0) matched++;
             }
-            await _runtime.Get<LibraryService>().SaveAsync(ct);
+            await _host.Get<LibraryService>().SaveAsync(ct);
             Context.RefreshLibrary();
             SetStatus("PlaylistMatched", matched, tracks.Length);
         });

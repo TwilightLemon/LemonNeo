@@ -1,6 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <ProjectReference Include="../LemonNeo.Plugin.Abstractions/LemonNeo.Plugin.Abstractions.csproj" />
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
-  </ItemGroup>
-</Project>

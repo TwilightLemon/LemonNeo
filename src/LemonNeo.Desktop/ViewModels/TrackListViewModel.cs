@@ -1,7 +1,8 @@
+using LemonNeo.Application.Library;
+using LemonNeo.Core.Library;
+using LemonNeo.Core.Music;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.Input;
-using LemonNeo.Application;
-using LemonNeo.Core;
 using LemonNeo.Desktop.Infrastructure;
 
 namespace LemonNeo.Desktop.ViewModels;
@@ -50,7 +51,7 @@ public abstract class TrackListViewModel : PageViewModel
             values = values.Where(t => $"{t.Track.Title} {string.Join(' ', t.Track.Artists.Select(a => a.Name))} {t.Track.Album?.Title}"
                 .Contains(Filter.Trim(), StringComparison.CurrentCultureIgnoreCase));
         Tracks.Clear();
-        var artwork = _runtime.Get<ArtworkService>();
+        var artwork = _host.Get<ArtworkService>();
         foreach (var track in values) Tracks.Add(track with { ArtworkLoader = artwork });
         SelectedTrack = Tracks.FirstOrDefault(t => selected?.PlaylistItemId is { } itemId ? t.PlaylistItemId == itemId
             : selected?.QueueItemId is { } queueId ? t.QueueItemId == queueId : t.Track.Id == selected?.Track.Id);
@@ -59,8 +60,8 @@ public abstract class TrackListViewModel : PageViewModel
     }
     public Task AddTrackAsync(Guid playlistId, Track track) => ExecuteAsync(async ct =>
     {
-        _runtime.Get<PlaylistService>().Add(playlistId, track);
-        await _runtime.Get<LibraryService>().SaveAsync(ct);
+        _host.Get<PlaylistService>().Add(playlistId, track);
+        await _host.Get<LibraryService>().SaveAsync(ct);
         Context.RefreshLibrary(); SetStatus("TrackAdded");
     });
     private void OnLibraryChanged(object? sender, EventArgs args)

@@ -1,12 +1,17 @@
+using LemonNeo.Abstractions.Providers;
+using LemonNeo.Application.Library;
+using LemonNeo.Application.Lyrics;
+using LemonNeo.Application.Playback;
+using LemonNeo.Application.Providers;
+using LemonNeo.Core.Library;
+using LemonNeo.Core.Lyrics;
+using LemonNeo.Core.Music;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using LemonNeo.Application;
-using LemonNeo.Core;
 using LemonNeo.Desktop.Infrastructure;
-using LemonNeo.Plugin.Abstractions;
 
 namespace LemonNeo.Desktop.ViewModels;
 
@@ -33,13 +38,13 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
             if (!CanUseMetadataMatch(row)) return;
             var added = Editor!.AddExternalIds(row!.Match.Metadata.ExternalIds); SetStatus("MetadataIdsAdded", added);
         }, row => CanUseMetadataMatch(row) && row!.Match.Metadata.ExternalIds.Count > 0);
-        MetadataSources = MetadataSourceOption.Create(_runtime.Get<IProviderRegistry>(), _runtime.Get<IPlaybackSourceProviderRegistry>());
+        MetadataSources = MetadataSourceOption.Create(_host.Get<IProviderRegistry>(), _host.Get<IPlaybackSourceProviderRegistry>());
         foreach (var source in MetadataSources) source.PropertyChanged += OnMetadataSourceChanged;
         UseTrackSearchQuery();
         LyricsDetailsCommand = new(InspectLyricsAsync); SourcesCommand = new(InspectSourcesAsync);
         PlaySourceCommand = new(() => SelectedSource is { } source && _sourceTrack is { } track
             ? playback.ExecutePlaybackAsync(ct =>
-                _runtime.Get<PlaybackSessionService>().PlayTrackAsync(track, new(RequiredSourceProviderId: source.Provider), ct)) : Task.CompletedTask);
+                _host.Get<PlaybackSessionService>().PlayTrackAsync(track, new(RequiredSourceProviderId: source.Provider), ct)) : Task.CompletedTask);
         Context.LibraryChanged += OnLibraryChanged;
     }
     public TrackEditorViewModel? Editor { get; }
@@ -75,10 +80,10 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
         return ExecuteAsync(async ct =>
         {
             var track = editor.Build();
-            var service = _runtime.Get<PlaylistService>();
+            var service = _host.Get<PlaylistService>();
             if (editor.ItemId is { } itemId) service.UpdateTrack(destination, itemId, track);
             else editor.AttachItem(destination, service.Add(destination, track).Id);
-            await _runtime.Get<LibraryService>().SaveAsync(ct);
+            await _host.Get<LibraryService>().SaveAsync(ct);
             // Stay in the editor on validation or persistence failure.
             Context.RefreshLibrary();
             if (ReferenceEquals(Navigation.Current, this)) await Navigation.GoBackAsync();
@@ -116,12 +121,12 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
         var targets = MetadataSources.Where(source => source.IsSelected).Select(source => source.Namespace).ToArray();
         if (targets.Length == 0) throw new ArgumentException(_text["SelectMetadataSources"]);
         var query = MetadataSearchQuery.Trim();
-        var result = await Task.Run(() => _runtime.Get<MetadataService>().LookupAsync(track, targets, limitPerSource: 20,
+        var result = await Task.Run(() => _host.Get<MetadataService>().LookupAsync(track, targets, limitPerSource: 20,
             minimumConfidence: 0, cancellationToken: ct, searchKeyword: query), ct);
         ct.ThrowIfCancellationRequested();
         MetadataMatches.Clear();
         foreach (var match in result.Matches) MetadataMatches.Add(new(match, _text, ReplaceMatchMetadataCommand, AddMatchExternalIdsCommand)
-            { ArtworkLoader = _runtime.Get<ArtworkService>() });
+            { ArtworkLoader = _host.Get<ArtworkService>() });
         RefreshMetadataCommands();
         InspectionMessages = FormatErrors(result.SourceErrors);
         SetStatus("MetadataCompleted", result.Matches.Count);
@@ -130,7 +135,7 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
     public Task InspectLyricsAsync() => ExecuteAsync(async ct =>
     {
         var track = GetInspectionTrack();
-        var result = await Task.Run(() => _runtime.Get<LyricsService>().GetLyricsAsync(track, ct), ct);
+        var result = await Task.Run(() => _host.Get<LyricsService>().GetLyricsAsync(track, ct), ct);
         _inspectedLyrics = result;
         LyricsDetails = result.Lyrics is { } lyrics ? FormatLyricsDetails(lyrics, result.ProviderId) : _text["NoLyrics"];
         InspectionMessages = FormatErrors(result.ProviderErrors);
@@ -139,7 +144,7 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
     public Task InspectSourcesAsync() => ExecuteAsync(async ct =>
     {
         var track = GetInspectionTrack();
-        var result = await Task.Run(() => _runtime.Get<PlaybackSourceDiscoveryService>().FindAsync(track, cancellationToken: ct), ct);
+        var result = await Task.Run(() => _host.Get<PlaybackSourceDiscoveryService>().FindAsync(track, cancellationToken: ct), ct);
         DiscoveredSources.Clear();
         foreach (var candidate in result.Candidates) DiscoveredSources.Add(new(candidate, _text));
         _sourceTrack = track;
@@ -184,7 +189,7 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
         base.RefreshLocalizedProperties();
         if (_inspectedLyrics is { } result) LyricsDetails = result.Lyrics is { } lyrics ? FormatLyricsDetails(lyrics, result.ProviderId) : _text["NoLyrics"];
         for (var i = 0; i < MetadataMatches.Count; i++) MetadataMatches[i] = new(MetadataMatches[i].Match, _text, ReplaceMatchMetadataCommand, AddMatchExternalIdsCommand)
-            { ArtworkLoader = _runtime.Get<ArtworkService>() };
+            { ArtworkLoader = _host.Get<ArtworkService>() };
         for (var i = 0; i < DiscoveredSources.Count; i++) DiscoveredSources[i] = new(DiscoveredSources[i].Candidate, _text);
     }
     public override async ValueTask DisposeAsync()

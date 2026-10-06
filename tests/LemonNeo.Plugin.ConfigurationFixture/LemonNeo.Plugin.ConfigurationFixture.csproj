@@ -4,7 +4,7 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../src/LemonNeo.Plugin.Abstractions/LemonNeo.Plugin.Abstractions.csproj" />
+    <ProjectReference Include="../../src/LemonNeo.Abstractions/LemonNeo.Abstractions.csproj" />
     <None Include="plugin.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

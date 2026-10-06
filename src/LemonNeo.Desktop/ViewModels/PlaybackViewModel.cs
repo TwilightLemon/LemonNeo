@@ -1,11 +1,11 @@
+using LemonNeo.Abstractions.Playback;
+using LemonNeo.Application.Playback;
+using LemonNeo.Core.Playback;
 using CommunityToolkit.Mvvm.Input;
 using Avalonia.Threading;
 using Avalonia.Media.Imaging;
 using Avalonia.Media;
-using LemonNeo.Application;
-using LemonNeo.Core;
 using LemonNeo.Desktop.Infrastructure;
-using LemonNeo.Plugin.Abstractions;
 
 namespace LemonNeo.Desktop.ViewModels;
 
@@ -32,8 +32,8 @@ public sealed class PlaybackViewModel : PageViewModel
 
     public PlaybackViewModel(DesktopContext context, ArtworkService artwork) : base(context, "Playback")
     {
-        _session = _runtime.Get<PlaybackSessionService>();
-        _interaction = _runtime.Get<IPlaybackInteraction>();
+        _session = _host.Get<PlaybackSessionService>();
+        _interaction = _host.Get<IPlaybackInteraction>();
         _artwork = artwork;
         _snapshot = _session.Snapshot;
         _volumePercent = _session.Volume * 100;

@@ -1,5 +1,5 @@
-using Avalonia.Media.Imaging;
 using LemonNeo.Application;
+using Avalonia.Media.Imaging;
 using Microsoft.Extensions.Logging;
 
 namespace LemonNeo.Desktop.Infrastructure;

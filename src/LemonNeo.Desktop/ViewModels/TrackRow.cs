@@ -1,4 +1,4 @@
-using LemonNeo.Core;
+using LemonNeo.Core.Music;
 using LemonNeo.Desktop.Infrastructure;
 
 namespace LemonNeo.Desktop.ViewModels;

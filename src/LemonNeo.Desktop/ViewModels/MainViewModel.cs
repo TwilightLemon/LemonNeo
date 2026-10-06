@@ -1,8 +1,7 @@
+using LemonNeo.Core.Lyrics;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.Input;
-using LemonNeo.Application;
 using LemonNeo.Desktop.Infrastructure;
-using LemonNeo.Plugin.Runtime;
 
 namespace LemonNeo.Desktop.ViewModels;
 
@@ -14,8 +13,8 @@ public sealed class MainViewModel : PageViewModel
     private SearchViewModel? _searchPage;
     private PlaybackQueueViewModel? _queueDrawer;
     private bool _isQueueOpen;
-    public MainViewModel(DesktopRuntime runtime, LocalizationService text, AppearanceService appearance, ArtworkService artwork)
-        : base(new DesktopContext(runtime, text, appearance), "Library")
+    public MainViewModel(DesktopHost host, LocalizationService text, AppearanceService appearance, ArtworkService artwork)
+        : base(new DesktopContext(host, text, appearance), "Library")
     {
         Playback = new(Context, artwork);
         Navigation = new(CreatePage, Context, Playback);
@@ -169,12 +168,12 @@ public sealed class MainViewModel : PageViewModel
 
     public Task InitializeAsync() => RunOperationAsync(async ct =>
     {
-        await _runtime.Settings.LoadAsync(ct);
-        await Task.Run(() => _runtime.InitializeAsync(ct), ct);
+        await _host.Settings.LoadAsync(ct);
+        await Task.Run(() => _host.InitializeAsync(ct), ct);
         ct.ThrowIfCancellationRequested();
         Context.IsInitialized = true;
         Context.RefreshLibrary();
-        var report = _runtime.Get<PluginLoader>().LastReport;
+        var report = _host.Plugins.LastReport;
         if (report.Failures.Count > 0)
             SetError("PluginFailures", [report.Failures.Count], string.Join(Environment.NewLine, report.Failures.Select(f => f.Error)));
         Playback.UpdateSnapshot();

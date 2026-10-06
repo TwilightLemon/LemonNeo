@@ -1,3 +1,5 @@
+using LemonNeo.Application.Lyrics;
+using LemonNeo.Core.Lyrics;
 using System.Diagnostics;
 using System.Windows.Input;
 using Avalonia;
@@ -9,8 +11,6 @@ using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.VisualTree;
-using LemonNeo.Application;
-using LemonNeo.Plugin.Abstractions;
 using CommunityToolkit.Mvvm.Input;
 
 namespace LemonNeo.Desktop.Controls;

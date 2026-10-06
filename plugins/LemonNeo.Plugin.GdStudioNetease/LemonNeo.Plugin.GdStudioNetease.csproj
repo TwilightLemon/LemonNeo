@@ -1,19 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/LemonNeo.Core/LemonNeo.Core.csproj" />
-    <ProjectReference Include="../../src/LemonNeo.Plugin.Abstractions/LemonNeo.Plugin.Abstractions.csproj" />
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../../src/LemonNeo.Abstractions/LemonNeo.Abstractions.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="plugin.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
-  <Target Name="DeployToPrototypeHost" AfterTargets="Build">
-    <PropertyGroup>
-      <PrototypePluginDirectory>$(MSBuildProjectDirectory)\..\..\src\LemonNeo.Console\bin\$(Configuration)\$(TargetFramework)\plugins\LemonNeo.Plugin.GdStudioNetease\</PrototypePluginDirectory>
-    </PropertyGroup>
-    <MakeDir Directories="$(PrototypePluginDirectory)" />
-    <Copy SourceFiles="$(TargetPath);$(TargetDir)plugin.json"
-          DestinationFolder="$(PrototypePluginDirectory)"
-          SkipUnchangedFiles="true" />
-  </Target>
 </Project>

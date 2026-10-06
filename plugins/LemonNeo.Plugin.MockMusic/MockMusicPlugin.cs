@@ -1,6 +1,9 @@
+using LemonNeo.Abstractions.Plugins;
+using LemonNeo.Abstractions.Providers;
+using LemonNeo.Core.Lyrics;
+using LemonNeo.Core.Music;
+using LemonNeo.Core.Playback;
 using System.Runtime.CompilerServices;
-using LemonNeo.Core;
-using LemonNeo.Plugin.Abstractions;
 
 namespace LemonNeo.Plugin.MockMusic;
 

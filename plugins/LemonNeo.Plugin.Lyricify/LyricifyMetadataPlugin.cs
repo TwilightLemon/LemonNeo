@@ -1,15 +1,17 @@
+using LemonNeo.Abstractions.Plugins;
+using LemonNeo.Abstractions.Providers;
+using LemonNeo.Core.Lyrics;
+using LemonNeo.Core.Music;
 using System.Text.Json;
-using LemonNeo.Core;
-using LemonNeo.Plugin.Abstractions;
 using Lyricify.Lyrics.Helpers;
 using Lyricify.Lyrics.Models;
 using Lyricify.Lyrics.Searchers;
 using Lyricify.Lyrics.Searchers.Helpers;
 using Microsoft.Extensions.Logging;
 using HelperSearchers = Lyricify.Lyrics.Searchers.Searchers;
-using LemonLyrics = LemonNeo.Plugin.Abstractions.Lyrics;
-using LemonLyricsLine = LemonNeo.Plugin.Abstractions.LyricsLine;
-using LemonTrackMetadata = LemonNeo.Plugin.Abstractions.TrackMetadata;
+using LemonLyrics = LemonNeo.Core.Lyrics.Lyrics;
+using LemonLyricsLine = LemonNeo.Core.Lyrics.LyricsLine;
+using LemonTrackMetadata = LemonNeo.Abstractions.Providers.TrackMetadata;
 
 namespace LemonNeo.Plugin.Lyricify;
 

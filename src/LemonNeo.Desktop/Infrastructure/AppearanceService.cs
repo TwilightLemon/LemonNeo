@@ -1,9 +1,9 @@
+using LemonNeo.Abstractions.Settings;
 using Avalonia.Media;
-using LemonNeo.Plugin.Abstractions;
 
 namespace LemonNeo.Desktop.Infrastructure;
 
-/// <summary>Applies theme and motion changes; configuration is owned by Runtime.</summary>
+/// <summary>Applies theme and motion changes; configuration is owned by the host.</summary>
 public sealed class AppearanceService : IDisposable
 {
     private readonly Avalonia.Application _application;

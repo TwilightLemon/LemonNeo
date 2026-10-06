@@ -1,7 +1,9 @@
+using LemonNeo.Application.Playback;
+using LemonNeo.Application.Providers;
+using LemonNeo.Core.Music;
+using LemonNeo.Core.Playback;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using LemonNeo.Application;
-using LemonNeo.Core;
 using LemonNeo.Desktop.Infrastructure;
 
 namespace LemonNeo.Desktop.ViewModels;
@@ -16,11 +18,11 @@ public sealed partial class SearchViewModel : TrackListViewModel
     public bool CanSearch => CanInteract && !string.IsNullOrWhiteSpace(SearchQuery);
     protected override IEnumerable<TrackRow> GetTracks() => _searchTracks.Select((t, index) => new TrackRow(t, index + 1, _text));
     public override Task PlayAsync(TrackRow? selected = null) => (selected ?? SelectedTrack ?? Tracks.FirstOrDefault()) is { } result
-        ? Playback.ExecutePlaybackAsync(ct => _runtime.Get<PlaybackSessionService>().PlayTrackAsync(result.Track, new PlaybackRequest(), ct)) : Task.CompletedTask;
+        ? Playback.ExecutePlaybackAsync(ct => _host.Get<PlaybackSessionService>().PlayTrackAsync(result.Track, new PlaybackRequest(), ct)) : Task.CompletedTask;
     public Task SearchAsync() => ExecuteAsync(async ct =>
     {
         if (string.IsNullOrWhiteSpace(SearchQuery)) throw new ArgumentException(_text["SearchQueryRequired"]);
-        var results = await Task.Run(() => _runtime.Get<SearchService>().SearchForPlaybackAsync(SearchQuery.Trim(), ct), ct);
+        var results = await Task.Run(() => _host.Get<SearchService>().SearchForPlaybackAsync(SearchQuery.Trim(), ct), ct);
         ct.ThrowIfCancellationRequested();
         _searchTracks = results.SelectMany(r => r.Tracks).DistinctBy(t => t.Id).ToArray();
         Filter = "";

@@ -1,9 +1,9 @@
+using LemonNeo.Application.Lyrics;
+using LemonNeo.Core.Lyrics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.TextFormatting;
-using LemonNeo.Application;
-using LemonNeo.Plugin.Abstractions;
 
 namespace LemonNeo.Desktop.Controls;
 

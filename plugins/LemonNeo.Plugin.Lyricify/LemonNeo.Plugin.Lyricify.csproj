@@ -5,24 +5,10 @@
   <ItemGroup>
     <InternalsVisibleTo Include="LemonNeo.Lyrics.Tests" />
     <ProjectReference Include="../../src/LemonNeo.Core/LemonNeo.Core.csproj" />
-    <ProjectReference Include="../../src/LemonNeo.Plugin.Abstractions/LemonNeo.Plugin.Abstractions.csproj" />
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../../src/LemonNeo.Abstractions/LemonNeo.Abstractions.csproj" />
     <ProjectReference Include="../../external/Lyricify-Lyrics-Helper/Lyricify.Lyrics.Helper/Lyricify.Lyrics.Helper.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="plugin.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
-  <Target Name="DeployToPrototypeHost" AfterTargets="Build">
-    <PropertyGroup>
-      <PrototypePluginDirectory>$(MSBuildProjectDirectory)\..\..\src\LemonNeo.Console\bin\$(Configuration)\$(TargetFramework)\plugins\LemonNeo.Plugin.Lyricify\</PrototypePluginDirectory>
-    </PropertyGroup>
-    <MakeDir Directories="$(PrototypePluginDirectory)" />
-    <ItemGroup>
-      <PrivatePluginDependency Include="@(ReferenceCopyLocalPaths)"
-                               Condition="'%(Filename)' != 'LemonNeo.Core' and '%(Filename)' != 'LemonNeo.Plugin.Abstractions'" />
-    </ItemGroup>
-    <Copy SourceFiles="$(TargetPath);$(TargetDir)plugin.json;@(PrivatePluginDependency)"
-          DestinationFolder="$(PrototypePluginDirectory)"
-          SkipUnchangedFiles="true" />
-  </Target>
 </Project>

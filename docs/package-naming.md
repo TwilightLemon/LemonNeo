@@ -9,11 +9,11 @@
 | Desktop | `LemonNeo.Desktop` |
 | Console | `LemonNeo.Console` |
 | 插件 | `LemonNeo.Plugin.<Name>`，例如 `LemonNeo.Plugin.Netease`、`LemonNeo.Plugin.QqMusic` |
-| 同步实现 | `LemonNeo.Sync.<Name>`，例如 `LemonNeo.Sync.MockGit` |
+| 基础设施 | `LemonNeo.Infrastructure`；MockGit 为内部 `Sync` 模块，不是插件包 |
 
 插件 manifest 的 `id` 与 `PluginDescriptor.Id` 必须完全一致，推荐与程序集名一致。
 每一段以大写字母开头，后续字符只能使用 ASCII 字母和数字；不使用反向域名、连字符、路径字符或空段。
-Runtime 拒绝无效包名、不同大小写的重复配置包与已加载的重复插件包。
+Hosting 拒绝无效包名、不同大小写的重复配置包与已加载的重复插件包。
 
 ```json
 {
