@@ -88,14 +88,12 @@ public sealed class DesktopPluginInformationTests
             throw new InvalidOperationException("The information page must not perform a metadata lookup.");
     }
 
-    private sealed class AliasedPlaybackProvider : IMusicProvider, IPlaybackProvider, ITrackIdResolverProvider
+    private sealed class AliasedPlaybackProvider : IMusicProvider, IPlaybackProvider
     {
         public string Id => "alias-playback";
         public ProviderDescriptor Descriptor { get; } = new("Playback source", "Consumes file and Netease identifiers.");
         public IReadOnlyCollection<MusicIdScheme> AcceptedIdSchemes => [new("file", "path"), new("netease", "song-id"), new("netease", "other-id")];
-        public Task<PlaybackSource?> ResolvePlaybackAsync(Track track, PlaybackRequest request, CancellationToken cancellationToken = default) =>
+        public Task<PlaybackSource?> ResolvePlaybackAsync(MusicItemId trackId, PlaybackRequest request, CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("The information page must not resolve audio.");
-        public Task<Track?> ResolveTrackIdAsync(ExternalMusicId identifier, TrackMetadata metadata, CancellationToken cancellationToken = default) =>
-            throw new InvalidOperationException("The information page must not resolve external identifiers.");
     }
 }

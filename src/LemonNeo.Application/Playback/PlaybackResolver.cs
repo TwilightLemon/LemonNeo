@@ -77,16 +77,9 @@ public sealed class PlaybackResolver(
                 playbackSources.Get(track.Id.ProviderId) is { } nativeSource)
             {
                 source = await nativeSource.PlaybackProvider.ResolvePlaybackAsync(
-                    track,
+                    track.Id,
                     playbackRequest,
                     cancellationToken);
-
-                if (source is null && playbackRequest.RequiredSourceProviderId is not null)
-                {
-                    throw new PlaybackResolutionException(
-                        $"Required source provider '{playbackRequest.RequiredSourceProviderId}' reported that " +
-                        $"'{track.Title}' is unavailable.");
-                }
             }
 
             if (source is null)

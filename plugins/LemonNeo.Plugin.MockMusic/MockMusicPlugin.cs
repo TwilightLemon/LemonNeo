@@ -159,8 +159,10 @@ public sealed class MockMusicPlugin :
         }
     }
 
+    public IReadOnlyCollection<MusicIdScheme> AcceptedIdSchemes => [];
+
     public Task<PlaybackSource?> ResolvePlaybackAsync(
-        Track track,
+        MusicItemId trackId,
         PlaybackRequest request,
         CancellationToken cancellationToken = default)
     {

@@ -51,7 +51,7 @@ public sealed partial class MatchPlaylistPageViewModel : PageViewModel
             var results = await Task.WhenAll(tracks.Select(async track =>
             {
                 await concurrency.WaitAsync(ct);
-                try { return (Original: track, Result: await Task.Run(() => _host.Get<MetadataService>().EnrichAsync(track, targets, ct), ct)); }
+                try { return (Original: track, Result: await Task.Run(() => _host.Get<MetadataService>().MatchAndReplaceAsync(track, targets, ct), ct)); }
                 finally { concurrency.Release(); }
             }));
             ct.ThrowIfCancellationRequested();

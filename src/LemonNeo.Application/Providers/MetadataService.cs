@@ -9,9 +9,9 @@ public sealed class MetadataService(IProviderRegistry registry)
         Track track,
         IReadOnlyList<string>? targetNamespaces = null,
         int limitPerSource = 3,
-        double minimumConfidence = 0.7,
-        CancellationToken cancellationToken = default,
-        string? searchKeyword = null)
+        double minimumConfidence = 0.8,
+        string? searchKeyword = null,
+        CancellationToken cancellationToken = default)
     {
         var matches = new List<MetadataMatch>();
         var errors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -54,12 +54,7 @@ public sealed class MetadataService(IProviderRegistry registry)
             errors);
     }
 
-    public Task<(Track Track, MetadataLookupResult Lookup)> EnrichAsync(
-        Track track,
-        CancellationToken cancellationToken = default) =>
-        EnrichAsync(track, null, cancellationToken);
-
-    public async Task<(Track Track, MetadataLookupResult Lookup)> EnrichAsync(
+    public async Task<(Track Track, MetadataLookupResult Lookup)> MatchAndReplaceAsync(
         Track track,
         IReadOnlyList<string>? targetNamespaces,
         CancellationToken cancellationToken = default)
@@ -68,14 +63,14 @@ public sealed class MetadataService(IProviderRegistry registry)
             track,
             targetNamespaces,
             cancellationToken: cancellationToken);
-        var reliable = lookup.Matches.Where(match => match.Confidence >= 0.6).ToArray();
+        var reliable = lookup.Matches.ToArray();
         if (reliable.Length == 0)
         {
             return (track, lookup);
         }
 
-        var best = reliable[0].Metadata;
-        var externalIds = track.ExternalIds.Concat(reliable.SelectMany(match => match.Metadata.ExternalIds))
+        var best = reliable[0].Track;
+        var externalIds = track.ExternalIds.Concat(reliable.SelectMany(match => match.Track.ExternalIds))
             .DistinctBy(id => new
             {
                 Namespace = id.Namespace.ToUpperInvariant(),
@@ -88,10 +83,10 @@ public sealed class MetadataService(IProviderRegistry registry)
             Title = string.IsNullOrWhiteSpace(best.Title) ? track.Title : best.Title,
             Artists = best.Artists.Count == 0
                 ? track.Artists
-                : best.Artists.Select(name => new ArtistRef { Name = name }).ToArray(),
-            Album = string.IsNullOrWhiteSpace(best.Album)
+                : best.Artists,
+            Album = string.IsNullOrWhiteSpace(best.Album?.Title)
                 ? track.Album
-                : new AlbumRef { Title = best.Album },
+                : best.Album,
             Duration = best.Duration ?? track.Duration,
             ArtworkUri = best.ArtworkUri ?? track.ArtworkUri,
             ExternalIds = externalIds

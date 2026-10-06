@@ -11,7 +11,6 @@ using Microsoft.Extensions.Logging;
 using HelperSearchers = Lyricify.Lyrics.Searchers.Searchers;
 using LemonLyrics = LemonNeo.Core.Lyrics.Lyrics;
 using LemonLyricsLine = LemonNeo.Core.Lyrics.LyricsLine;
-using LemonTrackMetadata = LemonNeo.Abstractions.Providers.TrackMetadata;
 
 namespace LemonNeo.Plugin.Lyricify;
 
@@ -428,7 +427,7 @@ public sealed class LyricifyMetadataPlugin :
                     MinimumConfidence = 0.7
                 },
                 cancellationToken);
-            identifiers.AddRange(lookup.Matches.SelectMany(match => match.Metadata.ExternalIds));
+            identifiers.AddRange(lookup.Matches.SelectMany(match => match.Track.ExternalIds));
         }
 
         var preferences = new[]
@@ -520,15 +519,7 @@ public sealed class LyricifyMetadataPlugin :
             SourceNamespace = sourceNamespace,
             Confidence = Confidence(level),
             MatchLevel = level.ToString(),
-            Metadata = new LemonTrackMetadata
-            {
-                Title = result.Title,
-                Artists = result.Artists,
-                Album = string.IsNullOrWhiteSpace(result.Album) ? null : result.Album,
-                Duration = result.DurationMs is null ? null : TimeSpan.FromMilliseconds(result.DurationMs.Value),
-                ArtworkUri = GetArtworkUri(result),
-                ExternalIds = GetIdentifiers(sourceNamespace, result)
-            }
+            Track = ToSearchTrack(sourceNamespace, result)
         };
     }
 

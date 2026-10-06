@@ -62,9 +62,9 @@ public sealed record Album
 }
 
 /// <summary>
-/// A self-contained metadata snapshot used by search results, playlist items, and
-/// playback queues. Playback availability is deliberately not stored here; it is
-/// determined at resolution time by playback-source providers.
+/// A self-contained metadata snapshot used by search results, metadata matches,
+/// playlist items, and playback queues. Playback availability is determined at
+/// resolution time by playback-source providers.
 /// </summary>
 public sealed record Track
 {

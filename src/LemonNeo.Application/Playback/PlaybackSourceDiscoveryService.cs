@@ -69,7 +69,6 @@ public sealed class PlaybackSourceDiscoveryService(
             errors[$"metadata/{error.Key}"] = error.Value;
         }
 
-        var metadata = FromTrack(track);
         var matches = metadataLookup.Matches
             .Where(match => match.Confidence >= MinimumMetadataConfidence)
             .OrderByDescending(match => match.Confidence)
@@ -84,7 +83,7 @@ public sealed class PlaybackSourceDiscoveryService(
             {
                 if (string.Equals(track.Id.ProviderId, musicProvider.Id, StringComparison.OrdinalIgnoreCase))
                 {
-                    var direct = await provider.ResolvePlaybackAsync(track, request, cancellationToken);
+                    var direct = await provider.ResolvePlaybackAsync(track.Id, request, cancellationToken);
                     if (direct is not null)
                     {
                         candidates.Add(new PlaybackSourceCandidate(
@@ -97,13 +96,12 @@ public sealed class PlaybackSourceDiscoveryService(
                     }
                 }
 
-                if (provider is ITrackIdResolverProvider idResolver)
+                if (provider.AcceptedIdSchemes.Count > 0)
                 {
                     var resolved = await ResolveDeclaredIdsAsync(
                         musicProvider.Id,
                         provider,
-                        idResolver,
-                        metadata,
+                        track,
                         confidence: 0.98,
                         request,
                         cancellationToken);
@@ -114,15 +112,14 @@ public sealed class PlaybackSourceDiscoveryService(
                     }
 
                     var bestMatch = matches.FirstOrDefault(match =>
-                        match.Metadata.ExternalIds.Any(identifier =>
-                            idResolver.AcceptedIdSchemes.Any(scheme => scheme.Accepts(identifier))));
+                        match.Track.ExternalIds.Any(identifier =>
+                            provider.AcceptedIdSchemes.Any(scheme => scheme.Accepts(identifier))));
                     if (bestMatch is not null)
                     {
                         var matched = await ResolveDeclaredIdsAsync(
                             musicProvider.Id,
                             provider,
-                            idResolver,
-                            bestMatch.Metadata,
+                            bestMatch.Track,
                             bestMatch.Confidence,
                             request,
                             cancellationToken);
@@ -148,31 +145,25 @@ public sealed class PlaybackSourceDiscoveryService(
     private static async Task<PlaybackSourceCandidate?> ResolveDeclaredIdsAsync(
         string providerId,
         IPlaybackProvider playbackProvider,
-        ITrackIdResolverProvider resolver,
-        TrackMetadata metadata,
+        Track track,
         double confidence,
         PlaybackRequest request,
         CancellationToken cancellationToken)
     {
-        foreach (var identifier in metadata.ExternalIds)
+        foreach (var identifier in track.ExternalIds)
         {
-            if (!resolver.AcceptedIdSchemes.Any(scheme => scheme.Accepts(identifier)))
+            if (!playbackProvider.AcceptedIdSchemes.Any(scheme => scheme.Accepts(identifier)))
             {
                 continue;
             }
 
-            var resolvedTrack = await resolver.ResolveTrackIdAsync(identifier, metadata, cancellationToken);
-            if (resolvedTrack is null)
-            {
-                continue;
-            }
-
-            var source = await playbackProvider.ResolvePlaybackAsync(resolvedTrack, request, cancellationToken);
+            var trackId = new MusicItemId(providerId, identifier.Value);
+            var source = await playbackProvider.ResolvePlaybackAsync(trackId, request, cancellationToken);
             if (source is not null)
             {
                 return new PlaybackSourceCandidate(
                     providerId,
-                    resolvedTrack,
+                    track with { Id = trackId },
                     source,
                     confidence,
                     $"declared-id:{identifier.Namespace}/{identifier.Kind}");
@@ -181,14 +172,4 @@ public sealed class PlaybackSourceDiscoveryService(
 
         return null;
     }
-
-    private static TrackMetadata FromTrack(Track track) => new()
-    {
-        Title = track.Title,
-        Artists = track.Artists.Select(artist => artist.Name).ToArray(),
-        Album = track.Album?.Title,
-        Duration = track.Duration,
-        ArtworkUri = track.ArtworkUri,
-        ExternalIds = track.ExternalIds
-    };
 }

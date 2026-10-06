@@ -16,6 +16,7 @@
     <ProjectReference Include="../../src/LemonNeo.Hosting/LemonNeo.Hosting.csproj" />
     <ProjectReference Include="../../src/LemonNeo.Console/LemonNeo.Console.csproj" />
     <ProjectReference Include="../../src/LemonNeo.Desktop/LemonNeo.Desktop.csproj" />
+    <ProjectReference Include="../../plugins/LemonNeo.Plugin.LocalMusic/LemonNeo.Plugin.LocalMusic.csproj" />
     <ProjectReference Include="../LemonNeo.Plugin.ConfigurationFixture/LemonNeo.Plugin.ConfigurationFixture.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
   <Target Name="CopyConfigurationFixture" AfterTargets="Build">

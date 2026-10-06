@@ -36,16 +36,6 @@ public sealed record FolderScanResult(
     IReadOnlyList<Track> Tracks,
     IReadOnlyList<string> SkippedFiles);
 
-public sealed record TrackMetadata
-{
-    public required string Title { get; init; }
-    public IReadOnlyList<string> Artists { get; init; } = [];
-    public string? Album { get; init; }
-    public TimeSpan? Duration { get; init; }
-    public Uri? ArtworkUri { get; init; }
-    public IReadOnlyList<ExternalMusicId> ExternalIds { get; init; } = [];
-}
-
 public sealed record MetadataLookupRequest
 {
     public required Track Track { get; init; }
@@ -60,7 +50,7 @@ public sealed record MetadataMatch
 {
     public required string MetadataProviderId { get; init; }
     public required string SourceNamespace { get; init; }
-    public required TrackMetadata Metadata { get; init; }
+    public required Track Track { get; init; }
     public required double Confidence { get; init; }
     public required string MatchLevel { get; init; }
 }
@@ -152,8 +142,12 @@ public interface IFolderImportProvider
 
 public interface IPlaybackProvider
 {
+    /// <summary>External ID schemes whose values this provider accepts as RemoteId.</summary>
+    IReadOnlyCollection<MusicIdScheme> AcceptedIdSchemes { get; }
+
+    /// <summary>Resolves audio using an ID scoped to this playback provider.</summary>
     Task<PlaybackSource?> ResolvePlaybackAsync(
-        Track track,
+        MusicItemId trackId,
         PlaybackRequest request,
         CancellationToken cancellationToken = default);
 }
@@ -171,16 +165,6 @@ public interface IMetadataProvider
 
     Task<MetadataLookupResult> LookupMetadataAsync(
         MetadataLookupRequest request,
-        CancellationToken cancellationToken = default);
-}
-
-public interface ITrackIdResolverProvider
-{
-    IReadOnlyCollection<MusicIdScheme> AcceptedIdSchemes { get; }
-
-    Task<Track?> ResolveTrackIdAsync(
-        ExternalMusicId identifier,
-        TrackMetadata metadata,
         CancellationToken cancellationToken = default);
 }
 

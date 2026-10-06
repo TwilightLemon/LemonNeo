@@ -12,8 +12,7 @@ namespace LemonNeo.Plugin.GdStudioNetease;
 public sealed class GdStudioNeteasePlugin :
     ILemonPlugin,
     IMusicProvider,
-    IPlaybackProvider,
-    ITrackIdResolverProvider
+    IPlaybackProvider
 {
     private const string ProviderId = "gdstudio-netease";
     private const string PluginId = "LemonNeo.Plugin.GdStudioNetease";
@@ -61,46 +60,13 @@ public sealed class GdStudioNeteasePlugin :
         return ValueTask.CompletedTask;
     }
 
-    public Task<Track?> ResolveTrackIdAsync(
-        ExternalMusicId identifier,
-        TrackMetadata metadata,
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (!AcceptedIdSchemes.Any(scheme => scheme.Accepts(identifier)) || !IsValidSongId(identifier.Value))
-        {
-            return Task.FromResult<Track?>(null);
-        }
-
-        var externalIds = metadata.ExternalIds.Append(identifier)
-            .DistinctBy(id => new
-            {
-                Namespace = id.Namespace.ToUpperInvariant(),
-                id.Value,
-                Kind = id.Kind?.ToUpperInvariant()
-            })
-            .ToArray();
-        return Task.FromResult<Track?>(new Track
-        {
-            Id = new MusicItemId(ProviderId, identifier.Value),
-            Title = metadata.Title,
-            Artists = metadata.Artists.Select(name => new ArtistRef { Name = name }).ToArray(),
-            Album = string.IsNullOrWhiteSpace(metadata.Album)
-                ? null
-                : new AlbumRef { Title = metadata.Album },
-            Duration = metadata.Duration,
-            ArtworkUri = metadata.ArtworkUri,
-            ExternalIds = externalIds
-        });
-    }
-
     public async Task<PlaybackSource?> ResolvePlaybackAsync(
-        Track track,
+        MusicItemId trackId,
         PlaybackRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (!string.Equals(track.Id.ProviderId, ProviderId, StringComparison.OrdinalIgnoreCase) ||
-            !IsValidSongId(track.Id.RemoteId))
+        if (!string.Equals(trackId.ProviderId, ProviderId, StringComparison.OrdinalIgnoreCase) ||
+            !IsValidSongId(trackId.RemoteId))
         {
             return null;
         }
@@ -108,7 +74,7 @@ public sealed class GdStudioNeteasePlugin :
         var client = _httpClient ?? throw new InvalidOperationException("The GDStudio provider is not initialized.");
         var endpoint = new Uri(
             $"https://music-api.gdstudio.xyz/api.php?types=url&source=netease" +
-            $"&id={Uri.EscapeDataString(track.Id.RemoteId)}&br=999");
+            $"&id={Uri.EscapeDataString(trackId.RemoteId)}&br=999");
         using var message = new HttpRequestMessage(HttpMethod.Get, endpoint);
         message.Headers.UserAgent.ParseAdd(UserAgent);
         message.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -123,7 +89,7 @@ public sealed class GdStudioNeteasePlugin :
         catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
             throw new TimeoutException(
-                $"GDStudio timed out while resolving Netease song '{track.Id.RemoteId}'.",
+                $"GDStudio timed out while resolving Netease song '{trackId.RemoteId}'.",
                 exception);
         }
 
@@ -140,20 +106,20 @@ public sealed class GdStudioNeteasePlugin :
             {
                 _logger?.LogWarning(
                     "GDStudio returned no usable source for Netease song {SongId}.",
-                    track.Id.RemoteId);
+                    trackId.RemoteId);
                 return null;
             }
 
             _logger?.LogInformation(
                 "Resolved Netease song {SongId} through GDStudio ({Bitrate} kbps, {Size} bytes, {Source}).",
-                track.Id.RemoteId,
+                trackId.RemoteId,
                 payload.Bitrate,
                 payload.Size,
                 payload.From ?? "unknown");
             return new HttpPlaybackSource
             {
                 Uri = playbackUri,
-                CacheKey = $"{ProviderId}:{track.Id.RemoteId}:{payload.Bitrate}:{payload.Size}:{Path.GetExtension(playbackUri.AbsolutePath).ToLowerInvariant()}",
+                CacheKey = $"{ProviderId}:{trackId.RemoteId}:{payload.Bitrate}:{payload.Size}:{Path.GetExtension(playbackUri.AbsolutePath).ToLowerInvariant()}",
                 Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
                     ["User-Agent"] = UserAgent,

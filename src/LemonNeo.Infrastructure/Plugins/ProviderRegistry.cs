@@ -68,16 +68,13 @@ internal sealed class ProviderRegistry : IProviderRegistry, IPlaybackSourceProvi
 
             if (provider is IPlaybackProvider playbackProvider)
             {
-                var acceptedIdSchemes = provider is ITrackIdResolverProvider idResolver
-                    ? idResolver.AcceptedIdSchemes.ToArray()
-                    : [];
                 _playbackSources.Add(
                     provider.Id,
                     new PlaybackSourceProviderRegistration(
                         provider.Id,
                         provider,
                         playbackProvider,
-                        acceptedIdSchemes));
+                        playbackProvider.AcceptedIdSchemes.ToArray()));
             }
         }
     }

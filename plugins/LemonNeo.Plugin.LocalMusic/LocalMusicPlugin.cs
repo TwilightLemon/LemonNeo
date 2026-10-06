@@ -14,8 +14,7 @@ public sealed class LocalMusicPlugin :
     ISearchProvider,
     ITrackLookupProvider,
     IPlaybackProvider,
-    IFolderImportProvider,
-    ITrackIdResolverProvider
+    IFolderImportProvider
 {
     private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -131,43 +130,23 @@ public sealed class LocalMusicPlugin :
     }
 
     public Task<PlaybackSource?> ResolvePlaybackAsync(
-        Track track,
+        MusicItemId trackId,
         PlaybackRequest request,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (!string.Equals(track.Id.ProviderId, Id, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(trackId.ProviderId, Id, StringComparison.OrdinalIgnoreCase))
         {
             return Task.FromResult<PlaybackSource?>(null);
         }
 
-        var path = track.ExternalIds
-            .FirstOrDefault(id => string.Equals(id.Namespace, "file", StringComparison.OrdinalIgnoreCase))
-            ?.Value;
-        if (path is null && _catalog.TryGetValue(track.Id.RemoteId, out var catalogTrack))
-        {
-            path = catalogTrack.ExternalIds
-                .FirstOrDefault(id => string.Equals(id.Namespace, "file", StringComparison.OrdinalIgnoreCase))
-                ?.Value;
-        }
+        var path = _catalog.TryGetValue(trackId.RemoteId, out var catalogTrack)
+            ? catalogTrack.ExternalIds.FirstOrDefault(id => AcceptedIdSchemes.Any(scheme => scheme.Accepts(id)))?.Value
+            : trackId.RemoteId;
 
         return Task.FromResult<PlaybackSource?>(path is not null && File.Exists(path)
             ? new FilePlaybackSource(path)
             : null);
-    }
-
-    public Task<Track?> ResolveTrackIdAsync(
-        ExternalMusicId identifier,
-        TrackMetadata metadata,
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (!AcceptedIdSchemes.Any(scheme => scheme.Accepts(identifier)) || !File.Exists(identifier.Value))
-        {
-            return Task.FromResult<Track?>(null);
-        }
-
-        return Task.FromResult<Track?>(CreateTrack(identifier.Value));
     }
 
     private static Track CreateTrack(string path)

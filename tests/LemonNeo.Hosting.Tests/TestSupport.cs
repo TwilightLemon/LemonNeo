@@ -173,7 +173,8 @@ internal sealed class TestMusic : IMusicProvider, IPlaybackProvider
 {
     public string Id => "acceptance-music";
     public ProviderDescriptor Descriptor { get; } = new("Acceptance music", "No network resolution.");
-    public Task<PlaybackSource?> ResolvePlaybackAsync(Track track, PlaybackRequest request, CancellationToken cancellationToken = default) =>
+    public IReadOnlyCollection<MusicIdScheme> AcceptedIdSchemes => [];
+    public Task<PlaybackSource?> ResolvePlaybackAsync(MusicItemId trackId, PlaybackRequest request, CancellationToken cancellationToken = default) =>
         Task.FromResult<PlaybackSource?>(new FilePlaybackSource("acceptance.audio"));
 }
 

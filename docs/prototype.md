@@ -289,6 +289,9 @@ public sealed record Track
 
 Track 表示音乐实体。
 
+搜索结果、元数据匹配候选、歌单和播放队列统一使用 `Track`。
+`MetadataMatch.Track` 携带匹配到的歌曲，匹配来源和置信度保留在 `MetadataMatch` 中。
+
 不要把：
 
 ```text
@@ -301,7 +304,7 @@ HTTP Header
 放进 Track。
 
 Track 本身不声明能否播放。可播放性是一次动态解析的结果，由
-`IPlaybackProvider` 根据 Track、用户凭据和当前网络状态决定。
+`IPlaybackProvider` 根据 MusicItemId、播放请求、用户凭据和当前网络状态决定。
 
 ---
 
@@ -477,8 +480,10 @@ public interface IPlaylistProvider
 ```csharp
 public interface IPlaybackProvider
 {
+    IReadOnlyCollection<MusicIdScheme> AcceptedIdSchemes { get; }
+
     Task<PlaybackSource?> ResolvePlaybackAsync(
-        Track track,
+        MusicItemId trackId,
         PlaybackRequest request,
         CancellationToken cancellationToken = default);
 }
@@ -727,6 +732,8 @@ Track
 查看原始 Provider
   ↓
 查找 IPlaybackProvider
+  ↓
+Track.Id 或支持的外部 ID 对应的 MusicItemId
   ↓
 ResolvePlaybackAsync
   ↓

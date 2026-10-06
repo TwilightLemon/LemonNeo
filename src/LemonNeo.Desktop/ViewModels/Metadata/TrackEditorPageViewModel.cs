@@ -33,14 +33,14 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
         UseTrackSearchQueryCommand = new(UseTrackSearchQuery, () => CanInteract && Editor is not null);
         ReplaceMatchMetadataCommand = new(row =>
         {
-            if (!CanUseMetadataMatch(row) || string.IsNullOrWhiteSpace(row!.Match.Metadata.Title)) return;
-            Editor!.ApplyMetadata(row!.Match.Metadata); SetStatus("MetadataApplied");
-        }, row => CanUseMetadataMatch(row) && !string.IsNullOrWhiteSpace(row!.Match.Metadata.Title));
+            if (!CanUseMetadataMatch(row) || string.IsNullOrWhiteSpace(row!.Match.Track.Title)) return;
+            Editor!.ApplyMetadata(row!.Match.Track); SetStatus("MetadataApplied");
+        }, row => CanUseMetadataMatch(row) && !string.IsNullOrWhiteSpace(row!.Match.Track.Title));
         AddMatchExternalIdsCommand = new(row =>
         {
             if (!CanUseMetadataMatch(row)) return;
-            var added = Editor!.AddExternalIds(row!.Match.Metadata.ExternalIds); SetStatus("MetadataIdsAdded", added);
-        }, row => CanUseMetadataMatch(row) && row!.Match.Metadata.ExternalIds.Count > 0);
+            var added = Editor!.AddExternalIds(row!.Match.Track.ExternalIds); SetStatus("MetadataIdsAdded", added);
+        }, row => CanUseMetadataMatch(row) && row!.Match.Track.ExternalIds.Count > 0);
         MetadataSources = MetadataSourceOption.Create(_host.Get<IProviderRegistry>(), _host.Get<IPlaybackSourceProviderRegistry>());
         foreach (var source in MetadataSources) source.PropertyChanged += OnMetadataSourceChanged;
         UseTrackSearchQuery();

@@ -13,8 +13,7 @@ internal sealed class QqMusicPlaybackProvider(
     Func<QqMusicCredentials?> getAuthentication,
     ILogger<QqMusicPlaybackProvider> logger) :
     IMusicProvider,
-    IPlaybackProvider,
-    ITrackIdResolverProvider
+    IPlaybackProvider
 {
     private const string ProviderId = "qqmusic-playback";
     private const string UserAgent =
@@ -37,47 +36,13 @@ internal sealed class QqMusicPlaybackProvider(
         new(MusicIdNamespaces.QQMusic, "song-mid")
     ];
 
-    public Task<Track?> ResolveTrackIdAsync(
-        ExternalMusicId identifier,
-        TrackMetadata metadata,
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (!AcceptedIdSchemes.Any(scheme => scheme.Accepts(identifier)) ||
-            !IsValidSongMid(identifier.Value))
-        {
-            return Task.FromResult<Track?>(null);
-        }
-
-        var externalIds = metadata.ExternalIds.Append(identifier)
-            .DistinctBy(id => new
-            {
-                Namespace = id.Namespace.ToUpperInvariant(),
-                id.Value,
-                Kind = id.Kind?.ToUpperInvariant()
-            })
-            .ToArray();
-        return Task.FromResult<Track?>(new Track
-        {
-            Id = new MusicItemId(ProviderId, identifier.Value),
-            Title = metadata.Title,
-            Artists = metadata.Artists.Select(name => new ArtistRef { Name = name }).ToArray(),
-            Album = string.IsNullOrWhiteSpace(metadata.Album)
-                ? null
-                : new AlbumRef { Title = metadata.Album },
-            Duration = metadata.Duration,
-            ArtworkUri = metadata.ArtworkUri,
-            ExternalIds = externalIds
-        });
-    }
-
     public async Task<PlaybackSource?> ResolvePlaybackAsync(
-        Track track,
+        MusicItemId trackId,
         PlaybackRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (!string.Equals(track.Id.ProviderId, ProviderId, StringComparison.OrdinalIgnoreCase) ||
-            !IsValidSongMid(track.Id.RemoteId))
+        if (!string.Equals(trackId.ProviderId, ProviderId, StringComparison.OrdinalIgnoreCase) ||
+            !IsValidSongMid(trackId.RemoteId))
         {
             return null;
         }
@@ -88,7 +53,7 @@ internal sealed class QqMusicPlaybackProvider(
         foreach (var quality in SelectQualities(request.Quality))
         {
             var purl = await ResolvePurlAsync(
-                track.Id.RemoteId,
+                trackId.RemoteId,
                 quality,
                 authentication.Cookie,
                 cancellationToken);
@@ -107,11 +72,11 @@ internal sealed class QqMusicPlaybackProvider(
 
             logger.LogInformation(
                 "Resolved QQ Music song {SongMid} at {Quality} quality.",
-                track.Id.RemoteId,
+                trackId.RemoteId,
                 quality.Label);
             return new HttpPlaybackSource
             {
-                CacheKey = $"{Id}:{track.Id.RemoteId}:{quality.Prefix}:{quality.Extension}",
+                CacheKey = $"{Id}:{trackId.RemoteId}:{quality.Prefix}:{quality.Extension}",
                 Uri = playbackUri,
                 Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
@@ -126,7 +91,7 @@ internal sealed class QqMusicPlaybackProvider(
 
         logger.LogWarning(
             "QQ Music returned no playable vkey source for song {SongMid}.",
-            track.Id.RemoteId);
+            trackId.RemoteId);
         return null;
     }
 

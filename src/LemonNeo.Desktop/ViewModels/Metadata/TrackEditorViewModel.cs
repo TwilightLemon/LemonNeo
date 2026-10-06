@@ -1,4 +1,3 @@
-using LemonNeo.Abstractions.Providers;
 using LemonNeo.Core.Music;
 using System.Collections.ObjectModel;
 using System.Globalization;
@@ -50,13 +49,14 @@ public sealed partial class TrackEditorViewModel : ObservableObject
         foreach (var id in track.ExternalIds) ExternalIds.Add(new() { Namespace = id.Namespace, Kind = id.Kind ?? "", Value = id.Value });
     }
 
-    public void ApplyMetadata(TrackMetadata metadata)
+    public void ApplyMetadata(Track track)
     {
-        Title = metadata.Title;
-        Artists = string.Join("; ", metadata.Artists);
-        Album = metadata.Album ?? "";
-        DurationSeconds = metadata.Duration?.TotalSeconds.ToString("0.#######", _text.Culture) ?? "";
-        if (metadata.ArtworkUri is not null) ArtworkUri = metadata.ArtworkUri.ToString();
+        _snapshot = _snapshot with { Artists = track.Artists, Album = track.Album };
+        Title = track.Title;
+        Artists = string.Join("; ", track.Artists.Select(artist => artist.Name));
+        Album = track.Album?.Title ?? "";
+        DurationSeconds = track.Duration?.TotalSeconds.ToString("0.#######", _text.Culture) ?? "";
+        if (track.ArtworkUri is not null) ArtworkUri = track.ArtworkUri.ToString();
     }
 
     public int AddExternalIds(IEnumerable<ExternalMusicId> identifiers)

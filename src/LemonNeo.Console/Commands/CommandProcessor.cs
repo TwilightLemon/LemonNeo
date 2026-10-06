@@ -373,7 +373,6 @@ internal sealed partial class CommandProcessor(
         var capabilities = new List<string>();
         if (provider is ISearchProvider) capabilities.Add("Search");
         if (provider is ITrackLookupProvider) capabilities.Add("Track Lookup");
-        if (provider is ITrackIdResolverProvider) capabilities.Add("External ID Resolution");
         if (provider is IPlaylistProvider) capabilities.Add("Playlist");
         if (provider is IPlaylistCollectionProvider) capabilities.Add("Playlist Collections");
         if (provider is IPlaybackProvider) capabilities.Add("Playback");
@@ -438,7 +437,7 @@ internal sealed partial class CommandProcessor(
                 {
                     _output.WriteLine($"    Metadata namespaces: {string.Join(", ", metadataProvider.MetadataNamespaces)}");
                 }
-                if (provider is ITrackIdResolverProvider sourceProvider)
+                if (provider is IPlaybackProvider sourceProvider && sourceProvider.AcceptedIdSchemes.Count > 0)
                 {
                     _output.WriteLine($"    Accepted IDs: {string.Join(", ", sourceProvider.AcceptedIdSchemes.Select(scheme => $"{scheme.Namespace}:{scheme.Kind ?? "-"}"))}");
                 }
@@ -647,13 +646,13 @@ internal sealed partial class CommandProcessor(
 
         foreach (var match in result.Matches)
         {
-            var value = match.Metadata;
+            var value = match.Track;
             _output.WriteLine(
                 $"{match.SourceNamespace} | {match.Confidence:P0} | {match.MatchLevel} | " +
-                $"{value.Title} - {string.Join(", ", value.Artists)}");
-            if (!string.IsNullOrWhiteSpace(value.Album))
+                $"{value.Title} - {string.Join(", ", value.Artists.Select(artist => artist.Name))}");
+            if (!string.IsNullOrWhiteSpace(value.Album?.Title))
             {
-                _output.WriteLine($"  Album: {value.Album}");
+                _output.WriteLine($"  Album: {value.Album.Title}");
             }
 
             if (value.Duration is { } duration)
@@ -673,7 +672,7 @@ internal sealed partial class CommandProcessor(
     private async Task EnrichAsync(string providerId, string trackId, CancellationToken cancellationToken)
     {
         var track = await GetTrackAsync(providerId, trackId, cancellationToken);
-        var (enriched, lookup) = await metadata.EnrichAsync(track, cancellationToken);
+        var (enriched, lookup) = await metadata.MatchAndReplaceAsync(track, null, cancellationToken);
         if (ReferenceEquals(enriched, track))
         {
             _output.WriteLine("No high-confidence metadata match was found; the track was not changed.");
@@ -713,7 +712,7 @@ internal sealed partial class CommandProcessor(
             await concurrency.WaitAsync(cancellationToken);
             try
             {
-                var result = await metadata.EnrichAsync(track, targetNamespaces, cancellationToken);
+                var result = await metadata.MatchAndReplaceAsync(track, targetNamespaces, cancellationToken);
                 return (Original: track, Track: result.Track, Lookup: result.Lookup);
             }
             finally

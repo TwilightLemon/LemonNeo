@@ -127,7 +127,7 @@ public sealed partial class ToolsViewModel : PageViewModel
             var capabilities = new List<string>();
             void Capability(bool available, string key) { if (available) capabilities.Add(_text[key]); }
             Capability(provider is ISearchProvider, "CapabilitySearch"); Capability(provider is ITrackLookupProvider, "CapabilityLookup");
-            Capability(provider is ITrackIdResolverProvider, "CapabilityResolveIds"); Capability(provider is IPlaylistProvider, "CapabilityPlaylist");
+            Capability(provider is IPlaylistProvider, "CapabilityPlaylist");
             Capability(provider is IPlaylistCollectionProvider, "CapabilityCollections"); Capability(provider is IPlaybackProvider, "CapabilityPlayback");
             Capability(provider is IMetadataProvider, "CapabilityMetadata"); Capability(provider is ILyricsProvider, "CapabilityLyrics");
             Capability(provider is IAuthenticationProvider, "CapabilityAuthentication"); Capability(provider is IFolderImportProvider, "CapabilityFolder");
@@ -135,8 +135,8 @@ public sealed partial class ToolsViewModel : PageViewModel
             var details = new List<PluginDetail>();
             if (provider is ISearchNamespaceProvider search) details.Add(new(_text["SearchSources"], string.Join(", ", NormalizeNamespaces(search.SearchNamespaces))));
             if (provider is IMetadataProvider metadata) details.Add(new(_text["MetadataSources"], string.Join(", ", NormalizeNamespaces(metadata.MetadataNamespaces))));
-            if (provider is ITrackIdResolverProvider resolver)
-                details.Add(new(_text["AcceptedIds"], string.Join(", ", resolver.AcceptedIdSchemes.Select(s => $"{s.Namespace}:{s.Kind ?? "*"}").Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase))));
+            if (provider is IPlaybackProvider playbackProvider && playbackProvider.AcceptedIdSchemes.Count > 0)
+                details.Add(new(_text["AcceptedIds"], string.Join(", ", playbackProvider.AcceptedIdSchemes.Select(s => $"{s.Namespace}:{s.Kind ?? "*"}").Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase))));
             details.AddRange(GetPluginDetails(plugin));
             var playable = sources.FirstOrDefault(s => string.Equals(s.ProviderId, provider.Id, StringComparison.OrdinalIgnoreCase));
             var category = provider switch
@@ -192,7 +192,7 @@ public sealed partial class ToolsViewModel : PageViewModel
         var namespaces = new List<string>();
         if (provider is ISearchNamespaceProvider search) namespaces.AddRange(search.SearchNamespaces);
         if (provider is IMetadataProvider metadata) namespaces.AddRange(metadata.MetadataNamespaces);
-        if (provider is ITrackIdResolverProvider resolver) namespaces.AddRange(resolver.AcceptedIdSchemes.Select(s => s.Namespace));
+        if (provider is IPlaybackProvider playback) namespaces.AddRange(playback.AcceptedIdSchemes.Select(s => s.Namespace));
         return NormalizeNamespaces(namespaces);
     }
 

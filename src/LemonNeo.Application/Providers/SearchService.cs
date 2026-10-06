@@ -15,10 +15,12 @@ public sealed class SearchService(IProviderRegistry registry, IPlaybackSourcePro
         var sources = playbackSources.Sources.ToArray();
         if (sources.Length == 0) return [];
         var namespaces = sources.SelectMany(source => source.AcceptedIdSchemes.Select(scheme => scheme.Namespace))
-            .Concat(sources.Select(source => source.ProviderId)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                                                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
         bool Supported(Track track) => sources.Any(source =>
             string.Equals(source.ProviderId, track.Id.ProviderId, StringComparison.OrdinalIgnoreCase) ||
             track.ExternalIds.Any(id => source.AcceptedIdSchemes.Any(scheme => scheme.Accepts(id))));
+
         var results = new List<SearchResult>();
         foreach (var provider in registry.Providers.Where(provider => provider is ISearchProvider))
         {
@@ -35,12 +37,6 @@ public sealed class SearchService(IProviderRegistry registry, IPlaybackSourcePro
         }
         return results;
     }
-
-    public Task<IReadOnlyList<SearchResult>> SearchAsync(
-        string keyword,
-        string? providerId = null,
-        CancellationToken cancellationToken = default) =>
-        SearchAsync(keyword, providerId, null, cancellationToken);
 
     public async Task<IReadOnlyList<SearchResult>> SearchAsync(
         string keyword,
