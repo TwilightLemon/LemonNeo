@@ -7,7 +7,6 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using LemonNeo.Desktop.Controls.Navigation;
 using LemonNeo.Desktop.ViewModels.Accounts;
-using LemonNeo.Desktop.ViewModels.Components;
 using LemonNeo.Desktop.ViewModels.Library;
 using LemonNeo.Desktop.ViewModels.Lyrics;
 using LemonNeo.Desktop.ViewModels.Metadata;
@@ -18,7 +17,6 @@ using LemonNeo.Desktop.ViewModels.Settings;
 using LemonNeo.Desktop.ViewModels.Shared;
 using LemonNeo.Desktop.ViewModels.Tools;
 using LemonNeo.Desktop.Views.Accounts;
-using LemonNeo.Desktop.Views.Components;
 using LemonNeo.Desktop.Views.Library;
 using LemonNeo.Desktop.Views.Lyrics;
 using LemonNeo.Desktop.Views.Metadata;
@@ -164,7 +162,7 @@ public sealed class DesktopNavigation : ObservableObject, IAsyncDisposable
             AccountsViewModel => new AccountsView(),
             LyricsViewModel => new LyricsView(), TrackEditorPageViewModel => new TrackEditorView(), ToolsViewModel => new ToolsView(),
             MatchPlaylistPageViewModel => new MatchPlaylistView(),
-            SettingsViewModel => new SettingsView(), ComponentsViewModel => new ComponentsView(),
+            SettingsViewModel => new SettingsView(),
             _ => throw new ArgumentException($"No view registered for {model.GetType().Name}.")
         };
         var page = new ContentPage

@@ -3,7 +3,6 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.Input;
 using LemonNeo.Desktop.Services;
 using LemonNeo.Desktop.ViewModels.Accounts;
-using LemonNeo.Desktop.ViewModels.Components;
 using LemonNeo.Desktop.ViewModels.Library;
 using LemonNeo.Desktop.ViewModels.Lyrics;
 using LemonNeo.Desktop.ViewModels.Metadata;
@@ -136,10 +135,9 @@ public sealed class MainViewModel : PageViewModel
         DesktopRoutes.Accounts => new AccountsViewModel(Context),
         DesktopRoutes.Editor => new TrackEditorPageViewModel(Context, Navigation, Playback, null),
         DesktopRoutes.MatchPlaylist => new MatchPlaylistPageViewModel(Context, Navigation, playlist ?? throw new ArgumentException("A playlist is required.")),
-        DesktopRoutes.Tools => new ToolsViewModel(Context, Navigation),
+        DesktopRoutes.Tools => new ToolsViewModel(Context),
         DesktopRoutes.Settings => new SettingsViewModel(Context),
         DesktopRoutes.Lyrics => new LyricsViewModel(Context, Playback),
-        DesktopRoutes.Components => new ComponentsViewModel(Context),
         _ => throw new ArgumentOutOfRangeException(nameof(route), route, "Unknown desktop route.")
     };
 

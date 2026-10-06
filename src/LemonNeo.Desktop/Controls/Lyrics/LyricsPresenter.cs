@@ -43,7 +43,7 @@ public sealed class LyricsPresenter : UserControl
     private readonly Border _topSpace = new();
     private readonly Border _bottomSpace = new();
     private readonly TextBlock _empty = new() { TextWrapping = TextWrapping.Wrap, HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(24) };
-    private readonly Button _follow = new() { Classes = { "ghost" }, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 12), IsVisible = false };
+    private readonly Button _follow = new() { Classes = { "ghost" },FontSize = 14, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 12), IsVisible = false };
     private readonly List<RowControls> _rows = [];
     private readonly Stopwatch _positionClock = new();
     private readonly Stopwatch _scrollClock = new();
