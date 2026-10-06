@@ -1,6 +1,8 @@
+using LemonNeo.Abstractions.Playback;
+using LemonNeo.Abstractions.Plugins;
+using LemonNeo.Core.Music;
 using System.Diagnostics;
 using System.Text.Json;
-using LemonNeo.Plugin.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace LemonNeo.Plugin.MacNowPlaying;
@@ -12,7 +14,7 @@ public sealed class MacNowPlayingPlugin : InteractivePluginBase
     private Task? _readTask;
     private Task? _errorTask;
 
-    public override PluginDescriptor Descriptor { get; } = new("macos-now-playing", "macOS Now Playing", "0.1.0");
+    public override PluginDescriptor Descriptor { get; } = new("LemonNeo.Plugin.MacNowPlaying", "macOS Now Playing", "0.1.0");
 
     protected override async ValueTask InitializeCoreAsync(IPluginContext context, CancellationToken cancellationToken)
     {

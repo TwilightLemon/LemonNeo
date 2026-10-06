@@ -1,0 +1,4 @@
+<Project>
+  <Import Project="$(MSBuildThisFileDirectory)build/LemonNeo.Plugins.props" Condition="'$(IsLemonNeoHost)' == 'true'" />
+  <Import Project="$(MSBuildThisFileDirectory)build/LemonNeo.Plugins.targets" />
+</Project>

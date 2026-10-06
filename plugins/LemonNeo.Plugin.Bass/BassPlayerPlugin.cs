@@ -1,5 +1,7 @@
-using LemonNeo.Core;
-using LemonNeo.Plugin.Abstractions;
+using LemonNeo.Abstractions.Playback;
+using LemonNeo.Abstractions.Plugins;
+using LemonNeo.Core.Music;
+using LemonNeo.Core.Playback;
 using Microsoft.Extensions.Logging;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
@@ -13,7 +15,7 @@ public sealed class BassPlayerPlugin : ILemonPlugin, IPlayerProvider
     private BassPlayer? _player;
 
     public PluginDescriptor Descriptor { get; } = new(
-        "org.lemonneo.bass",
+        "LemonNeo.Plugin.Bass",
         "BASS Player",
         "1.1.0");
 
@@ -45,13 +47,14 @@ public sealed class BassPlayerPlugin : ILemonPlugin, IPlayerProvider
     }
 }
 
-internal sealed class BassPlayer : ISeekablePlayer, IStreamingPlayer, IAsyncDisposable
+internal sealed class BassPlayer : ISeekablePlayer, IStreamingPlayer, IVolumePlayer, IAsyncDisposable
 {
     private const int InvalidStream = 0;
     private readonly object _gate = new();
     private readonly ILogger<BassPlayer> _logger;
     private int _stream;
     private int _flacPlugin;
+    private float _volume = 1;
     private bool _disposed;
     private bool _isHttpStream;
     private BassDownloadForwarder? _downloadForwarder;
@@ -143,6 +146,14 @@ internal sealed class BassPlayer : ISeekablePlayer, IStreamingPlayer, IAsyncDisp
                 throw BassFailure($"open '{sourceDescription}'");
             }
 
+            // Apply before playback starts so new streams never briefly play at full volume.
+            if (!BassApi.BASS_ChannelSetAttribute(_stream, BASSAttribute.BASS_ATTRIB_VOL, _volume))
+            {
+                var error = BassApi.BASS_ErrorGetCode();
+                FreeCurrentStream();
+                throw BassFailure("set the stream volume", error);
+            }
+
             if (!BassApi.BASS_ChannelPlay(_stream, false))
             {
                 var error = BassApi.BASS_ErrorGetCode();
@@ -226,6 +237,36 @@ internal sealed class BassPlayer : ISeekablePlayer, IStreamingPlayer, IAsyncDisp
             }
         }
 
+        return Task.CompletedTask;
+    }
+
+    public Task<double> GetVolumeAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_gate)
+        {
+            ThrowIfDisposed();
+            var volume = _volume;
+            if (_stream != InvalidStream &&
+                !BassApi.BASS_ChannelGetAttribute(_stream, BASSAttribute.BASS_ATTRIB_VOL, ref volume))
+                throw BassFailure("read the stream volume");
+            return Task.FromResult((double)volume);
+        }
+    }
+
+    public Task SetVolumeAsync(double volume, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!double.IsFinite(volume) || volume is < 0 or > 1)
+            throw new ArgumentOutOfRangeException(nameof(volume), "Volume must be between 0 and 1.");
+        lock (_gate)
+        {
+            ThrowIfDisposed();
+            if (_stream != InvalidStream &&
+                !BassApi.BASS_ChannelSetAttribute(_stream, BASSAttribute.BASS_ATTRIB_VOL, (float)volume))
+                throw BassFailure("set the stream volume");
+            _volume = (float)volume;
+        }
         return Task.CompletedTask;
     }
 

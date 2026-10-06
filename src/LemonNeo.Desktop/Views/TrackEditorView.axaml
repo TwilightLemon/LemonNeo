@@ -1,0 +1,129 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:LemonNeo.Desktop.Controls" xmlns:vm="using:LemonNeo.Desktop.ViewModels" xmlns:i18n="using:LemonNeo.Desktop.Infrastructure"
+             xmlns:converters="using:Avalonia.Data.Converters"
+             x:Class="LemonNeo.Desktop.Views.TrackEditorView" x:DataType="vm:TrackEditorPageViewModel">
+  <Grid RowDefinitions="Auto,Auto,*">
+    <controls:PageHeader Title="{Binding PageTitle}" Description="{Binding PageDescription}" Summary="{Binding PageSummary}">
+      <controls:PageHeader.Actions>
+        <StackPanel Spacing="8">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="{Translate {x:Static i18n:LanguageManager+Keys.Back}}" Command="{Binding CloseEditorCommand}" />
+            <Button Classes="primary" Content="{Translate {x:Static i18n:LanguageManager+Keys.Save}}" Command="{Binding SaveEditorCommand}" IsEnabled="{Binding CanSaveEditor}" />
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsBusy}" ToolTip.Tip="{Binding Status}">
+            <ProgressBar IsIndeterminate="True" Width="60" Height="3" VerticalAlignment="Center" AutomationProperties.Name="{Binding Status}" />
+            <Button Classes="ghost" Command="{Binding CancelOperationCommand}" Content="{Translate {x:Static i18n:LanguageManager+Keys.CancelOperation}}" />
+          </StackPanel>
+        </StackPanel>
+      </controls:PageHeader.Actions>
+    </controls:PageHeader>
+    <Border Grid.Row="1" IsVisible="{Binding HasError}" Background="{DynamicResource Brush.DangerSoft}" CornerRadius="10" Padding="14" Margin="0,0,0,12">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Text="{Binding Error}" Foreground="{DynamicResource Brush.Danger}" TextWrapping="Wrap" MaxHeight="90" />
+        <Button Grid.Column="1" Classes="ghost" Content="×" Command="{Binding DismissErrorCommand}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}" />
+      </Grid>
+    </Border>
+    <Grid Grid.Row="2">
+      <Grid RowDefinitions="Auto,Auto,*">
+        <WrapPanel Margin="0,0,0,12" IsVisible="{Binding EditorNeedsPlaylist}">
+          <ComboBox Width="220" ItemsSource="{Binding Playlists}" SelectedItem="{Binding TargetPlaylist}" ItemTemplate="{StaticResource PlaylistOptionTemplate}"
+                    IsVisible="{Binding EditorNeedsPlaylist}" IsEnabled="{Binding CanInteract}" Margin="0,0,10,8"
+                    PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.TargetPlaylist}}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.TargetPlaylist}}" />
+        </WrapPanel>
+        <TextBlock Grid.Row="1" Text="{Binding InspectionMessages}" Classes="muted" TextWrapping="Wrap" MaxHeight="80" Margin="0,0,0,8" />
+        <TabControl Grid.Row="2">
+          <TabItem Header="{Translate {x:Static i18n:LanguageManager+Keys.TrackDetails}}">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+              <StackPanel Spacing="14" Margin="0,16,12,16" IsEnabled="{Binding CanInteract}">
+                <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.ItemId}}" />
+                <SelectableTextBlock Text="{Binding Editor.ItemIdentity}" />
+                <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                  <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.TrackTitle}}" VerticalAlignment="Center" />
+                  <TextBox Grid.Column="1" Text="{Binding Editor.Title}" Margin="0,0,0,12" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.TrackTitle}}" />
+                  <TextBlock Grid.Row="1" Text="{Translate {x:Static i18n:LanguageManager+Keys.ArtistsLabel}}" VerticalAlignment="Center" />
+                  <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Editor.Artists}" Margin="0,0,0,12" PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.ArtistsHint}}"
+                           AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.ArtistsLabel}}" />
+                  <TextBlock Grid.Row="2" Text="{Translate {x:Static i18n:LanguageManager+Keys.AlbumLabel}}" VerticalAlignment="Center" />
+                  <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Editor.Album}" Margin="0,0,0,12" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.AlbumLabel}}" />
+                  <TextBlock Grid.Row="3" Text="{Translate {x:Static i18n:LanguageManager+Keys.DurationSecondsLabel}}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,8,0" />
+                  <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Editor.DurationSeconds}" Margin="0,0,0,12" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DurationSecondsLabel}}" />
+                  <TextBlock Grid.Row="4" Text="{Translate {x:Static i18n:LanguageManager+Keys.ArtworkUriLabel}}" VerticalAlignment="Center" />
+                  <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding Editor.ArtworkUri}" Margin="0,0,0,12" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.ArtworkUriLabel}}" />
+                  <TextBlock Grid.Row="5" Text="{Translate {x:Static i18n:LanguageManager+Keys.ProviderId}}" VerticalAlignment="Center" />
+                  <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding Editor.ProviderId}" Margin="0,0,0,12" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.ProviderId}}" />
+                  <TextBlock Grid.Row="6" Text="{Translate {x:Static i18n:LanguageManager+Keys.TrackId}}" VerticalAlignment="Center" />
+                  <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding Editor.TrackId}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.TrackId}}" />
+                </Grid>
+                <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.ExternalIds}}" Margin="0,8,0,0" />
+                <ItemsControl ItemsSource="{Binding Editor.ExternalIds}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ExternalIdEditor">
+                      <Grid ColumnDefinitions="130,100,*,40" Margin="0,0,0,10">
+                        <TextBox Text="{Binding Namespace}" PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.Namespace}}" Margin="0,0,8,0"
+                                 AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Namespace}}" />
+                        <TextBox Grid.Column="1" Text="{Binding Kind}" PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.Kind}}" Margin="0,0,8,0"
+                                 AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Kind}}" />
+                        <TextBox Grid.Column="2" Text="{Binding Value}" PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.Value}}" Margin="0,0,8,0"
+                                 AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Value}}" />
+                        <Button Grid.Column="3" Classes="ghost icon" Content="×" Click="OnRemoveExternalId" ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.RemoveExternalId}}"
+                                AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.RemoveExternalId}}" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button Content="{Translate {x:Static i18n:LanguageManager+Keys.AddExternalId}}" Command="{Binding Editor.AddExternalIdCommand}" HorizontalAlignment="Left" />
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+          <TabItem Header="{Translate {x:Static i18n:LanguageManager+Keys.MetadataLabel}}">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+              <StackPanel Spacing="14" Margin="0,16,12,16" IsEnabled="{Binding CanInteract}">
+                <StackPanel Spacing="6">
+                  <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.MetadataSearchSources}}" Classes="caption" TextWrapping="Wrap" />
+                  <ItemsControl Name="MetadataSourceSelector" ItemsSource="{Binding MetadataSources}" IsVisible="{Binding HasMetadataSources}">
+                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:MetadataSourceOption">
+                        <CheckBox Content="{Binding Namespace}" IsChecked="{Binding IsSelected, Mode=TwoWay}" Margin="0,0,20,8" />
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.NoMetadataSources}}" IsVisible="{Binding !HasMetadataSources}" Classes="muted" TextWrapping="Wrap" />
+                </StackPanel>
+                <StackPanel Spacing="8">
+                  <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.MetadataSearchQuery}}" Classes="caption" />
+                  <Grid ColumnDefinitions="*,Auto,Auto">
+                    <TextBox Name="MetadataSearchQueryBox" Text="{Binding MetadataSearchQuery, Mode=TwoWay}"
+                             AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.MetadataSearchQuery}}" />
+                    <Button Grid.Column="1" Content="{Translate {x:Static i18n:LanguageManager+Keys.UseTrackSearchQuery}}" Command="{Binding UseTrackSearchQueryCommand}" Margin="10,0,0,0" />
+                    <Button Name="FindMetadataMatchesButton" Grid.Column="2" Classes="primary" Content="{Translate {x:Static i18n:LanguageManager+Keys.MetadataLookup}}" Command="{Binding MetadataCommand}" Margin="10,0,0,0" />
+                  </Grid>
+                </StackPanel>
+                <ItemsControl Name="MetadataMatchesList" ItemsSource="{Binding MetadataMatches}" ItemTemplate="{StaticResource MetadataMatchTemplate}" />
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+          <TabItem Header="{Translate {x:Static i18n:LanguageManager+Keys.LyricsDetailsLabel}}">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+              <StackPanel Spacing="16" Margin="0,16,12,16" IsEnabled="{Binding CanInteract}">
+                <Button Content="{Translate {x:Static i18n:LanguageManager+Keys.LoadLyrics}}" Command="{Binding LyricsDetailsCommand}" HorizontalAlignment="Left" />
+                <SelectableTextBlock Text="{Binding LyricsDetails}" TextWrapping="Wrap" />
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+          <TabItem Header="{Translate {x:Static i18n:LanguageManager+Keys.SourcesLabel}}">
+            <Grid RowDefinitions="Auto,*,Auto" Margin="0,16,0,0" IsEnabled="{Binding CanInteract}">
+              <Button Content="{Translate {x:Static i18n:LanguageManager+Keys.FindSources}}" Command="{Binding SourcesCommand}" HorizontalAlignment="Left" Margin="0,0,0,16" />
+              <ListBox Grid.Row="1" ItemsSource="{Binding DiscoveredSources}" SelectedItem="{Binding SelectedSource}" ItemTemplate="{StaticResource PlaybackSourceTemplate}" />
+              <StackPanel Grid.Row="2" Spacing="10" Margin="{DynamicResource Space.PlaybackFooterInset}">
+              <SelectableTextBlock Text="{Binding SelectedSource.Location}" TextWrapping="Wrap" MaxHeight="80" />
+              <Button Classes="primary" Content="{Translate {x:Static i18n:LanguageManager+Keys.PlaySource}}" Command="{Binding PlaySourceCommand}"
+                      IsEnabled="{Binding SelectedSource, Converter={x:Static converters:ObjectConverters.IsNotNull}}" HorizontalAlignment="Left" Margin="0,16,0,0" />
+              </StackPanel>
+            </Grid>
+          </TabItem>
+        </TabControl>
+      </Grid>
+    </Grid>
+  </Grid>
+</UserControl>

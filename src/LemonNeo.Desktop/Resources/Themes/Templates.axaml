@@ -1,0 +1,67 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="using:LemonNeo.Desktop.ViewModels" xmlns:core="using:LemonNeo.Core.Library"
+                    xmlns:i18n="using:LemonNeo.Desktop.Infrastructure" xmlns:controls="using:LemonNeo.Desktop.Controls">
+  <DataTemplate x:Key="ProviderOptionTemplate" x:DataType="vm:ProviderOption">
+    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+  </DataTemplate>
+  <DataTemplate x:Key="PlaylistOptionTemplate" x:DataType="core:Playlist">
+    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+  </DataTemplate>
+  <DataTemplate x:Key="TrackRowTemplate" x:DataType="vm:TrackRow">
+    <Grid MinHeight="44" ToolTip.Tip="{Binding Identity}">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="38" />
+        <ColumnDefinition Width="56" />
+        <ColumnDefinition Width="3*" />
+        <ColumnDefinition Width="2*" />
+        <ColumnDefinition Width="Auto" SharedSizeGroup="TrackDuration" />
+      </Grid.ColumnDefinitions>
+      <TextBlock Text="{Binding Number}" Classes="caption" VerticalAlignment="Center" />
+      <controls:Artwork Name="TrackArtwork" Grid.Column="1" Width="44" Height="44" CornerRadius="8"
+                        HorizontalAlignment="Left" VerticalAlignment="Center"
+                        SourceUri="{Binding ArtworkUri}" Loader="{Binding ArtworkLoader}" />
+      <StackPanel Grid.Column="2" Spacing="5" Margin="0,0,16,0">
+        <TextBlock Text="{Binding Title}" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
+        <TextBlock Text="{Binding Artists}" Classes="caption" TextTrimming="CharacterEllipsis" />
+      </StackPanel>
+      <TextBlock Grid.Column="3" Text="{Binding Album}" Classes="muted" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,12,0" />
+      <TextBlock Grid.Column="4" Text="{Binding Duration}" Classes="caption" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="12,0,0,0" />
+    </Grid>
+  </DataTemplate>
+  <DataTemplate x:Key="MetadataMatchTemplate" x:DataType="vm:MetadataMatchRow">
+    <Border Background="{DynamicResource Brush.SurfaceRaised}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1" CornerRadius="12" Padding="16" Margin="0,8">
+      <StackPanel Spacing="6">
+        <Grid ColumnDefinitions="56,*">
+          <controls:Artwork Width="44" Height="44" CornerRadius="8" HorizontalAlignment="Left"
+                            SourceUri="{Binding ArtworkUri}" Loader="{Binding ArtworkLoader}" />
+          <StackPanel Grid.Column="1" Spacing="6">
+            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding Artists}" Classes="muted" TextWrapping="Wrap" />
+          </StackPanel>
+        </Grid>
+        <WrapPanel>
+          <TextBlock Text="{Binding Source}" Classes="caption" Margin="0,0,16,0" />
+          <TextBlock Text="{Binding Confidence}" Classes="caption" Margin="0,0,16,0" />
+          <TextBlock Text="{Binding Level}" Classes="caption" />
+        </WrapPanel>
+        <TextBlock Text="{Binding Album}" Classes="caption" TextWrapping="Wrap" />
+        <SelectableTextBlock Text="{Binding ExternalIds}" TextWrapping="Wrap" />
+        <WrapPanel Margin="0,8,0,0">
+          <Button Name="ReplaceMatchMetadataButton" Content="{Translate {x:Static i18n:LanguageManager+Keys.ReplaceMatchMetadata}}" Command="{Binding ReplaceMetadataCommand}" CommandParameter="{Binding}" Margin="0,0,10,8" />
+          <Button Name="AddMatchExternalIdsButton" Content="{Translate {x:Static i18n:LanguageManager+Keys.AddMatchExternalIds}}" Command="{Binding AddExternalIdsCommand}" CommandParameter="{Binding}" Margin="0,0,10,8" />
+        </WrapPanel>
+      </StackPanel>
+    </Border>
+  </DataTemplate>
+  <DataTemplate x:Key="PlaybackSourceTemplate" x:DataType="vm:PlaybackSourceRow">
+    <StackPanel Spacing="6">
+      <WrapPanel>
+        <TextBlock Text="{Binding Provider}" FontWeight="SemiBold" Margin="0,0,16,0" />
+        <TextBlock Text="{Binding Confidence}" Classes="muted" Margin="0,0,16,0" />
+        <TextBlock Text="{Binding Method}" Classes="muted" />
+      </WrapPanel>
+      <TextBlock Text="{Binding Identity}" Classes="caption" TextWrapping="Wrap" />
+      <TextBlock Text="{Binding Location}" Classes="caption" TextWrapping="Wrap" MaxHeight="60" />
+    </StackPanel>
+  </DataTemplate>
+</ResourceDictionary>

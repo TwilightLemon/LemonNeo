@@ -1,4 +1,7 @@
-using LemonNeo.Plugin.Abstractions;
+using LemonNeo.Abstractions.Playback;
+using LemonNeo.Abstractions.Plugins;
+using LemonNeo.Core.Music;
+using LemonNeo.Core.Playback;
 using Microsoft.Extensions.Logging;
 using Windows.Media;
 using Windows.Media.Playback;
@@ -13,7 +16,7 @@ public sealed class WindowsSmtcPlugin : InteractivePluginBase
     private SystemMediaTransportControls? _controls;
     private InteractivePlaybackSnapshot? _last;
 
-    public override PluginDescriptor Descriptor { get; } = new("windows-smtc", "Windows System Media Transport Controls", "0.1.0");
+    public override PluginDescriptor Descriptor { get; } = new("LemonNeo.Plugin.WindowsSmtc", "Windows System Media Transport Controls", "0.1.0");
 
     protected override ValueTask InitializeCoreAsync(IPluginContext context, CancellationToken cancellationToken)
     {

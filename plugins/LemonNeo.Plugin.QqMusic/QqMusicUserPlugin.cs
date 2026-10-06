@@ -1,10 +1,16 @@
+using LemonNeo.Abstractions.Plugins;
+using LemonNeo.Abstractions.Providers;
+using LemonNeo.Abstractions.Settings;
+using LemonNeo.Abstractions.Storage;
+using LemonNeo.Core.Exceptions;
+using LemonNeo.Core.Music;
 using System.Globalization;
 using System.Runtime.CompilerServices;
-using LemonNeo.Core;
-using LemonNeo.Plugin.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace LemonNeo.Plugin.QqMusic;
+
+public sealed record AccountSettings(string? UserId = null, string? Nickname = null, string? AvatarUri = null);
 
 public sealed class QqMusicUserPlugin :
     ILemonPlugin,
@@ -17,11 +23,8 @@ public sealed class QqMusicUserPlugin :
     private const string ProviderId = "qqmusic";
     private const string CookieKey = "y-qq-cookie";
     private const string GtkKey = "g-tk";
-    private const string UserIdKey = "user-id";
-    private const string NicknameKey = "nickname";
-    private const string AvatarKey = "avatar-uri";
 
-    private IPluginStorage? _storage;
+    private ISettingsScope? _settings;
     private ICredentialVault? _credentials;
     private QqMusicApiClient? _api;
     private QqMusicPlaybackProvider? _playbackProvider;
@@ -30,7 +33,7 @@ public sealed class QqMusicUserPlugin :
     private AuthenticationState _state = new(false);
 
     public PluginDescriptor Descriptor { get; } = new(
-        "org.lemonneo.qqmusic.user",
+        "LemonNeo.Plugin.QqMusic",
         "QQ Music User Library",
         "1.0.0");
 
@@ -44,16 +47,18 @@ public sealed class QqMusicUserPlugin :
 
     public async ValueTask InitializeAsync(IPluginContext context, CancellationToken cancellationToken)
     {
-        _storage = context.Storage;
+        _settings = context.Settings;
+        await _settings.RegisterAsync(nameof(AccountSettings), new AccountSettings(), cancellationToken: cancellationToken);
         _credentials = context.Credentials;
         _api = new QqMusicApiClient(context.HttpClientFactory.CreateClient(Descriptor.Id));
         _logger = context.LoggerFactory.CreateLogger<QqMusicUserPlugin>();
 
         var cookie = await _credentials.GetSecretAsync(CookieKey, cancellationToken);
         var gtkValue = await _credentials.GetSecretAsync(GtkKey, cancellationToken);
-        var userId = await _storage.GetAsync(UserIdKey, cancellationToken);
-        var nickname = await _storage.GetAsync(NicknameKey, cancellationToken);
-        var avatarValue = await _storage.GetAsync(AvatarKey, cancellationToken);
+        var account = _settings.Get<AccountSettings>();
+        var userId = account.UserId;
+        var nickname = account.Nickname;
+        var avatarValue = account.AvatarUri;
         if (!string.IsNullOrWhiteSpace(cookie) &&
             long.TryParse(gtkValue, NumberStyles.None, CultureInfo.InvariantCulture, out var gtk) &&
             !string.IsNullOrWhiteSpace(userId))
@@ -66,7 +71,7 @@ public sealed class QqMusicUserPlugin :
                 TryCreateUri(avatarValue));
         }
 
-        var playbackClient = context.HttpClientFactory.CreateClient("org.lemonneo.qqmusic.playback");
+        var playbackClient = context.HttpClientFactory.CreateClient("LemonNeo.Plugin.QqMusic.Playback");
         playbackClient.Timeout = TimeSpan.FromSeconds(20);
         _playbackProvider = new QqMusicPlaybackProvider(
             playbackClient,
@@ -83,7 +88,7 @@ public sealed class QqMusicUserPlugin :
         _state = new AuthenticationState(false);
         _api = null;
         _playbackProvider = null;
-        _storage = null;
+        _settings = null;
         _credentials = null;
         _logger = null;
         return ValueTask.CompletedTask;
@@ -111,22 +116,13 @@ public sealed class QqMusicUserPlugin :
         var profile = await Required(_api).GetProfileAsync(authentication, cancellationToken);
 
         var credentials = Required(_credentials);
-        var storage = Required(_storage);
+        var configuration = Required(_settings);
         await credentials.SetSecretAsync(CookieKey, authentication.Cookie, cancellationToken);
         await credentials.SetSecretAsync(
             GtkKey,
             authentication.Gtk.ToString(CultureInfo.InvariantCulture),
             cancellationToken);
-        await storage.SetAsync(UserIdKey, profile.UserId, cancellationToken);
-        await storage.SetAsync(NicknameKey, profile.Nickname, cancellationToken);
-        if (profile.AvatarUri is not null)
-        {
-            await storage.SetAsync(AvatarKey, profile.AvatarUri.AbsoluteUri, cancellationToken);
-        }
-        else
-        {
-            await storage.DeleteAsync(AvatarKey, cancellationToken);
-        }
+        configuration.Apply<AccountSettings>(_ => new(profile.UserId, profile.Nickname, profile.AvatarUri?.AbsoluteUri));
 
         _authentication = authentication;
         _state = new AuthenticationState(
@@ -141,12 +137,10 @@ public sealed class QqMusicUserPlugin :
     public async Task SignOutAsync(CancellationToken cancellationToken = default)
     {
         var credentials = Required(_credentials);
-        var storage = Required(_storage);
+        var configuration = Required(_settings);
         await credentials.DeleteSecretAsync(CookieKey, cancellationToken);
         await credentials.DeleteSecretAsync(GtkKey, cancellationToken);
-        await storage.DeleteAsync(UserIdKey, cancellationToken);
-        await storage.DeleteAsync(NicknameKey, cancellationToken);
-        await storage.DeleteAsync(AvatarKey, cancellationToken);
+        configuration.Apply<AccountSettings>(_ => new());
         _authentication = null;
         _state = new AuthenticationState(false);
     }

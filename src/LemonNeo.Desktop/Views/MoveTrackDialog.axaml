@@ -1,0 +1,13 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:i18n="using:LemonNeo.Desktop.Infrastructure" x:Class="LemonNeo.Desktop.Views.MoveTrackDialog"
+        Title="{Translate {x:Static i18n:LanguageManager+Keys.MoveTo}}" Width="380" SizeToContent="Height" CanResize="False" WindowStartupLocation="CenterOwner">
+  <StackPanel Margin="28" Spacing="20">
+    <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.DestinationPosition}}" TextWrapping="Wrap" />
+    <NumericUpDown Name="DestinationInput" Minimum="1" FormatString="0" Increment="1"
+                   AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DestinationPosition}}" />
+    <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
+      <Button Content="{Translate {x:Static i18n:LanguageManager+Keys.Cancel}}" Click="OnCancel" IsCancel="True" />
+      <Button Name="MoveButton" Classes="primary" Content="{Translate {x:Static i18n:LanguageManager+Keys.Move}}" Click="OnMove" IsDefault="True" />
+    </StackPanel>
+  </StackPanel>
+</Window>

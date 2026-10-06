@@ -1,5 +1,7 @@
 .vs/
 **/bin/
 **/obj/
+.idea/
 LemonLibrary/
 .demo-library/
+artifacts/

@@ -1,8 +1,10 @@
+using LemonNeo.Abstractions.Plugins;
+using LemonNeo.Abstractions.Providers;
+using LemonNeo.Core.Music;
+using LemonNeo.Core.Playback;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using LemonNeo.Core;
-using LemonNeo.Plugin.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace LemonNeo.Plugin.GdStudioNetease;
@@ -14,7 +16,7 @@ public sealed class GdStudioNeteasePlugin :
     ITrackIdResolverProvider
 {
     private const string ProviderId = "gdstudio-netease";
-    private const string PluginId = "org.lemonneo.gdstudio.netease";
+    private const string PluginId = "LemonNeo.Plugin.GdStudioNetease";
     private const string UserAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
         "AppleWebKit/537.36 (KHTML, like Gecko) " +

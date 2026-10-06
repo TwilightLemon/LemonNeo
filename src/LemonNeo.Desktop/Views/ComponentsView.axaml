@@ -1,0 +1,66 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:LemonNeo.Desktop.ViewModels" xmlns:i18n="using:LemonNeo.Desktop.Infrastructure"
+             xmlns:controls="using:LemonNeo.Desktop.Controls"
+             x:Class="LemonNeo.Desktop.Views.ComponentsView" x:DataType="vm:ComponentsViewModel">
+  <Grid RowDefinitions="Auto,Auto,*">
+    <controls:PageHeader Title="{Binding PageTitle}" Description="{Binding PageDescription}" Summary="{Binding PageSummary}">
+      <controls:PageHeader.Actions>
+        <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsBusy}" ToolTip.Tip="{Binding Status}">
+          <ProgressBar IsIndeterminate="True" Width="60" Height="3" VerticalAlignment="Center" AutomationProperties.Name="{Binding Status}" />
+          <Button Classes="ghost" Command="{Binding CancelOperationCommand}" Content="{Translate {x:Static i18n:LanguageManager+Keys.CancelOperation}}" />
+        </StackPanel>
+      </controls:PageHeader.Actions>
+    </controls:PageHeader>
+    <Border Grid.Row="1" IsVisible="{Binding HasError}" Background="{DynamicResource Brush.DangerSoft}" CornerRadius="10" Padding="14" Margin="0,0,0,12">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Text="{Binding Error}" Foreground="{DynamicResource Brush.Danger}" TextWrapping="Wrap" MaxHeight="90" />
+        <Button Grid.Column="1" Classes="ghost" Content="×" Command="{Binding DismissErrorCommand}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}" />
+      </Grid>
+    </Border>
+    <Grid Grid.Row="2">
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="18">
+          <Border Classes="card">
+            <StackPanel Spacing="18">
+              <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.Buttons}}" />
+              <WrapPanel>
+                <Button Classes="primary" Content="{Translate {x:Static i18n:LanguageManager+Keys.PrimaryButton}}" Command="{Binding SampleCommand}" Margin="0,0,10,10" />
+                <Button Content="{Translate {x:Static i18n:LanguageManager+Keys.SecondaryButton}}" Command="{Binding SampleCommand}" Margin="0,0,10,10" />
+                <Button Classes="ghost" Content="{Translate {x:Static i18n:LanguageManager+Keys.GhostButton}}" Command="{Binding SampleCommand}" Margin="0,0,10,10" />
+                <Button Classes="danger" Content="{Translate {x:Static i18n:LanguageManager+Keys.DangerButton}}" Command="{Binding SampleCommand}" Margin="0,0,10,10" />
+                <Button IsEnabled="False" Content="{Translate {x:Static i18n:LanguageManager+Keys.DisabledButton}}" Margin="0,0,10,10" />
+                <Button Classes="icon" Command="{Binding SampleCommand}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Create}}"><Path Classes="icon" Data="{StaticResource Icon.Add}" /></Button>
+              </WrapPanel>
+            </StackPanel>
+          </Border>
+          <Border Classes="card">
+            <StackPanel Spacing="18">
+              <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.Inputs}}" />
+              <TextBox PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.SampleInput}}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.SampleInput}}" />
+              <ComboBox SelectedIndex="0" HorizontalAlignment="Stretch" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Theme}}">
+                <ComboBoxItem Content="{Translate {x:Static i18n:LanguageManager+Keys.ThemeSystem}}" />
+                <ComboBoxItem Content="{Translate {x:Static i18n:LanguageManager+Keys.ThemeLight}}" />
+                <ComboBoxItem Content="{Translate {x:Static i18n:LanguageManager+Keys.ThemeDark}}" />
+              </ComboBox>
+              <Grid ColumnDefinitions="*,*">
+                <CheckBox Content="{Translate {x:Static i18n:LanguageManager+Keys.SampleToggle}}" IsChecked="True" />
+                <ToggleSwitch Grid.Column="1" Content="{Translate {x:Static i18n:LanguageManager+Keys.SampleToggle}}" />
+              </Grid>
+              <Slider Minimum="0" Maximum="100" Value="40" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Seek}}" />
+              <ProgressBar Minimum="0" Maximum="100" Value="65" Height="5" />
+            </StackPanel>
+          </Border>
+          <Border Classes="card">
+            <StackPanel Spacing="16">
+              <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.Templates}}" />
+              <controls:PageHeader Title="{Translate {x:Static i18n:LanguageManager+Keys.SampleCardTitle}}" Description="{Translate {x:Static i18n:LanguageManager+Keys.SampleCardDescription}}" />
+              <controls:EmptyState Title="{Translate {x:Static i18n:LanguageManager+Keys.SampleEmptyTitle}}" Description="{Translate {x:Static i18n:LanguageManager+Keys.SampleEmptyDescription}}" Icon="{StaticResource Icon.Library}" Margin="0,8,0,24">
+                <controls:EmptyState.Actions><Button Classes="primary" Content="{Translate {x:Static i18n:LanguageManager+Keys.SampleAction}}" Command="{Binding SampleCommand}" /></controls:EmptyState.Actions>
+              </controls:EmptyState>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </ScrollViewer>
+    </Grid>
+  </Grid>
+</UserControl>

@@ -2,35 +2,13 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <Version>0.1.0</Version>
+    <IsLemonNeoHost>true</IsLemonNeoHost>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../LemonNeo.Hosting/LemonNeo.Hosting.csproj" />
     <ProjectReference Include="../LemonNeo.Application/LemonNeo.Application.csproj" />
-    <ProjectReference Include="../LemonNeo.Configuration/LemonNeo.Configuration.csproj" />
+    <ProjectReference Include="../LemonNeo.Abstractions/LemonNeo.Abstractions.csproj" />
     <ProjectReference Include="../LemonNeo.Core/LemonNeo.Core.csproj" />
-    <ProjectReference Include="../LemonNeo.Persistence/LemonNeo.Persistence.csproj" />
-    <ProjectReference Include="../LemonNeo.Playback/LemonNeo.Playback.csproj" />
-    <ProjectReference Include="../LemonNeo.Plugin.Abstractions/LemonNeo.Plugin.Abstractions.csproj" />
-    <ProjectReference Include="../LemonNeo.Plugin.Runtime/LemonNeo.Plugin.Runtime.csproj" />
-    <ProjectReference Include="../LemonNeo.Sync.Abstractions/LemonNeo.Sync.Abstractions.csproj" />
-    <ProjectReference Include="../../plugins/LemonNeo.Sync.MockGit/LemonNeo.Sync.MockGit.csproj" />
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.0" />
   </ItemGroup>
-  <ItemGroup>
-    <DefaultPluginProjects Include="$(MSBuildProjectDirectory)\..\..\plugins\LemonNeo.Plugin.MockMusic\LemonNeo.Plugin.MockMusic.csproj" />
-    <DefaultPluginProjects Include="$(MSBuildProjectDirectory)\..\..\plugins\LemonNeo.Plugin.Netease\LemonNeo.Plugin.Netease.csproj" />
-    <DefaultPluginProjects Include="$(MSBuildProjectDirectory)\..\..\plugins\LemonNeo.Plugin.QqMusic\LemonNeo.Plugin.QqMusic.csproj" />
-    <DefaultPluginProjects Include="$(MSBuildProjectDirectory)\..\..\plugins\LemonNeo.Plugin.LocalMusic\LemonNeo.Plugin.LocalMusic.csproj" />
-    <DefaultPluginProjects Include="$(MSBuildProjectDirectory)\..\..\plugins\LemonNeo.Plugin.Bass\LemonNeo.Plugin.Bass.csproj" />
-    <DefaultPluginProjects Include="$(MSBuildProjectDirectory)\..\..\plugins\LemonNeo.Plugin.GdStudioNetease\LemonNeo.Plugin.GdStudioNetease.csproj" />
-    <DefaultPluginProjects Include="$(MSBuildProjectDirectory)\..\..\plugins\LemonNeo.Plugin.Lyricify\LemonNeo.Plugin.Lyricify.csproj" />
-    <DefaultPluginProjects Include="$(MSBuildProjectDirectory)/../../plugins/LemonNeo.Plugin.WindowsSmtc/LemonNeo.Plugin.WindowsSmtc.csproj" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
-    <DefaultPluginProjects Include="$(MSBuildProjectDirectory)/../../plugins/LemonNeo.Plugin.MacNowPlaying/LemonNeo.Plugin.MacNowPlaying.csproj" Condition="$([MSBuild]::IsOSPlatform('OSX'))" />
-  </ItemGroup>
-  <Target Name="BuildDefaultPlugins" BeforeTargets="Build">
-    <MSBuild Projects="@(DefaultPluginProjects)"
-             Targets="Build"
-             Properties="Configuration=$(Configuration)"
-             RemoveProperties="TargetFramework"
-             BuildInParallel="false" />
-  </Target>
 </Project>

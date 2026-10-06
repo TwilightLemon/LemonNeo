@@ -1,0 +1,16 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+  <FontFamily x:Key="Font.UI">Segoe UI, Microsoft YaHei UI, Noto Sans, sans-serif</FontFamily>
+  <FontFamily x:Key="Font.Code">Cascadia Mono, Menlo, DejaVu Sans Mono, monospace</FontFamily>
+  <sys:Double x:Key="Font.Body">14</sys:Double>
+  <sys:Double x:Key="Font.Caption">12</sys:Double>
+  <sys:Double x:Key="Font.Title">30</sys:Double>
+  <CornerRadius x:Key="Radius.Control">10</CornerRadius>
+  <CornerRadius x:Key="Radius.Card">16</CornerRadius>
+  <Thickness x:Key="Space.Page">32</Thickness>
+  <Thickness x:Key="Space.Control">16,10</Thickness>
+  <Thickness x:Key="Space.PlaybackInset">0</Thickness>
+  <Thickness x:Key="Space.PlaybackFooterInset">0,12,0,0</Thickness>
+  <sys:TimeSpan x:Key="Motion.Fast">0:0:0.140</sys:TimeSpan>
+  <sys:TimeSpan x:Key="Motion.Normal">0:0:0.220</sys:TimeSpan>
+</ResourceDictionary>

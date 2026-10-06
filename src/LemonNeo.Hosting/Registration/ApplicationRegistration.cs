@@ -1,0 +1,39 @@
+using LemonNeo.Abstractions.Playback;
+using LemonNeo.Abstractions.Storage;
+using LemonNeo.Application;
+using LemonNeo.Application.Library;
+using LemonNeo.Application.Lyrics;
+using LemonNeo.Application.Playback;
+using LemonNeo.Application.Providers;
+using LemonNeo.Application.Sync;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+namespace LemonNeo.Hosting.Registration;
+
+internal static class ApplicationRegistration
+{
+    public static void AddApplication(this IServiceCollection services, IAppPathProvider paths)
+    {
+        services.AddSingleton<LibraryService>();
+        services.AddSingleton<IPlaylistOrderingService, FractionalPlaylistOrderingService>();
+        services.AddSingleton<PlaylistService>();
+        services.AddSingleton<FolderImportService>();
+        services.AddSingleton<ImportService>();
+        services.AddSingleton<SearchService>();
+        services.AddSingleton<TrackLookupService>();
+        services.AddSingleton<MetadataService>();
+        services.AddSingleton(provider => new ImageCache(paths.CacheDirectory,
+            provider.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(ImageCache)), provider.GetRequiredService<ILogger<ImageCache>>()));
+        services.AddSingleton(provider => new LyricsCache(paths.CacheDirectory, provider.GetRequiredService<ILogger<LyricsCache>>()));
+        services.AddSingleton<LyricsService>();
+        services.AddSingleton<IPlaybackQueue, PlaybackQueue>();
+        services.AddSingleton(provider => new PlaybackAudioCache(paths.CacheDirectory, provider.GetRequiredService<ILogger<PlaybackAudioCache>>()));
+        services.AddSingleton<PlaybackSourceDiscoveryService>();
+        services.AddSingleton<PlaybackResolver>();
+        services.AddSingleton<PlaybackSessionService>();
+        services.AddSingleton<IPlaybackInteraction, PlaybackInteractionService>();
+        services.AddSingleton<ILibraryMergeService, LibraryMergeService>();
+        services.AddSingleton<SyncService>();
+    }
+}

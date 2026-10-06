@@ -1,15 +1,17 @@
+using LemonNeo.Abstractions.Plugins;
+using LemonNeo.Abstractions.Providers;
+using LemonNeo.Core.Lyrics;
+using LemonNeo.Core.Music;
 using System.Text.Json;
-using LemonNeo.Core;
-using LemonNeo.Plugin.Abstractions;
 using Lyricify.Lyrics.Helpers;
 using Lyricify.Lyrics.Models;
 using Lyricify.Lyrics.Searchers;
 using Lyricify.Lyrics.Searchers.Helpers;
 using Microsoft.Extensions.Logging;
 using HelperSearchers = Lyricify.Lyrics.Searchers.Searchers;
-using LemonLyrics = LemonNeo.Plugin.Abstractions.Lyrics;
-using LemonLyricsLine = LemonNeo.Plugin.Abstractions.LyricsLine;
-using LemonTrackMetadata = LemonNeo.Plugin.Abstractions.TrackMetadata;
+using LemonLyrics = LemonNeo.Core.Lyrics.Lyrics;
+using LemonLyricsLine = LemonNeo.Core.Lyrics.LyricsLine;
+using LemonTrackMetadata = LemonNeo.Abstractions.Providers.TrackMetadata;
 
 namespace LemonNeo.Plugin.Lyricify;
 
@@ -52,7 +54,7 @@ public sealed class LyricifyMetadataPlugin :
     private ILogger<LyricifyMetadataPlugin>? _logger;
 
     public PluginDescriptor Descriptor { get; } = new(
-        "org.lemonneo.lyricify",
+        "LemonNeo.Plugin.Lyricify",
         "Lyricify Metadata & Lyrics",
         "1.0.0");
 
@@ -245,7 +247,12 @@ public sealed class LyricifyMetadataPlugin :
         var duration = int.TryParse(ReadJsonString(song, "dt"), out var milliseconds)
             ? milliseconds
             : 0;
-        return new NeteaseSearchResult(title, artists, album, null, duration, id);
+        return new NeteaseSearchResult(title, artists, album, null, duration, id)
+        {
+            ArtworkUrl = albumValue.ValueKind == JsonValueKind.Object
+                ? ReadJsonString(albumValue, "picUrl")
+                : null
+        };
     }
 
     private async Task<ISearchResult?> GetKugouTrackAsync(
@@ -289,7 +296,10 @@ public sealed class LyricifyMetadataPlugin :
             ReadJsonString(data, "album_name") ?? string.Empty,
             null,
             duration,
-            hash);
+            hash)
+        {
+            ArtworkUrl = ArtworkHelper.WithSize(ReadJsonString(data, "img"))
+        };
     }
 
     private static string? ReadJsonString(JsonElement value, string property) =>
@@ -343,7 +353,7 @@ public sealed class LyricifyMetadataPlugin :
             $"Search failed after {attempts} attempt(s): {lastError}");
     }
 
-    private static Track ToSearchTrack(string sourceNamespace, ISearchResult result)
+    internal static Track ToSearchTrack(string sourceNamespace, ISearchResult result)
     {
         var identifiers = GetIdentifiers(sourceNamespace, result);
         var primaryId = identifiers.FirstOrDefault(identifier =>
@@ -362,9 +372,13 @@ public sealed class LyricifyMetadataPlugin :
             Duration = result.DurationMs is null
                 ? null
                 : TimeSpan.FromMilliseconds(result.DurationMs.Value),
+            ArtworkUri = GetArtworkUri(result),
             ExternalIds = identifiers
         };
     }
+
+    private static Uri? GetArtworkUri(ISearchResult result) =>
+        ArtworkHelper.NormalizeUrl(result.ArtworkUrl) is { } url ? new Uri(url) : null;
 
     public async Task<MetadataLookupResult> LookupMetadataAsync(
         MetadataLookupRequest request,
@@ -373,10 +387,9 @@ public sealed class LyricifyMetadataPlugin :
         var requestedNamespaces = request.TargetNamespaces.Count == 0
             ? null
             : request.TargetNamespaces.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var helperTrack = ToHelperMetadata(request.Track);
         var searches = Sources
             .Where(source => requestedNamespaces is null || requestedNamespaces.Contains(source.Namespace))
-            .Select(source => SearchSourceAsync(source, helperTrack, request, cancellationToken));
+            .Select(source => SearchSourceAsync(source, request, cancellationToken));
         var sourceResults = await Task.WhenAll(searches);
 
         var matches = sourceResults.SelectMany(result => result.Matches)
@@ -464,20 +477,12 @@ public sealed class LyricifyMetadataPlugin :
 
     private static async Task<SourceSearchResult> SearchSourceAsync(
         SourceDefinition source,
-        TrackMultiArtistMetadata helperTrack,
         MetadataLookupRequest request,
         CancellationToken cancellationToken)
     {
         try
         {
-            var results = await source.Searcher.GetSearcher()
-                .SearchForResults(helperTrack)
-                .WaitAsync(RequestTimeout, cancellationToken);
-            var matches = results
-                .Where(result => Confidence(result.MatchType) >= request.MinimumConfidence)
-                .Take(Math.Max(0, request.LimitPerSource))
-                .Select(result => ToMetadataMatch(source.Namespace, result))
-                .ToArray();
+            var matches = await SearchMetadataMatchesAsync(source.Searcher.GetSearcher(), source.Namespace, request, cancellationToken);
             return new SourceSearchResult(source.Namespace, matches, null);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -486,21 +491,42 @@ public sealed class LyricifyMetadataPlugin :
         }
     }
 
-    private static MetadataMatch ToMetadataMatch(string sourceNamespace, ISearchResult result)
+    internal static async Task<IReadOnlyList<MetadataMatch>> SearchMetadataMatchesAsync(
+        ISearcher searcher,
+        string sourceNamespace,
+        MetadataLookupRequest request,
+        CancellationToken cancellationToken = default)
     {
-        var matchType = result.MatchType ?? CompareHelper.MatchType.NoMatch;
+        cancellationToken.ThrowIfCancellationRequested();
+        var helperTrack = ToHelperMetadata(request.Track);
+        var customKeyword = !string.IsNullOrWhiteSpace(request.SearchKeyword);
+        var results = customKeyword
+            ? await searcher.SearchForResults(request.SearchKeyword!.Trim()).WaitAsync(RequestTimeout, cancellationToken) ?? []
+            : await searcher.SearchForResults(helperTrack).WaitAsync(RequestTimeout, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        return results.Select(result => ToMetadataMatch(sourceNamespace, result,
+                customKeyword ? CompareHelper.CompareTrack(helperTrack, result) : null))
+            .Where(match => match.Confidence >= request.MinimumConfidence)
+            .OrderByDescending(match => match.Confidence)
+            .Take(Math.Max(0, request.LimitPerSource)).ToArray();
+    }
+
+    private static MetadataMatch ToMetadataMatch(string sourceNamespace, ISearchResult result, CompareHelper.MatchType? matchType = null)
+    {
+        var level = matchType ?? result.MatchType ?? CompareHelper.MatchType.NoMatch;
         return new MetadataMatch
         {
             MetadataProviderId = "lyricify",
             SourceNamespace = sourceNamespace,
-            Confidence = Confidence(matchType),
-            MatchLevel = matchType.ToString(),
+            Confidence = Confidence(level),
+            MatchLevel = level.ToString(),
             Metadata = new LemonTrackMetadata
             {
                 Title = result.Title,
                 Artists = result.Artists,
                 Album = string.IsNullOrWhiteSpace(result.Album) ? null : result.Album,
                 Duration = result.DurationMs is null ? null : TimeSpan.FromMilliseconds(result.DurationMs.Value),
+                ArtworkUri = GetArtworkUri(result),
                 ExternalIds = GetIdentifiers(sourceNamespace, result)
             }
         };

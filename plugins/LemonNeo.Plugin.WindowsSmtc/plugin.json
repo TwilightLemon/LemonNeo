@@ -1,5 +1,5 @@
 {
-  "id": "windows-smtc",
+  "id": "LemonNeo.Plugin.WindowsSmtc",
   "name": "Windows System Media Transport Controls",
   "version": "0.1.0",
   "entryAssembly": "LemonNeo.Plugin.WindowsSmtc.dll",

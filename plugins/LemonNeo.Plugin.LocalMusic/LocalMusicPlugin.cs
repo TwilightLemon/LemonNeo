@@ -1,8 +1,10 @@
+using LemonNeo.Abstractions.Plugins;
+using LemonNeo.Abstractions.Providers;
+using LemonNeo.Core.Music;
+using LemonNeo.Core.Playback;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
-using LemonNeo.Core;
-using LemonNeo.Plugin.Abstractions;
 
 namespace LemonNeo.Plugin.LocalMusic;
 
@@ -23,7 +25,7 @@ public sealed class LocalMusicPlugin :
     private readonly ConcurrentDictionary<string, Track> _catalog = new(StringComparer.Ordinal);
 
     public PluginDescriptor Descriptor { get; } = new(
-        "org.lemonneo.localmusic",
+        "LemonNeo.Plugin.LocalMusic",
         "Local Music",
         "1.0.0");
 

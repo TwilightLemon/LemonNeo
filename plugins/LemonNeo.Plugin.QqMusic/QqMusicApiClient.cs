@@ -1,7 +1,8 @@
+using LemonNeo.Abstractions.Providers;
+using LemonNeo.Core.Exceptions;
+using LemonNeo.Core.Music;
 using System.Globalization;
 using System.Text.Json;
-using LemonNeo.Core;
-using LemonNeo.Plugin.Abstractions;
 
 namespace LemonNeo.Plugin.QqMusic;
 

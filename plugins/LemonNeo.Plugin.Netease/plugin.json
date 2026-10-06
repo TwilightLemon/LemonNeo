@@ -1,5 +1,5 @@
 {
-  "id": "org.lemonneo.netease.user",
+  "id": "LemonNeo.Plugin.Netease",
   "name": "Netease User Library",
   "version": "1.0.0",
   "minimumHostVersion": "0.1.0",

@@ -1,0 +1,14 @@
+<Project>
+  <!-- Build dependencies, never host assembly references. Keep the list in one place. -->
+  <ItemGroup>
+    <DefaultPluginProjects Include="$(MSBuildThisFileDirectory)../plugins/LemonNeo.Plugin.MockMusic/LemonNeo.Plugin.MockMusic.csproj" />
+    <DefaultPluginProjects Include="$(MSBuildThisFileDirectory)../plugins/LemonNeo.Plugin.LocalMusic/LemonNeo.Plugin.LocalMusic.csproj" />
+    <DefaultPluginProjects Include="$(MSBuildThisFileDirectory)../plugins/LemonNeo.Plugin.Bass/LemonNeo.Plugin.Bass.csproj" />
+    <DefaultPluginProjects Include="$(MSBuildThisFileDirectory)../plugins/LemonNeo.Plugin.GdStudioNetease/LemonNeo.Plugin.GdStudioNetease.csproj" />
+    <DefaultPluginProjects Include="$(MSBuildThisFileDirectory)../plugins/LemonNeo.Plugin.Lyricify/LemonNeo.Plugin.Lyricify.csproj" />
+    <DefaultPluginProjects Include="$(MSBuildThisFileDirectory)../plugins/LemonNeo.Plugin.Netease/LemonNeo.Plugin.Netease.csproj" />
+    <DefaultPluginProjects Include="$(MSBuildThisFileDirectory)../plugins/LemonNeo.Plugin.QqMusic/LemonNeo.Plugin.QqMusic.csproj" />
+    <DefaultPluginProjects Include="$(MSBuildThisFileDirectory)../plugins/LemonNeo.Plugin.WindowsSmtc/LemonNeo.Plugin.WindowsSmtc.csproj" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
+    <DefaultPluginProjects Include="$(MSBuildThisFileDirectory)../plugins/LemonNeo.Plugin.MacNowPlaying/LemonNeo.Plugin.MacNowPlaying.csproj" Condition="$([MSBuild]::IsOSPlatform('OSX'))" />
+  </ItemGroup>
+</Project>

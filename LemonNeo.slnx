@@ -2,19 +2,18 @@
   <Folder Name="/external/">
     <Project Path="external/Lyricify-Lyrics-Helper/Lyricify.Lyrics.Helper/Lyricify.Lyrics.Helper.csproj" />
   </Folder>
-  <Folder Name="/tests/">
-    <Project Path="tests/LemonNeo.Interactive.Tests/LemonNeo.Interactive.Tests.csproj" />
-  </Folder>
   <Folder Name="/src/">
+    <Project Path="src/LemonNeo.Abstractions/LemonNeo.Abstractions.csproj" />
+    <Project Path="src/LemonNeo.Infrastructure/LemonNeo.Infrastructure.csproj" />
     <Project Path="src/LemonNeo.Application/LemonNeo.Application.csproj" />
-    <Project Path="src/LemonNeo.Configuration/LemonNeo.Configuration.csproj" />
     <Project Path="src/LemonNeo.Console/LemonNeo.Console.csproj" />
     <Project Path="src/LemonNeo.Core/LemonNeo.Core.csproj" />
-    <Project Path="src/LemonNeo.Persistence/LemonNeo.Persistence.csproj" />
-    <Project Path="src/LemonNeo.Playback/LemonNeo.Playback.csproj" />
-    <Project Path="src/LemonNeo.Plugin.Abstractions/LemonNeo.Plugin.Abstractions.csproj" />
-    <Project Path="src/LemonNeo.Plugin.Runtime/LemonNeo.Plugin.Runtime.csproj" />
-    <Project Path="src/LemonNeo.Sync.Abstractions/LemonNeo.Sync.Abstractions.csproj" />
+    <Project Path="src/LemonNeo.Desktop/LemonNeo.Desktop.csproj" />
+    <Project Path="src/LemonNeo.Hosting/LemonNeo.Hosting.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/LemonNeo.Hosting.Tests/LemonNeo.Hosting.Tests.csproj" />
+    <Project Path="tests/LemonNeo.Plugin.ConfigurationFixture/LemonNeo.Plugin.ConfigurationFixture.csproj" />
   </Folder>
   <Folder Name="/plugins/">
     <Project Path="plugins/LemonNeo.Plugin.WindowsSmtc/LemonNeo.Plugin.WindowsSmtc.csproj" />
@@ -26,6 +25,5 @@
     <Project Path="plugins/LemonNeo.Plugin.MockMusic/LemonNeo.Plugin.MockMusic.csproj" />
     <Project Path="plugins/LemonNeo.Plugin.Netease/LemonNeo.Plugin.Netease.csproj" />
     <Project Path="plugins/LemonNeo.Plugin.QqMusic/LemonNeo.Plugin.QqMusic.csproj" />
-    <Project Path="plugins/LemonNeo.Sync.MockGit/LemonNeo.Sync.MockGit.csproj" />
   </Folder>
 </Solution>

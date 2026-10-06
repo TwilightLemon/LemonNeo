@@ -1,5 +1,5 @@
 {
-  "id": "org.lemonneo.gdstudio.netease",
+  "id": "LemonNeo.Plugin.GdStudioNetease",
   "name": "GDStudio Netease Playback Source",
   "version": "1.0.0",
   "entryAssembly": "LemonNeo.Plugin.GdStudioNetease.dll",

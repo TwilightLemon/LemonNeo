@@ -1,5 +1,5 @@
 {
-  "id": "org.lemonneo.localmusic",
+  "id": "LemonNeo.Plugin.LocalMusic",
   "name": "Local Music",
   "version": "1.0.0",
   "entryAssembly": "LemonNeo.Plugin.LocalMusic.dll",

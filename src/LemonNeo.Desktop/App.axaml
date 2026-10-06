@@ -1,0 +1,27 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:theme="using:LemonNeo.Desktop.Infrastructure"
+             x:Class="LemonNeo.Desktop.App" Name="Lemon Neo" RequestedThemeVariant="Default">
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <theme:ThemeResources />
+        <ResourceInclude Source="/Resources/Themes/Tokens.axaml" />
+        <ResourceInclude Source="/Resources/Themes/Icons.axaml" />
+        <ResourceInclude Source="/Resources/Themes/Controls.axaml" />
+        <ResourceInclude Source="/Resources/Themes/Templates.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+  <!-- The caption theme derives from Fluent's official drawn decorations. -->
+  <Application.Styles>
+    <FluentTheme>
+      <FluentTheme.Palettes>
+        <ColorPaletteResources x:Key="Light" Accent="#627C16" />
+        <ColorPaletteResources x:Key="Dark" Accent="#DCEC7E" />
+      </FluentTheme.Palettes>
+    </FluentTheme>
+    <StyleInclude Source="/Resources/Themes/WindowChrome.axaml" />
+    <StyleInclude Source="/Resources/Themes/Styles.axaml" />
+  </Application.Styles>
+</Application>

@@ -1,0 +1,31 @@
+<Project>
+  <Target Name="BuildHostPlugins" BeforeTargets="Build"
+          Condition="'$(IsLemonNeoHost)' == 'true' and '$(SkipHostPlugins)' != 'true'">
+    <MSBuild Projects="@(DefaultPluginProjects)" Targets="Restore;Build"
+             Properties="Configuration=$(Configuration);PluginDeploymentRoot=$(TargetDir)plugins/"
+             RemoveProperties="TargetFramework;RuntimeIdentifier;SelfContained;IsLemonNeoHost"
+             BuildInParallel="false" />
+  </Target>
+
+  <!-- Hosts explicitly request deployment; standalone plugin builds only write their own output. -->
+  <Target Name="DeployPluginToHost" AfterTargets="Build"
+          Condition="'$(PluginDeploymentRoot)' != '' and '$(IsTestFixture)' != 'true' and Exists('$(MSBuildProjectDirectory)/plugin.json')">
+    <ItemGroup>
+      <PluginDeploymentAsset Include="$(TargetDir)**/*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(PluginDeploymentAsset)"
+          DestinationFiles="@(PluginDeploymentAsset->'$(PluginDeploymentRoot)$(MSBuildProjectName)/%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="PublishHostPlugins" BeforeTargets="ComputeFilesToPublish"
+          Condition="'$(IsLemonNeoHost)' == 'true'">
+    <ItemGroup>
+      <HostPluginPublishAsset Include="$(TargetDir)plugins/**/*" />
+      <ResolvedFileToPublish Include="@(HostPluginPublishAsset)">
+        <RelativePath>plugins/%(HostPluginPublishAsset.RecursiveDir)%(HostPluginPublishAsset.Filename)%(HostPluginPublishAsset.Extension)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
+</Project>

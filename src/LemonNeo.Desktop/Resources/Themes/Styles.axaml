@@ -1,0 +1,101 @@
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:i18n="using:LemonNeo.Desktop.Infrastructure">
+  <Style Selector="Window">
+    <Setter Property="Background" Value="{DynamicResource Brush.Canvas}" />
+    <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
+    <Setter Property="FontFamily" Value="{DynamicResource Font.UI}" />
+    <Setter Property="FontSize" Value="{DynamicResource Font.Body}" />
+  </Style>
+  <Style Selector="TextBlock"><Setter Property="Foreground" Value="{DynamicResource Brush.Text}" /></Style>
+  <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}" /></Style>
+  <Style Selector="TextBlock.caption"><Setter Property="FontSize" Value="{DynamicResource Font.Caption}" /><Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}" /></Style>
+  <Style Selector="TextBlock.section"><Setter Property="FontSize" Value="18" /><Setter Property="FontWeight" Value="SemiBold" /></Style>
+  <Style Selector="Border.card">
+    <Setter Property="Background" Value="{DynamicResource Brush.Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource Radius.Card}" />
+    <Setter Property="Padding" Value="24" />
+  </Style>
+  <Style Selector="Button"><Setter Property="Theme" Value="{StaticResource LemonButton}" /></Style>
+  <Style Selector="Button.primary">
+    <Setter Property="Background" Value="{DynamicResource Brush.Accent}" />
+    <Setter Property="Foreground" Value="{DynamicResource Brush.OnAccent}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="Button.primary:pointerover"><Setter Property="Background" Value="{DynamicResource Brush.Accent}" /><Setter Property="Opacity" Value="0.85" /></Style>
+  <Style Selector="Button.ghost, Button.nav"><Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /></Style>
+  <Style Selector="Button.nav"><Setter Property="HorizontalContentAlignment" Value="Left" /><Setter Property="HorizontalAlignment" Value="Stretch" /><Setter Property="Padding" Value="16,8" /></Style>
+  <Style Selector="Button.nav.active"><Setter Property="Background" Value="{DynamicResource Brush.AccentSoft}" /><Setter Property="Foreground" Value="{DynamicResource Brush.AccentText}" /></Style>
+  <Style Selector="Button.ghost:pointerover, Button.nav:pointerover"><Setter Property="Background" Value="{DynamicResource Brush.Hover}" /></Style>
+  <Style Selector="Button.nav.active:pointerover"><Setter Property="Background" Value="{DynamicResource Brush.AccentSoft}" /><Setter Property="Opacity" Value="0.85" /></Style>
+  <Style Selector="Button.icon"><Setter Property="Width" Value="40" /><Setter Property="Height" Value="40" /><Setter Property="Padding" Value="10" /></Style>
+  <Style Selector="Button.compact"><Setter Property="MinWidth" Value="32" /><Setter Property="MinHeight" Value="32" /><Setter Property="Height" Value="32" /><Setter Property="Padding" Value="7,4" /><Setter Property="CornerRadius" Value="8" /></Style>
+  <Style Selector="Button.danger"><Setter Property="Foreground" Value="{DynamicResource Brush.Danger}" /><Setter Property="Background" Value="{DynamicResource Brush.DangerSoft}" /></Style>
+  <Style Selector="Button.themeColor">
+    <Setter Property="Background" Value="{DynamicResource Brush.Surface}" />
+    <Setter Property="BorderThickness" Value="2" /><Setter Property="Padding" Value="12" />
+  </Style>
+  <Style Selector="Button.themeColor.selected">
+    <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentText}" />
+    <Setter Property="Background" Value="{DynamicResource Brush.AccentSoft}" />
+  </Style>
+  <Style Selector="Button.themeColor.selected:pointerover"><Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentText}" /></Style>
+  <Style Selector="Path.icon"><Setter Property="Width" Value="18" /><Setter Property="Height" Value="18" /><Setter Property="Stretch" Value="Uniform" /><Setter Property="Fill" Value="{DynamicResource Brush.TextSecondary}" /></Style>
+  <Style Selector="Button.primary Path.icon"><Setter Property="Fill" Value="{DynamicResource Brush.OnAccent}" /></Style>
+  <Style Selector="Button.primary TextBlock"><Setter Property="Foreground" Value="{DynamicResource Brush.OnAccent}" /></Style>
+  <Style Selector="Button.nav.active Path.icon"><Setter Property="Fill" Value="{DynamicResource Brush.AccentText}" /></Style>
+  <Style Selector="Button#DesktopLyricsButton.active"><Setter Property="Background" Value="{DynamicResource Brush.AccentSoft}" /></Style>
+  <Style Selector="Button#DesktopLyricsButton.active Path.icon"><Setter Property="Fill" Value="{DynamicResource Brush.AccentText}" /></Style>
+  <Style Selector="TextBox">
+    <Setter Property="CornerRadius" Value="{DynamicResource Radius.Control}" />
+    <Setter Property="Background" Value="{DynamicResource Brush.Surface}" />
+    <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />
+    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="Padding" Value="12,10" />
+  </Style>
+  <Style Selector="TextBox.toolbarSearch"><Setter Property="MinHeight" Value="32" /><Setter Property="Height" Value="32" /><Setter Property="Padding" Value="10,5" /><Setter Property="CornerRadius" Value="8" /></Style>
+  <Style Selector="ComboBox">
+    <Setter Property="CornerRadius" Value="{DynamicResource Radius.Control}" /><Setter Property="MinHeight" Value="40" />
+    <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
+    <Setter Property="Background" Value="{DynamicResource Brush.Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />
+  </Style>
+  <Style Selector="ToggleSwitch">
+    <Setter Property="OnContent" Value="{Translate {x:Static i18n:LanguageManager+Keys.On}}" />
+    <Setter Property="OffContent" Value="{Translate {x:Static i18n:LanguageManager+Keys.Off}}" />
+  </Style>
+  <Style Selector="ListBox"><Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /></Style>
+  <Style Selector="ListBox /template/ ScrollViewer#PART_ScrollViewer">
+    <Setter Property="AllowAutoHide" Value="False" />
+  </Style>
+  <!-- Keep the viewport stable while hiding scrollbars outside the hovered list. -->
+  <Style Selector="ListBox:not(:pointerover) /template/ ScrollViewer#PART_ScrollViewer /template/ ScrollBar">
+    <Setter Property="Opacity" Value="0" />
+    <Setter Property="IsHitTestVisible" Value="False" />
+  </Style>
+  <Style Selector="ListBox:pointerover /template/ ScrollViewer#PART_ScrollViewer /template/ ScrollBar">
+    <Setter Property="Opacity" Value="1" />
+    <Setter Property="IsHitTestVisible" Value="True" />
+  </Style>
+  <Style Selector="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="Padding" Value="12,10" /><Setter Property="Margin" Value="0,2" /><Setter Property="CornerRadius" Value="{DynamicResource Radius.Control}" /></Style>
+  <Style Selector="ListBoxItem:selected /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource Brush.AccentSoft}" /></Style>
+  <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource Brush.Hover}" /></Style>
+  <Style Selector="ListBox.serviceTabs ListBoxItem">
+    <Setter Property="Padding" Value="16,10" /><Setter Property="Margin" Value="0" /><Setter Property="CornerRadius" Value="0" />
+  </Style>
+  <Style Selector="ListBox.serviceTabs ListBoxItem /template/ ContentPresenter,
+                   ListBox.serviceTabs ListBoxItem:selected /template/ ContentPresenter,
+                   ListBox.serviceTabs ListBoxItem:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="ListBox.serviceTabs ListBoxItem TextBlock"><Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}" /></Style>
+  <Style Selector="ListBox.serviceTabs ListBoxItem:selected TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Brush.AccentText}" /><Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="ListBox.serviceTabs ListBoxItem:pointerover TextBlock"><Setter Property="Foreground" Value="{DynamicResource Brush.Text}" /></Style>
+  <Style Selector="Slider"><Setter Property="Foreground" Value="{DynamicResource Brush.AccentText}" /></Style>
+  <Style Selector="ProgressBar"><Setter Property="Foreground" Value="{DynamicResource Brush.AccentText}" /></Style>
+</Styles>
