@@ -1,6 +1,5 @@
 using System.Text;
 using LemonNeo.Configuration;
-using LemonNeo.Playback;
 using LemonNeo.Plugin.Abstractions;
 using LemonNeo.Runtime;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,9 +26,11 @@ internal static class Program
         try
         {
             await using var runtime = new AppRuntime(paths,
-                new(options.PluginDirectory, options.LibraryDirectory, options.StartupFile), services =>
+                new(options.PluginDirectory, options.LibraryDirectory), services =>
                 {
                     services.AddSingleton(options);
+                    services.AddSingleton(provider => new StartupCommands(provider.GetRequiredService<IAppSettingsService>(),
+                        paths, options.StartupFile));
                     services.AddLogging(builder => builder.SetMinimumLevel(LogLevel.Information).AddSimpleConsole(console =>
                     {
                         console.SingleLine = true;

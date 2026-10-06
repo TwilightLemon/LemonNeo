@@ -150,24 +150,4 @@ public sealed class PlaybackConfigurationTests
         await runtime.Settings.SaveAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(1, store.WriteCount(nameof(PlaybackQueueState)));
     }
-
-    [Fact]
-    public async Task StartupScriptUsesApplicationEntityAndFlushesOnExit()
-    {
-        using var paths = new TemporaryPaths();
-        var file = paths.GetEntityConfigurationFile(PackageNames.Application, nameof(StartupPreferences));
-        await using (var runtime = RuntimeFixture.Create(paths, new TestPlayer()))
-        {
-            await runtime.InitializeAsync(cancellationToken: TestContext.Current.CancellationToken);
-            await runtime.Settings.StopAsync();
-            await runtime.Get<StartupCommands>().WriteAsync("version\nlibrary\n", cancellationToken: TestContext.Current.CancellationToken);
-            Assert.False(File.Exists(file));
-            Assert.Equal(["version", "library", ""], await runtime.Get<StartupCommands>().LoadAsync(cancellationToken: TestContext.Current.CancellationToken));
-        }
-        Assert.True(File.Exists(file));
-        await using var restored = RuntimeFixture.Create(paths, new TestPlayer());
-        await restored.InitializeAsync(cancellationToken: TestContext.Current.CancellationToken);
-        await restored.Settings.StopAsync();
-        Assert.Equal(["version", "library", ""], await restored.Get<StartupCommands>().LoadAsync(cancellationToken: TestContext.Current.CancellationToken));
-    }
 }

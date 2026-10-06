@@ -1,15 +1,17 @@
+using LemonNeo.Configuration;
 using LemonNeo.Plugin.Abstractions;
 
-namespace LemonNeo.Application;
+namespace LemonNeo.ConsoleApp;
 
 public sealed record StartupPreferences(string Script = StartupCommands.DefaultScript);
 
-/// <summary>Shared startup commands stored as an Application entity; --startup selects an explicit script file.</summary>
-public sealed class StartupCommands(IAppSettingsService settings, string configurationFile, string? scriptPath = null)
+/// <summary>Console startup commands stored as a Console entity; --startup selects an explicit script file.</summary>
+public sealed class StartupCommands(IAppSettingsService settings, IAppPathProvider paths, string? scriptPath = null)
 {
     public const string DefaultScript = "# Show version\nversion\n# Show loaded plugins\nplugins\n# Show library statistics\nlibrary\n";
-    private readonly ISettingsScope _settings = settings.ForPackage(PackageNames.Application);
-    public string FilePath { get; } = Path.GetFullPath(scriptPath ?? configurationFile);
+    private readonly ISettingsScope _settings = settings.ForPackage(PackageNames.Console);
+    public string FilePath { get; } = Path.GetFullPath(scriptPath ??
+        paths.GetEntityConfigurationFile(PackageNames.Console, nameof(StartupPreferences)));
 
     public Task InitializeAsync(CancellationToken cancellationToken = default) =>
         _settings.RegisterAsync(nameof(StartupPreferences), new StartupPreferences(),

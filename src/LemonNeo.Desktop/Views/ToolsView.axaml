@@ -53,22 +53,6 @@
             </StackPanel>
           </ScrollViewer>
         </TabItem>
-        <TabItem Header="{Translate {x:Static i18n:LanguageManager+Keys.Startup}}">
-          <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Spacing="16" Margin="0,16,12,16" IsEnabled="{Binding CanInteract}">
-              <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.StartupDescription}}" Classes="muted" TextWrapping="Wrap" />
-              <SelectableTextBlock Text="{Binding StartupPath}" TextWrapping="Wrap" />
-              <TextBox Text="{Binding StartupScript}" AcceptsReturn="True" TextWrapping="NoWrap" MinHeight="200" MaxHeight="400"
-                       FontFamily="{DynamicResource Font.Code}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Startup}}" />
-              <WrapPanel>
-                <Button Classes="primary" Content="{Translate {x:Static i18n:LanguageManager+Keys.Save}}" Command="{Binding SaveStartupCommand}" Margin="0,0,10,8" />
-                <Button Content="{Translate {x:Static i18n:LanguageManager+Keys.ImportScript}}" Click="OnImportScript" Margin="0,0,10,8" />
-                <Button Content="{Translate {x:Static i18n:LanguageManager+Keys.Reload}}" Command="{Binding ReloadStartupCommand}" Margin="0,0,10,8" />
-                <Button Content="{Translate {x:Static i18n:LanguageManager+Keys.Reset}}" Command="{Binding ResetStartupCommand}" Margin="0,0,10,8" />
-              </WrapPanel>
-            </StackPanel>
-          </ScrollViewer>
-        </TabItem>
         <TabItem Header="{Translate {x:Static i18n:LanguageManager+Keys.Help}}">
           <ScrollViewer HorizontalScrollBarVisibility="Disabled">
             <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.HelpText}}" TextWrapping="Wrap" LineHeight="26" Margin="0,16,12,16" />

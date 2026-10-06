@@ -13,8 +13,6 @@ namespace LemonNeo.Desktop.ViewModels;
 public sealed partial class ToolsViewModel : PageViewModel
 {
     private readonly PlaybackSessionService _session;
-    private bool _startupLoaded;
-    private Task? _activation;
     public ToolsViewModel(DesktopContext context, DesktopNavigation navigation) : base(context, DesktopRoutes.Tools)
     {
         _session = _runtime.Get<PlaybackSessionService>();
@@ -29,23 +27,8 @@ public sealed partial class ToolsViewModel : PageViewModel
             SetStatus("LibrarySaved");
         }));
         SyncCommand = new(action => SynchronizeAsync(action ?? "status"));
-        SaveStartupCommand = new(() => ExecuteAsync(async ct =>
-        {
-            await _runtime.Get<StartupCommands>().WriteAsync(StartupScript, ct);
-            await _runtime.Settings.SaveAsync(ct);
-            SetStatus("StartupScriptSaved");
-        }));
-        ReloadStartupCommand = new(() => ExecuteAsync(LoadStartupScriptCoreAsync));
-        ResetStartupCommand = new(() => ExecuteAsync(async ct =>
-        {
-            await _runtime.Get<StartupCommands>().WriteAsync(StartupCommands.DefaultScript, ct);
-            await _runtime.Settings.SaveAsync(ct);
-            await LoadStartupScriptCoreAsync(ct);
-            SetStatus("StartupScriptSaved");
-        }));
     }
 
-    [ObservableProperty] private string _startupScript = "";
     [ObservableProperty] private string _syncDetails = "";
     private SyncStatus? _syncStatus;
     private SyncResult? _syncResult;
@@ -54,7 +37,6 @@ public sealed partial class ToolsViewModel : PageViewModel
     public ObservableCollection<ProviderOption> SyncProviders { get; } = [];
     public ObservableCollection<string> SyncConflicts { get; } = [];
     public string Version => $"Lemon Neo {typeof(ToolsViewModel).Assembly.GetName().Version?.ToString(3)}";
-    public string StartupPath => _runtime.Get<StartupCommands>().FilePath;
     public string PluginPath => _runtime.Get<DesktopOptions>().PluginDirectory;
     public string DataPath => _runtime.Paths.DataDirectory;
     public string Diagnostics => BuildDiagnostics();
@@ -64,7 +46,7 @@ public sealed partial class ToolsViewModel : PageViewModel
         $"{_text["DataPath"]}: {DataPath}", $"{_text["HistoryPath"]}: {_runtime.Paths.GetEntityConfigurationFile(PackageNames.Console, "CommandHistoryState")}",
         $"{_text["CachePath"]}: {CachePath}", $"{_text["LyricsCachePath"]}: {Path.Combine(CachePath, "Lyrics")}",
         $"{_text["ImageCachePath"]}: {_runtime.Get<ImageCache>().DirectoryPath}",
-        $"{_text["LibraryPath"]}: {LibraryPath}", $"{_text["PluginPath"]}: {PluginPath}", $"{_text["StartupPath"]}: {StartupPath}"
+        $"{_text["LibraryPath"]}: {LibraryPath}", $"{_text["PluginPath"]}: {PluginPath}"
     });
     public string MetadataNamespaces => string.Join(", ", _runtime.Get<IProviderRegistry>().Providers.OfType<IMetadataProvider>()
         .SelectMany(p => p.MetadataNamespaces).Distinct(StringComparer.OrdinalIgnoreCase).Order());
@@ -77,20 +59,6 @@ public sealed partial class ToolsViewModel : PageViewModel
     public AsyncRelayCommand RefreshCommand { get; }
     public AsyncRelayCommand SaveCommand { get; }
     public AsyncRelayCommand<string> SyncCommand { get; }
-    public AsyncRelayCommand SaveStartupCommand { get; }
-    public AsyncRelayCommand ReloadStartupCommand { get; }
-    public AsyncRelayCommand ResetStartupCommand { get; }
-    private async Task LoadStartupScriptCoreAsync(CancellationToken ct) =>
-        StartupScript = string.Join(Environment.NewLine, await _runtime.Get<StartupCommands>().LoadAsync(ct));
-
-    public Task ImportStartupScriptAsync(string path) => ExecuteAsync(async ct =>
-    {
-        var script = await File.ReadAllTextAsync(path, ct);
-        await _runtime.Get<StartupCommands>().WriteAsync(script, ct);
-        await _runtime.Settings.SaveAsync(ct);
-        StartupScript = script;
-        SetStatus("StartupScriptSaved");
-    });
 
     private void RefreshSyncProviders()
     {
@@ -188,9 +156,7 @@ public sealed partial class ToolsViewModel : PageViewModel
     public override Task ActivateAsync()
     {
         RefreshSyncProviders();
-        if (!_startupLoaded && (_activation is null || _activation.IsCompleted))
-            _activation = ExecuteAsync(async ct => { await LoadStartupScriptCoreAsync(ct); _startupLoaded = true; });
-        return _activation ?? Task.CompletedTask;
+        return Task.CompletedTask;
     }
     protected override void RefreshLocalizedProperties()
     {

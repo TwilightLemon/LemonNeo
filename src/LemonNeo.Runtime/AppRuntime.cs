@@ -12,7 +12,7 @@ using Microsoft.Extensions.Logging;
 
 namespace LemonNeo.Runtime;
 
-public sealed record RuntimeOptions(string PluginDirectory, string LibraryDirectory, string? StartupFile = null);
+public sealed record RuntimeOptions(string PluginDirectory, string LibraryDirectory);
 
 /// <summary>The shared Desktop/Console owner of configuration, plugins, playback and shutdown.</summary>
 public class AppRuntime : IAsyncDisposable
@@ -35,8 +35,6 @@ public class AppRuntime : IAsyncDisposable
         services.AddSingleton<AppSettingsService>();
         services.AddSingleton<IAppSettingsService>(provider => provider.GetRequiredService<AppSettingsService>());
         services.AddSingleton<IPluginDataStoreFactory, PluginDataStoreFactory>();
-        services.AddSingleton(provider => new StartupCommands(provider.GetRequiredService<IAppSettingsService>(),
-            paths.GetEntityConfigurationFile(PackageNames.Application, nameof(StartupPreferences)), options.StartupFile));
         services.AddSingleton<ProviderRegistry>();
         services.AddSingleton<IProviderRegistry>(provider => provider.GetRequiredService<ProviderRegistry>());
         services.AddSingleton<IPlaybackSourceProviderRegistry>(provider => provider.GetRequiredService<ProviderRegistry>());
@@ -77,7 +75,6 @@ public class AppRuntime : IAsyncDisposable
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         await Settings.LoadAsync(cancellationToken);
-        await Get<StartupCommands>().InitializeAsync(cancellationToken);
         await Get<PlaybackSessionService>().InitializeAsync(cancellationToken);
         if (!_pluginsLoaded)
         {

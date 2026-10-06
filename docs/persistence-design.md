@@ -26,13 +26,13 @@ Library 的仓储和数据结构保持现状：`library.json`、`playlists/<id>.
     PlaybackQueueState.json
     PlaybackResumeState.json
     PlaybackPreferences.json
-    StartupPreferences.json
   LemonNeo.Desktop/
     AppearancePreferences.json
     LanguagePreferences.json
     LyricsPreferences.json
     DesktopLyricsPreferences.json
   LemonNeo.Console/
+    StartupPreferences.json
     CommandHistoryState.json
   LemonNeo.Plugin.Netease/
     AccountSettings.json
@@ -51,7 +51,8 @@ Desktop 和 Console 的 `--library`、`--plugins` 继续选择 Library 和插件
 ## 依赖与生命周期
 
 `LemonNeo.Runtime.AppRuntime` 为 Desktop 和 Console 统一注册配置、插件、播放、Library 和缓存服务，管理启动与关闭顺序。
-`DesktopRuntime` 只补充桌面服务与宿主选项。Console 在共享 Runtime 上注册命令服务与宿主播放器。
+`DesktopRuntime` 只补充桌面服务与宿主选项。Console 在共享 Runtime 上注册命令服务、启动脚本与宿主播放器。
+`StartupCommands` 与 `StartupPreferences` 属于 `LemonNeo.Console`；共享 Runtime 与 Desktop 不登记或读取启动脚本。
 
 `AppSettingsService` 的实现位于 `LemonNeo.Configuration`；`IAppSettingsService`、`ISettingsScope` 位于
 `LemonNeo.Plugin.Abstractions`，Application 和插件无需依赖 Desktop 或 JSON 实现。
@@ -60,9 +61,11 @@ Runtime 持有唯一服务实例与保存循环。包入口只绑定包名，不
 启动顺序：
 
 1. 登记并加载宿主配置。Desktop 先在 UI 线程加载其预登记实体，应用主题与语言。
-2. 登记 Application 启动脚本与播放实体，恢复队列、进度、音量。
+2. 登记 Application 播放实体，恢复队列、进度、音量。
 3. 加载插件，由插件主动登记自己的实体。
 4. 加载 Library，启动配置服务的固定周期保存。
+
+Console 随后加载自己的启动脚本并执行命令，再进入交互；Desktop 直接打开图形界面。
 
 正常关闭顺序：
 
@@ -127,8 +130,8 @@ Apply 同步校验、比较、替换内存值并标记变化，然后在内存�
 音量操作中的串行逻辑只协调异步播放器调用，配置变化本身立即进入内存。
 
 显式保存也统一调用 `runtime.Settings.SaveAsync()`。Console 的 `save` 同时保存 Library、捕获播放状态、刷新配置；
-启动脚本的显式保存按钮与命令也通过此入口。默认启动脚本存于 `StartupPreferences`；
-`--startup <file>` 显式选择外部脚本时，继续直接读写该文件。
+Console 的启动脚本保存命令也通过此入口。默认启动脚本存于 Console 包的 `StartupPreferences`；
+Console 的 `--startup <file>` 显式选择外部脚本时，继续直接读写该文件。Desktop 不提供启动脚本选项或编辑界面。
 Console 历史存于 `CommandHistoryState`，记录命令只更新内存，仍保留去重、1000 条上限与凭据命令过滤。
 
 固定周期允许合并高频变化；强制结束进程可能丢失最近一个周期尚未提交的修改。正常退出立即保存最终状态。
@@ -172,7 +175,7 @@ JSON 序列化元数据使用每次操作独立的选项，配置存储不长期
 
 ```sh
 dotnet build LemonNeo.slnx -p:SkipDesktopPlugins=true -p:SkipConsolePlugins=true --disable-build-servers -m:1
-dotnet test tests/LemonNeo.Runtime.Tests/LemonNeo.Runtime.Tests.csproj -p:SkipDesktopPlugins=true --disable-build-servers -m:1
+dotnet test tests/LemonNeo.Runtime.Tests/LemonNeo.Runtime.Tests.csproj -p:SkipDesktopPlugins=true -p:SkipConsolePlugins=true --disable-build-servers -m:1
 ```
 
 覆盖包与实体隔离、通知范围、周期合并与重试、写入期间的新修改、取消与失败恢复、退出保存、

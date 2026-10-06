@@ -179,13 +179,7 @@ PlaybackRequest
 AudioQuality
 ```
 
-原型阶段实现：
-
-```text
-MockPlayer
-```
-
-只打印当前播放内容，不真正输出音频。
+Console 宿主的原型播放器为 `LemonNeo.Console` 项目中的 `ConsolePlayer`，只打印当前播放内容，不真正输出音频。
 
 ---
 
@@ -697,7 +691,7 @@ public interface IPlayer
 }
 ```
 
-原型：
+Console 宿主的原型实现位于 `LemonNeo.Console`：
 
 ```text
 ConsolePlayer
