@@ -1,5 +1,7 @@
 {
   "AppName": "Lemon Neo",
+  "ShowMainWindow": "显示 Lemon Neo",
+  "ExitApplication": "退出 Lemon Neo",
   "Navigation": "我的音乐",
   "Library": "音乐库",
   "LibraryDescription": "把喜欢的音乐，收在一起。",

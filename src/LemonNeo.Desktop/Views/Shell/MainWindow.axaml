@@ -9,6 +9,7 @@
   xmlns:shellVm="using:LemonNeo.Desktop.ViewModels.Shell"
   Name="DesktopWindow"
   Title="Lemon Neo"
+  Icon="/Resources/Icons/App.ico"
   Width="1180"
   Height="790"
   MinWidth="880"
@@ -65,16 +66,20 @@
           Margin="12,0,0,16"
           Orientation="Horizontal"
           Spacing="10">
-          <Border
+          <Viewbox
             Width="34"
             Height="34"
-            Background="{DynamicResource Brush.Accent}"
-            CornerRadius="12">
-            <Path
-              Classes="icon"
-              Data="{StaticResource Icon.Music}"
-              Fill="{DynamicResource Brush.OnAccent}" />
-          </Border>
+            VerticalAlignment="Center">
+            <Grid Width="56" Height="56">
+              <Border Background="{DynamicResource Brush.Accent}" CornerRadius="20" />
+              <Path
+                Width="56"
+                Height="56"
+                Stretch="None"
+                Data="{StaticResource Icon.AppMusic}"
+                Fill="{DynamicResource Brush.OnAccent}" />
+            </Grid>
+          </Viewbox>
           <TextBlock
             VerticalAlignment="Center"
             FontSize="23"

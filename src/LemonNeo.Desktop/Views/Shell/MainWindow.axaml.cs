@@ -67,6 +67,12 @@ public partial class MainWindow : Window
 
     public void CloseDesktopLyrics() => _desktopLyrics?.Close();
 
+    public void PrepareForBackground()
+    {
+        VolumePopup.IsOpen = false;
+        if (DataContext is MainViewModel vm) vm.CloseQueueCommand.Execute(null);
+    }
+
     private void OnToggleVolume(object? sender, RoutedEventArgs args)
     {
         if (DataContext is not MainViewModel { Playback.CanAdjustVolume: true } vm) return;

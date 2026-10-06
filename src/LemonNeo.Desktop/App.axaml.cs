@@ -1,7 +1,6 @@
 using LemonNeo.Abstractions.Settings;
 using LemonNeo.Hosting;
 using Avalonia;
-using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using LemonNeo.Desktop.Config;
@@ -29,17 +28,10 @@ public partial class App : Avalonia.Application
             var viewModel = new MainViewModel(host, text, appearance, host.Get<ArtworkService>());
             var window = new MainWindow { DataContext = viewModel };
             desktop.MainWindow = window;
-            window.Opened += async (_, _) => await viewModel.InitializeAsync();
-
-            var shutdownStarted = false;
-            var shutdownComplete = false;
-            async void Shutdown(object? sender, WindowClosingEventArgs args)
+            DesktopApplicationMenu? menu = null;
+            async Task ShutdownAsync()
             {
-                if (shutdownComplete) return;
-                args.Cancel = true;
-                if (shutdownStarted) return;
-                shutdownStarted = true;
-                window.IsEnabled = false;
+                menu?.Dispose();
                 window.CloseDesktopLyrics();
                 try
                 {
@@ -58,11 +50,15 @@ public partial class App : Avalonia.Application
                     }
                     appearance.Dispose();
                     text.Dispose();
-                    shutdownComplete = true;
-                    window.Close();
                 }
             }
-            window.Closing += Shutdown;
+            var lifetime = new DesktopLifetimeService(desktop, window,
+                keepRunningOnClose: OperatingSystem.IsWindows() || OperatingSystem.IsMacOS(),
+                viewModel.InitializeAsync, ShutdownAsync, this.TryGetFeature<IActivatableLifetime>(),
+                window.PrepareForBackground);
+            if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
+                menu = new DesktopApplicationMenu(this, lifetime, viewModel.Playback, text,
+                    useTrayIcon: OperatingSystem.IsWindows());
         }
         base.OnFrameworkInitializationCompleted();
     }

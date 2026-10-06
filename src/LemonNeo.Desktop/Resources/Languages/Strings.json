@@ -1,5 +1,7 @@
 {
   "AppName": "Lemon Neo",
+  "ShowMainWindow": "Show Lemon Neo",
+  "ExitApplication": "Quit Lemon Neo",
   "Navigation": "YOUR MUSIC",
   "Library": "Music library",
   "LibraryDescription": "Your collection, together in one place.",
