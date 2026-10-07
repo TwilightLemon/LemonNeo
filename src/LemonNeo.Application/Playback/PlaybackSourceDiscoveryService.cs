@@ -56,7 +56,10 @@ public sealed class PlaybackSourceDiscoveryService(
         var search = new Search(this, request, cancellationToken);
         var known = GetIdentities(track).Where(identity => request.RequiredSourceId is null ||
             MusicCacheIdentity.GetKey(identity.Id) == MusicCacheIdentity.GetKey(request.RequiredSourceId)).ToArray();
-        List<SourceIdentity>? expanded = expandMetadata && request.RequiredSourceId is null ? null : [];
+        // Multiple external namespaces mean this track has already been expanded, regardless of ID kind.
+        var hasExpandedSources = track.ExternalIds.Select(id => id.Namespace)
+            .Distinct(StringComparer.OrdinalIgnoreCase).Skip(1).Any();
+        List<SourceIdentity>? expanded = expandMetadata && request.RequiredSourceId is null && !hasExpandedSources ? null : [];
         var metadataExpanded = false;
         var updatedTrack = track;
         foreach (var quality in AudioQualities.SearchOrder(request.Quality))

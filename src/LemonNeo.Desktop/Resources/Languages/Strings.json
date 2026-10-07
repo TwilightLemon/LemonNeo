@@ -194,6 +194,7 @@
   "UpdateSignIn": "Update sign-in",
   "CookieLogin": "Sign in with a cookie",
   "AuthenticationProvider": "Account service",
+  "AuthenticationProvidedByPlugin": "Sign-in provided by the {0} {1} plugin.",
   "Cookie": "Site cookie",
   "CookieHint": "Paste the complete authenticated site cookie.",
   "CookieRequired": "A cookie value is required.",
@@ -334,5 +335,17 @@
   "AudioQualityHigh": "High (320 kbps)",
   "AudioQualityLossless": "Lossless",
   "AudioQualityHiRes": "Hi-Res",
-  "AudioQualityUnknown": "Quality unknown"
+  "AudioQualityUnknown": "Quality unknown",
+  "PlaybackSourceDetails": "Current playback source",
+  "PlaybackSourceType": "Source",
+  "PlaybackSourceOnline": "Online audio",
+  "PlaybackSourceLocal": "Local file",
+  "PlaybackSourceCached": "Cached audio",
+  "PlaybackSourceLocation": "URL / path",
+  "PlaybackSourceKind": "Kind",
+  "PlaybackSourceId": "Source ID",
+  "PlaybackSourceQuality": "Quality",
+  "PlaybackSourceBitrate": "Bitrate",
+  "PlaybackSourcePlayer": "Playback engine",
+  "PlaybackSourceUnknown": "Unknown"
 }

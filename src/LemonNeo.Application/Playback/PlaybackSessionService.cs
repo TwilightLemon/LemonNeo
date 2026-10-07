@@ -23,7 +23,8 @@ public sealed record PlaybackSessionSnapshot(
     string? PlayerId,
     string? RequiredSourceProviderId,
     PlaybackStatus? RestoredStatus = null,
-    AudioQuality? Quality = null);
+    AudioQuality? Quality = null,
+    PlaybackSourceDetails? SourceDetails = null);
 
 public sealed class PlaybackSessionChangedEventArgs(PlaybackSessionSnapshot snapshot) : EventArgs
 {
@@ -120,7 +121,7 @@ public sealed class PlaybackSessionService(
         // A provider can reuse its player while advancing to a different source
         // track. Never combine that track's position with the previous lyrics.
         if (before != playerTrackId || after != playerTrackId)
-            return snapshot with { State = PlayerState.Stopped };
+            return snapshot with { State = PlayerState.Stopped, Quality = null, SourceDetails = null };
 
         return snapshot with
         {
@@ -654,7 +655,8 @@ public sealed class PlaybackSessionService(
             activePlayer?.Id,
             queue.Request.RequiredSourceProviderId,
             _restoredStatus,
-            resolver.CurrentSource?.Quality);
+            resolver.CurrentSource?.Quality,
+            resolver.CurrentSourceDetails);
     }
 
     private PlaybackRequest EffectiveRequest() => queue.Request.UseQualityPreference
@@ -740,7 +742,8 @@ public sealed class PlaybackSessionService(
         previous.QueueCount != current.QueueCount ||
         previous.PlayerId != current.PlayerId ||
         previous.RequiredSourceProviderId != current.RequiredSourceProviderId ||
-        previous.Quality != current.Quality;
+        previous.Quality != current.Quality ||
+        previous.SourceDetails != current.SourceDetails;
 
     private void Raise<TEventArgs>(EventHandler<TEventArgs>? handler, TEventArgs arguments)
         where TEventArgs : EventArgs

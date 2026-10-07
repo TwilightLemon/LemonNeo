@@ -29,6 +29,8 @@
     <Grid Grid.Row="3" Margin="0,24,0,0">
       <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasServices}">
         <StackPanel Spacing="20" IsEnabled="{Binding CanInteract}">
+          <TextBlock Name="AuthenticationPluginAttribution" Text="{Binding PluginAttribution}" Classes="caption"
+                     TextWrapping="Wrap" IsVisible="{Binding HasPluginAttribution}" />
           <Grid Name="SignedInAccount" ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding IsAuthenticated}">
             <Border Name="AccountAvatar" Width="56" Height="56" CornerRadius="28" ClipToBounds="True" Background="{DynamicResource Brush.SurfaceRaised}"
                     Margin="0,0,16,0" VerticalAlignment="Center">

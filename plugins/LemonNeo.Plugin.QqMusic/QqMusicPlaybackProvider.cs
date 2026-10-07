@@ -2,6 +2,7 @@ using LemonNeo.Abstractions.Providers;
 using LemonNeo.Core.Exceptions;
 using LemonNeo.Core.Music;
 using LemonNeo.Core.Playback;
+using LemonNeo.Abstractions.Playback;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using Microsoft.Extensions.Logging;
@@ -20,6 +21,7 @@ internal sealed class QqMusicPlaybackProvider(
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36";
     private static readonly Uri PlaybackBaseUri = new("https://ws.stream.qqmusic.qq.com/");
+    private static readonly TimeSpan QualityProbeTimeout = TimeSpan.FromSeconds(3);
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         TypeInfoResolver = new DefaultJsonTypeInfoResolver()
@@ -70,11 +72,7 @@ internal sealed class QqMusicPlaybackProvider(
             return null;
         }
 
-        logger.LogInformation(
-            "Resolved QQ Music song {SongMid} at {Quality} quality.",
-            trackId.RemoteId,
-            quality.Label);
-        return new HttpPlaybackSource
+        var source = new HttpPlaybackSource
         {
             Quality = quality.Quality,
             Uri = playbackUri,
@@ -87,6 +85,15 @@ internal sealed class QqMusicPlaybackProvider(
             ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(15),
             IsDirectAudio = true
         };
+        if (quality.Extension == "flac" || playbackUri.AbsolutePath.EndsWith(".flac", StringComparison.OrdinalIgnoreCase))
+            source = source with { Quality = await PlaybackSourceProbe.ReadFlacQualityAsync(httpClient, source, cancellationToken) };
+
+        logger.LogInformation(
+            "Resolved QQ Music song {SongMid} with {Quality} audio (requested {RequestedQuality}).",
+            trackId.RemoteId,
+            source.Quality?.ToString() ?? "unknown",
+            request.Quality);
+        return source;
     }
 
     private async Task<string?> ResolvePurlAsync(
@@ -184,7 +191,8 @@ internal sealed class QqMusicPlaybackProvider(
         AudioQuality.Low => QqQuality.Standard,
         AudioQuality.Medium => QqQuality.Medium,
         AudioQuality.High => QqQuality.High,
-        AudioQuality.Lossless or AudioQuality.Automatic => QqQuality.Lossless,
+        // Request the FLAC representation once, then report its actual resolution.
+        AudioQuality.Lossless or AudioQuality.HiRes or AudioQuality.Automatic => QqQuality.Lossless,
         _ => null
     };
 

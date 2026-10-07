@@ -562,8 +562,13 @@
                 VerticalAlignment="Center"
                 ColumnDefinitions="*,Auto,Auto">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="8">
-                  <TextBlock Name="CurrentAudioQuality" Classes="caption" Text="{Binding Playback.QualityLabel}" />
-                  <TextBlock Classes="caption" Text="{Binding Playback.TimeLabel}" TextTrimming="CharacterEllipsis" />
+                  <Button Name="CurrentAudioQuality" Classes="ghost" Padding="6,2"
+                          Click="OnToggleSourceDetails" IsEnabled="{Binding Playback.HasSourceDetails}"
+                          AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.PlaybackSourceDetails}}"
+                          ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.PlaybackSourceDetails}}">
+                    <TextBlock Classes="caption" Text="{Binding Playback.QualityLabel}"/>
+                  </Button>
+                  <TextBlock Classes="caption" Text="{Binding Playback.TimeLabel}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                 </StackPanel>
                 <Button
                   Name="VolumeButton"
@@ -633,6 +638,45 @@
           IsVisible="{Binding Playback.IsBusy}" />
       </Grid>
     </Border>
+    <Popup Name="SourceDetailsPopup"
+           IsOpen="{Binding Playback.IsSourceDetailsOpen, Mode=TwoWay}"
+           Opened="OnSourceDetailsOpened" Closed="OnSourceDetailsClosed"
+           IsLightDismissEnabled="True" OverlayDismissEventPassThrough="False"
+           Placement="TopEdgeAlignedRight" PlacementTarget="CurrentAudioQuality"
+           VerticalOffset="-8" ShouldUseOverlayLayer="True">
+      <Border Name="SourceDetailsCard" Width="420" Padding="20"
+              Background="{DynamicResource Brush.SurfaceRaised}" BorderBrush="{DynamicResource Brush.Border}"
+              BorderThickness="1" CornerRadius="16" BoxShadow="0 4 20 0 #26000000"
+              Focusable="True" KeyDown="OnSourceDetailsKeyDown">
+        <ScrollViewer MaxHeight="440" HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Spacing="16">
+            <TextBlock FontWeight="SemiBold" Text="{Translate {x:Static i18n:LanguageManager+Keys.PlaybackSourceDetails}}" />
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="8" ColumnSpacing="16">
+              <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.PlaybackSourceType}}" />
+              <SelectableTextBlock Grid.Column="1" Text="{Binding Playback.SourceType}" TextWrapping="Wrap" />
+              <TextBlock Grid.Row="1" Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.ProviderId}}" />
+              <SelectableTextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Playback.SourceProvider}" TextWrapping="Wrap" />
+              <TextBlock Grid.Row="2" Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.Namespace}}" />
+              <SelectableTextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Playback.SourceNamespace}" TextWrapping="Wrap" />
+              <TextBlock Grid.Row="3" Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.PlaybackSourceKind}}" />
+              <SelectableTextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Playback.SourceKind}" TextWrapping="Wrap" />
+              <TextBlock Grid.Row="4" Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.PlaybackSourceId}}" />
+              <SelectableTextBlock Grid.Row="4" Grid.Column="1" Text="{Binding Playback.SourceId}" TextWrapping="Wrap" />
+              <TextBlock Grid.Row="5" Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.PlaybackSourceQuality}}" />
+              <SelectableTextBlock Grid.Row="5" Grid.Column="1" Text="{Binding Playback.QualityLabel}" TextWrapping="Wrap" />
+              <TextBlock Grid.Row="6" Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.PlaybackSourceBitrate}}" />
+              <SelectableTextBlock Grid.Row="6" Grid.Column="1" Text="{Binding Playback.SourceBitrate}" TextWrapping="Wrap" />
+              <TextBlock Grid.Row="7" Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.PlaybackSourcePlayer}}" />
+              <SelectableTextBlock Grid.Row="7" Grid.Column="1" Text="{Binding Playback.SourcePlayer}" TextWrapping="Wrap" />
+            </Grid>
+            <StackPanel Spacing="6">
+              <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.PlaybackSourceLocation}}" />
+              <SelectableTextBlock Name="PlaybackSourceLocation" Text="{Binding Playback.SourceLocation}" TextWrapping="Wrap" FontSize="12" />
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+    </Popup>
     <Popup
       Name="VolumePopup"
       Closed="OnVolumeClosed"

@@ -21,7 +21,8 @@ public sealed class PlaybackResolver(
     private double _volume = 1;
     public IPlayerProvider? ActivePlayer { get; private set; }
     public Track? CurrentQueueTrack { get; private set; }
-    public PlaybackSource? CurrentSource { get; private set; }
+    public PlaybackSourceDetails? CurrentSourceDetails { get; private set; }
+    public PlaybackSource? CurrentSource => CurrentSourceDetails?.Source;
     public double Volume => _volume;
     public bool CanAdjustVolume => ActivePlayer is { } active
         ? active.Player is IVolumePlayer
@@ -129,7 +130,7 @@ public sealed class PlaybackResolver(
             }
             ActivePlayer = player;
             CurrentQueueTrack = queueTrack;
-            CurrentSource = source;
+            CurrentSourceDetails = new(source, candidate.IsCached ? null : candidate.ProviderId, candidate.SourceId, candidate.IsCached);
         }
         catch
         {
@@ -189,6 +190,6 @@ public sealed class PlaybackResolver(
         _download = null;
         ActivePlayer = null;
         CurrentQueueTrack = null;
-        CurrentSource = null;
+        CurrentSourceDetails = null;
     }
 }

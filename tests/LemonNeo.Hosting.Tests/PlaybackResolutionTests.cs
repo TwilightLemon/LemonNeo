@@ -77,6 +77,61 @@ public sealed class PlaybackResolutionTests
         Assert.All(provider.Calls, call => Assert.Equal(AudioQuality.HiRes, call.Request.Quality));
     }
 
+    [Theory]
+    [InlineData(false, "song-id")]
+    [InlineData(false, "album-id")]
+    [InlineData(false, null)]
+    [InlineData(true, "song-id")]
+    [InlineData(true, "album-id")]
+    [InlineData(true, null)]
+    public async Task MultipleExternalNamespacesSkipExpansionAndStillFindKnownSources(bool cached, string? otherKind)
+    {
+        using var paths = new TemporaryPaths();
+        var provider = new Source("source", (id, request) =>
+            id.RemoteId == "expanded" ? Audio(AudioQuality.HiRes) :
+            !cached && request.Quality == AudioQuality.High ? Audio(AudioQuality.High) : null);
+        var metadata = new Metadata(("expanded", .99));
+        await using var host = Host(paths, provider, metadata);
+        var track = Track("known") with
+        {
+            ExternalIds = [Id("known"), new("other", "other-id", otherKind)]
+        };
+        if (cached) Cache(host, Id("known"), AudioQuality.High);
+
+        var result = await host.Get<PlaybackSourceDiscoveryService>().FindAsync(track, cancellationToken: Token);
+
+        var candidate = Assert.Single(result.Candidates);
+        Assert.Equal(Id("known"), candidate.SourceId);
+        Assert.Equal(AudioQuality.High, candidate.Source.Quality);
+        Assert.Equal(cached, candidate.IsCached);
+        Assert.Equal(0, metadata.Calls);
+        Assert.False(result.MetadataExpanded);
+        Assert.Same(track, result.UpdatedTrack);
+    }
+
+    [Theory]
+    [InlineData("catalog", "song-id")]
+    [InlineData("CATALOG", "album-id")]
+    [InlineData("Catalog", null)]
+    public async Task SameExternalNamespaceStillAllowsExpansionRegardlessOfKindOrCase(string otherNamespace, string? otherKind)
+    {
+        using var paths = new TemporaryPaths();
+        var provider = new Source("source", (id, _) => id.RemoteId == "expanded" ? Audio(AudioQuality.HiRes) : null);
+        var metadata = new Metadata(("expanded", .99));
+        await using var host = Host(paths, provider, metadata);
+        var track = Track("known") with
+        {
+            // The native Track.Id belongs to another namespace and must not affect the rule.
+            ExternalIds = [Id("known"), new(otherNamespace, "other-id", otherKind)]
+        };
+
+        var result = await host.Get<PlaybackSourceDiscoveryService>().FindAsync(track, cancellationToken: Token);
+
+        Assert.Equal(Id("expanded"), Assert.Single(result.Candidates).SourceId);
+        Assert.Equal(1, metadata.Calls);
+        Assert.True(result.MetadataExpanded);
+    }
+
     [Fact]
     public async Task DowngradedUrlsAreReusedOnlyAfterOtherProvidersAndHigherQualitiesFail()
     {

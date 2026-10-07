@@ -1,4 +1,5 @@
 using LemonNeo.Abstractions.Providers;
+using LemonNeo.Abstractions.Plugins;
 using System.Collections.ObjectModel;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -50,6 +51,14 @@ public sealed partial class AccountsViewModel : PageViewModel
     public bool HasServices => Services.Count > 0;
     private IAuthenticationProvider? Provider => SelectedService?.Id is { } id
         ? _host.Get<IProviderRegistry>().Get(id) as IAuthenticationProvider : null;
+    private PluginInfo? ProviderPlugin => SelectedService?.Id is { } id
+        ? _host.Plugins.Loaded.FirstOrDefault(plugin =>
+            plugin.ProviderIds.Contains(id, StringComparer.OrdinalIgnoreCase))
+        : null;
+    public bool HasPluginAttribution => ProviderPlugin is not null;
+    public string PluginAttribution => ProviderPlugin is { } plugin
+        ? _text.Format("AuthenticationProvidedByPlugin", plugin.Manifest.Name, plugin.Manifest.Version)
+        : "";
     public bool IsAuthenticated => Provider?.State.IsAuthenticated == true;
     public string AuthenticationStatus => _text[IsAuthenticated ? "Authenticated" : "NotAuthenticated"];
     public string AccountName => Provider?.State is { IsAuthenticated: true } state
@@ -127,8 +136,9 @@ public sealed partial class AccountsViewModel : PageViewModel
     private void RaiseAccountProperties()
     {
         UpdateAvatar();
-        foreach (var name in new[] { nameof(IsAuthenticated), nameof(AuthenticationStatus), nameof(AccountName), nameof(AccountId),
-            nameof(CanLogin), nameof(CanLogout) }) OnPropertyChanged(name);
+        foreach (var name in new[] { nameof(HasPluginAttribution), nameof(PluginAttribution), nameof(IsAuthenticated),
+            nameof(AuthenticationStatus), nameof(AccountName), nameof(AccountId), nameof(CanLogin), nameof(CanLogout) })
+            OnPropertyChanged(name);
     }
 
     private void UpdateAvatar()

@@ -28,7 +28,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        Closed += (_, _) => { VolumePopup.IsOpen = false; CloseDesktopLyrics(); };
+        Closed += (_, _) => { VolumePopup.IsOpen = false; SourceDetailsPopup.IsOpen = false; CloseDesktopLyrics(); };
         // Avalonia draws Windows captions and preserves native macOS traffic lights.
         // Keep system decorations on Linux, where client-area extension varies by window manager.
         ExtendClientAreaToDecorationsHint = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS();
@@ -70,12 +70,14 @@ public partial class MainWindow : Window
     public void PrepareForBackground()
     {
         VolumePopup.IsOpen = false;
+        SourceDetailsPopup.IsOpen = false;
         if (DataContext is MainViewModel vm) vm.CloseQueueCommand.Execute(null);
     }
 
     private void OnToggleVolume(object? sender, RoutedEventArgs args)
     {
         if (DataContext is not MainViewModel { Playback.CanAdjustVolume: true } vm) return;
+        SourceDetailsPopup.IsOpen = false;
         if (!VolumePopup.IsOpen) vm.CloseQueueCommand.Execute(null);
         VolumePopup.IsOpen = !VolumePopup.IsOpen;
     }
@@ -92,6 +94,27 @@ public partial class MainWindow : Window
     {
         if (args.Key != Key.Escape) return;
         VolumePopup.IsOpen = false;
+        args.Handled = true;
+    }
+
+    private void OnToggleSourceDetails(object? sender, RoutedEventArgs args)
+    {
+        if (DataContext is not MainViewModel { Playback.HasSourceDetails: true } vm) return;
+        if (!vm.Playback.IsSourceDetailsOpen)
+        {
+            VolumePopup.IsOpen = false;
+            vm.CloseQueueCommand.Execute(null);
+        }
+        vm.Playback.IsSourceDetailsOpen = !vm.Playback.IsSourceDetailsOpen;
+    }
+
+    private void OnSourceDetailsOpened(object? sender, EventArgs args) => SourceDetailsCard.Focus();
+    private void OnSourceDetailsClosed(object? sender, EventArgs args) => CurrentAudioQuality.Focus();
+
+    private void OnSourceDetailsKeyDown(object? sender, KeyEventArgs args)
+    {
+        if (args.Key != Key.Escape) return;
+        SourceDetailsPopup.IsOpen = false;
         args.Handled = true;
     }
 
@@ -114,6 +137,7 @@ public partial class MainWindow : Window
     private async void OnQueueOpened(object? sender, EventArgs args)
     {
         VolumePopup.IsOpen = false;
+        SourceDetailsPopup.IsOpen = false;
         _queueAnimation?.Cancel();
         QueueCard.Focus();
         if (DataContext is not MainViewModel vm || vm.SharedContext.Appearance.Current.ReduceMotion) return;

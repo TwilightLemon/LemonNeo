@@ -28,6 +28,7 @@ public sealed class PlaybackViewModel : PageViewModel
     private Task _volumeUpdateTask = Task.CompletedTask;
     private Task _volumeReadTask = Task.CompletedTask;
     private bool _closing;
+    private bool _isSourceDetailsOpen;
     public bool IsSeeking { get; set; }
     public PlaybackSessionSnapshot Snapshot => _snapshot;
     public event EventHandler? Changed;
@@ -99,6 +100,28 @@ public sealed class PlaybackViewModel : PageViewModel
     public string PositionText => TrackRow.FormatTime(_snapshot.Timeline.Position);
     public string DurationText => _snapshot.Timeline.Duration is { } duration ? TrackRow.FormatTime(duration) : "—";
     public string QualityLabel => HasCurrentTrack ? _text["AudioQuality" + (_snapshot.Quality?.ToString() ?? "Unknown")] : "";
+    public bool HasSourceDetails => _snapshot.SourceDetails is not null;
+    public bool IsSourceDetailsOpen
+    {
+        get => _isSourceDetailsOpen;
+        set => SetProperty(ref _isSourceDetailsOpen, value && HasSourceDetails);
+    }
+    public string SourceType => _snapshot.SourceDetails is { } details
+        ? _text[details.IsCached ? "PlaybackSourceCached" : details.Source is HttpPlaybackSource
+            ? "PlaybackSourceOnline" : "PlaybackSourceLocal"] : _text["PlaybackSourceUnknown"];
+    public string SourceLocation => _snapshot.SourceDetails?.Source switch
+    {
+        HttpPlaybackSource http => http.Uri.AbsoluteUri,
+        FilePlaybackSource file => file.Path,
+        _ => _text["PlaybackSourceUnknown"]
+    };
+    public string SourceProvider => _snapshot.SourceDetails?.ProviderId ?? _text["PlaybackSourceUnknown"];
+    public string SourceNamespace => _snapshot.SourceDetails?.SourceId.Namespace ?? _text["PlaybackSourceUnknown"];
+    public string SourceKind => _snapshot.SourceDetails?.SourceId.Kind ?? "—";
+    public string SourceId => _snapshot.SourceDetails?.SourceId.Value ?? _text["PlaybackSourceUnknown"];
+    public string SourceBitrate => _snapshot.SourceDetails?.Source.BitrateKbps is > 0 and var bitrate
+        ? $"{bitrate} kbps" : _text["PlaybackSourceUnknown"];
+    public string SourcePlayer => _snapshot.PlayerId ?? _text["PlaybackSourceUnknown"];
     public string TimeLabel => $"{PositionText} / {DurationText}";
     public string PlaybackDetails => _text.Format("PlaybackDetailsFormat", _snapshot.CurrentTrack?.Id.ToString() ?? "—",
         _snapshot.CurrentIndex + 1, _snapshot.QueueCount, _snapshot.PlayerId ?? "—", _snapshot.RequiredSourceProviderId ?? _text["Automatic"]);
@@ -122,6 +145,7 @@ public sealed class PlaybackViewModel : PageViewModel
     public void UpdateSnapshot()
     {
         _snapshot = _session.GetCurrentSnapshot();
+        if (!HasSourceDetails) IsSourceDetailsOpen = false;
         if (!_isUpdatingVolume) SetDisplayedVolume(_session.Volume * 100);
         UpdateArtwork(); RaisePlaybackProperties(); Changed?.Invoke(this, EventArgs.Empty);
     }
@@ -226,6 +250,9 @@ public sealed class PlaybackViewModel : PageViewModel
 
     private void RaisePlaybackProperties()
     {
+        foreach (var name in new[] { nameof(HasSourceDetails), nameof(SourceType), nameof(SourceLocation), nameof(SourceProvider),
+                     nameof(SourceNamespace), nameof(SourceKind), nameof(SourceId), nameof(SourceBitrate), nameof(SourcePlayer) })
+            OnPropertyChanged(name);
         foreach (var name in new[] { nameof(QualityLabel), nameof(NowTitle), nameof(NowArtist), nameof(HasCurrentTrack), nameof(IsPlaying), nameof(PlayLabel), nameof(PlaybackLabel), nameof(ModeLabel), nameof(IsSequential), nameof(IsRepeatAll), nameof(IsShuffle), nameof(CanPrevious), nameof(CanNext), nameof(CanTogglePlayback), nameof(CanSeek), nameof(CanAdjustVolume), nameof(DurationSeconds), nameof(PositionText), nameof(DurationText) }) OnPropertyChanged(name);
         if (!IsSeeking) OnPropertyChanged(nameof(PositionSeconds));
         OnPropertyChanged(nameof(PlaybackDetails)); OnPropertyChanged(nameof(TimeLabel));

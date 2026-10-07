@@ -194,6 +194,7 @@
   "UpdateSignIn": "更新登录",
   "CookieLogin": "通过 Cookie 登录",
   "AuthenticationProvider": "账号服务",
+  "AuthenticationProvidedByPlugin": "登录功能由 {0} {1} 插件提供。",
   "Cookie": "网站 Cookie",
   "CookieHint": "粘贴网站登录后的完整 Cookie。",
   "CookieRequired": "请输入 Cookie。",
@@ -334,5 +335,17 @@
   "AudioQualityHigh": "高品质（320 kbps）",
   "AudioQualityLossless": "无损",
   "AudioQualityHiRes": "Hi-Res",
-  "AudioQualityUnknown": "音质未知"
+  "AudioQualityUnknown": "音质未知",
+  "PlaybackSourceDetails": "当前播放源",
+  "PlaybackSourceType": "来源",
+  "PlaybackSourceOnline": "在线音频",
+  "PlaybackSourceLocal": "本地文件",
+  "PlaybackSourceCached": "缓存音频",
+  "PlaybackSourceLocation": "URL / 路径",
+  "PlaybackSourceKind": "类型（kind）",
+  "PlaybackSourceId": "源 ID",
+  "PlaybackSourceQuality": "音质",
+  "PlaybackSourceBitrate": "码率",
+  "PlaybackSourcePlayer": "播放引擎",
+  "PlaybackSourceUnknown": "未知"
 }
