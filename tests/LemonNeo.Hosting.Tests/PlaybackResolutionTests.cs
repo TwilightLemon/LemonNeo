@@ -6,6 +6,7 @@ using LemonNeo.Application.Library;
 using LemonNeo.Application.Playback;
 using LemonNeo.Core.Music;
 using LemonNeo.Core.Playback;
+using LemonNeo.Plugin.LocalMusic;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -18,6 +19,103 @@ public sealed class PlaybackResolutionTests
     private static Track Track(params string[] ids) => HostFixture.Track() with { ExternalIds = ids.Select(Id).ToArray() };
     private static HttpPlaybackSource Audio(AudioQuality quality, string id = "audio") =>
         new() { Uri = new($"https://example.com/{id}.flac"), Quality = quality };
+
+    [Theory]
+    [InlineData(AudioQuality.Automatic, false)]
+    [InlineData(AudioQuality.HiRes, true)]
+    [InlineData(AudioQuality.Low, false)]
+    public async Task MatchedLocalFilesWinBeforeRemoteAudioOrCachesRegardlessOfQuality(AudioQuality quality, bool freshCatalog)
+    {
+        using var paths = new TemporaryPaths();
+        var path = Path.Combine(paths.Root, "original.mp3");
+        await File.WriteAllBytesAsync(path, [1], Token);
+        var local = new LocalMusicPlugin();
+        var track = Assert.Single((await local.ScanFolderAsync(new(paths.Root), Token)).Tracks);
+        var fileId = Assert.Single(track.ExternalIds);
+        // Metadata matching may put several remote identifiers ahead of the original file.
+        track = track with { ExternalIds = [Id("lyrics-1"), Id("lyrics-2"), new("qqmusic", "mid", "song-mid"), fileId] };
+        var remote = new Source("remote", (_, _) => Audio(AudioQuality.HiRes));
+        var metadata = new Metadata();
+        await using var host = Host(paths, freshCatalog ? new LocalMusicPlugin() : local, remote, metadata);
+        Cache(host, Id("lyrics-1"), AudioQuality.HiRes);
+
+        var result = await host.Get<PlaybackSourceDiscoveryService>().FindAsync(track, new(quality), Token);
+
+        var selected = Assert.Single(result.Candidates);
+        Assert.Equal(path, Assert.IsType<FilePlaybackSource>(selected.Source).Path);
+        Assert.Equal(fileId, selected.SourceId);
+        Assert.Null(selected.Source.Quality); // Preference is not a claim about the file's resolution.
+        Assert.False(selected.IsCached);
+        Assert.Same(track, result.UpdatedTrack);
+        Assert.Empty(remote.Calls);
+        Assert.Equal(0, metadata.Calls);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MissingLocalFileFallsBackToKnownRemoteAudioOrCache(bool cached)
+    {
+        using var paths = new TemporaryPaths();
+        var remote = new Source("remote", (_, _) => Audio(AudioQuality.HiRes));
+        var metadata = new Metadata();
+        await using var host = Host(paths, new LocalMusicPlugin(), remote, metadata);
+        var track = Track("lyrics") with
+        {
+            Id = new("local", "original-hash"),
+            ExternalIds = [new("file", Path.Combine(paths.Root, "missing.mp3"), "path"), Id("lyrics")]
+        };
+        if (cached) Cache(host, Id("lyrics"), AudioQuality.HiRes);
+
+        var result = await host.Get<PlaybackSourceDiscoveryService>().FindAsync(track, cancellationToken: Token);
+
+        var selected = Assert.Single(result.Candidates);
+        Assert.Equal(Id("lyrics"), selected.SourceId);
+        Assert.Equal(cached, selected.IsCached);
+        Assert.Equal(cached ? 0 : 1, remote.Calls.Count);
+        Assert.Equal(0, metadata.Calls);
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task ExplicitRemoteSelectionOverridesTheLocalFile(bool selectProvider, bool selectId)
+    {
+        using var paths = new TemporaryPaths();
+        var path = Path.Combine(paths.Root, "original.flac");
+        await File.WriteAllBytesAsync(path, [1], Token);
+        var remote = new Source("remote", (_, _) => Audio(AudioQuality.HiRes));
+        await using var host = Host(paths, new LocalMusicPlugin(), remote);
+        var track = Track("lyrics") with { ExternalIds = [new("file", path, "path"), Id("lyrics")] };
+
+        var result = await host.Get<PlaybackSourceDiscoveryService>().FindAsync(track,
+            new(RequiredSourceProviderId: selectProvider ? remote.Id : null, RequiredSourceId: selectId ? Id("lyrics") : null), Token);
+
+        Assert.IsType<HttpPlaybackSource>(Assert.Single(result.Candidates).Source);
+        Assert.Equal(Id("lyrics"), Assert.Single(result.Candidates).SourceId);
+        Assert.Single(remote.Calls);
+    }
+
+    [Fact]
+    public async Task LocalPreferenceDoesNotHideRemoteChoicesOnTheDetailsPage()
+    {
+        using var paths = new TemporaryPaths();
+        var path = Path.Combine(paths.Root, "original.flac");
+        await File.WriteAllBytesAsync(path, [1], Token);
+        var fileId = new ExternalMusicId("file", path, "path");
+        var remote = new Source("remote", (_, _) => Audio(AudioQuality.HiRes));
+        var metadata = new Metadata();
+        await using var host = Host(paths, new LocalMusicPlugin(), remote, metadata);
+        var track = Track("lyrics") with { ExternalIds = [fileId, Id("lyrics")] };
+
+        var result = await host.Get<PlaybackSourceDiscoveryService>().FindKnownAsync(track, cancellationToken: Token);
+
+        Assert.Equal(new[] { fileId, Id("lyrics") }, result.Candidates.Select(candidate => candidate.SourceId));
+        Assert.IsType<FilePlaybackSource>(result.Candidates[0].Source);
+        Assert.IsType<HttpPlaybackSource>(result.Candidates[1].Source);
+        Assert.Equal(0, metadata.Calls);
+    }
 
     [Fact]
     public async Task EachIdentityChecksItsCacheThenOnlineBeforeMovingToTheNextIdentity()

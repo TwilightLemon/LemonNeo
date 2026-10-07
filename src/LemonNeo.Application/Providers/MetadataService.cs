@@ -5,6 +5,10 @@ namespace LemonNeo.Application.Providers;
 
 public sealed class MetadataService(IProviderRegistry registry)
 {
+    //Lemon Neo定义的行为，只使用tiele + artists 来检索元数据
+    public static string GetTrackSearchKeyword(Track track) =>
+        string.Join(" ", new[] { track.Title }.Concat(track.Artists.Select(artist => artist.Name))
+            .Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Trim()));
     public async Task<MetadataLookupResult> LookupAsync(
         Track track,
         IReadOnlyList<string>? targetNamespaces = null,
@@ -18,7 +22,7 @@ public sealed class MetadataService(IProviderRegistry registry)
         var request = new MetadataLookupRequest
         {
             Track = track,
-            SearchKeyword = string.IsNullOrWhiteSpace(searchKeyword) ? null : searchKeyword.Trim(),
+            SearchKeyword = string.IsNullOrWhiteSpace(searchKeyword) ? GetTrackSearchKeyword(track) : searchKeyword.Trim(),
             TargetNamespaces = targetNamespaces ?? [],
             LimitPerSource = limitPerSource,
             MinimumConfidence = minimumConfidence

@@ -26,6 +26,7 @@ public sealed class PlaybackSourceDiscoveryService(
 {
     private readonly PlaybackAudioCache _audioCache = audioCache;
     private const double MinimumMetadataConfidence = 0.85;
+    private static readonly MusicIdScheme LocalFileScheme = new(MusicIdNamespaces.File, "path");
 
     // The detail page inspects every known identity independently, without metadata lookup.
     public async Task<PlaybackSourceDiscoveryResult> FindKnownAsync(
@@ -48,7 +49,7 @@ public sealed class PlaybackSourceDiscoveryService(
         return new(candidates, search.Errors, track);
     }
 
-    // Playback searches all known and expanded identities at one quality before falling back.
+    // An explicit local file is the preferred recording; quality ranks the alternatives only.
     public async Task<PlaybackSourceDiscoveryResult> FindAsync(
         Track track, PlaybackRequest? request = null, CancellationToken cancellationToken = default, bool expandMetadata = true)
     {
@@ -56,13 +57,18 @@ public sealed class PlaybackSourceDiscoveryService(
         var search = new Search(this, request, cancellationToken);
         var known = GetIdentities(track).Where(identity => request.RequiredSourceId is null ||
             MusicCacheIdentity.GetKey(identity.Id) == MusicCacheIdentity.GetKey(request.RequiredSourceId)).ToArray();
+        var qualities = AudioQualities.SearchOrder(request.Quality).ToArray();
+        foreach (var identity in known.Where(identity => LocalFileScheme.Accepts(identity.Id)))
+            if (await search.ResolveLocalFileAsync(identity, qualities[0]) is { } local)
+                return new([local], search.Errors, track);
+
         // Multiple external namespaces mean this track has already been expanded, regardless of ID kind.
         var hasExpandedSources = track.ExternalIds.Select(id => id.Namespace)
             .Distinct(StringComparer.OrdinalIgnoreCase).Skip(1).Any();
         List<SourceIdentity>? expanded = expandMetadata && request.RequiredSourceId is null && !hasExpandedSources ? null : [];
         var metadataExpanded = false;
         var updatedTrack = track;
-        foreach (var quality in AudioQualities.SearchOrder(request.Quality))
+        foreach (var quality in qualities)
         {
             foreach (var identity in known)
                 if (await search.ResolveAsync(identity, quality) is { } candidate)
@@ -140,6 +146,18 @@ public sealed class PlaybackSourceDiscoveryService(
 
         public Dictionary<string, string> Errors { get; } = new(StringComparer.OrdinalIgnoreCase);
 
+        public async Task<PlaybackSourceCandidate?> ResolveLocalFileAsync(SourceIdentity identity, AudioQuality quality)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!File.Exists(identity.Id.Value)) return null;
+            // Use the normal provider restrictions, but do not compare an original file's
+            // quality (which may be unknown) with cache entries or remote replacements.
+            foreach (var provider in owner.ProvidersFor(identity, request))
+                if (await ResolveProviderAsync(identity, provider, quality) is { Source: FilePlaybackSource file } candidate &&
+                    File.Exists(file.Path)) return candidate;
+            return null;
+        }
+
         public async Task<PlaybackSourceCandidate?> ResolveAsync(SourceIdentity identity, AudioQuality quality)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -160,30 +178,37 @@ public sealed class PlaybackSourceDiscoveryService(
             {
                 if (_deferred.Any(c => MusicCacheIdentity.GetKey(c.SourceId) == key &&
                     c.ProviderId == provider.ProviderId && c.Source.Quality is null)) continue;
-                var attempt = (key, provider.ProviderId, quality);
-                if (!_attempts.TryGetValue(attempt, out var source))
-                {
-                    try
-                    {
-                        var qualityRequest = request.Quality == quality ? request : request with { Quality = quality };
-                        source = await provider.PlaybackProvider.ResolvePlaybackAsync(
-                            new(provider.ProviderId, identity.Id.Value), qualityRequest, cancellationToken);
-                    }
-                    catch (Exception exception) when (exception is not OperationCanceledException)
-                    {
-                        Errors[$"{provider.ProviderId}/{identity.Id.Value}/{quality}"] = exception.Message;
-                    }
-                    _attempts[attempt] = source;
-                }
-                if (source is null) continue;
-                if (source.Quality == AudioQuality.Automatic) source = source with { Quality = null };
-                var resolvedTrack = identity.Track.Id == new MusicItemId(provider.ProviderId, identity.Id.Value) ? identity.Track :
-                    identity.Track with { Id = new(provider.ProviderId, identity.Id.Value) };
-                var candidate = new PlaybackSourceCandidate(provider.ProviderId, resolvedTrack, source, identity.Id, identity.Method);
-                if (source.Quality >= quality) return candidate;
+                var candidate = await ResolveProviderAsync(identity, provider, quality);
+                if (candidate is null) continue;
+                if (candidate.Source.Quality >= quality) return candidate;
                 _deferred.Add(candidate);
             }
             return null;
+        }
+
+        private async Task<PlaybackSourceCandidate?> ResolveProviderAsync(
+            SourceIdentity identity, PlaybackSourceProviderRegistration provider, AudioQuality quality)
+        {
+            var attempt = (MusicCacheIdentity.GetKey(identity.Id), provider.ProviderId, quality);
+            if (!_attempts.TryGetValue(attempt, out var source))
+            {
+                try
+                {
+                    var qualityRequest = request.Quality == quality ? request : request with { Quality = quality };
+                    source = await provider.PlaybackProvider.ResolvePlaybackAsync(
+                        new(provider.ProviderId, identity.Id.Value), qualityRequest, cancellationToken);
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    Errors[$"{provider.ProviderId}/{identity.Id.Value}/{quality}"] = exception.Message;
+                }
+                _attempts[attempt] = source;
+            }
+            if (source is null) return null;
+            if (source.Quality == AudioQuality.Automatic) source = source with { Quality = null };
+            var resolvedTrack = identity.Track.Id == new MusicItemId(provider.ProviderId, identity.Id.Value) ? identity.Track :
+                identity.Track with { Id = new(provider.ProviderId, identity.Id.Value) };
+            return new(provider.ProviderId, resolvedTrack, source, identity.Id, identity.Method);
         }
     }
 }
