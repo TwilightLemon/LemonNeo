@@ -8,6 +8,8 @@
       <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
         <TextBlock Text="{Binding Playback.NowTitle}" FontSize="22" FontWeight="Medium" TextAlignment="Center" TextTrimming="CharacterEllipsis" />
         <TextBlock Text="{Binding Playback.NowArtist}" Classes="muted" TextAlignment="Center" TextTrimming="CharacterEllipsis" />
+        <TextBlock Text="{Binding Playback.AudioFormatLabel}" IsVisible="{Binding Playback.HasSourceDetails}"
+                   Classes="caption" TextAlignment="Center" TextWrapping="Wrap" />
       </StackPanel>
       <Button Grid.Column="2" Name="LyricsSettingsButton" Classes="ghost icon" VerticalAlignment="Top"
               ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.LyricsDisplaySettings}}"

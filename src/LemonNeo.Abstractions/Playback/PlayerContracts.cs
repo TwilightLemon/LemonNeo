@@ -31,6 +31,13 @@ public interface IPlayer
     Task StopAsync(CancellationToken cancellationToken = default);
 }
 
+/// <summary>Optional decoder capability reporting the currently loaded audio's original format.</summary>
+public interface IAudioInfoPlayer : IPlayer
+{
+    /// <summary>Null when no stream is loaded. Individual fields may be unknown; reads must not perform network I/O.</summary>
+    AudioStreamInfo? AudioInfo { get; }
+}
+
 /// <summary>
 /// Receives the original encoded audio bytes from the player's existing network
 /// request. The host owns this sink and its lifetime; players never persist audio.

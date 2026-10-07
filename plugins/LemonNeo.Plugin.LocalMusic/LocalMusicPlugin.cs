@@ -5,6 +5,8 @@ using LemonNeo.Core.Playback;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace LemonNeo.Plugin.LocalMusic;
 
@@ -22,6 +24,8 @@ public sealed class LocalMusicPlugin :
     };
 
     private readonly ConcurrentDictionary<string, Track> _catalog = new(StringComparer.Ordinal);
+    private string? _artworkDirectory;
+    private ILogger _logger = NullLogger.Instance;
 
     public PluginDescriptor Descriptor { get; } = new(
         "LemonNeo.Plugin.LocalMusic",
@@ -42,6 +46,8 @@ public sealed class LocalMusicPlugin :
     public ValueTask InitializeAsync(IPluginContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        _artworkDirectory = Path.Combine(context.CacheDirectory, "Artwork");
+        _logger = context.LoggerFactory.CreateLogger<LocalMusicPlugin>();
         context.RegisterProvider(this);
         return ValueTask.CompletedTask;
     }
@@ -149,7 +155,7 @@ public sealed class LocalMusicPlugin :
             : null);
     }
 
-    private static Track CreateTrack(string path)
+    private Track CreateTrack(string path)
     {
         var fullPath = Path.GetFullPath(path);
         var fileName = Path.GetFileNameWithoutExtension(fullPath);
@@ -159,7 +165,7 @@ public sealed class LocalMusicPlugin :
         var normalizedPath = OperatingSystem.IsWindows() ? fullPath.ToUpperInvariant() : fullPath;
         var id = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalizedPath))).ToLowerInvariant();
 
-        return new Track
+        var fallback = new Track
         {
             Id = new MusicItemId("local", id),
             Title = title,
@@ -172,5 +178,79 @@ public sealed class LocalMusicPlugin :
                     "path")
             ]
         };
+        try
+        {
+            using var file = TagLib.File.Create(fullPath, TagLib.ReadStyle.Average);
+            var tag = file.Tag;
+            var artists = CleanNames(tag.Performers);
+            if (artists.Length == 0) artists = CleanNames(tag.AlbumArtists);
+            return fallback with
+            {
+                Title = CleanText(tag.Title) ?? fallback.Title,
+                Artists = artists.Length > 0 ? artists.Select(name => new ArtistRef { Name = name }).ToArray() : fallback.Artists,
+                Album = CleanText(tag.Album) is { } album ? new AlbumRef { Title = album } : null,
+                Duration = file.Properties.Duration > TimeSpan.Zero ? file.Properties.Duration : null,
+                ArtworkUri = ReadArtwork(tag.Pictures)
+            };
+        }
+        catch (Exception exception) when (exception is TagLib.CorruptFileException or TagLib.UnsupportedFormatException or
+            IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            // A missing or damaged tag must not prevent importing a playable local file.
+            _logger.LogDebug(exception, "Could not read tags from {Path}; using its filename.", fullPath);
+            return fallback;
+        }
+    }
+
+    private static string? CleanText(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static string[] CleanNames(IEnumerable<string> names) => names.Select(CleanText).OfType<string>()
+        .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+
+    private Uri? ReadArtwork(IEnumerable<TagLib.IPicture> pictures)
+    {
+        if (_artworkDirectory is null) return null;
+        foreach (var picture in pictures.OrderByDescending(picture => picture.Type == TagLib.PictureType.FrontCover))
+        {
+            // Match the host image size limit. Do not persist URLs or arbitrary attachments as artwork.
+            if (picture.Data.Count is <= 0 or > 16 * 1024 * 1024) continue;
+            var bytes = picture.Data.Data;
+            var extension = ImageExtension(bytes);
+            if (extension is null) continue;
+            string? temporary = null;
+            try
+            {
+                Directory.CreateDirectory(_artworkDirectory);
+                var path = Path.Combine(_artworkDirectory, Convert.ToHexStringLower(SHA256.HashData(bytes)) + extension);
+                if (!File.Exists(path))
+                {
+                    temporary = Path.Combine(_artworkDirectory, Guid.NewGuid().ToString("N") + ".part");
+                    File.WriteAllBytes(temporary, bytes);
+                    File.Move(temporary, path, overwrite: true);
+                }
+                return new Uri(Path.GetFullPath(path));
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                // Artwork storage failure must not discard the title, artists or album tags.
+                _logger.LogDebug(exception, "Could not extract embedded artwork.");
+                return null;
+            }
+            finally
+            {
+                if (temporary is not null)
+                    try { File.Delete(temporary); }
+                    catch (Exception exception) when (exception is IOException or UnauthorizedAccessException) { }
+            }
+        }
+        return null;
+    }
+
+    private static string? ImageExtension(ReadOnlySpan<byte> data)
+    {
+        if (data.StartsWith(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 })) return ".png";
+        if (data.StartsWith(new byte[] { 255, 216, 255 })) return ".jpg";
+        if (data.StartsWith("GIF87a"u8) || data.StartsWith("GIF89a"u8)) return ".gif";
+        if (data.Length >= 12 && data[..4].SequenceEqual("RIFF"u8) && data.Slice(8, 4).SequenceEqual("WEBP"u8)) return ".webp";
+        return null;
     }
 }

@@ -24,7 +24,8 @@ public sealed record PlaybackSessionSnapshot(
     string? RequiredSourceProviderId,
     PlaybackStatus? RestoredStatus = null,
     AudioQuality? Quality = null,
-    PlaybackSourceDetails? SourceDetails = null);
+    PlaybackSourceDetails? SourceDetails = null,
+    AudioStreamInfo? AudioInfo = null);
 
 public sealed class PlaybackSessionChangedEventArgs(PlaybackSessionSnapshot snapshot) : EventArgs
 {
@@ -112,6 +113,7 @@ public sealed class PlaybackSessionService(
         var before = player.CurrentTrack?.Id;
         var state = player.State;
         var timeline = player.Timeline;
+        var audioInfo = (player as IAudioInfoPlayer)?.AudioInfo;
         var after = player.CurrentTrack?.Id;
         lock (_snapshotGate)
         {
@@ -121,11 +123,13 @@ public sealed class PlaybackSessionService(
         // A provider can reuse its player while advancing to a different source
         // track. Never combine that track's position with the previous lyrics.
         if (before != playerTrackId || after != playerTrackId)
-            return snapshot with { State = PlayerState.Stopped, Quality = null, SourceDetails = null };
+            return snapshot with { State = PlayerState.Stopped, Quality = null, SourceDetails = null, AudioInfo = null };
 
         return snapshot with
         {
             State = state,
+            AudioInfo = audioInfo,
+            Quality = AudioQualities.Resolve(audioInfo, snapshot.SourceDetails?.Source.Quality),
             Timeline = new PlaybackTimelineInfo(timeline.Position, timeline.Duration ?? snapshot.Timeline.Duration)
         };
     }
@@ -644,6 +648,7 @@ public sealed class PlaybackSessionService(
         var current = queue.CurrentItem?.Track ?? player?.CurrentTrack;
         var playerTimeline = player?.Timeline;
         var duration = playerTimeline?.Duration ?? current?.Duration;
+        var audioInfo = (player as IAudioInfoPlayer)?.AudioInfo;
         return new PlaybackSessionSnapshot(
             player?.State ?? PlayerState.Stopped,
             current,
@@ -655,8 +660,9 @@ public sealed class PlaybackSessionService(
             activePlayer?.Id,
             queue.Request.RequiredSourceProviderId,
             _restoredStatus,
-            resolver.CurrentSource?.Quality,
-            resolver.CurrentSourceDetails);
+            AudioQualities.Resolve(audioInfo, resolver.CurrentSource?.Quality),
+            resolver.CurrentSourceDetails,
+            audioInfo);
     }
 
     private PlaybackRequest EffectiveRequest() => queue.Request.UseQualityPreference
@@ -743,7 +749,8 @@ public sealed class PlaybackSessionService(
         previous.PlayerId != current.PlayerId ||
         previous.RequiredSourceProviderId != current.RequiredSourceProviderId ||
         previous.Quality != current.Quality ||
-        previous.SourceDetails != current.SourceDetails;
+        previous.SourceDetails != current.SourceDetails ||
+        previous.AudioInfo != current.AudioInfo;
 
     private void Raise<TEventArgs>(EventHandler<TEventArgs>? handler, TEventArgs arguments)
         where TEventArgs : EventArgs

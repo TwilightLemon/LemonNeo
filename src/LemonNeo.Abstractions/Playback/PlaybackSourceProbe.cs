@@ -41,7 +41,7 @@ public static class PlaybackSourceProbe
             var sampleRate = (header[18] << 12) | (header[19] << 4) | (header[20] >> 4);
             var bitDepth = (((header[20] & 1) << 4) | (header[21] >> 4)) + 1;
             if (sampleRate == 0 || bitDepth < 4) return null;
-            return bitDepth > 16 || sampleRate > 48000 ? AudioQuality.HiRes : AudioQuality.Lossless;
+            return AudioQualities.Classify(new AudioStreamInfo(SampleRateHz: sampleRate, BitsPerSample: bitDepth, IsLossless: true));
         }
         catch (Exception exception) when (
             !cancellationToken.IsCancellationRequested &&

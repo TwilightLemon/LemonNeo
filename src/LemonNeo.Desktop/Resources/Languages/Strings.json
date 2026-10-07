@@ -347,5 +347,14 @@
   "PlaybackSourceQuality": "Quality",
   "PlaybackSourceBitrate": "Bitrate",
   "PlaybackSourcePlayer": "Playback engine",
-  "PlaybackSourceUnknown": "Unknown"
+  "PlaybackSourceUnknown": "Unknown",
+  "PlaybackQualityLow": "Low",
+  "PlaybackQualityMedium": "Medium",
+  "PlaybackQualityHigh": "High",
+  "PlaybackBitrateDecoder": "Bitrate (decoder)",
+  "PlaybackBitrateSource": "Bitrate (source)",
+  "PlaybackCodec": "Codec",
+  "PlaybackSampleRate": "Sample rate",
+  "PlaybackBitDepth": "Bit depth",
+  "PlaybackChannels": "Channels"
 }

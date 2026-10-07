@@ -22,6 +22,59 @@ namespace LemonNeo.Hosting.Tests;
 public sealed class DesktopPlaybackSourceDetailsTests
 {
     [AvaloniaFact]
+    public async Task DecoderMeasurementsOverrideProviderLabelsAndDrivePlaybackDisplayAndCache()
+    {
+        using var paths = new TemporaryPaths();
+        var provider = new SourceProvider(); // Claims HiRes and 1536 kbps.
+        var player = new MeasuredTestPlayer { Measurements = new(845, 44100, 16, 2, true, "FLAC") };
+        await using var host = new DesktopHost(paths, new(paths.PluginDirectory, paths.MusicLibraryDirectory), [player], [provider]);
+        var scope = host.Settings.ForPackage(PackageNames.Desktop);
+        DesktopPreferences.Register(scope);
+        using var text = new LocalizationService(scope);
+        text.Apply(LanguagePreference.English);
+        using var appearance = new AppearanceService(Avalonia.Application.Current!, scope);
+        await using var main = new MainViewModel(host, text, appearance, host.Get<ArtworkService>());
+        await main.InitializeAsync();
+        var session = host.Get<PlaybackSessionService>();
+        var id = new ExternalMusicId("audio-catalog", "actual-id", "song");
+        await session.PlayTrackAsync(HostFixture.Track() with { ExternalIds = [id] }, cancellationToken: TestContext.Current.CancellationToken);
+        main.Playback.UpdateSnapshot();
+
+        Assert.Equal("Lossless", main.Playback.QualityLabel);
+        Assert.Equal("845 kbps", main.Playback.SourceBitrate);
+        Assert.Equal("Bitrate (decoder)", main.Playback.BitrateOrigin);
+        Assert.Equal("FLAC", main.Playback.SourceCodec);
+        Assert.Equal("44.1 kHz", main.Playback.SourceSampleRate);
+        Assert.Equal("16 bit", main.Playback.SourceBitDepth);
+        Assert.Equal("2", main.Playback.SourceChannels);
+        Assert.Equal("Lossless · FLAC · 845 kbps · 44.1 kHz · 16 bit", main.Playback.AudioFormatLabel);
+        Assert.Equal(player.Measurements, session.Snapshot.AudioInfo);
+        Assert.Equal(AudioQuality.Lossless, session.Snapshot.Quality);
+        var cache = host.Get<PlaybackAudioCache>();
+        Assert.Null(await cache.TryGetAsync(id, AudioQuality.HiRes, TestContext.Current.CancellationToken));
+        var cached = await cache.TryGetAsync(id, AudioQuality.Lossless, TestContext.Current.CancellationToken);
+        Assert.NotNull(cached);
+        Assert.Equal(845, cached.BitrateKbps);
+
+        await session.PauseAsync(TestContext.Current.CancellationToken);
+        main.Playback.UpdateSnapshot();
+        Assert.Equal("845 kbps", main.Playback.SourceBitrate);
+        player.Measurements = new(256, 48000, null, 2, false, "MP3");
+        await session.PlayTrackAsync(HostFixture.Track("second") with { ExternalIds = [id with { Value = "second" }] },
+            cancellationToken: TestContext.Current.CancellationToken);
+        main.Playback.UpdateSnapshot();
+        Assert.Equal("High", main.Playback.QualityLabel);
+        Assert.Equal("256 kbps", main.Playback.SourceBitrate);
+        Assert.DoesNotContain("FLAC", main.Playback.AudioFormatLabel);
+        Assert.DoesNotContain("16 bit", main.Playback.AudioFormatLabel);
+
+        await session.StopAsync(TestContext.Current.CancellationToken);
+        main.Playback.UpdateSnapshot();
+        Assert.Null(session.Snapshot.AudioInfo);
+        Assert.Equal("", main.Playback.AudioFormatLabel);
+    }
+
+    [AvaloniaFact]
     public async Task QualityButtonShowsSelectedSourceAndFollowsPauseStopAndCachedPlayback()
     {
         using var paths = new TemporaryPaths();

@@ -651,7 +651,7 @@
         <ScrollViewer MaxHeight="440" HorizontalScrollBarVisibility="Disabled">
           <StackPanel Spacing="16">
             <TextBlock FontWeight="SemiBold" Text="{Translate {x:Static i18n:LanguageManager+Keys.PlaybackSourceDetails}}" />
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="8" ColumnSpacing="16">
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="8" ColumnSpacing="16">
               <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.PlaybackSourceType}}" />
               <SelectableTextBlock Grid.Column="1" Text="{Binding Playback.SourceType}" TextWrapping="Wrap" />
               <TextBlock Grid.Row="1" Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.ProviderId}}" />
@@ -664,10 +664,18 @@
               <SelectableTextBlock Grid.Row="4" Grid.Column="1" Text="{Binding Playback.SourceId}" TextWrapping="Wrap" />
               <TextBlock Grid.Row="5" Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.PlaybackSourceQuality}}" />
               <SelectableTextBlock Grid.Row="5" Grid.Column="1" Text="{Binding Playback.QualityLabel}" TextWrapping="Wrap" />
-              <TextBlock Grid.Row="6" Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.PlaybackSourceBitrate}}" />
+              <TextBlock Grid.Row="6" Classes="caption" Text="{Binding Playback.BitrateOrigin}" />
               <SelectableTextBlock Grid.Row="6" Grid.Column="1" Text="{Binding Playback.SourceBitrate}" TextWrapping="Wrap" />
               <TextBlock Grid.Row="7" Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.PlaybackSourcePlayer}}" />
               <SelectableTextBlock Grid.Row="7" Grid.Column="1" Text="{Binding Playback.SourcePlayer}" TextWrapping="Wrap" />
+              <TextBlock Grid.Row="8" Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.PlaybackCodec}}" />
+              <SelectableTextBlock Grid.Row="8" Grid.Column="1" Text="{Binding Playback.SourceCodec}" TextWrapping="Wrap" />
+              <TextBlock Grid.Row="9" Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.PlaybackSampleRate}}" />
+              <SelectableTextBlock Grid.Row="9" Grid.Column="1" Text="{Binding Playback.SourceSampleRate}" />
+              <TextBlock Grid.Row="10" Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.PlaybackBitDepth}}" />
+              <SelectableTextBlock Grid.Row="10" Grid.Column="1" Text="{Binding Playback.SourceBitDepth}" />
+              <TextBlock Grid.Row="11" Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.PlaybackChannels}}" />
+              <SelectableTextBlock Grid.Row="11" Grid.Column="1" Text="{Binding Playback.SourceChannels}" />
             </Grid>
             <StackPanel Spacing="6">
               <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.PlaybackSourceLocation}}" />

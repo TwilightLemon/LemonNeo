@@ -90,7 +90,7 @@ public sealed class PlaybackResolver(
                     ?? throw new PlaybackResolutionException($"No playable source could be found for '{track.Title}'.", exception);
                 await PlaySourceAsync(candidate, discovery.UpdatedTrack ?? CurrentQueueTrack, cancellationToken);
             }
-            return candidate.Source;
+            return CurrentSource!;
         }
         catch (Exception exception) when (exception is not OperationCanceledException and not PlaybackResolutionException)
         {
@@ -118,7 +118,7 @@ public sealed class PlaybackResolver(
                 await volumePlayer.SetVolumeAsync(_volume, cancellationToken);
             if (source is HttpPlaybackSource { IsDirectAudio: true } http && player.Player is IStreamingPlayer streaming)
             {
-                _download = audioCache.Start(candidate.SourceId, http);
+                _download = audioCache.Start(candidate.SourceId, http, awaitDecoderInfo: player.Player is IAudioInfoPlayer);
                 if (_download is not null)
                     await streaming.PlayAsync(resolvedTrack, http, _download, cancellationToken);
                 else
@@ -127,6 +127,18 @@ public sealed class PlaybackResolver(
             else
             {
                 await player.Player.PlayAsync(resolvedTrack, source, cancellationToken);
+            }
+            if (player.Player is IAudioInfoPlayer audioPlayer)
+            {
+                var info = audioPlayer.AudioInfo;
+                if (_download is not null) audioCache.SetAudioInfo(_download, info);
+                if (candidate.IsCached && source is FilePlaybackSource cached)
+                    await audioCache.RefreshAudioInfoAsync(candidate.SourceId, cached, info, cancellationToken);
+                source = source with
+                {
+                    Quality = AudioQualities.Resolve(info, source.Quality),
+                    BitrateKbps = info?.BitrateKbps is > 0 ? info.BitrateKbps : source.BitrateKbps
+                };
             }
             ActivePlayer = player;
             CurrentQueueTrack = queueTrack;

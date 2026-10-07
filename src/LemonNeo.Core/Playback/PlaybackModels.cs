@@ -33,6 +33,25 @@ public enum AudioQuality
 
 public static class AudioQualities
 {
+    /// <summary>Prefers measurements, retaining a provider's declaration only when it is not contradicted.</summary>
+    public static AudioQuality? Resolve(AudioStreamInfo? info, AudioQuality? reported)
+    {
+        if (Classify(info) is { } measured) return measured;
+        if (info is { IsLossless: false } && reported is AudioQuality.Lossless or AudioQuality.HiRes) return null;
+        return reported is { } quality && quality != AudioQuality.Automatic && Enum.IsDefined(quality) ? quality : null;
+    }
+
+    /// <summary>Classifies measured audio. Bitrate alone cannot establish lossless or HiRes quality.</summary>
+    public static AudioQuality? Classify(AudioStreamInfo? info) => info switch
+    {
+        { IsLossless: true, BitsPerSample: > 16 } or { IsLossless: true, SampleRateHz: > 48000 } => AudioQuality.HiRes,
+        { IsLossless: true } => AudioQuality.Lossless,
+        { IsLossless: false, BitrateKbps: > 192 } => AudioQuality.High,
+        { IsLossless: false, BitrateKbps: > 128 } => AudioQuality.Medium,
+        { IsLossless: false, BitrateKbps: > 0 } => AudioQuality.Low,
+        _ => null
+    };
+
     public static IReadOnlyList<AudioQuality> Descending { get; } =
         [AudioQuality.HiRes, AudioQuality.Lossless, AudioQuality.High, AudioQuality.Medium, AudioQuality.Low];
 

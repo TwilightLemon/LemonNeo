@@ -99,7 +99,13 @@ public sealed class PlaybackViewModel : PageViewModel
     public double DurationSeconds => Math.Max(1, _snapshot.Timeline.Duration?.TotalSeconds ?? 1);
     public string PositionText => TrackRow.FormatTime(_snapshot.Timeline.Position);
     public string DurationText => _snapshot.Timeline.Duration is { } duration ? TrackRow.FormatTime(duration) : "—";
-    public string QualityLabel => HasCurrentTrack ? _text["AudioQuality" + (_snapshot.Quality?.ToString() ?? "Unknown")] : "";
+    public string QualityLabel => HasCurrentTrack ? _text[_snapshot.Quality switch
+    {
+        AudioQuality.Low => "PlaybackQualityLow",
+        AudioQuality.Medium => "PlaybackQualityMedium",
+        AudioQuality.High => "PlaybackQualityHigh",
+        _ => "AudioQuality" + (_snapshot.Quality?.ToString() ?? "Unknown")
+    }] : "";
     public bool HasSourceDetails => _snapshot.SourceDetails is not null;
     public bool IsSourceDetailsOpen
     {
@@ -119,8 +125,24 @@ public sealed class PlaybackViewModel : PageViewModel
     public string SourceNamespace => _snapshot.SourceDetails?.SourceId.Namespace ?? _text["PlaybackSourceUnknown"];
     public string SourceKind => _snapshot.SourceDetails?.SourceId.Kind ?? "—";
     public string SourceId => _snapshot.SourceDetails?.SourceId.Value ?? _text["PlaybackSourceUnknown"];
-    public string SourceBitrate => _snapshot.SourceDetails?.Source.BitrateKbps is > 0 and var bitrate
+    private int? CurrentBitrate => _snapshot.AudioInfo?.BitrateKbps is > 0 and var measured
+        ? measured : _snapshot.SourceDetails?.Source.BitrateKbps;
+    public string SourceBitrate => CurrentBitrate is > 0 and var bitrate
         ? $"{bitrate} kbps" : _text["PlaybackSourceUnknown"];
+    public string BitrateOrigin => _text[_snapshot.AudioInfo?.BitrateKbps is > 0 ? "PlaybackBitrateDecoder" : "PlaybackBitrateSource"];
+    public string SourceCodec => _snapshot.AudioInfo?.Codec ?? _text["PlaybackSourceUnknown"];
+    public string SourceSampleRate => _snapshot.AudioInfo?.SampleRateHz is > 0 and var rate
+        ? $"{rate / 1000d:0.###} kHz" : _text["PlaybackSourceUnknown"];
+    public string SourceBitDepth => _snapshot.AudioInfo?.BitsPerSample is > 0 and var bits
+        ? $"{bits} bit" : _text["PlaybackSourceUnknown"];
+    public string SourceChannels => _snapshot.AudioInfo?.Channels is > 0 and var channels
+        ? channels.ToString() : _text["PlaybackSourceUnknown"];
+    public string AudioFormatLabel => HasSourceDetails
+        ? string.Join(" · ", new[] { QualityLabel, _snapshot.AudioInfo?.Codec,
+            CurrentBitrate is > 0 ? SourceBitrate : null,
+            _snapshot.AudioInfo?.SampleRateHz is > 0 ? SourceSampleRate : null,
+            _snapshot.AudioInfo?.BitsPerSample is > 0 ? SourceBitDepth : null }.Where(value => !string.IsNullOrEmpty(value)))
+        : "";
     public string SourcePlayer => _snapshot.PlayerId ?? _text["PlaybackSourceUnknown"];
     public string TimeLabel => $"{PositionText} / {DurationText}";
     public string PlaybackDetails => _text.Format("PlaybackDetailsFormat", _snapshot.CurrentTrack?.Id.ToString() ?? "—",
@@ -251,7 +273,8 @@ public sealed class PlaybackViewModel : PageViewModel
     private void RaisePlaybackProperties()
     {
         foreach (var name in new[] { nameof(HasSourceDetails), nameof(SourceType), nameof(SourceLocation), nameof(SourceProvider),
-                     nameof(SourceNamespace), nameof(SourceKind), nameof(SourceId), nameof(SourceBitrate), nameof(SourcePlayer) })
+                     nameof(SourceNamespace), nameof(SourceKind), nameof(SourceId), nameof(SourceBitrate), nameof(SourcePlayer),
+                     nameof(BitrateOrigin), nameof(SourceCodec), nameof(SourceSampleRate), nameof(SourceBitDepth), nameof(SourceChannels), nameof(AudioFormatLabel) })
             OnPropertyChanged(name);
         foreach (var name in new[] { nameof(QualityLabel), nameof(NowTitle), nameof(NowArtist), nameof(HasCurrentTrack), nameof(IsPlaying), nameof(PlayLabel), nameof(PlaybackLabel), nameof(ModeLabel), nameof(IsSequential), nameof(IsRepeatAll), nameof(IsShuffle), nameof(CanPrevious), nameof(CanNext), nameof(CanTogglePlayback), nameof(CanSeek), nameof(CanAdjustVolume), nameof(DurationSeconds), nameof(PositionText), nameof(DurationText) }) OnPropertyChanged(name);
         if (!IsSeeking) OnPropertyChanged(nameof(PositionSeconds));

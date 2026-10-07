@@ -13,6 +13,76 @@ namespace LemonNeo.Hosting.Tests;
 public sealed class CachePersistenceTests
 {
     [Fact]
+    public async Task DecodingExistingCacheCorrectsItsQualityAndKeepsItPlayableOffline()
+    {
+        using var paths = new TemporaryPaths();
+        var player = new MeasuredTestPlayer { Measurements = new(650, 44100, 16, 2, true, "FLAC") };
+        await using var host = new AppHost(paths, new(paths.PluginDirectory, paths.MusicLibraryDirectory),
+            services => services.AddSingleton<IPlayerProvider>(player));
+        await host.InitializeAsync(TestContext.Current.CancellationToken);
+        var track = HostFixture.Track();
+        var id = MusicCacheIdentity.FromTrackId(track.Id);
+        var cache = host.Get<PlaybackAudioCache>();
+        using (var download = cache.Start(id, new HttpPlaybackSource { Uri = new("https://example.com/audio.flac"), Quality = AudioQuality.HiRes }))
+        {
+            Assert.NotNull(download);
+            download.SetExpectedLength(3);
+            download.Write([1, 2, 3]);
+            download.Complete();
+        }
+        var session = host.Get<PlaybackSessionService>();
+        await session.PlayTrackAsync(track, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Equal(AudioQuality.Lossless, session.Snapshot.Quality);
+        Assert.Null(await cache.TryGetAsync(id, AudioQuality.HiRes, TestContext.Current.CancellationToken));
+        Assert.Equal(650, (await cache.TryGetAsync(id, AudioQuality.Lossless, TestContext.Current.CancellationToken))?.BitrateKbps);
+        Assert.Single(Directory.GetFiles(Path.Combine(paths.CacheDirectory, "Music"), "*.json"));
+        await session.PlayCurrentAsync(TestContext.Current.CancellationToken);
+        Assert.True(session.Snapshot.SourceDetails!.IsCached);
+        Assert.Equal(AudioQuality.Lossless, session.Snapshot.Quality);
+    }
+
+    [Theory]
+    [InlineData(true, AudioQuality.HiRes)]
+    [InlineData(false, AudioQuality.HiRes)]
+    [InlineData(true, null)]
+    [InlineData(false, null)]
+    public async Task DecoderQualityDeterminesCacheKeyRegardlessOfDownloadCompletionOrder(bool finishFirst, AudioQuality? providerQuality)
+    {
+        using var paths = new TemporaryPaths();
+        var cache = new PlaybackAudioCache(paths.CacheDirectory, NullLogger<PlaybackAudioCache>.Instance);
+        var id = new ExternalMusicId("catalog", "source-id", "song");
+        var source = new HttpPlaybackSource { Uri = new("https://example.com/audio"), Quality = providerQuality, BitrateKbps = 999 };
+        using var download = cache.Start(id, source, awaitDecoderInfo: true);
+        Assert.NotNull(download);
+        download.SetExpectedLength(3);
+        download.Write([1, 2, 3]);
+        if (finishFirst) download.Complete();
+        Assert.Empty(Directory.GetFiles(Path.Combine(paths.CacheDirectory, "Music"), "*.json"));
+        cache.SetAudioInfo(download, new AudioStreamInfo(700, 44100, 16, 2, true, "FLAC"));
+        if (!finishFirst) download.Complete();
+
+        Assert.Null(await cache.TryGetAsync(id, AudioQuality.HiRes, TestContext.Current.CancellationToken));
+        var cached = await cache.TryGetAsync(id, AudioQuality.Lossless, TestContext.Current.CancellationToken);
+        Assert.NotNull(cached);
+        Assert.Equal(700, cached.BitrateKbps);
+        Assert.Single(Directory.GetFiles(Path.Combine(paths.CacheDirectory, "Music"), "*.json"));
+    }
+
+    [Fact]
+    public void UnknownDecoderAndSourceQualityStillDoNotPublishAudio()
+    {
+        using var paths = new TemporaryPaths();
+        var cache = new PlaybackAudioCache(paths.CacheDirectory, NullLogger<PlaybackAudioCache>.Instance);
+        using var download = cache.Start(new("catalog", "source-id"), new HttpPlaybackSource { Uri = new("https://example.com/audio") }, awaitDecoderInfo: true);
+        Assert.NotNull(download);
+        download.SetExpectedLength(3);
+        download.Write([1, 2, 3]);
+        download.Complete();
+        cache.SetAudioInfo(download, new AudioStreamInfo(BitrateKbps: 2000));
+        Assert.Empty(Directory.GetFiles(Path.Combine(paths.CacheDirectory, "Music")));
+    }
+
+    [Fact]
     public async Task ImageBytesRemainAvailableFromDiskWithoutTheirSource()
     {
         using var paths = new TemporaryPaths();

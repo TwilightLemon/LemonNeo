@@ -47,7 +47,7 @@ public sealed class BassPlayerPlugin : ILemonPlugin, IPlayerProvider
     }
 }
 
-internal sealed class BassPlayer : ISeekablePlayer, IStreamingPlayer, IVolumePlayer, IAsyncDisposable
+internal sealed class BassPlayer : ISeekablePlayer, IStreamingPlayer, IVolumePlayer, IAudioInfoPlayer, IAsyncDisposable
 {
     private const int InvalidStream = 0;
     private readonly object _gate = new();
@@ -91,6 +91,20 @@ internal sealed class BassPlayer : ISeekablePlayer, IStreamingPlayer, IVolumePla
 
     public PlayerState State { get; private set; } = PlayerState.Stopped;
     public Track? CurrentTrack { get; private set; }
+    public AudioStreamInfo? AudioInfo
+    {
+        get
+        {
+            lock (_gate)
+            {
+                if (_stream == InvalidStream) return null;
+                var channel = BassApi.BASS_ChannelGetInfo(_stream);
+                float bitrate = 0;
+                var hasBitrate = BassApi.BASS_ChannelGetAttribute(_stream, BASSAttribute.BASS_ATTRIB_BITRATE, ref bitrate);
+                return BassAudioInfo.FromChannel(channel, hasBitrate ? bitrate : null);
+            }
+        }
+    }
     public PlayerTimeline Timeline
     {
         get
