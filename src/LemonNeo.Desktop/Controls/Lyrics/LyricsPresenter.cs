@@ -37,6 +37,9 @@ public sealed class LyricsPresenter : UserControl
     public static readonly StyledProperty<string?> EmptyTextProperty = AvaloniaProperty.Register<LyricsPresenter, string?>(nameof(EmptyText));
     // Zero keeps the full timeline; one/two show only the current and upcoming desktop rows.
     public static readonly StyledProperty<int> VisibleLineCountProperty = AvaloniaProperty.Register<LyricsPresenter, int>(nameof(VisibleLineCount), 0, coerce: (_, value) => Math.Clamp(value, 0, 2));
+    public static readonly StyledProperty<double> SubTextOpacityProperty = AvaloniaProperty.Register<LyricsPresenter, double>(nameof(SubTextOpacity),1, coerce: (_, value) => Math.Clamp(value, 0, 1));
+
+
 
     private readonly StackPanel _lines = new() { Name = "LyricsLines", Spacing = 32, Margin = new Thickness(12, 0) };
     private readonly ScrollViewer _scroll;
@@ -113,6 +116,7 @@ public sealed class LyricsPresenter : UserControl
     public string? FollowLabel { get => GetValue(FollowLabelProperty); set => SetValue(FollowLabelProperty, value); }
     public string? EmptyText { get => GetValue(EmptyTextProperty); set => SetValue(EmptyTextProperty, value); }
     public int VisibleLineCount { get => GetValue(VisibleLineCountProperty); set => SetValue(VisibleLineCountProperty, value); }
+    public double SubTextOpacity { get => GetValue(SubTextOpacityProperty); set => SetValue(SubTextOpacityProperty, value); }
     private bool IsCompact => VisibleLineCount > 0;
     public int CurrentIndex => _currentIndex;
     public bool IsFollowing => _isFollowing;
@@ -178,7 +182,7 @@ public sealed class LyricsPresenter : UserControl
             var panel = new StackPanel { Spacing = 5, HorizontalAlignment = HorizontalAlignment.Stretch, Background = Brushes.Transparent };
             var main = new LyricText { Text = row.Main.Text, Words = row.Main.Words, LineStartTimeMs = row.Main.EffectiveStartTimeMs };
             var romanization = new LyricText();
-            var translation = new TextBlock();
+            var translation = new TextBlock(){Opacity = SubTextOpacity};
             foreach (var text in new TextBlock[] { main, romanization, translation })
             {
                 text.TextWrapping = IsCompact ? TextWrapping.NoWrap : TextWrapping.Wrap;

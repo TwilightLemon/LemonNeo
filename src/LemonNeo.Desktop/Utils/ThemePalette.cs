@@ -73,6 +73,7 @@ public static class ThemePalette
         var secondary = EnsureContrast(Mix(text, background, .32), backgrounds, 5.3, dark);
         var accentText = EnsureContrast(dark ? accent : HslColor.ToRgb(hsl.H, Math.Min(hsl.S, .60), .32), backgrounds, 5.5, dark);
         var onAccent = Color.Parse("#172027");
+        var lyricText = Color.Parse(dark ? "#EEF1F4" : "#a2a6ac");
         // Blue/purple can be dark at the same HSL lightness as yellow. Lift the fill itself
         // so button labels retain a stable dark foreground throughout palette transitions.
         accent = EnsureContrast(accent, [onAccent], 5.5, true);
@@ -84,7 +85,7 @@ public static class ThemePalette
             ["Surface"] = surface, ["SurfaceRaised"] = raised, ["Text"] = text,
             ["TextSecondary"] = secondary, ["Border"] = Mix(raised, text, .16),
             ["Accent"] = accent, ["OnAccent"] = onAccent, ["AccentText"] = accentText,
-            ["LyricText"] = secondary, ["LyricHighlight"] = accentText,
+            ["LyricText"] = lyricText, ["LyricHighlight"] = accentText,
             ["AccentSoft"] = soft, ["Hover"] = hover, ["Danger"] = danger,
             ["DangerSoft"] = dangerSoft, ["Focus"] = accentText,
             ["Artwork"] = Mix(raised, seed, .20)

@@ -79,7 +79,8 @@
                                   SeekCommand="{Binding SeekLyricCommand}" CanSeek="{Binding Playback.CanSeek}"
                                   FontSize="{Binding LyricFontSize}" ShowRomanization="{Binding ShowRomanization}" ShowTranslation="{Binding ShowTranslation}" BoldLyrics="{Binding BoldLyrics}"
                                   TextAlignment="{Binding LyricTextAlignment}" ReduceMotion="{Binding ReduceMotion}"
-                                  Foreground="{DynamicResource Brush.TextSecondary}" UnreachedBrush="{DynamicResource Brush.LyricText}" ReachedBrush="{DynamicResource Brush.LyricHighlight}"
+                                  SubTextOpacity="0.8"
+                                  Foreground="{DynamicResource Brush.LyricText}" UnreachedBrush="{DynamicResource Brush.LyricText}" ReachedBrush="{DynamicResource Brush.LyricHighlight}"
                                   FollowLabel="{Translate {x:Static i18n:LanguageManager+Keys.FollowCurrentLyric}}" />
       </Grid>
     </Grid>
