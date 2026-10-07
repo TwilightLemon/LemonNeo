@@ -40,6 +40,58 @@
         </StackPanel>
         <TextBlock Text="{Binding Status}" IsVisible="{Binding HasStatus}" TextWrapping="Wrap" />
         <SelectableTextBlock Text="{Binding InspectionMessages}" Classes="muted" TextWrapping="Wrap" />
+        <StackPanel Spacing="10" IsVisible="{Binding HasResults}">
+          <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.MatchResults}}" Classes="section" />
+          <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.MatchResultsHint}}" Classes="caption" TextWrapping="Wrap" />
+          <ItemsControl ItemsSource="{Binding Results}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="metadataVm:PlaylistMatchResultRow">
+                <Button Classes="ghost" Command="{Binding OpenTrackCommand}" CommandParameter="{Binding}"
+                        ToolTip.Tip="{Binding OpenTrackHint}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                        Padding="0" Margin="0,0,0,10">
+                  <Border Classes="card" Padding="18" HorizontalAlignment="Stretch">
+                    <StackPanel Spacing="10">
+                      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                        <TextBlock Text="{Binding Number}" Classes="caption" VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="1" Spacing="4">
+                          <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                          <TextBlock Text="{Binding Artists}" Classes="muted" TextWrapping="Wrap" />
+                          <TextBlock Text="{Binding Identity}" Classes="caption" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Spacing="4" HorizontalAlignment="Right">
+                          <TextBlock Text="{Binding Result}" Foreground="{DynamicResource Brush.Danger}"
+                                     FontWeight="SemiBold" HorizontalAlignment="Right" IsVisible="{Binding !IsSuccessful}" />
+                          <TextBlock Text="{Binding Result}" Foreground="{DynamicResource Brush.AccentText}"
+                                     FontWeight="SemiBold" HorizontalAlignment="Right" IsVisible="{Binding IsSuccessful}" />
+                          <TextBlock Text="{Binding Details}" Classes="caption" HorizontalAlignment="Right" TextWrapping="Wrap" />
+                          <TextBlock Text="{Binding MatchSource}" Classes="caption" HorizontalAlignment="Right" TextWrapping="Wrap" />
+                        </StackPanel>
+                      </Grid>
+                      <ItemsControl ItemsSource="{Binding Changes}" IsVisible="{Binding HasChanges}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="metadataVm:PlaylistTrackChangeRow">
+                            <Grid ColumnDefinitions="120,*,Auto,*" ColumnSpacing="12" Margin="0,6,0,0">
+                              <TextBlock Text="{Binding Field}" FontWeight="Medium" TextWrapping="Wrap" />
+                              <StackPanel Grid.Column="1" Spacing="3">
+                                <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.BeforeMatch}}" Classes="caption" />
+                                <TextBlock Text="{Binding Before}" TextWrapping="Wrap" />
+                              </StackPanel>
+                              <TextBlock Grid.Column="2" Text="→" Classes="muted" VerticalAlignment="Center" />
+                              <StackPanel Grid.Column="3" Spacing="3">
+                                <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.AfterMatch}}" Classes="caption" />
+                                <TextBlock Text="{Binding After}" TextWrapping="Wrap" />
+                              </StackPanel>
+                            </Grid>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </Border>
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
       </StackPanel>
     </ScrollViewer>
   </Grid>

@@ -96,14 +96,15 @@ public sealed class PlaybackSourceDiscoveryTests
     }
 
     [Fact]
-    public async Task ApplyingMatchedTrackKeepsTheOriginalIdentityAndCompleteArtistAndAlbumReferences()
+    public async Task ApplyingMatchedTrackKeepsTheOriginalIdentityMetadataAndExistingExternalIdSchemes()
     {
         using var paths = new TemporaryPaths();
-        await using var host = CreateHost(paths, new TestPlayer(), new MatchingMetadataProvider());
+        var metadata = new MatchingMetadataProvider();
+        await using var host = CreateHost(paths, new TestPlayer(), metadata);
         var original = HostFixture.Track() with
         {
             ArtworkUri = new("https://example.com/saved.png"),
-            ExternalIds = [new("isrc", "ABC000000001"), new("NETEASE", "12345", "SONG-ID")]
+            ExternalIds = [new("isrc", "ABC000000001"), new("NETEASE", "saved-id", "SONG-ID")]
         };
 
         var (updated, lookup) = await host.Get<MetadataService>()
@@ -117,11 +118,35 @@ public sealed class PlaybackSourceDiscoveryTests
         Assert.Same(matched.Album, updated.Album);
         Assert.Equal(original.Duration, updated.Duration);
         Assert.Equal(original.ArtworkUri, updated.ArtworkUri);
-        Assert.Equal(3, updated.ExternalIds.Count);
+        Assert.Equal(2, updated.ExternalIds.Count);
         Assert.Contains(new("isrc", "ABC000000001"), updated.ExternalIds);
-        Assert.Single(updated.ExternalIds, identifier => identifier.Value == "12345");
+        Assert.Contains(new("NETEASE", "saved-id", "SONG-ID"), updated.ExternalIds);
+        Assert.DoesNotContain(updated.ExternalIds, identifier => identifier.Value is "12345" or "below-threshold");
+        Assert.Equal(1, Assert.Single(metadata.Requests).LimitPerSource);
         Assert.Equal("one", original.Title);
         Assert.Equal(2, original.ExternalIds.Count);
+    }
+
+    [Fact]
+    public async Task ApplyingMatchedTrackAddsOnlyOneExternalIdForAMissingScheme()
+    {
+        using var paths = new TemporaryPaths();
+        await using var host = CreateHost(paths, new TestPlayer(), new MatchingMetadataProvider());
+        var original = HostFixture.Track() with
+        {
+            ExternalIds = [new("isrc", "ABC000000001")]
+        };
+
+        var (updated, _) = await host.Get<MetadataService>()
+            .MatchAndReplaceAsync(original, ["netease"], TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, updated.ExternalIds.Count);
+        Assert.Contains(new("isrc", "ABC000000001"), updated.ExternalIds);
+        Assert.Contains(new("netease", "12345", "song-id"), updated.ExternalIds);
+        Assert.DoesNotContain(updated.ExternalIds, identifier => identifier.Value == "below-threshold");
+        Assert.Single(updated.ExternalIds, identifier =>
+            string.Equals(identifier.Namespace, "netease", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(identifier.Kind, "song-id", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

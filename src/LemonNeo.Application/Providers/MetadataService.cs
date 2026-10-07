@@ -66,6 +66,7 @@ public sealed class MetadataService(IProviderRegistry registry)
         var lookup = await LookupAsync(
             track,
             targetNamespaces,
+            limitPerSource: 1,
             cancellationToken: cancellationToken);
         var reliable = lookup.Matches.ToArray();
         if (reliable.Length == 0)
@@ -74,14 +75,15 @@ public sealed class MetadataService(IProviderRegistry registry)
         }
 
         var best = reliable[0].Track;
-        var externalIds = track.ExternalIds.Concat(reliable.SelectMany(match => match.Track.ExternalIds))
-            .DistinctBy(id => new
-            {
-                Namespace = id.Namespace.ToUpperInvariant(),
-                id.Value,
-                Kind = id.Kind?.ToUpperInvariant()
-            })
-            .ToArray();
+        // An external-ID scheme is unique by namespace and kind. Metadata matching may
+        // fill a missing scheme, but must never replace (or add a competing value for)
+        // a scheme already carried by the source track.
+        var externalIds = track.ExternalIds.ToList();
+        foreach (var candidate in reliable.SelectMany(match => match.Track.ExternalIds))
+        {
+            if (externalIds.Any(existing => SameScheme(existing, candidate))) continue;
+            externalIds.Add(candidate);
+        }
         var enriched = track with
         {
             Title = string.IsNullOrWhiteSpace(best.Title) ? track.Title : best.Title,
@@ -93,8 +95,12 @@ public sealed class MetadataService(IProviderRegistry registry)
                 : best.Album,
             Duration = best.Duration ?? track.Duration,
             ArtworkUri = best.ArtworkUri ?? track.ArtworkUri,
-            ExternalIds = externalIds
+            ExternalIds = externalIds.ToArray()
         };
         return (enriched, lookup);
     }
+
+    private static bool SameScheme(ExternalMusicId left, ExternalMusicId right) =>
+        string.Equals(left.Namespace, right.Namespace, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(left.Kind, right.Kind, StringComparison.OrdinalIgnoreCase);
 }
