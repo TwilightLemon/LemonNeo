@@ -18,7 +18,9 @@ public sealed class LyricsService(IProviderRegistry registry, LyricsCache? cache
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (cache is not null && await cache.TryGetAsync(track, cancellationToken) is { } cached) return cached;
+        if (cache is not null)
+            foreach (var id in MusicCacheIdentity.KnownIds(track))
+                if (await cache.TryGetAsync(id, cancellationToken) is { } cached) return cached;
 
         var errors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var providers = registry.Providers
@@ -34,7 +36,10 @@ public sealed class LyricsService(IProviderRegistry registry, LyricsCache? cache
                 var lyrics = await ((ILyricsProvider)provider).GetLyricsAsync(track, cancellationToken);
                 if (lyrics is not null)
                 {
-                    if (cache is not null) await cache.StoreAsync(track, lyrics, provider.Id, cancellationToken);
+                    var sourceId = lyrics.SourceId ?? (string.Equals(provider.Id, track.Id.ProviderId, StringComparison.OrdinalIgnoreCase)
+                        ? MusicCacheIdentity.FromTrackId(track.Id) : null);
+                    if (cache is not null && sourceId is not null)
+                        await cache.StoreAsync(sourceId, lyrics, provider.Id, cancellationToken);
                     return new LyricsLookupResult(lyrics, provider.Id, errors);
                 }
             }

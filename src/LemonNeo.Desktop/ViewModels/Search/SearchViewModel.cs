@@ -20,7 +20,7 @@ public sealed partial class SearchViewModel : TrackListViewModel
     public bool CanSearch => CanInteract && !string.IsNullOrWhiteSpace(SearchQuery);
     protected override IEnumerable<TrackRow> GetTracks() => _searchTracks.Select((t, index) => new TrackRow(t, index + 1, _text));
     public override Task PlayAsync(TrackRow? selected = null) => (selected ?? SelectedTrack ?? Tracks.FirstOrDefault()) is { } result
-        ? Playback.ExecutePlaybackAsync(ct => _host.Get<PlaybackSessionService>().PlayTrackAsync(result.Track, new PlaybackRequest(), ct)) : Task.CompletedTask;
+        ? Playback.ExecutePlaybackAsync(ct => _host.Get<PlaybackSessionService>().PlayTrackAsync(result.Track, cancellationToken: ct)) : Task.CompletedTask;
     public Task SearchAsync() => ExecuteAsync(async ct =>
     {
         if (string.IsNullOrWhiteSpace(SearchQuery)) throw new ArgumentException(_text["SearchQueryRequired"]);

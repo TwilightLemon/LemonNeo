@@ -1,3 +1,6 @@
+using LemonNeo.Abstractions.Settings;
+using LemonNeo.Application.Playback;
+using LemonNeo.Core.Playback;
 using CommunityToolkit.Mvvm.Input;
 using LemonNeo.Desktop.Config;
 using LemonNeo.Desktop.Services;
@@ -11,10 +14,14 @@ public sealed class SettingsViewModel : PageViewModel
     private AppearanceService _appearance => Context.Appearance;
     private readonly IDisposable _appearanceSubscription;
     private readonly IDisposable _languageSubscription;
+    private readonly ISettingsScope _playbackSettings;
+    private readonly IDisposable _playbackSubscription;
     private bool _closing;
 
     public SettingsViewModel(DesktopContext context) : base(context, DesktopRoutes.Settings)
     {
+        _playbackSettings = _host.Settings.ForPackage(PackageNames.Application);
+        _playbackSubscription = _playbackSettings.Subscribe<PlaybackPreferences>(_ => OnPropertyChanged(nameof(SelectedAudioQuality)));
         ThemeCommand = new(value => ApplyAppearance(current => current with { Theme = Enum.Parse<ThemePreference>(value!) }));
         LanguageCommand = new(value =>
         {
@@ -26,6 +33,18 @@ public sealed class SettingsViewModel : PageViewModel
         _appearanceSubscription = Context.Settings.Subscribe<AppearancePreferences>(_ => RefreshAppearanceProperties());
         _languageSubscription = Context.Settings.Subscribe<LanguagePreferences>(_ => RefreshLanguageProperties());
         _appearance.Colors.Changed += OnColorChanged;
+    }
+
+    public IReadOnlyList<string> AudioQualityOptions => Enum.GetValues<AudioQuality>()
+        .Select(quality => _text["AudioQuality" + quality]).ToArray();
+    public int SelectedAudioQuality
+    {
+        get => (int)_playbackSettings.Get<PlaybackPreferences>().Quality;
+        set
+        {
+            if (!_closing && Enum.IsDefined((AudioQuality)value))
+                _playbackSettings.Apply<PlaybackPreferences>(current => current with { Quality = (AudioQuality)value });
+        }
     }
 
     public RelayCommand<string> ThemeCommand { get; }
@@ -77,12 +96,15 @@ public sealed class SettingsViewModel : PageViewModel
         base.RefreshLocalizedProperties();
         RefreshAppearanceProperties();
         RefreshLanguageProperties();
+        OnPropertyChanged(nameof(AudioQualityOptions));
+        OnPropertyChanged(nameof(SelectedAudioQuality));
         OnPropertyChanged(nameof(PluginSummary));
         OnPropertyChanged(nameof(PluginDescriptions));
     }
     public override async ValueTask DisposeAsync()
     {
         _closing = true;
+        _playbackSubscription.Dispose();
         _appearanceSubscription.Dispose();
         _languageSubscription.Dispose();
         _appearance.Colors.Changed -= OnColorChanged;

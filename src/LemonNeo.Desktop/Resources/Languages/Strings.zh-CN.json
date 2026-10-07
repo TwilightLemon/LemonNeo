@@ -325,5 +325,14 @@
   "CancelOperation": "取消操作",
   "Volume": "音量",
   "NoMatchesYet": "暂无结果",
-  "NoMatchesDescription": "查询后在此查看结果。"
+  "NoMatchesDescription": "查询后在此查看结果。",
+  "AudioQualityPreference": "音质偏好",
+  "AudioQualityPreferenceDescription": "从下次播放起生效。自动选择可用的最高音质。",
+  "AudioQualityAutomatic": "自动（最高可用音质）",
+  "AudioQualityLow": "标准（128 kbps）",
+  "AudioQualityMedium": "较高（192 kbps）",
+  "AudioQualityHigh": "高品质（320 kbps）",
+  "AudioQualityLossless": "无损",
+  "AudioQualityHiRes": "Hi-Res",
+  "AudioQualityUnknown": "音质未知"
 }

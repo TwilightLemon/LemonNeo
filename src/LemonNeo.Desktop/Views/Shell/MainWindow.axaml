@@ -561,12 +561,10 @@
                 Margin="8,0,0,0"
                 VerticalAlignment="Center"
                 ColumnDefinitions="*,Auto,Auto">
-                <TextBlock
-                  HorizontalAlignment="Right"
-                  VerticalAlignment="Center"
-                  Classes="caption"
-                  Text="{Binding Playback.TimeLabel}"
-                  TextTrimming="CharacterEllipsis" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="8">
+                  <TextBlock Name="CurrentAudioQuality" Classes="caption" Text="{Binding Playback.QualityLabel}" />
+                  <TextBlock Classes="caption" Text="{Binding Playback.TimeLabel}" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
                 <Button
                   Name="VolumeButton"
                   Grid.Column="1"

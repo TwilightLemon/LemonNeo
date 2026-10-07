@@ -7,6 +7,12 @@ namespace LemonNeo.Core.Music;
 /// <summary>Stable cache identities shared by catalogue snapshots from different providers.</summary>
 public static class MusicCacheIdentity
 {
+    // Native IDs have no external scheme. Keep their own explicit kind instead of aliasing an external ID.
+    public static ExternalMusicId FromTrackId(MusicItemId id) => new(id.ProviderId, id.RemoteId, "track-id");
+
+    public static IEnumerable<ExternalMusicId> KnownIds(Track track) =>
+        new[] { FromTrackId(track.Id) }.Concat(track.ExternalIds).DistinctBy(GetKey);
+
     public static ExternalMusicId Normalize(ExternalMusicId identifier) => identifier with
     {
         Namespace = identifier.Namespace.ToUpperInvariant(),

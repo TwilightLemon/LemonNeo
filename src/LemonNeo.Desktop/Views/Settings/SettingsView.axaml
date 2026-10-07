@@ -13,6 +13,15 @@
       <ScrollViewer HorizontalScrollBarVisibility="Disabled">
         <StackPanel Spacing="18">
           <Border Classes="card">
+            <StackPanel Spacing="14">
+              <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.AudioQualityPreference}}" />
+              <ComboBox Name="AudioQualityPreference" ItemsSource="{Binding AudioQualityOptions}"
+                        SelectedIndex="{Binding SelectedAudioQuality}" MinWidth="220"
+                        AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.AudioQualityPreference}}" />
+              <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Translate {x:Static i18n:LanguageManager+Keys.AudioQualityPreferenceDescription}}" />
+            </StackPanel>
+          </Border>
+          <Border Classes="card">
             <StackPanel Spacing="16">
               <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.Appearance}}" />
               <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Translate {x:Static i18n:LanguageManager+Keys.AppearanceDescription}}" />

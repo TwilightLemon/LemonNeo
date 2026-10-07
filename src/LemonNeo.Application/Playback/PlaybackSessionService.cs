@@ -22,7 +22,8 @@ public sealed record PlaybackSessionSnapshot(
     int QueueCount,
     string? PlayerId,
     string? RequiredSourceProviderId,
-    PlaybackStatus? RestoredStatus = null);
+    PlaybackStatus? RestoredStatus = null,
+    AudioQuality? Quality = null);
 
 public sealed class PlaybackSessionChangedEventArgs(PlaybackSessionSnapshot snapshot) : EventArgs
 {
@@ -148,7 +149,8 @@ public sealed class PlaybackSessionService(
             }, cancellationToken);
             await _settings.RegisterAsync(nameof(PlaybackPreferences), new PlaybackPreferences(), value => value with
             {
-                Volume = double.IsFinite(value.Volume) ? Math.Clamp(value.Volume, 0, 1) : 1
+                Volume = double.IsFinite(value.Volume) ? Math.Clamp(value.Volume, 0, 1) : 1,
+                Quality = Enum.IsDefined(value.Quality) ? value.Quality : AudioQuality.Automatic
             }, cancellationToken);
             var saved = _settings.Get<PlaybackQueueState>();
             var resume = _settings.Get<PlaybackResumeState>();
@@ -190,9 +192,9 @@ public sealed class PlaybackSessionService(
             EnsureReady();
             queue.Replace([track]);
             ResetRestoredState();
-            queue.SetRequest(request ?? new PlaybackRequest());
+            queue.SetRequest(request ?? new PlaybackRequest(UseQualityPreference: true));
             PublishSelectedTrack();
-            await resolver.PlayAsync(track, queue.Request, cancellationToken);
+            await resolver.PlayAsync(track, EffectiveRequest(), cancellationToken);
             UpdateSettings();
             _completionHandled = false;
             snapshot = CaptureSnapshot();
@@ -234,9 +236,9 @@ public sealed class PlaybackSessionService(
             EnsureReady();
             queue.Replace(values, startIndex);
             ResetRestoredState();
-            queue.SetRequest(request ?? new PlaybackRequest());
+            queue.SetRequest(request ?? new PlaybackRequest(UseQualityPreference: true));
             PublishSelectedTrack();
-            await resolver.PlayAsync(queue.CurrentItem!.Track, queue.Request, cancellationToken);
+            await resolver.PlayAsync(queue.CurrentItem!.Track, EffectiveRequest(), cancellationToken);
             UpdateSettings();
             _completionHandled = false;
             snapshot = CaptureSnapshot();
@@ -292,7 +294,7 @@ public sealed class PlaybackSessionService(
             }
 
             PublishSelectedTrack();
-            await resolver.PlayAsync(item.Track, queue.Request, cancellationToken);
+            await resolver.PlayAsync(item.Track, EffectiveRequest(), cancellationToken);
             if (_restoredItemId == item.Id && _restoredPosition > TimeSpan.Zero)
             {
                 if (resolver.ActivePlayer?.Player is ISeekablePlayer seekable)
@@ -483,7 +485,7 @@ public sealed class PlaybackSessionService(
             }
             else if (item is not null)
             {
-                await resolver.PlayAsync(item.Track, queue.Request, cancellationToken);
+                await resolver.PlayAsync(item.Track, EffectiveRequest(), cancellationToken);
             }
 
             UpdateSettings();
@@ -592,7 +594,7 @@ public sealed class PlaybackSessionService(
                 {
                     try
                     {
-                        await resolver.PlayAsync(next.Track, queue.Request, cancellationToken);
+                        await resolver.PlayAsync(next.Track, EffectiveRequest(), cancellationToken);
                         _completionHandled = false;
                     }
                     catch (Exception exception) when (exception is not OperationCanceledException)
@@ -651,8 +653,13 @@ public sealed class PlaybackSessionService(
             queue.Items.Count,
             activePlayer?.Id,
             queue.Request.RequiredSourceProviderId,
-            _restoredStatus);
+            _restoredStatus,
+            resolver.CurrentSource?.Quality);
     }
+
+    private PlaybackRequest EffectiveRequest() => queue.Request.UseQualityPreference
+        ? queue.Request with { Quality = _settings.Get<PlaybackPreferences>().Quality, UseQualityPreference = false }
+        : queue.Request;
 
     private void ResetRestoredState()
     {
@@ -732,7 +739,8 @@ public sealed class PlaybackSessionService(
         previous.CurrentIndex != current.CurrentIndex ||
         previous.QueueCount != current.QueueCount ||
         previous.PlayerId != current.PlayerId ||
-        previous.RequiredSourceProviderId != current.RequiredSourceProviderId;
+        previous.RequiredSourceProviderId != current.RequiredSourceProviderId ||
+        previous.Quality != current.Quality;
 
     private void Raise<TEventArgs>(EventHandler<TEventArgs>? handler, TEventArgs arguments)
         where TEventArgs : EventArgs

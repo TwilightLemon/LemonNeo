@@ -1,3 +1,4 @@
+using LemonNeo.Core.Playback;
 using LemonNeo.Abstractions.Providers;
 using LemonNeo.Application.Library;
 using LemonNeo.Application.Lyrics;
@@ -47,7 +48,9 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
         LyricsDetailsCommand = new(InspectLyricsAsync); SourcesCommand = new(InspectSourcesAsync);
         PlaySourceCommand = new(() => SelectedSource is { } source && _sourceTrack is { } track
             ? playback.ExecutePlaybackAsync(ct =>
-                _host.Get<PlaybackSessionService>().PlayTrackAsync(track, new(RequiredSourceProviderId: source.Provider), ct)) : Task.CompletedTask);
+                _host.Get<PlaybackSessionService>().PlayTrackAsync(track, new(
+                    source.Candidate.Source.Quality ?? AudioQuality.Automatic,
+                    source.Candidate.IsCached ? null : source.Provider, source.Candidate.SourceId), ct)) : Task.CompletedTask);
         Context.LibraryChanged += OnLibraryChanged;
     }
     public TrackEditorViewModel? Editor { get; }
@@ -147,7 +150,7 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
     public Task InspectSourcesAsync() => ExecuteAsync(async ct =>
     {
         var track = GetInspectionTrack();
-        var result = await Task.Run(() => _host.Get<PlaybackSourceDiscoveryService>().FindAsync(track, cancellationToken: ct), ct);
+        var result = await Task.Run(() => _host.Get<PlaybackSourceDiscoveryService>().FindKnownAsync(track, cancellationToken: ct), ct);
         DiscoveredSources.Clear();
         foreach (var candidate in result.Candidates) DiscoveredSources.Add(new(candidate, _text));
         _sourceTrack = track;

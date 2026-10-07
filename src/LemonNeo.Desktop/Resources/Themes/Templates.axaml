@@ -57,7 +57,7 @@
     <StackPanel Spacing="6">
       <WrapPanel>
         <TextBlock Text="{Binding Provider}" FontWeight="SemiBold" Margin="0,0,16,0" />
-        <TextBlock Text="{Binding Confidence}" Classes="muted" Margin="0,0,16,0" />
+        <TextBlock Text="{Binding Quality}" Classes="muted" Margin="0,0,16,0" />
         <TextBlock Text="{Binding Method}" Classes="muted" />
       </WrapPanel>
       <TextBlock Text="{Binding Identity}" Classes="caption" TextWrapping="Wrap" />

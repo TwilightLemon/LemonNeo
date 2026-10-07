@@ -47,52 +47,46 @@ internal sealed class QqMusicPlaybackProvider(
             return null;
         }
 
+        var quality = SelectQuality(request.Quality);
+        if (quality is null) return null;
         var authentication = getAuthentication()
             ?? throw new ProviderException(
                 "QQ Music playback requires login. Run 'login qqmusic' first.");
-        foreach (var quality in SelectQualities(request.Quality))
+        var purl = await ResolvePurlAsync(
+            trackId.RemoteId,
+            quality,
+            authentication.Cookie,
+            cancellationToken);
+        if (string.IsNullOrWhiteSpace(purl))
         {
-            var purl = await ResolvePurlAsync(
-                trackId.RemoteId,
-                quality,
-                authentication.Cookie,
-                cancellationToken);
-            if (string.IsNullOrWhiteSpace(purl))
-            {
-                continue;
-            }
-
-            var playbackUri = Uri.TryCreate(purl, UriKind.Absolute, out var absolute)
-                ? absolute
-                : new Uri(PlaybackBaseUri, purl);
-            if (playbackUri.Scheme is not ("http" or "https"))
-            {
-                continue;
-            }
-
-            logger.LogInformation(
-                "Resolved QQ Music song {SongMid} at {Quality} quality.",
-                trackId.RemoteId,
-                quality.Label);
-            return new HttpPlaybackSource
-            {
-                CacheKey = $"{Id}:{trackId.RemoteId}:{quality.Prefix}:{quality.Extension}",
-                Uri = playbackUri,
-                Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-                {
-                    ["User-Agent"] = UserAgent,
-                    ["Referer"] = "https://y.qq.com/",
-                    ["Accept"] = "*/*"
-                },
-                ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(15),
-                IsDirectAudio = true
-            };
+            return null;
         }
 
-        logger.LogWarning(
-            "QQ Music returned no playable vkey source for song {SongMid}.",
-            trackId.RemoteId);
-        return null;
+        var playbackUri = Uri.TryCreate(purl, UriKind.Absolute, out var absolute)
+            ? absolute
+            : new Uri(PlaybackBaseUri, purl);
+        if (playbackUri.Scheme is not ("http" or "https"))
+        {
+            return null;
+        }
+
+        logger.LogInformation(
+            "Resolved QQ Music song {SongMid} at {Quality} quality.",
+            trackId.RemoteId,
+            quality.Label);
+        return new HttpPlaybackSource
+        {
+            Quality = quality.Quality,
+            Uri = playbackUri,
+            Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["User-Agent"] = UserAgent,
+                ["Referer"] = "https://y.qq.com/",
+                ["Accept"] = "*/*"
+            },
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(15),
+            IsDirectAudio = true
+        };
     }
 
     private async Task<string?> ResolvePurlAsync(
@@ -185,13 +179,13 @@ internal sealed class QqMusicPlaybackProvider(
         }
     }
 
-    private static IReadOnlyList<QqQuality> SelectQualities(AudioQuality requested) => requested switch
+    private static QqQuality? SelectQuality(AudioQuality requested) => requested switch
     {
-        AudioQuality.Low or AudioQuality.Medium => [QqQuality.Standard],
-        AudioQuality.High => [QqQuality.High, QqQuality.Standard],
-        AudioQuality.Lossless or AudioQuality.Automatic =>
-            [QqQuality.Lossless, QqQuality.High, QqQuality.Standard],
-        _ => [QqQuality.Standard]
+        AudioQuality.Low => QqQuality.Standard,
+        AudioQuality.Medium => QqQuality.Medium,
+        AudioQuality.High => QqQuality.High,
+        AudioQuality.Lossless or AudioQuality.Automatic => QqQuality.Lossless,
+        _ => null
     };
 
     private static bool IsValidSongMid(string value) =>
@@ -221,10 +215,11 @@ internal sealed class QqMusicPlaybackProvider(
     private static int? ReadInt32(JsonElement value, string property) =>
         int.TryParse(ReadString(value, property), out var result) ? result : null;
 
-    private sealed record QqQuality(string Prefix, string Extension, string Label)
+    private sealed record QqQuality(string Prefix, string Extension, string Label, AudioQuality Quality)
     {
-        public static QqQuality Standard { get; } = new("C400", "m4a", "standard");
-        public static QqQuality High { get; } = new("M800", "mp3", "high");
-        public static QqQuality Lossless { get; } = new("F000", "flac", "lossless");
+        public static QqQuality Standard { get; } = new("M500", "mp3", "128 kbps", AudioQuality.Low);
+        public static QqQuality Medium { get; } = new("C600", "m4a", "192 kbps", AudioQuality.Medium);
+        public static QqQuality High { get; } = new("M800", "mp3", "320 kbps", AudioQuality.High);
+        public static QqQuality Lossless { get; } = new("F000", "flac", "lossless", AudioQuality.Lossless);
     }
 }

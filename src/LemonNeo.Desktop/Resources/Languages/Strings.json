@@ -325,5 +325,14 @@
   "CancelOperation": "Cancel action",
   "Volume": "Volume",
   "NoMatchesYet": "No results yet",
-  "NoMatchesDescription": "Run a lookup to see results here."
+  "NoMatchesDescription": "Run a lookup to see results here.",
+  "AudioQualityPreference": "Audio Quality Preference",
+  "AudioQualityPreferenceDescription": "Used for the next playback. Automatic selects the highest available quality.",
+  "AudioQualityAutomatic": "Automatic (best available)",
+  "AudioQualityLow": "Low (128 kbps)",
+  "AudioQualityMedium": "Medium (192 kbps)",
+  "AudioQualityHigh": "High (320 kbps)",
+  "AudioQualityLossless": "Lossless",
+  "AudioQualityHiRes": "Hi-Res",
+  "AudioQualityUnknown": "Quality unknown"
 }

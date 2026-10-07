@@ -13,7 +13,7 @@ namespace LemonNeo.Application;
 /// </summary>
 public sealed class LyricsCache(string cacheDirectory, ILogger<LyricsCache> logger)
 {
-    private const int FormatVersion = 2;
+    private const int FormatVersion = 1;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -22,27 +22,10 @@ public sealed class LyricsCache(string cacheDirectory, ILogger<LyricsCache> logg
     };
     private readonly string _directory = Path.Combine(Path.GetFullPath(cacheDirectory), "Lyrics");
 
-    public async Task<LyricsLookupResult?> TryGetAsync(Track track, CancellationToken cancellationToken = default)
+    public async Task<LyricsLookupResult?> TryGetAsync(ExternalMusicId identifier, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var identifiers = MusicCacheIdentity.GetIdentifiers(track.ExternalIds);
-        foreach (var identifier in identifiers)
-        {
-            var result = await TryGetAsync(identifier, cancellationToken);
-            if (result is null) continue;
-            foreach (var alias in identifiers)
-            {
-                if (alias != identifier && !File.Exists(GetPath(alias)))
-                    await StoreAsync(alias, result.Lyrics!, result.ProviderId!, cancellationToken);
-            }
-            return result;
-        }
-        return null;
-    }
-
-    private async Task<LyricsLookupResult?> TryGetAsync(ExternalMusicId identifier, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
+        identifier = MusicCacheIdentity.Normalize(identifier);
         var path = GetPath(identifier);
         try
         {
@@ -66,22 +49,12 @@ public sealed class LyricsCache(string cacheDirectory, ILogger<LyricsCache> logg
         }
     }
 
-    public async Task StoreAsync(Track track, LyricsModel lyrics, string providerId,
+    public async Task StoreAsync(ExternalMusicId identifier, LyricsModel lyrics, string providerId,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!IsValid(lyrics)) return;
-        var identifiers = MusicCacheIdentity.GetIdentifiers(lyrics.SourceId is { } sourceId
-            ? track.ExternalIds.Append(sourceId)
-            : track.ExternalIds);
-        foreach (var identifier in identifiers)
-            await StoreAsync(identifier, lyrics, providerId, cancellationToken);
-    }
-
-    private async Task StoreAsync(ExternalMusicId identifier, LyricsModel lyrics, string providerId,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
+        identifier = MusicCacheIdentity.Normalize(identifier);
         var temporaryPath = Path.Combine(_directory, Guid.NewGuid().ToString("N") + ".part");
         try
         {

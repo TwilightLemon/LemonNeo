@@ -29,7 +29,6 @@ public sealed class PlaybackSourceDiscoveryTests
         Assert.Same(request, call.Request);
         var candidate = Assert.Single(result.Candidates);
         Assert.Same(track, candidate.Track);
-        Assert.Equal(1, candidate.Confidence);
         Assert.Equal("provider-native-id", candidate.ResolutionMethod);
     }
 
@@ -58,8 +57,8 @@ public sealed class PlaybackSourceDiscoveryTests
             .FindKnownAsync(track, request, TestContext.Current.CancellationToken);
 
         Assert.Equal([new MusicItemId(provider.Id, "missing"), new(provider.Id, "12345")],
-            provider.Calls.Select(call => call.Id));
-        Assert.All(provider.Calls, call => Assert.Same(request, call.Request));
+            provider.Calls.Where(call => call.Request.Quality == AudioQuality.High).Select(call => call.Id));
+        Assert.Same(request, provider.Calls.Last().Request);
         var candidate = Assert.Single(result.Candidates);
         Assert.Equal(new(provider.Id, "12345"), candidate.Track.Id);
         Assert.Equal(track.Title, candidate.Track.Title);
@@ -67,7 +66,6 @@ public sealed class PlaybackSourceDiscoveryTests
         Assert.Equal(track.Album, candidate.Track.Album);
         Assert.Equal(track.Duration, candidate.Track.Duration);
         Assert.Equal(track.ExternalIds, candidate.Track.ExternalIds);
-        Assert.Equal(.98, candidate.Confidence);
         Assert.Equal("declared-id:NETEASE/SONG-ID", candidate.ResolutionMethod);
         Assert.Empty(result.ProviderErrors);
     }
@@ -93,7 +91,6 @@ public sealed class PlaybackSourceDiscoveryTests
         Assert.Equal(new MusicItemId("netease", "artist-1"), Assert.Single(candidate.Track.Artists).Id);
         Assert.Equal(new MusicItemId("netease", "album-1"), candidate.Track.Album!.Id);
         Assert.Equal(new("netease", "12345", "song-id"), Assert.Single(candidate.Track.ExternalIds));
-        Assert.Equal(.96, candidate.Confidence);
         Assert.Equal("metadata-match:metadata-broker/netease", candidate.ResolutionMethod);
         Assert.Empty(result.ProviderErrors);
     }

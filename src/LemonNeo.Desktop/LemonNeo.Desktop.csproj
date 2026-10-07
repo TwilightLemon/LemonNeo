@@ -17,6 +17,6 @@
     <ProjectReference Include="../LemonNeo.Application/LemonNeo.Application.csproj" />
     <ProjectReference Include="../LemonNeo.Abstractions/LemonNeo.Abstractions.csproj" />
     <ProjectReference Include="../LemonNeo.Core/LemonNeo.Core.csproj" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.12" />
   </ItemGroup>
 </Project>

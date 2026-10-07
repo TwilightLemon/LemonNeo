@@ -835,7 +835,7 @@ internal sealed partial class CommandProcessor(
     private async Task PrintSourcesAsync(string providerId, string trackId, CancellationToken cancellationToken)
     {
         var track = await GetTrackAsync(providerId, trackId, cancellationToken);
-        var result = await sourceDiscovery.FindAsync(track, cancellationToken: cancellationToken);
+        var result = await sourceDiscovery.FindKnownAsync(track, cancellationToken: cancellationToken);
         if (result.Candidates.Count == 0)
         {
             _output.WriteLine("No playable source found.");
@@ -850,7 +850,7 @@ internal sealed partial class CommandProcessor(
                 _ => candidate.Source.GetType().Name
             };
             _output.WriteLine(
-                $"{candidate.ProviderId} | {candidate.Confidence:P0} | {candidate.ResolutionMethod} | " +
+                $"{candidate.ProviderId} | {candidate.Source.Quality} | {candidate.ResolutionMethod} | " +
                 $"{candidate.Track.Id} | {source}");
         }
 
@@ -1029,7 +1029,7 @@ internal sealed partial class CommandProcessor(
         var track = await GetTrackAsync(providerId, trackId, cancellationToken);
         await playback.PlayTrackAsync(
             track,
-            new PlaybackRequest(RequiredSourceProviderId: requiredSourceProviderId),
+            new PlaybackRequest(RequiredSourceProviderId: requiredSourceProviderId, UseQualityPreference: true),
             cancellationToken);
     }
 
@@ -1048,7 +1048,7 @@ internal sealed partial class CommandProcessor(
         await playback.PlayPlaylistAsync(
             tracks,
             startIndex,
-            new PlaybackRequest(RequiredSourceProviderId: requiredSourceProviderId),
+            new PlaybackRequest(RequiredSourceProviderId: requiredSourceProviderId, UseQualityPreference: true),
             cancellationToken);
         _output.WriteLine(
             $"Playing \"{playlist.Name}\" from track {startIndex + 1}/{tracks.Length} " +

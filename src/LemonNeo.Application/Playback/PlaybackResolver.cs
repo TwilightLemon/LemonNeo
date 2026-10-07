@@ -1,6 +1,7 @@
 using LemonNeo.Abstractions.Playback;
 using LemonNeo.Abstractions.Providers;
 using LemonNeo.Application;
+using LemonNeo.Application.Library;
 using LemonNeo.Core.Exceptions;
 using LemonNeo.Core.Music;
 using LemonNeo.Core.Playback;
@@ -12,12 +13,15 @@ public sealed class PlaybackResolver(
     IPlaybackSourceProviderRegistry playbackSources,
     IPlayerRegistry players,
     PlaybackSourceDiscoveryService sourceDiscovery,
-    PlaybackAudioCache audioCache)
+    PlaybackAudioCache audioCache,
+    LibraryService library,
+    PlaylistService playlists)
 {
     private IPlaybackDownloadSink? _download;
     private double _volume = 1;
     public IPlayerProvider? ActivePlayer { get; private set; }
     public Track? CurrentQueueTrack { get; private set; }
+    public PlaybackSource? CurrentSource { get; private set; }
     public double Volume => _volume;
     public bool CanAdjustVolume => ActivePlayer is { } active
         ? active.Player is IVolumePlayer
@@ -62,54 +66,30 @@ public sealed class PlaybackResolver(
             // which may take time or fail before the next player is selected.
             await StopAsync(cancellationToken);
             var playbackRequest = request ?? new PlaybackRequest();
-            // A persisted queue snapshot is sufficient for offline playback.
-            // Check before provider validation, ID discovery, and URL resolution.
-            if (await TryPlayCachedAsync(track, playbackRequest, cancellationToken) is { } cachedSource)
-                return cachedSource;
-            ValidateRequiredSourceProvider(playbackRequest);
-            var resolvedTrack = track;
-            PlaybackSource? source = null;
-            if ((playbackRequest.RequiredSourceProviderId is null ||
-                 string.Equals(
-                     playbackRequest.RequiredSourceProviderId,
-                     track.Id.ProviderId,
-                     StringComparison.OrdinalIgnoreCase)) &&
-                playbackSources.Get(track.Id.ProviderId) is { } nativeSource)
+            var discovery = await sourceDiscovery.FindAsync(track, playbackRequest, cancellationToken);
+            CurrentQueueTrack = discovery.UpdatedTrack ?? track;
+            await SaveDiscoveredIdsAsync(track, CurrentQueueTrack, cancellationToken);
+            var candidate = discovery.Candidates.FirstOrDefault();
+            if (candidate is null)
             {
-                source = await nativeSource.PlaybackProvider.ResolvePlaybackAsync(
-                    track.Id,
-                    playbackRequest,
-                    cancellationToken);
+                ValidateRequiredSourceProvider(playbackRequest);
+                throw new PlaybackResolutionException($"No playable source could be found for '{track.Title}'.");
             }
-
-            if (source is null)
+            try
             {
-                var discovery = await sourceDiscovery.FindKnownAsync(track, playbackRequest, cancellationToken);
-                if (discovery.Candidates.Count == 0)
-                {
-                    discovery = await sourceDiscovery.FindAsync(track, playbackRequest, cancellationToken);
-                }
-
-                var candidate = discovery.Candidates.FirstOrDefault()
-                    ?? throw new PlaybackResolutionException(
-                        playbackRequest.RequiredSourceProviderId is null
-                            ? $"No playable source could be found for '{track.Title}'."
-                            : $"Required source provider '{playbackRequest.RequiredSourceProviderId}' " +
-                              $"could not resolve '{track.Title}'.");
-                source = candidate.Source;
-                resolvedTrack = candidate.Track;
+                await PlaySourceAsync(candidate, CurrentQueueTrack, cancellationToken);
             }
-
-            var cacheTrack = track with
+            catch (Exception exception) when (candidate.IsCached && exception is not OperationCanceledException)
             {
-                ExternalIds = MusicCacheIdentity.GetIdentifiers(track.ExternalIds.Concat(resolvedTrack.ExternalIds))
-            };
-            // Discovery may reveal an ID whose audio was already cached by another snapshot.
-            if (!track.ExternalIds.SequenceEqual(cacheTrack.ExternalIds) &&
-                await TryPlayCachedAsync(cacheTrack, playbackRequest, cancellationToken) is { } discoveredCache)
-                return discoveredCache;
-            await PlaySourceAsync(resolvedTrack, source, cacheTrack, playbackRequest, cancellationToken);
-            return source;
+                audioCache.Invalidate(candidate.SourceId, candidate.Source.Quality!.Value);
+                // Retry discovery after rejecting a corrupt or undecodable cached resource.
+                discovery = await sourceDiscovery.FindAsync(CurrentQueueTrack, playbackRequest, cancellationToken, expandMetadata: !discovery.MetadataExpanded);
+                await SaveDiscoveredIdsAsync(CurrentQueueTrack, discovery.UpdatedTrack ?? CurrentQueueTrack, cancellationToken);
+                candidate = discovery.Candidates.FirstOrDefault()
+                    ?? throw new PlaybackResolutionException($"No playable source could be found for '{track.Title}'.", exception);
+                await PlaySourceAsync(candidate, discovery.UpdatedTrack ?? CurrentQueueTrack, cancellationToken);
+            }
+            return candidate.Source;
         }
         catch (Exception exception) when (exception is not OperationCanceledException and not PlaybackResolutionException)
         {
@@ -123,31 +103,13 @@ public sealed class PlaybackResolver(
     public Task ResumeAsync(CancellationToken cancellationToken = default) =>
         ActivePlayer?.Player.ResumeAsync(cancellationToken) ?? Task.CompletedTask;
 
-    private async Task<FilePlaybackSource?> TryPlayCachedAsync(
-        Track track, PlaybackRequest request, CancellationToken cancellationToken)
-    {
-        var source = await audioCache.TryGetAsync(track, request, cancellationToken);
-        if (source is null) return null;
-        try
-        {
-            await PlaySourceAsync(track, source, track, request, cancellationToken);
-            return source;
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            // A verified byte stream can still be rejected by a decoder.
-            audioCache.Invalidate(track, request);
-            return null;
-        }
-    }
-
     private async Task PlaySourceAsync(
-        Track resolvedTrack,
-        PlaybackSource source,
+        PlaybackSourceCandidate candidate,
         Track queueTrack,
-        PlaybackRequest request,
         CancellationToken cancellationToken)
     {
+        var source = candidate.Source;
+        var resolvedTrack = candidate.Track;
         var player = players.GetRequiredPlayer(source);
         try
         {
@@ -155,8 +117,7 @@ public sealed class PlaybackResolver(
                 await volumePlayer.SetVolumeAsync(_volume, cancellationToken);
             if (source is HttpPlaybackSource { IsDirectAudio: true } http && player.Player is IStreamingPlayer streaming)
             {
-                // Original and discovered external IDs are aliases for this download.
-                _download = audioCache.Start(queueTrack, request, http);
+                _download = audioCache.Start(candidate.SourceId, http);
                 if (_download is not null)
                     await streaming.PlayAsync(resolvedTrack, http, _download, cancellationToken);
                 else
@@ -168,18 +129,34 @@ public sealed class PlaybackResolver(
             }
             ActivePlayer = player;
             CurrentQueueTrack = queueTrack;
+            CurrentSource = source;
         }
         catch
         {
             try { await player.Player.StopAsync(CancellationToken.None); }
             finally
             {
-                if (_download is not null) audioCache.Invalidate(queueTrack, request);
+                if (_download is not null && source.Quality is { } quality) audioCache.Invalidate(candidate.SourceId, quality);
                 _download?.Dispose();
                 _download = null;
             }
             throw;
         }
+    }
+
+    private async Task SaveDiscoveredIdsAsync(Track original, Track updated, CancellationToken cancellationToken)
+    {
+        if (original.ExternalIds.SequenceEqual(updated.ExternalIds)) return;
+        var changed = false;
+        foreach (var playlist in library.Current.Playlists)
+        foreach (var item in playlist.Items.Where(item => item.Track.Id == original.Id))
+        {
+            var ids = item.Track.ExternalIds.Concat(updated.ExternalIds).DistinctBy(MusicCacheIdentity.GetKey).ToArray();
+            if (item.Track.ExternalIds.SequenceEqual(ids)) continue;
+            playlists.UpdateTrack(playlist.Id, item.Id, item.Track with { ExternalIds = ids });
+            changed = true;
+        }
+        if (changed) await library.SaveAsync(cancellationToken);
     }
 
     private void ValidateRequiredSourceProvider(PlaybackRequest request)
@@ -212,5 +189,6 @@ public sealed class PlaybackResolver(
         _download = null;
         ActivePlayer = null;
         CurrentQueueTrack = null;
+        CurrentSource = null;
     }
 }

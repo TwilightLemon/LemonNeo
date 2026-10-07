@@ -8,44 +8,35 @@ using Microsoft.Extensions.Logging;
 
 namespace LemonNeo.Application;
 
-/// <summary>
-/// Host-owned audio storage, indexed by external music identities and playback
-/// request so lookup never needs a provider, a URL, or an internet connection.
-/// </summary>
+/// <summary>Audio indexed by one namespace-kind-id identity and its actual quality.</summary>
 public sealed class PlaybackAudioCache(string cacheDirectory, ILogger<PlaybackAudioCache> logger)
 {
-    private const int FormatVersion = 2;
+    private const int FormatVersion = 1;
     private readonly string _directory = Path.Combine(Path.GetFullPath(cacheDirectory), "Music");
 
     public async Task<FilePlaybackSource?> TryGetAsync(
-        Track track,
-        PlaybackRequest request,
-        CancellationToken cancellationToken = default)
+        ExternalMusicId identifier, AudioQuality quality, CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        var identifiers = MusicCacheIdentity.GetIdentifiers(track.ExternalIds);
-        foreach (var identifier in identifiers)
+        var entry = await TryGetEntryAsync(MusicCacheIdentity.Normalize(identifier), quality, cancellationToken);
+        return entry is null ? null : new FilePlaybackSource(Path.Combine(_directory, entry.FileName))
         {
-            var entry = await TryGetEntryAsync(identifier, request, cancellationToken);
-            if (entry is null) continue;
-            AddAliases(entry, identifiers, request);
-            return new FilePlaybackSource(Path.Combine(_directory, entry.FileName));
-        }
-        return null;
+            Quality = entry.Quality,
+            BitrateKbps = entry.BitrateKbps
+        };
     }
 
     private async Task<CacheEntry?> TryGetEntryAsync(
-        ExternalMusicId identifier, PlaybackRequest request, CancellationToken cancellationToken)
+        ExternalMusicId identifier, AudioQuality quality, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var indexPath = GetIndexPath(identifier, request);
+        var indexPath = GetIndexPath(identifier, quality);
         if (!File.Exists(indexPath)) return null;
         try
         {
             var entry = JsonSerializer.Deserialize<CacheEntry>(
                 await File.ReadAllTextAsync(indexPath, cancellationToken));
             if (entry is null || entry.FormatVersion != FormatVersion || entry.Length <= 0 ||
-                entry.Identifiers is null || !entry.Identifiers.Contains(identifier) ||
+                entry.Identifier != identifier || entry.Quality != quality || quality == AudioQuality.Automatic ||
                 !IsDigest(entry.Sha256) || string.IsNullOrEmpty(entry.FileName) ||
                 entry.FileName != entry.Sha256 + AudioExtension(Path.GetExtension(entry.FileName)))
             {
@@ -62,7 +53,7 @@ public sealed class PlaybackAudioCache(string cacheDirectory, ILogger<PlaybackAu
                 RemoveIndex(indexPath);
                 return null;
             }
-            logger.LogInformation("Playing host-cached audio from {Path}.", path);
+            logger.LogInformation("Found host-cached audio at {Path}.", path);
             return entry;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
@@ -73,37 +64,16 @@ public sealed class PlaybackAudioCache(string cacheDirectory, ILogger<PlaybackAu
         }
     }
 
-    private void AddAliases(CacheEntry entry, ExternalMusicId[] identifiers, PlaybackRequest request)
+    public IPlaybackDownloadSink? Start(ExternalMusicId identifier, HttpPlaybackSource source)
     {
-        var aliases = MusicCacheIdentity.GetIdentifiers(entry.Identifiers.Concat(identifiers));
-        if (entry.Identifiers.SequenceEqual(aliases)) return;
-        var temporaryPath = Path.Combine(_directory, Guid.NewGuid().ToString("N") + ".json.part");
-        try
-        {
-            var json = JsonSerializer.Serialize(entry with { Identifiers = aliases });
-            foreach (var alias in aliases)
-            {
-                File.WriteAllText(temporaryPath, json);
-                File.Move(temporaryPath, GetIndexPath(alias, request), overwrite: true);
-            }
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            logger.LogWarning(exception, "Could not add audio cache aliases. Cached playback continues.");
-        }
-        finally { RemoveIndex(temporaryPath); }
-    }
-
-    public IPlaybackDownloadSink? Start(Track track, PlaybackRequest request, HttpPlaybackSource source)
-    {
-        var identifiers = MusicCacheIdentity.GetIdentifiers(track.ExternalIds);
-        if (identifiers.Length == 0) return null;
+        // Unknown quality must never be cached under the requested quality.
+        if (source.Quality is not { } quality || quality == AudioQuality.Automatic || !Enum.IsDefined(quality)) return null;
+        identifier = MusicCacheIdentity.Normalize(identifier);
         try
         {
             Directory.CreateDirectory(_directory);
-            return new DownloadWriter(_directory, identifiers,
-                identifiers.Select(identifier => GetIndexPath(identifier, request)).ToArray(),
-                AudioExtension(Path.GetExtension(source.Uri.AbsolutePath)), logger);
+            return new DownloadWriter(_directory, identifier, quality, source.BitrateKbps,
+                GetIndexPath(identifier, quality), AudioExtension(Path.GetExtension(source.Uri.AbsolutePath)), logger);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
@@ -112,38 +82,12 @@ public sealed class PlaybackAudioCache(string cacheDirectory, ILogger<PlaybackAu
         }
     }
 
-    public void Invalidate(Track track, PlaybackRequest request)
-    {
-        foreach (var identifier in MusicCacheIdentity.GetIdentifiers(track.ExternalIds))
-        {
-            var indexPath = GetIndexPath(identifier, request);
-            try
-            {
-                if (!File.Exists(indexPath)) continue;
-                var entry = JsonSerializer.Deserialize<CacheEntry>(File.ReadAllText(indexPath));
-                if (entry is { FormatVersion: FormatVersion, Identifiers: not null } &&
-                    entry.Identifiers.Contains(identifier))
-                {
-                    foreach (var alias in MusicCacheIdentity.GetIdentifiers(entry.Identifiers))
-                        RemoveIndex(GetIndexPath(alias, request));
-                }
-            }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
-            {
-                logger.LogWarning(exception, "Could not read audio cache aliases during invalidation.");
-            }
-            finally { RemoveIndex(indexPath); }
-        }
-    }
+    public void Invalidate(ExternalMusicId identifier, AudioQuality quality) =>
+        RemoveIndex(GetIndexPath(identifier, quality));
 
-    private string GetIndexPath(ExternalMusicId identifier, PlaybackRequest request)
+    private string GetIndexPath(ExternalMusicId identifier, AudioQuality quality)
     {
-        var identity = JsonSerializer.Serialize(new
-        {
-            MusicId = MusicCacheIdentity.GetKey(identifier),
-            request.Quality,
-            RequiredSourceProviderId = request.RequiredSourceProviderId?.ToUpperInvariant()
-        });
+        var identity = JsonSerializer.Serialize(new { MusicId = MusicCacheIdentity.GetKey(identifier), Quality = quality });
         return Path.Combine(_directory,
             Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(identity))) + ".json");
     }
@@ -167,15 +111,17 @@ public sealed class PlaybackAudioCache(string cacheDirectory, ILogger<PlaybackAu
         _ => ".audio"
     };
 
-    private sealed record CacheEntry(int FormatVersion, ExternalMusicId[] Identifiers,
+    private sealed record CacheEntry(int FormatVersion, ExternalMusicId Identifier, AudioQuality Quality, int? BitrateKbps,
         string FileName, long Length, string Sha256);
 
     private sealed class DownloadWriter : IPlaybackDownloadSink
     {
         private readonly object _gate = new();
         private readonly string _directory;
-        private readonly ExternalMusicId[] _identifiers;
-        private readonly string[] _indexPaths;
+        private readonly ExternalMusicId _identifier;
+        private readonly AudioQuality _quality;
+        private readonly int? _bitrateKbps;
+        private readonly string _indexPath;
         private readonly string _extension;
         private readonly string _temporaryPath;
         private readonly string _temporaryIndexPath;
@@ -187,12 +133,14 @@ public sealed class PlaybackAudioCache(string cacheDirectory, ILogger<PlaybackAu
         private bool _ended;
         private bool _closed;
 
-        public DownloadWriter(string directory, ExternalMusicId[] identifiers,
-            string[] indexPaths, string extension, ILogger logger)
+        public DownloadWriter(string directory, ExternalMusicId identifier, AudioQuality quality, int? bitrateKbps,
+            string indexPath, string extension, ILogger logger)
         {
             _directory = directory;
-            _identifiers = identifiers;
-            _indexPaths = indexPaths;
+            _identifier = identifier;
+            _quality = quality;
+            _bitrateKbps = bitrateKbps;
+            _indexPath = indexPath;
             _extension = extension;
             _logger = logger;
             var temporaryId = Guid.NewGuid().ToString("N");
@@ -272,13 +220,9 @@ public sealed class PlaybackAudioCache(string cacheDirectory, ILogger<PlaybackAu
                 _file.Dispose();
                 _file = null;
                 File.Move(_temporaryPath, Path.Combine(_directory, fileName), overwrite: true);
-                var entry = JsonSerializer.Serialize(new CacheEntry(FormatVersion, _identifiers, fileName, _written, digest));
-                foreach (var indexPath in _indexPaths)
-                {
-                    File.WriteAllText(_temporaryIndexPath, entry);
-                    // Each alias is committed atomically after the complete audio.
-                    File.Move(_temporaryIndexPath, indexPath, overwrite: true);
-                }
+                var entry = JsonSerializer.Serialize(new CacheEntry(FormatVersion, _identifier, _quality, _bitrateKbps, fileName, _written, digest));
+                File.WriteAllText(_temporaryIndexPath, entry);
+                File.Move(_temporaryIndexPath, _indexPath, overwrite: true);
                 _logger.LogInformation("Cached downloaded audio at {Path}.", Path.Combine(_directory, fileName));
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)

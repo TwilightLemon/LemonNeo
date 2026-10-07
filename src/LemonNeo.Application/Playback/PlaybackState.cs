@@ -18,4 +18,4 @@ public sealed record PlaybackQueueState
 public sealed record PlaybackResumeState(Guid? ItemId = null, TimeSpan Position = default,
     PlaybackStatus Status = PlaybackStatus.Stopped);
 
-public sealed record PlaybackPreferences(double Volume = 1);
+public sealed record PlaybackPreferences(double Volume = 1, AudioQuality Quality = AudioQuality.Automatic);

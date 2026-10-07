@@ -145,7 +145,12 @@ public interface IPlaybackProvider
     /// <summary>External ID schemes whose values this provider accepts as RemoteId.</summary>
     IReadOnlyCollection<MusicIdScheme> AcceptedIdSchemes { get; }
 
-    /// <summary>Resolves audio using an ID scoped to this playback provider.</summary>
+    /// <summary>
+    /// Resolves only the requested quality using an ID scoped to this provider.
+    /// Automatic means the highest supported quality. Return null when unavailable;
+    /// do not retry at lower qualities. If the remote service silently downgrades,
+    /// return its actual quality in PlaybackSource.Quality for host arbitration.
+    /// </summary>
     Task<PlaybackSource?> ResolvePlaybackAsync(
         MusicItemId trackId,
         PlaybackRequest request,

@@ -3,7 +3,12 @@ using System.Collections.Immutable;
 
 namespace LemonNeo.Core.Playback;
 
-public abstract record PlaybackSource;
+public abstract record PlaybackSource
+{
+    /// <summary>Actual resource quality; null means the provider cannot determine it.</summary>
+    public AudioQuality? Quality { get; init; }
+    public int? BitrateKbps { get; init; }
+}
 
 public sealed record HttpPlaybackSource : PlaybackSource
 {
@@ -12,13 +17,6 @@ public sealed record HttpPlaybackSource : PlaybackSource
         = new Dictionary<string, string>();
     public DateTimeOffset? ExpiresAt { get; init; }
     public bool IsDirectAudio { get; init; } = true;
-    /// <summary>
-    /// Optional provider-qualified identity for this exact audio variant (track,
-    /// quality, and format). It stays stable when a signed playback URL changes.
-    /// The host's audio cache does not use this value: it selects cached
-    /// audio by external music IDs and the playback request before URL resolution.
-    /// </summary>
-    public string? CacheKey { get; init; }
 }
 
 public sealed record FilePlaybackSource(string Path) : PlaybackSource;
@@ -29,12 +27,25 @@ public enum AudioQuality
     Low,
     Medium,
     High,
-    Lossless
+    Lossless,
+    HiRes
+}
+
+public static class AudioQualities
+{
+    public static IReadOnlyList<AudioQuality> Descending { get; } =
+        [AudioQuality.HiRes, AudioQuality.Lossless, AudioQuality.High, AudioQuality.Medium, AudioQuality.Low];
+
+    public static IEnumerable<AudioQuality> SearchOrder(AudioQuality preferred) =>
+        preferred == AudioQuality.Automatic ? Descending : new[] { preferred }.Concat(Descending.Where(q => q != preferred));
 }
 
 public sealed record PlaybackRequest(
     AudioQuality Quality = AudioQuality.Automatic,
-    string? RequiredSourceProviderId = null);
+    string? RequiredSourceProviderId = null,
+    ExternalMusicId? RequiredSourceId = null,
+    // Host-only: resolve the saved preference at each queue playback; explicit Auto still means highest.
+    bool UseQualityPreference = false);
 
 public enum PlaybackMode
 {

@@ -74,7 +74,7 @@ public sealed class GdStudioNeteasePlugin :
         var client = _httpClient ?? throw new InvalidOperationException("The GDStudio provider is not initialized.");
         var endpoint = new Uri(
             $"https://music-api.gdstudio.xyz/api.php?types=url&source=netease" +
-            $"&id={Uri.EscapeDataString(trackId.RemoteId)}&br=999");
+            $"&id={Uri.EscapeDataString(trackId.RemoteId)}&br={RequestedBitrate(request.Quality)}");
         using var message = new HttpRequestMessage(HttpMethod.Get, endpoint);
         message.Headers.UserAgent.ParseAdd(UserAgent);
         message.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -119,7 +119,8 @@ public sealed class GdStudioNeteasePlugin :
             return new HttpPlaybackSource
             {
                 Uri = playbackUri,
-                CacheKey = $"{ProviderId}:{trackId.RemoteId}:{payload.Bitrate}:{payload.Size}:{Path.GetExtension(playbackUri.AbsolutePath).ToLowerInvariant()}",
+                Quality = ActualQuality(payload.Bitrate),
+                BitrateKbps = payload.Bitrate,
                 Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
                     ["User-Agent"] = UserAgent,
@@ -131,6 +132,27 @@ public sealed class GdStudioNeteasePlugin :
         }
     }
 
+    private static int RequestedBitrate(AudioQuality quality) => quality switch
+    {
+        AudioQuality.Low => 128,
+        AudioQuality.Medium => 192,
+        AudioQuality.High => 320,
+        AudioQuality.Lossless => 740,
+        _ => 999
+    };
+
+    // Response br is actual kbps, not the 740/999 request selector. Since it does not
+    // include bit depth, use conservative bitrate tiers (16-bit CD PCM is 1411 kbps).
+    private static AudioQuality? ActualQuality(int? bitrate) => bitrate switch
+    {
+        > 1411 => AudioQuality.HiRes,
+        > 320 => AudioQuality.Lossless,
+        > 192 => AudioQuality.High,
+        > 128 => AudioQuality.Medium,
+        > 0 => AudioQuality.Low,
+        _ => null
+    };
+
     private static bool IsValidSongId(string value) =>
         long.TryParse(value, out var parsed) && parsed > 0;
 
@@ -140,6 +162,7 @@ public sealed class GdStudioNeteasePlugin :
         public string? Url { get; init; }
 
         [JsonPropertyName("br")]
+        [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
         public int? Bitrate { get; init; }
 
         [JsonPropertyName("size")]
