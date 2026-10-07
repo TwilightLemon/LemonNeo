@@ -25,6 +25,7 @@
   <Window.Resources>
     <Thickness x:Key="Space.PlaybackInset">0,0,0,132</Thickness>
     <Thickness x:Key="Space.PlaybackFooterInset">0,12,0,132</Thickness>
+    <Thickness x:Key="Space.PlaybackFloatingInset">0,0,16,132</Thickness>
   </Window.Resources>
   <Window.Styles>
     <Style Selector="Border#TopBar">
@@ -39,7 +40,7 @@
     <Style Selector="Border#Sidebar.macos">
       <Setter Property="Padding" Value="16,32,16,12" />
     </Style>
-    <Style Selector="ContentControl#PageContent ListBox:not(.serviceTabs) /template/ ItemsPresenter#PART_ItemsPresenter">
+    <Style Selector="ContentControl#PageContent ListBox:not(.serviceTabs):not(.playlistPicker) /template/ ItemsPresenter#PART_ItemsPresenter">
       <Setter Property="Margin" Value="{DynamicResource Space.PlaybackInset}" />
     </Style>
     <Style Selector="ContentControl#PageContent ScrollViewer:not(#PART_ScrollViewer):not(#LyricsScrollViewer)">
@@ -163,6 +164,7 @@
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="shellVm:PlaylistMenuItemViewModel">
                 <Grid ColumnDefinitions="*,Auto">
+
                   <TextBlock
                     VerticalAlignment="Center"
                     Text="{Binding Name}"

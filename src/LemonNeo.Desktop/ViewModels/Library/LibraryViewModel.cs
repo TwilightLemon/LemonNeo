@@ -14,6 +14,7 @@ public sealed partial class LibraryViewModel : TrackListViewModel
 {
     private readonly Guid? _playlistId;
     private Guid[] _queueIds = [];
+    private Track? _lastPlaybackTrack;
     public LibraryViewModel(DesktopContext context, DesktopNavigation navigation, PlaybackViewModel playback, string route, Guid? playlistId = null)
         : base(context, navigation, playback, route)
     {
@@ -39,13 +40,14 @@ public sealed partial class LibraryViewModel : TrackListViewModel
     public bool CanEditPlaylist => CanInteract && IsLibrary && SelectedPlaylist is not null;
     public bool HasSelectedPlaylist => IsLibrary && SelectedPlaylist is not null;
     public bool CanEditTrack => CanInspectTrack && SelectedTrack!.PlaylistId is not null && SelectedTrack.PlaylistItemId is not null;
+    public bool CanRemoveTracks => CanEditPlaylist && HasActionTracks;
+    public bool CanReorderTracks => CanEditPlaylist && IsSelectionMode && string.IsNullOrWhiteSpace(Filter);
     public bool CanMoveUp => CanEditTrack && SelectedTrack!.Number > 1;
     public bool CanMoveDown => CanEditTrack && SelectedTrack!.Number < SelectedPlaylist?.Items.Count;
     public override string PageTitle => SelectedPlaylist?.Name ?? base.PageTitle;
     public override string PageDescription => IsLibrary ? SelectedPlaylist?.Description ?? "" : base.PageDescription;
     public string EmptyTitle => _text[!string.IsNullOrWhiteSpace(Filter) ? "NoResults" : IsQueue ? "EmptyQueue" : SelectedPlaylist is null ? "EmptyLibrary" : "PlaylistEmpty"];
     public string EmptyDescription => _text[!string.IsNullOrWhiteSpace(Filter) ? "NoResultsDescription" : IsQueue ? "EmptyQueueDescription" : SelectedPlaylist is null ? "EmptyLibraryDescription" : "PlaylistEmptyDescription"];
-    public AsyncRelayCommand ClearQueueCommand => Playback.ClearQueueCommand;
     public AsyncRelayCommand RemoveTrackCommand { get; }
     public AsyncRelayCommand MoveTrackUpCommand { get; }
     public AsyncRelayCommand MoveTrackDownCommand { get; }
@@ -118,10 +120,25 @@ public sealed partial class LibraryViewModel : TrackListViewModel
 
     public Task RemoveSelectedTrackAsync()
     {
-        if (!CanEditTrack || SelectedTrack is not { PlaylistId: { } playlistId, PlaylistItemId: { } itemId }) return Task.CompletedTask;
+        if (!CanRemoveTracks || SelectedPlaylist is not { } playlist) return Task.CompletedTask;
+        var ids = ActionTracks.Select(t => t.PlaylistItemId).OfType<Guid>().ToArray();
         return ExecuteAsync(async ct =>
         {
-            _host.Get<PlaylistService>().Remove(playlistId, itemId);
+            foreach (var id in ids) _host.Get<PlaylistService>().Remove(playlist.Id, id);
+            await _host.Get<LibraryService>().SaveAsync(ct);
+            Context.RefreshLibrary();
+            SetStatus("LibrarySaved");
+        });
+    }
+
+    public Task ReorderTracksAsync(TrackRow source, TrackRow target, bool after)
+    {
+        if (!CanReorderTracks || SelectedPlaylist is not { } playlist || source.PlaylistItemId is not { } sourceId || target.PlaylistItemId is not { } targetId)
+            return Task.CompletedTask;
+        var ids = IsSelectionMode && source.IsMarked ? ActionTracks.Select(t => t.PlaylistItemId!.Value).ToArray() : [sourceId];
+        return ExecuteAsync(async ct =>
+        {
+            _host.Get<PlaylistService>().Reorder(playlist.Id, ids, targetId, after);
             await _host.Get<LibraryService>().SaveAsync(ct);
             Context.RefreshLibrary();
             SetStatus("LibrarySaved");
@@ -144,6 +161,15 @@ public sealed partial class LibraryViewModel : TrackListViewModel
 
     private void OnPlaybackChanged(object? sender, EventArgs args)
     {
+        // Resolution can enrich the stored snapshots with the chosen source ID.
+        // Refresh only when metadata changes, not on every playback timeline tick.
+        if (!ReferenceEquals(_lastPlaybackTrack, Playback.Snapshot.CurrentTrack))
+        {
+            _lastPlaybackTrack = Playback.Snapshot.CurrentTrack;
+            var latest = GetTracks().ToDictionary(row => row.PlaylistItemId?.ToString() ?? row.QueueItemId?.ToString() ?? row.Identity, row => row.Track);
+            if (Tracks.Any(row => latest.TryGetValue(row.PlaylistItemId?.ToString() ?? row.QueueItemId?.ToString() ?? row.Identity, out var track) && !ReferenceEquals(row.Track, track)))
+                RefreshTracks();
+        }
         if (!IsQueue) return;
         var ids = _host.Get<PlaybackSessionService>().Queue.Items.Select(i => i.Id).ToArray();
         if (_queueIds.SequenceEqual(ids)) return;
@@ -154,7 +180,7 @@ public sealed partial class LibraryViewModel : TrackListViewModel
     {
         base.RaiseInteractionProperties();
         foreach (var name in new[] { nameof(CanEditPlaylist), nameof(CanEditTrack), nameof(CanMoveUp), nameof(CanMoveDown), nameof(HasSelectedPlaylist),
-            nameof(SelectedPlaylist), nameof(EmptyTitle), nameof(EmptyDescription) }) OnPropertyChanged(name);
+            nameof(SelectedPlaylist), nameof(EmptyTitle), nameof(EmptyDescription), nameof(CanRemoveTracks), nameof(CanReorderTracks) }) OnPropertyChanged(name);
     }
     public override async ValueTask DisposeAsync() { Playback.Changed -= OnPlaybackChanged; await base.DisposeAsync(); }
 }

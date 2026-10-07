@@ -106,7 +106,7 @@
                                 VisibleLineCount="{Binding DesktopLyricLineCount}" FontSize="{Binding DesktopLyricFontSize}"
                                 ShowRomanization="{Binding DesktopShowRomanization}" ShowTranslation="{Binding DesktopShowTranslation}"
                                 BoldLyrics="True" TextAlignment="Center" ReduceMotion="{Binding ReduceMotion}"
-                                Foreground="White" UnreachedBrush="White" ReachedBrush="#FFFFD166">
+                                Foreground="White" UnreachedBrush="White" ReachedBrush="{DynamicResource Brush.LyricText}">
         <lyricsControls:LyricsPresenter.Effect>
           <DropShadowEffect Color="Black" BlurRadius="4" OffsetX="0" OffsetY="1" Opacity="1" />
         </lyricsControls:LyricsPresenter.Effect>

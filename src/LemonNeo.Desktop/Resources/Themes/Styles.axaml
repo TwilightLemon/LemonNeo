@@ -1,5 +1,8 @@
 <Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:i18n="using:LemonNeo.Desktop.Services">
+        xmlns:i18n="using:LemonNeo.Desktop.Services"
+        xmlns:sharedControls="using:LemonNeo.Desktop.Controls.Shared"
+        xmlns:sharedVm="using:LemonNeo.Desktop.ViewModels.Shared"
+        xmlns:playbackVm="using:LemonNeo.Desktop.ViewModels.Playback">
   <Style Selector="Window">
     <Setter Property="Background" Value="{DynamicResource Brush.Canvas}" />
     <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
@@ -33,6 +36,12 @@
   <Style Selector="Button.icon"><Setter Property="Width" Value="40" /><Setter Property="Height" Value="40" /><Setter Property="Padding" Value="10" /></Style>
   <Style Selector="Button.compact"><Setter Property="MinWidth" Value="32" /><Setter Property="MinHeight" Value="32" /><Setter Property="Height" Value="32" /><Setter Property="Padding" Value="7,4" /><Setter Property="CornerRadius" Value="8" /></Style>
   <Style Selector="Button.danger"><Setter Property="Foreground" Value="{DynamicResource Brush.Danger}" /><Setter Property="Background" Value="{DynamicResource Brush.DangerSoft}" /></Style>
+  <Style Selector="Button.floating"><Setter Property="Width" Value="48" /><Setter Property="Height" Value="48" /><Setter Property="CornerRadius" Value="24" /><Setter Property="Padding" Value="12" /></Style>
+  <Style Selector="Border.floatingAction"><Setter Property="CornerRadius" Value="24" /><Setter Property="BoxShadow" Value="0 4 16 0 #55000000" /></Style>
+  <Style Selector="Border.trackRow.current TextBlock"><Setter Property="Foreground" Value="{DynamicResource Brush.AccentText}" /></Style>
+  <Style Selector="ListBoxItem.dragging"><Setter Property="Opacity" Value="0.5" /></Style>
+  <Style Selector="ListBoxItem.dropBefore /template/ ContentPresenter"><Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentText}" /><Setter Property="BorderThickness" Value="0,2,0,0" /></Style>
+  <Style Selector="ListBoxItem.dropAfter /template/ ContentPresenter"><Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentText}" /><Setter Property="BorderThickness" Value="0,0,0,2" /></Style>
   <Style Selector="Button.themeColor">
     <Setter Property="Background" Value="{DynamicResource Brush.Surface}" />
     <Setter Property="BorderThickness" Value="2" /><Setter Property="Padding" Value="12" />
@@ -83,6 +92,19 @@
   <Style Selector="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="Padding" Value="12,10" /><Setter Property="Margin" Value="0,2" /><Setter Property="CornerRadius" Value="{DynamicResource Radius.Control}" /></Style>
   <Style Selector="ListBoxItem:selected /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource Brush.AccentSoft}" /></Style>
   <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource Brush.Hover}" /></Style>
+  <Style Selector="ListBox.trackList ListBoxItem" x:DataType="sharedVm:TrackRow">
+    <Setter Property="sharedControls:TrackRowAppearance.IsCurrent" Value="{Binding IsCurrent}" />
+    <Setter Property="sharedControls:TrackRowAppearance.IsMarked" Value="{Binding IsMarked}" />
+  </Style>
+  <Style Selector="ListBox.queueList ListBoxItem" x:DataType="playbackVm:QueueTrackViewModel">
+    <Setter Property="sharedControls:TrackRowAppearance.IsCurrent" Value="{Binding IsCurrent}" />
+  </Style>
+  <Style Selector="ListBoxItem.current /template/ ContentPresenter, ListBoxItem.marked /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Brush.AccentSoft}" />
+  </Style>
+  <Style Selector="ListBox.managing ListBoxItem:selected:not(.current):not(.marked):not(:pointerover) /template/ ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
   <Style Selector="ListBox.serviceTabs ListBoxItem">
     <Setter Property="Padding" Value="16,10" /><Setter Property="Margin" Value="0" /><Setter Property="CornerRadius" Value="0" />
   </Style>

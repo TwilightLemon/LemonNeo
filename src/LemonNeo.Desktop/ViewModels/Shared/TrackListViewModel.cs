@@ -5,6 +5,8 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.Input;
 using LemonNeo.Desktop.Services;
 using LemonNeo.Desktop.ViewModels.Playback;
+using LemonNeo.Desktop.Config;
+using System.ComponentModel;
 
 namespace LemonNeo.Desktop.ViewModels.Shared;
 
@@ -15,15 +17,25 @@ public abstract class TrackListViewModel : PageViewModel
     private TrackRow? _selectedTrack;
     private Playlist? _targetPlaylist;
     private string _filter = "";
+    private bool _isSelectionMode;
+    private bool _updatingSelection;
+    private bool _hasPlayingTrack;
+    private ExternalMusicId? _lastPlayingId;
+    private readonly IDisposable _preferencesSubscription;
     protected TrackListViewModel(DesktopContext context, DesktopNavigation navigation, PlaybackViewModel playback, string route) : base(context, route)
     {
         Navigation = navigation; Playback = playback;
         PlayAllCommand = new(() => PlayAsync(), AsyncRelayCommandOptions.AllowConcurrentExecutions);
         PlaySelectedCommand = new(() => PlayAsync(SelectedTrack), AsyncRelayCommandOptions.AllowConcurrentExecutions);
         InspectTrackCommand = new(() => { if (CanInspectTrack && SelectedTrack is { } row) _ = Navigation.OpenEditorAsync(row); });
-        AddToPlaylistCommand = new(() => SelectedTrack is { } row && TargetPlaylist is { } target ? AddTrackAsync(target.Id, row.Track) : Task.CompletedTask);
+        AddToPlaylistCommand = new(async () => await AddSelectedTracksAsync());
+        ToggleSelectionCommand = new(() => IsSelectionMode = !IsSelectionMode);
+        SelectAllCommand = new(() => SetSelection(true));
+        ClearSelectionCommand = new(() => SetSelection(false));
         Context.LibraryChanged += OnLibraryChanged;
         Playback.PropertyChanged += OnPlaybackPropertyChanged;
+        Playback.Changed += OnPlaybackChanged;
+        _preferencesSubscription = Context.Settings.Subscribe<LibraryPreferences>(_ => OnPropertyChanged(nameof(InsertAtStart)));
         _targetPlaylist = Playlists.FirstOrDefault();
     }
     public ObservableCollection<Playlist> Playlists => Context.Playlists;
@@ -33,8 +45,35 @@ public abstract class TrackListViewModel : PageViewModel
     public string Filter { get => _filter; set { if (SetProperty(ref _filter, value)) RefreshTracks(); } }
     public bool HasTracks => Tracks.Count > 0;
     public bool CanPlay => CanInteract && Playback.CanInteract && HasTracks;
-    public bool CanInspectTrack => CanInteract && SelectedTrack is not null;
-    public bool CanAddToPlaylist => CanInspectTrack && TargetPlaylist is not null;
+    public bool CanInspectTrack => CanInteract && SelectedTrack is not null && !IsSelectionMode;
+    public IReadOnlyList<TrackRow> ActionTracks => IsSelectionMode ? Tracks.Where(t => t.IsMarked).ToArray()
+        : SelectedTrack is { } row ? [row] : [];
+    public bool HasActionTracks => CanInteract && ActionTracks.Count > 0;
+    public bool CanAddToPlaylist => HasActionTracks && TargetPlaylist is not null;
+    public bool IsSelectionMode
+    {
+        get => _isSelectionMode;
+        set
+        {
+            if (!SetProperty(ref _isSelectionMode, value)) return;
+            foreach (var row in Tracks) row.IsSelectionMode = value;
+            SetSelection(false);
+        }
+    }
+    public string SelectionSummary => _text.Format("SelectedTrackCount", ActionTracks.Count);
+    public string SelectionModeLabel => _text[IsSelectionMode ? "FinishSelection" : "ManageTracks"];
+    public bool InsertAtStart
+    {
+        get => Context.Settings.Get<LibraryPreferences>().InsertAtStart;
+        set => Context.Settings.Apply<LibraryPreferences>(preferences => preferences with { InsertAtStart = value });
+    }
+    public bool HasPlayingTrack => _hasPlayingTrack;
+    public TrackRow? RevealPlayingTrack()
+    {
+        if (!HasPlayingTrack) return null;
+        if (!Tracks.Any(t => t.IsCurrent)) Filter = "";
+        return Tracks.FirstOrDefault(t => t.IsCurrent);
+    }
     public string TrackSummary => _text.Format("TrackSummary", Tracks.Count,
         TrackRow.FormatTime(TimeSpan.FromSeconds(Tracks.Sum(t => t.Track.Duration?.TotalSeconds ?? 0))));
     public override string? PageSummary => TrackSummary;
@@ -42,33 +81,94 @@ public abstract class TrackListViewModel : PageViewModel
     public AsyncRelayCommand PlaySelectedCommand { get; }
     public RelayCommand InspectTrackCommand { get; }
     public AsyncRelayCommand AddToPlaylistCommand { get; }
+    public RelayCommand ToggleSelectionCommand { get; }
+    public RelayCommand SelectAllCommand { get; }
+    public RelayCommand ClearSelectionCommand { get; }
     public abstract Task PlayAsync(TrackRow? selected = null);
     protected abstract IEnumerable<TrackRow> GetTracks();
     protected virtual void RefreshTracks()
     {
         var selected = SelectedTrack;
+        var marked = Tracks.Where(t => t.IsMarked).Select(RowKey).ToHashSet();
         var values = GetTracks();
         if (!string.IsNullOrWhiteSpace(Filter))
             values = values.Where(t => $"{t.Track.Title} {string.Join(' ', t.Track.Artists.Select(a => a.Name))} {t.Track.Album?.Title}"
                 .Contains(Filter.Trim(), StringComparison.CurrentCultureIgnoreCase));
+        var rows = values.ToArray();
+        foreach (var row in Tracks) row.PropertyChanged -= OnRowChanged;
         Tracks.Clear();
         var artwork = _host.Get<ArtworkService>();
-        foreach (var track in values) Tracks.Add(track with { ArtworkLoader = artwork });
+        foreach (var row in rows)
+        {
+            row.ArtworkLoader = artwork;
+            row.IsSelectionMode = IsSelectionMode;
+            row.IsMarked = marked.Contains(RowKey(row));
+            row.PropertyChanged += OnRowChanged;
+            Tracks.Add(row);
+        }
         SelectedTrack = Tracks.FirstOrDefault(t => selected?.PlaylistItemId is { } itemId ? t.PlaylistItemId == itemId
             : selected?.QueueItemId is { } queueId ? t.QueueItemId == queueId : t.Track.Id == selected?.Track.Id);
         OnPropertyChanged(nameof(HasTracks)); OnPropertyChanged(nameof(TrackSummary)); OnPropertyChanged(nameof(PageSummary));
+        RefreshPlayingTracks();
         RaiseInteractionProperties();
+    }
+    private static string RowKey(TrackRow row) => row.PlaylistItemId?.ToString() ?? row.QueueItemId?.ToString() ?? row.Identity;
+    private void OnRowChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (!_updatingSelection && args.PropertyName == nameof(TrackRow.IsMarked)) RaiseInteractionProperties();
+    }
+    private void SetSelection(bool marked)
+    {
+        _updatingSelection = true;
+        try { foreach (var row in Tracks) row.IsMarked = marked; }
+        finally { _updatingSelection = false; }
+        RaiseInteractionProperties();
+    }
+    private void OnPlaybackChanged(object? sender, EventArgs args)
+    {
+        if (!Equals(_lastPlayingId, Playback.Snapshot.SourceDetails?.SourceId)) RefreshPlayingTracks();
+    }
+    protected void RefreshPlayingTracks()
+    {
+        var source = Playback.Snapshot.SourceDetails?.SourceId;
+        _lastPlayingId = source;
+        foreach (var row in Tracks) row.IsCurrent = PlayingTrackMatcher.Matches(row.Track, source);
+        SetProperty(ref _hasPlayingTrack, source is not null && GetTracks().Any(row => PlayingTrackMatcher.Matches(row.Track, source)), nameof(HasPlayingTrack));
+    }
+    public async Task<bool> AddSelectedTracksAsync()
+    {
+        if (!CanAddToPlaylist || TargetPlaylist is not { } target) return false;
+        var tracks = ActionTracks.Select(row => row.Track).ToArray();
+        var insertAtStart = InsertAtStart;
+        var succeeded = false;
+        await ExecuteAsync(async ct =>
+        {
+            await _host.Settings.SaveAsync(ct);
+            var playlists = _host.Get<PlaylistService>();
+            var added = playlists.AddRange(target.Id, tracks, insertAtStart);
+            try { await _host.Get<LibraryService>().SaveAsync(ct); }
+            catch
+            {
+                foreach (var item in added) playlists.Remove(target.Id, item.Id);
+                Context.RefreshLibrary();
+                throw;
+            }
+            Context.RefreshLibrary();
+            SetStatus("TracksAdded", tracks.Length, target.Name);
+            succeeded = true;
+        });
+        return succeeded;
     }
     public Task AddTrackAsync(Guid playlistId, Track track) => ExecuteAsync(async ct =>
     {
-        _host.Get<PlaylistService>().Add(playlistId, track);
+        _host.Get<PlaylistService>().AddRange(playlistId, [track], InsertAtStart);
         await _host.Get<LibraryService>().SaveAsync(ct);
         Context.RefreshLibrary(); SetStatus("TrackAdded");
     });
     private void OnLibraryChanged(object? sender, EventArgs args)
     {
         TargetPlaylist = Playlists.FirstOrDefault(p => p.Id == TargetPlaylist?.Id) ?? Playlists.FirstOrDefault();
-        RefreshTracks(); RefreshLocalizedProperties();
+        RefreshLocalizedProperties();
     }
     private void OnPlaybackPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
     {
@@ -78,13 +178,16 @@ public abstract class TrackListViewModel : PageViewModel
     protected override void RaiseInteractionProperties()
     {
         base.RaiseInteractionProperties();
-        foreach (var name in new[] { nameof(CanPlay), nameof(CanInspectTrack), nameof(CanAddToPlaylist) }) OnPropertyChanged(name);
+        foreach (var name in new[] { nameof(CanPlay), nameof(CanInspectTrack), nameof(CanAddToPlaylist), nameof(HasActionTracks), nameof(SelectionSummary), nameof(SelectionModeLabel) }) OnPropertyChanged(name);
     }
     protected override void RefreshLocalizedProperties() { base.RefreshLocalizedProperties(); RefreshTracks(); }
     public override async ValueTask DisposeAsync()
     {
         Context.LibraryChanged -= OnLibraryChanged;
         Playback.PropertyChanged -= OnPlaybackPropertyChanged;
+        Playback.Changed -= OnPlaybackChanged;
+        _preferencesSubscription.Dispose();
+        foreach (var row in Tracks) row.PropertyChanged -= OnRowChanged;
         await base.DisposeAsync();
     }
 }

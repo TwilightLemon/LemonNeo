@@ -85,6 +85,40 @@ public sealed class PlaylistService(
         return removed;
     }
 
+    public IReadOnlyList<PlaylistItem> AddRange(Guid playlistId, IEnumerable<Track> tracks, bool insertAtStart = false)
+    {
+        var values = tracks.ToArray();
+        foreach (var track in values) ValidateTrack(track);
+        var playlist = GetRequired(playlistId);
+        var existing = playlist.Items.OrderBy(item => FractionalPlaylistOrderingService.Parse(item.SortKey)).ThenBy(item => item.Id).ToArray();
+        var added = values.Select(track => new PlaylistItem { Track = track, SortKey = "0" }).ToArray();
+        if (added.Length == 0) return added;
+        playlist.Items.AddRange(added);
+        SetOrder(playlist, insertAtStart ? added.Concat(existing) : existing.Concat(added));
+        return added;
+    }
+
+    public void Reorder(Guid playlistId, IReadOnlyCollection<Guid> itemIds, Guid targetId, bool after)
+    {
+        var playlist = GetRequired(playlistId);
+        var items = playlist.Items.OrderBy(item => FractionalPlaylistOrderingService.Parse(item.SortKey)).ThenBy(item => item.Id).ToList();
+        var moving = items.Where(item => itemIds.Contains(item.Id)).ToArray();
+        if (moving.Length != itemIds.Distinct().Count()) throw new ArgumentException("A playlist item was not found.");
+        var target = GetItemRequired(playlistId, targetId);
+        if (moving.Length == 0 || moving.Contains(target)) return;
+        items.RemoveAll(item => itemIds.Contains(item.Id));
+        items.InsertRange(items.IndexOf(target) + (after ? 1 : 0), moving);
+        SetOrder(playlist, items);
+    }
+
+    private void SetOrder(Playlist playlist, IEnumerable<PlaylistItem> items)
+    {
+        var index = 0;
+        foreach (var item in items) item.SortKey = (++index).ToString(CultureInfo.InvariantCulture);
+        ordering.Normalize(playlist);
+        Touch(playlist);
+    }
+
     public Playlist Update(Guid playlistId, string name, string? description)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);

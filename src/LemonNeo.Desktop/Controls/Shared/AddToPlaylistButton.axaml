@@ -1,0 +1,31 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:LemonNeo.Desktop.ViewModels.Shared" xmlns:i18n="using:LemonNeo.Desktop.Services"
+             x:Class="LemonNeo.Desktop.Controls.Shared.AddToPlaylistButton" x:DataType="vm:TrackListViewModel" Name="Root">
+  <Button Name="AddButton" Classes.ghost="{Binding IsGhost, ElementName=Root}" Classes.compact="{Binding IsCompact, ElementName=Root}"
+          Content="{Translate {x:Static i18n:LanguageManager+Keys.AddToPlaylist}}" IsEnabled="{Binding HasActionTracks}">
+    <Button.Flyout>
+      <Flyout Placement="BottomEdgeAlignedLeft">
+        <StackPanel Width="300" Spacing="12">
+          <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.TargetPlaylist}}" FontWeight="SemiBold" />
+          <ListBox Name="PlaylistPicker" Classes="playlistPicker" ItemsSource="{Binding Playlists}" SelectedItem="{Binding TargetPlaylist}"
+                   ItemTemplate="{StaticResource PlaylistOptionTemplate}" MaxHeight="240"
+                   ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                   AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.TargetPlaylist}}">
+            <ListBox.ItemsPanel><ItemsPanelTemplate><StackPanel /></ItemsPanelTemplate></ListBox.ItemsPanel>
+          </ListBox>
+          <TextBlock Classes="caption" IsVisible="{Binding !Playlists.Count}" TextWrapping="Wrap"
+                     Text="{Translate {x:Static i18n:LanguageManager+Keys.NoTargetPlaylists}}" />
+          <Separator />
+          <ToggleSwitch Name="InsertPosition" IsChecked="{Binding InsertAtStart}"
+                        OnContent="{Translate {x:Static i18n:LanguageManager+Keys.InsertAtStart}}"
+                        OffContent="{Translate {x:Static i18n:LanguageManager+Keys.InsertAtEnd}}"
+                        AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.InsertPosition}}" />
+          <Button Name="ConfirmAdd" Classes="primary" HorizontalAlignment="Stretch" Click="OnAdd"
+                  Content="{Translate {x:Static i18n:LanguageManager+Keys.AddToPlaylist}}" IsEnabled="{Binding CanAddToPlaylist}" />
+          <TextBlock Text="{Binding Error}" IsVisible="{Binding HasError}" Foreground="{DynamicResource Brush.Danger}"
+                     TextWrapping="Wrap" MaxHeight="80" />
+        </StackPanel>
+      </Flyout>
+    </Button.Flyout>
+  </Button>
+</UserControl>

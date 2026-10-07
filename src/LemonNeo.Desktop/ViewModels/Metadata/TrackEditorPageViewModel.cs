@@ -35,12 +35,16 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
         ReplaceMatchMetadataCommand = new(row =>
         {
             if (!CanUseMetadataMatch(row) || string.IsNullOrWhiteSpace(row!.Match.Track.Title)) return;
-            Editor!.ApplyMetadata(row!.Match.Track); SetStatus("MetadataApplied");
+            Editor!.ApplyMetadata(row!.Match.Track);
+            row.MarkMetadataReplaced();
+            SetStatus("MetadataApplied");
         }, row => CanUseMetadataMatch(row) && !string.IsNullOrWhiteSpace(row!.Match.Track.Title));
         AddMatchExternalIdsCommand = new(row =>
         {
             if (!CanUseMetadataMatch(row)) return;
-            var added = Editor!.AddExternalIds(row!.Match.Track.ExternalIds); SetStatus("MetadataIdsAdded", added);
+            var added = Editor!.AddExternalIds(row!.Match.Track.ExternalIds);
+            row.MarkExternalIdsAdded();
+            SetStatus("MetadataIdsAdded", added);
         }, row => CanUseMetadataMatch(row) && row!.Match.Track.ExternalIds.Count > 0);
         MetadataSources = MetadataSourceOption.Create(_host.Get<IProviderRegistry>(), _host.Get<IPlaybackSourceProviderRegistry>());
         foreach (var source in MetadataSources) source.PropertyChanged += OnMetadataSourceChanged;
@@ -194,8 +198,7 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
     {
         base.RefreshLocalizedProperties();
         if (_inspectedLyrics is { } result) LyricsDetails = result.Lyrics is { } lyrics ? FormatLyricsDetails(lyrics, result.ProviderId) : _text["NoLyrics"];
-        for (var i = 0; i < MetadataMatches.Count; i++) MetadataMatches[i] = new(MetadataMatches[i].Match, _text, ReplaceMatchMetadataCommand, AddMatchExternalIdsCommand)
-            { ArtworkLoader = _host.Get<ArtworkService>() };
+        foreach (var row in MetadataMatches) row.RefreshLocalizedProperties();
         for (var i = 0; i < DiscoveredSources.Count; i++) DiscoveredSources[i] = new(DiscoveredSources[i].Candidate, _text);
     }
     public override async ValueTask DisposeAsync()

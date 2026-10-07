@@ -7,6 +7,10 @@ public static class DesktopPreferences
 {
     public static void Register(ISettingsScope settings)
     {
+        settings.Register(nameof(LibraryPreferences), new LibraryPreferences(), value => value with
+        {
+            PlaylistOrder = (value.PlaylistOrder ?? []).Distinct().ToArray()
+        });
         settings.Register(nameof(AppearancePreferences), new AppearancePreferences(), value => value with
         {
             Theme = Enum.IsDefined(value.Theme) ? value.Theme : ThemePreference.System,

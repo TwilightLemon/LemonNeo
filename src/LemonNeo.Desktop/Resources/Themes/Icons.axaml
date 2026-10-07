@@ -1,4 +1,6 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <StreamGeometry x:Key="Icon.More">M5,10 A2,2 0 1 0 5,14 A2,2 0 1 0 5,10 M12,10 A2,2 0 1 0 12,14 A2,2 0 1 0 12,10 M19,10 A2,2 0 1 0 19,14 A2,2 0 1 0 19,10</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Locate">M11,1 H13 V4 A8,8 0 0 1 20,11 H23 V13 H20 A8,8 0 0 1 13,20 V23 H11 V20 A8,8 0 0 1 4,13 H1 V11 H4 A8,8 0 0 1 11,4 Z M12,6 A6,6 0 1 0 12,18 A6,6 0 1 0 12,6 M12,9 A3,3 0 1 0 12,15 A3,3 0 1 0 12,9</StreamGeometry>
   <StreamGeometry x:Key="Icon.Music">M9,3 L21,1 L21,16 C21,20 15,22 15,18 C15,15 18,14 19,15 L19,6 L9,8 L9,19 C9,23 3,25 3,21 C3,18 6,17 7,18 L7,5 Z</StreamGeometry>
   <!-- Optical centering on the 56px brand tile; also used by build/Generate-DesktopIcon.ps1. -->
   <GeometryGroup x:Key="Icon.AppMusic">

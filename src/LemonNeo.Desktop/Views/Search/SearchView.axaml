@@ -21,20 +21,16 @@
         <WrapPanel Margin="0,0,0,12" IsEnabled="{Binding CanInteract}">
           <Button Classes="primary" Content="{Translate {x:Static i18n:LanguageManager+Keys.Play}}" Command="{Binding PlaySelectedCommand}" IsEnabled="{Binding CanInspectTrack}" Margin="0,0,8,8" />
           <Button Content="{Translate {x:Static i18n:LanguageManager+Keys.TrackDetails}}" Command="{Binding InspectTrackCommand}" IsEnabled="{Binding CanInspectTrack}" Margin="0,0,8,8" />
-          <Button Content="{Translate {x:Static i18n:LanguageManager+Keys.AddToPlaylist}}" IsEnabled="{Binding CanInspectTrack}" Margin="0,0,8,8">
-            <Button.Flyout>
-              <Flyout>
-                <StackPanel Width="280" Spacing="12">
-                  <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.TargetPlaylist}}" />
-                  <ComboBox ItemsSource="{Binding Playlists}" SelectedItem="{Binding TargetPlaylist}" ItemTemplate="{StaticResource PlaylistOptionTemplate}"
-                            HorizontalAlignment="Stretch" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.TargetPlaylist}}" />
-                  <Button Classes="primary" Content="{Translate {x:Static i18n:LanguageManager+Keys.AddToPlaylist}}" Command="{Binding AddToPlaylistCommand}" IsEnabled="{Binding CanAddToPlaylist}" />
-                </StackPanel>
-              </Flyout>
-            </Button.Flyout>
-          </Button>
+          <sharedControls:AddToPlaylistButton Margin="0,0,8,8" />
+          <Button Content="{Translate {x:Static i18n:LanguageManager+Keys.MultiSelect}}" Command="{Binding ToggleSelectionCommand}" IsVisible="{Binding !IsSelectionMode}" Margin="0,0,8,8" />
+          <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsSelectionMode}" Margin="0,0,8,8">
+            <TextBlock Text="{Binding SelectionSummary}" VerticalAlignment="Center" />
+            <Button Classes="ghost" Content="{Translate {x:Static i18n:LanguageManager+Keys.SelectAllTracks}}" Command="{Binding SelectAllCommand}" />
+            <Button Classes="ghost" Content="{Translate {x:Static i18n:LanguageManager+Keys.ClearTrackSelection}}" Command="{Binding ClearSelectionCommand}" />
+            <Button Content="{Translate {x:Static i18n:LanguageManager+Keys.FinishSelection}}" Command="{Binding ToggleSelectionCommand}" />
+          </StackPanel>
         </WrapPanel>
-        <ListBox Grid.Row="1" ItemsSource="{Binding Tracks}" SelectedItem="{Binding SelectedTrack}" ItemTemplate="{StaticResource TrackRowTemplate}" Grid.IsSharedSizeScope="True"
+        <ListBox Name="TrackList" Classes="trackList" Classes.managing="{Binding IsSelectionMode}" Grid.Row="1" ItemsSource="{Binding Tracks}" SelectedItem="{Binding SelectedTrack}" ItemTemplate="{StaticResource TrackRowTemplate}" Grid.IsSharedSizeScope="True"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                  IsVisible="{Binding HasTracks}" IsEnabled="{Binding CanInteract}" DoubleTapped="OnTrackDoubleTapped" KeyDown="OnTrackKeyDown" />
         <StackPanel Grid.Row="1" IsVisible="{Binding !HasTracks}" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="400" Spacing="8">

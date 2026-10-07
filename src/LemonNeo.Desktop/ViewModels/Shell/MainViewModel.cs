@@ -12,6 +12,7 @@ using LemonNeo.Desktop.ViewModels.Search;
 using LemonNeo.Desktop.ViewModels.Settings;
 using LemonNeo.Desktop.ViewModels.Shared;
 using LemonNeo.Desktop.ViewModels.Tools;
+using LemonNeo.Desktop.Config;
 
 namespace LemonNeo.Desktop.ViewModels.Shell;
 
@@ -173,6 +174,20 @@ public sealed class MainViewModel : PageViewModel
             }
         }
         SyncPlaylistSelection();
+    }
+
+    public Task ReorderPlaylistsAsync(PlaylistMenuItemViewModel source, PlaylistMenuItemViewModel target, bool after)
+    {
+        if (!CanInteract || source.Id == target.Id) return Task.CompletedTask;
+        return ExecuteAsync(async ct =>
+        {
+            var ids = Context.Playlists.Select(p => p.Id).ToList();
+            if (!ids.Contains(target.Id) || !ids.Remove(source.Id)) return;
+            ids.Insert(ids.IndexOf(target.Id) + (after ? 1 : 0), source.Id);
+            Context.Settings.Apply<LibraryPreferences>(preferences => preferences with { PlaylistOrder = ids.ToArray() });
+            await _host.Settings.SaveAsync(ct);
+            Context.RefreshLibrary();
+        });
     }
 
     public Task InitializeAsync() => RunOperationAsync(async ct =>

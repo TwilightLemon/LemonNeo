@@ -5,6 +5,7 @@ using LemonNeo.Core.Music;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using LemonNeo.Desktop.Services;
+using LemonNeo.Desktop.Config;
 
 namespace LemonNeo.Desktop;
 
@@ -27,7 +28,10 @@ public sealed class DesktopContext(DesktopHost host, LocalizationService text, A
 
     public void RefreshLibrary()
     {
-        var values = Host.Get<LibraryService>().Current.Playlists.OrderBy(p => p.Name, StringComparer.Create(Text.Culture, true)).ToArray();
+        var order = Settings.Get<LibraryPreferences>().PlaylistOrder;
+        var values = Host.Get<LibraryService>().Current.Playlists
+            .OrderBy(p => Array.IndexOf(order, p.Id) is var index && index >= 0 ? index : int.MaxValue)
+            .ThenBy(p => p.Name, StringComparer.Create(Text.Culture, true)).ToArray();
         // Preserve the sidebar selection while refreshing existing playlist objects.
         for (var i = Playlists.Count - 1; i >= 0; i--)
             if (!values.Any(p => p.Id == Playlists[i].Id)) Playlists.RemoveAt(i);

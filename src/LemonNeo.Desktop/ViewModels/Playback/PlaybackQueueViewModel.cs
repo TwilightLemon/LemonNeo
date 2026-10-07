@@ -33,12 +33,18 @@ public sealed class PlaybackQueueViewModel : PageViewModel
     public string Filter { get => _filter; set { if (SetProperty(ref _filter, value)) RefreshTracks(); } }
     public string TrackCount => _text.Format("TrackCount", _rows.Length);
     public bool HasTracks => Tracks.Count > 0;
+    public bool HasPlayingTrack => _rows.Any(row => row.IsCurrent);
+    public QueueTrackViewModel? RevealPlayingTrack()
+    {
+        var row = _rows.FirstOrDefault(row => row.IsCurrent && row.Id == _session.Queue.CurrentItem?.Id)
+            ?? _rows.FirstOrDefault(row => row.IsCurrent);
+        if (row is not null && !Tracks.Contains(row)) Filter = "";
+        return row;
+    }
     public bool CanPlay => CanInteract && Playback.CanInteract;
-    public bool CanClearQueue => CanPlay && _rows.Length > 0;
     public string EmptyTitle => _text[_rows.Length == 0 ? "EmptyQueue" : "NoResults"];
     public string EmptyDescription => _text[_rows.Length == 0 ? "EmptyQueueDescription" : "NoResultsDescription"];
     public AsyncRelayCommand<QueueTrackViewModel> PlayTrackCommand { get; }
-    public AsyncRelayCommand ClearQueueCommand => Playback.ClearQueueCommand;
 
     public Task PlayTrackAsync(QueueTrackViewModel? row) => CanPlay && row is not null
         ? Playback.ExecutePlaybackAsync(ct => _session.PlayQueueItemAsync(row.Id, ct)) : Task.CompletedTask;
@@ -52,14 +58,14 @@ public sealed class PlaybackQueueViewModel : PageViewModel
     private void RefreshQueue()
     {
         var items = _session.Queue.Items;
-        if (!_rows.Select(r => r.Id).SequenceEqual(items.Select(i => i.Id)))
+        if (!_rows.Select(r => (r.Id, r.Row.Track)).SequenceEqual(items.Select(i => (i.Id, i.Track))))
         {
             _rows = items.Select((item, index) => new QueueTrackViewModel(item, index + 1, _text, _host.Get<ArtworkService>())).ToArray();
             RefreshTracks();
             OnPropertyChanged(nameof(TrackCount));
         }
-        var current = _session.Queue.CurrentItem?.Id;
-        foreach (var row in _rows) row.IsCurrent = row.Id == current;
+        foreach (var row in _rows) row.IsCurrent = PlayingTrackMatcher.Matches(row.Row.Track, Playback.Snapshot.SourceDetails?.SourceId);
+        OnPropertyChanged(nameof(HasPlayingTrack));
         RaiseInteractionProperties();
     }
 
@@ -78,7 +84,7 @@ public sealed class PlaybackQueueViewModel : PageViewModel
     protected override void RaiseInteractionProperties()
     {
         base.RaiseInteractionProperties();
-        OnPropertyChanged(nameof(CanPlay)); OnPropertyChanged(nameof(CanClearQueue));
+        OnPropertyChanged(nameof(CanPlay));
         PlayTrackCommand.NotifyCanExecuteChanged();
     }
     protected override void RefreshLocalizedProperties()

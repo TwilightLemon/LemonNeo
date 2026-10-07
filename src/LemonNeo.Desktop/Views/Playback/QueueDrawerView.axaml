@@ -2,7 +2,7 @@
              xmlns:playbackVm="using:LemonNeo.Desktop.ViewModels.Playback" xmlns:i18n="using:LemonNeo.Desktop.Services"
              xmlns:sharedControls="using:LemonNeo.Desktop.Controls.Shared"
              x:Class="LemonNeo.Desktop.Views.Playback.QueueDrawerView" x:DataType="playbackVm:PlaybackQueueViewModel">
-  <Grid RowDefinitions="Auto,Auto,*,Auto">
+  <Grid RowDefinitions="Auto,Auto,*">
     <StackPanel Spacing="6" Margin="0,0,40,0">
       <TextBlock Text="{Binding PageTitle}" FontSize="24" FontWeight="SemiBold" />
       <TextBlock Classes="caption" Text="{Binding TrackCount}" />
@@ -10,13 +10,12 @@
     <TextBox Name="QueueFilter" Grid.Row="1" Text="{Binding Filter}" Margin="0,16,0,12"
              PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.SearchPlaceholder}}"
              AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.SearchPlaceholder}}" />
-    <ListBox Name="QueueTracks" Grid.Row="2" ItemsSource="{Binding Tracks}" SelectedItem="{Binding SelectedTrack}"
+    <ListBox Name="QueueTracks" Classes="queueList" Grid.Row="2" ItemsSource="{Binding Tracks}" SelectedItem="{Binding SelectedTrack}"
              IsVisible="{Binding HasTracks}" Tapped="OnTrackTapped" KeyDown="OnTrackKeyDown"
              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
       <ListBox.Styles>
         <Style Selector="ListBoxItem"><Setter Property="Padding" Value="0" /><Setter Property="Margin" Value="0,2" /></Style>
         <Style Selector="Border.queueTrack"><Setter Property="Background" Value="Transparent" /></Style>
-        <Style Selector="Border.queueTrack.current"><Setter Property="Background" Value="{DynamicResource Brush.AccentSoft}" /></Style>
       </ListBox.Styles>
       <ListBox.ItemTemplate>
         <DataTemplate x:DataType="playbackVm:QueueTrackViewModel">
@@ -35,11 +34,15 @@
         </DataTemplate>
       </ListBox.ItemTemplate>
     </ListBox>
+    <Border Grid.Row="2" Classes="floatingAction" IsVisible="{Binding HasPlayingTrack}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,12,12">
+      <Button Name="LocatePlayingButton" Classes="primary floating" Click="OnLocatePlaying"
+              ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.LocatePlayingTrack}}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.LocatePlayingTrack}}">
+        <Path Classes="icon" Data="{StaticResource Icon.Locate}" Width="22" Height="22" />
+      </Button>
+    </Border>
     <StackPanel Grid.Row="2" IsVisible="{Binding !HasTracks}" VerticalAlignment="Center" Spacing="8" Margin="12">
       <TextBlock Text="{Binding EmptyTitle}" FontSize="20" TextWrapping="Wrap" TextAlignment="Center" />
       <TextBlock Classes="caption" Text="{Binding EmptyDescription}" TextWrapping="Wrap" TextAlignment="Center" />
     </StackPanel>
-    <Button Name="ClearQueueButton" Grid.Row="3" Classes="ghost" HorizontalAlignment="Right" Margin="0,12,0,0"
-            Content="{Translate {x:Static i18n:LanguageManager+Keys.ClearQueue}}" Command="{Binding ClearQueueCommand}" IsEnabled="{Binding CanClearQueue}" />
   </Grid>
 </UserControl>

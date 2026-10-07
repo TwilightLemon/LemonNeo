@@ -47,7 +47,6 @@ public sealed class PlaybackViewModel : PageViewModel
         PreviousCommand = new(() => ExecutePlaybackAsync(ct => _interaction.ExecuteAsync(PlaybackCommand.Previous, cancellationToken: ct)), commandOptions);
         NextCommand = new(() => ExecutePlaybackAsync(ct => _interaction.ExecuteAsync(PlaybackCommand.Next, cancellationToken: ct)), commandOptions);
         StopCommand = new(() => ExecutePlaybackAsync(ct => _session.StopAsync(ct), showBusy: false), commandOptions);
-        ClearQueueCommand = new(() => ExecutePlaybackAsync(ct => _session.ClearQueueAsync(ct), showBusy: false), commandOptions);
         CycleModeCommand = new(() => ExecutePlaybackAsync(ct => _session.SetModeAsync((PlaybackMode)(((int)_snapshot.Mode + 1) % 3), ct), showBusy: false), commandOptions);
         ModeCommand = new(mode => ExecutePlaybackAsync(ct => _session.SetModeAsync(Enum.Parse<PlaybackMode>(mode!), ct), showBusy: false), commandOptions);
         _session.StateChanged += OnPlaybackChanged;
@@ -58,7 +57,6 @@ public sealed class PlaybackViewModel : PageViewModel
     public AsyncRelayCommand PreviousCommand { get; }
     public AsyncRelayCommand NextCommand { get; }
     public AsyncRelayCommand StopCommand { get; }
-    public AsyncRelayCommand ClearQueueCommand { get; }
     public AsyncRelayCommand CycleModeCommand { get; }
     public AsyncRelayCommand<string> ModeCommand { get; }
     // Playback execution is exclusive, but its progress must not disable the whole control bar.

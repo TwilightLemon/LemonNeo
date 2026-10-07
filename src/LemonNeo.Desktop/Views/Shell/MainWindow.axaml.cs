@@ -13,6 +13,7 @@ using LemonNeo.Desktop.ViewModels.Shell;
 using LemonNeo.Desktop.Views.Library;
 using LemonNeo.Desktop.Views.Lyrics;
 using LemonNeo.Desktop.Views.Shared;
+using LemonNeo.Desktop.Controls.Shared;
 
 namespace LemonNeo.Desktop.Views.Shell;
 
@@ -28,6 +29,9 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        _ = new ListReorderBehavior(PlaylistList, () => DataContext is MainViewModel { CanInteract: true },
+            (source, target, after) => DataContext is MainViewModel vm && source is PlaylistMenuItemViewModel playlist && target is PlaylistMenuItemViewModel destination
+                ? vm.ReorderPlaylistsAsync(playlist, destination, after) : Task.CompletedTask);
         Closed += (_, _) => { VolumePopup.IsOpen = false; SourceDetailsPopup.IsOpen = false; CloseDesktopLyrics(); };
         // Avalonia draws Windows captions and preserves native macOS traffic lights.
         // Keep system decorations on Linux, where client-area extension varies by window manager.
@@ -123,6 +127,7 @@ public partial class MainWindow : Window
         var inset = args.NewSize.Height + PlaybackBar.Margin.Bottom + 12;
         Resources["Space.PlaybackInset"] = new Thickness(0, 0, 0, inset);
         Resources["Space.PlaybackFooterInset"] = new Thickness(0, 12, 0, inset);
+        Resources["Space.PlaybackFloatingInset"] = new Thickness(0, 0, 16, inset);
     }
 
     private void OnPageContentSizeChanged(object? sender, SizeChangedEventArgs args)

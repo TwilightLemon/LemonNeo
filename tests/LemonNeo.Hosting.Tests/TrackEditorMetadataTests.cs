@@ -38,6 +38,12 @@ public sealed class TrackEditorMetadataTests
         Assert.Equal("Matched artist", row.Artists);
         Assert.Equal("Matched album", row.Album);
         Assert.Equal(matched.Title, row.Title);
+        Assert.False(row.HasActionStatus);
+        row.MarkMetadataReplaced();
+        Assert.True(row.HasActionStatus);
+        Assert.Equal(text["MetadataReplacedConfirmation"], row.ActionStatus);
+        row.MarkExternalIdsAdded();
+        Assert.Equal(text["MetadataIdsAddedConfirmation"], row.ActionStatus);
 
         var editor = new TrackEditorViewModel(original, text)
         {
