@@ -317,9 +317,10 @@
           <Button
             Grid.Column="2"
             AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}"
-            Classes="ghost"
-            Command="{Binding DismissErrorCommand}"
-            Content="×" />
+            Classes="ghost icon"
+            Command="{Binding DismissErrorCommand}">
+            <Path Classes="icon" Data="{StaticResource Icon.Close}" />
+          </Button>
         </Grid>
       </Border>
       <ContentControl
@@ -373,8 +374,9 @@
               Padding="4,0"
               AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}"
               Classes="ghost compact"
-              Command="{Binding Playback.DismissErrorCommand}"
-              Content="×" />
+              Command="{Binding Playback.DismissErrorCommand}">
+              <Path Classes="icon" Data="{StaticResource Icon.Close}" Width="12" Height="12" />
+            </Button>
           </Grid>
           <Grid Grid.Row="1" ColumnDefinitions="*,Auto,*">
             <Button

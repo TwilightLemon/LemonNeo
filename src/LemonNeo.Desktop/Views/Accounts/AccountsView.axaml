@@ -13,7 +13,9 @@
     <Border Grid.Row="1" IsVisible="{Binding HasError}" Background="{DynamicResource Brush.DangerSoft}" Padding="14" Margin="0,0,0,12">
       <Grid ColumnDefinitions="*,Auto">
         <TextBlock Text="{Binding Error}" Foreground="{DynamicResource Brush.Danger}" TextWrapping="Wrap" MaxHeight="90" Margin="0,0,12,0" />
-        <Button Grid.Column="1" Classes="ghost compact" Content="×" Command="{Binding DismissErrorCommand}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}" />
+        <Button Grid.Column="1" Classes="ghost compact" Command="{Binding DismissErrorCommand}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}">
+          <Path Classes="icon" Data="{StaticResource Icon.Close}" Width="14" Height="14" />
+        </Button>
       </Grid>
     </Border>
     <Border Grid.Row="2" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="0,0,0,1" IsVisible="{Binding HasServices}">

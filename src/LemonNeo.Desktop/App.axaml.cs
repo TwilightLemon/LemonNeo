@@ -52,9 +52,14 @@ public partial class App : Avalonia.Application
                     text.Dispose();
                 }
             }
+            async Task InitializeAsync()
+            {
+                await viewModel.InitializeAsync();
+                window.RestoreDesktopLyrics();
+            }
             var lifetime = new DesktopLifetimeService(desktop, window,
                 keepRunningOnClose: OperatingSystem.IsWindows() || OperatingSystem.IsMacOS(),
-                viewModel.InitializeAsync, ShutdownAsync, this.TryGetFeature<IActivatableLifetime>(),
+                InitializeAsync, ShutdownAsync, this.TryGetFeature<IActivatableLifetime>(),
                 window.PrepareForBackground);
             if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
                 menu = new DesktopApplicationMenu(this, lifetime, viewModel.Playback, text,

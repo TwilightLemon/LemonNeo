@@ -93,9 +93,11 @@
                 </Flyout>
               </Button.Flyout>
             </Button>
-            <Button Name="DesktopLyricsCloseButton" Classes="ghost desktopControl" Content="×" Click="OnCloseWindow"
+            <Button Name="DesktopLyricsCloseButton" Classes="ghost desktopControl" Click="OnCloseWindow"
                     ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.CloseDesktopLyrics}}"
-                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.CloseDesktopLyrics}}" />
+                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.CloseDesktopLyrics}}">
+              <Path Classes="icon" Data="{StaticResource Icon.Close}" Width="14" Height="14" />
+            </Button>
           </StackPanel>
         </Grid>
       </Border>
@@ -106,7 +108,7 @@
                                 VisibleLineCount="{Binding DesktopLyricLineCount}" FontSize="{Binding DesktopLyricFontSize}"
                                 ShowRomanization="{Binding DesktopShowRomanization}" ShowTranslation="{Binding DesktopShowTranslation}"
                                 BoldLyrics="True" TextAlignment="Center" ReduceMotion="{Binding ReduceMotion}"
-                                Foreground="White" UnreachedBrush="White" ReachedBrush="{DynamicResource Brush.LyricText}">
+                                Foreground="White" UnreachedBrush="White" ReachedBrush="{DynamicResource Brush.LyricHighlight}">
         <lyricsControls:LyricsPresenter.Effect>
           <DropShadowEffect Color="Black" BlurRadius="4" OffsetX="0" OffsetY="1" Opacity="1" />
         </lyricsControls:LyricsPresenter.Effect>

@@ -4,10 +4,12 @@ using LemonNeo.Core.Lyrics;
 using LemonNeo.Core.Music;
 using System.Runtime.InteropServices;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LemonNeo.Desktop;
@@ -30,6 +32,57 @@ public static class HeadlessApplication
 
 public sealed class DesktopConfigurationTests
 {
+    [AvaloniaFact]
+    public async Task DesktopLyricsOpenStatePersistsAndRestoresWithoutShutdownClearingIt()
+    {
+        using var paths = new TemporaryPaths();
+        await using (var host = new DesktopHost(paths, new(paths.PluginDirectory, paths.MusicLibraryDirectory),
+                         [new TestPlayer()], [new TestMusic()]))
+        {
+            var scope = host.Settings.ForPackage(PackageNames.Desktop);
+            DesktopPreferences.Register(scope);
+            using var text = new LocalizationService(scope);
+            using var appearance = new AppearanceService(Avalonia.Application.Current!, scope);
+            await using var main = new MainViewModel(host, text, appearance, host.Get<ArtworkService>());
+            await main.InitializeAsync();
+            var window = new MainWindow { DataContext = main };
+            window.Show();
+            try
+            {
+                window.FindControl<Button>("DesktopLyricsButton")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.True(window.IsDesktopLyricsOpen);
+                Assert.True(scope.Get<DesktopLyricsPreferences>().IsEnabled);
+                window.CloseDesktopLyrics(preservePreference: true);
+                Assert.False(window.IsDesktopLyricsOpen);
+                Assert.True(scope.Get<DesktopLyricsPreferences>().IsEnabled);
+                await host.Settings.SaveAsync(TestContext.Current.CancellationToken);
+            }
+            finally { window.Close(); }
+        }
+
+        await using (var host = new DesktopHost(paths, new(paths.PluginDirectory, paths.MusicLibraryDirectory),
+                         [new TestPlayer()], [new TestMusic()]))
+        {
+            var scope = host.Settings.ForPackage(PackageNames.Desktop);
+            DesktopPreferences.Register(scope);
+            using var text = new LocalizationService(scope);
+            using var appearance = new AppearanceService(Avalonia.Application.Current!, scope);
+            await using var main = new MainViewModel(host, text, appearance, host.Get<ArtworkService>());
+            await main.InitializeAsync();
+            var window = new MainWindow { DataContext = main };
+            window.Show();
+            try
+            {
+                window.RestoreDesktopLyrics();
+                Assert.True(window.IsDesktopLyricsOpen);
+                window.CloseDesktopLyrics(preservePreference: false);
+                Assert.False(window.IsDesktopLyricsOpen);
+                Assert.False(scope.Get<DesktopLyricsPreferences>().IsEnabled);
+            }
+            finally { window.Close(); }
+        }
+    }
+
     [AvaloniaFact]
     public async Task DesktopLyricsFontChangesKeepPlaylistRowsSelectionAndLoadedArtwork()
     {

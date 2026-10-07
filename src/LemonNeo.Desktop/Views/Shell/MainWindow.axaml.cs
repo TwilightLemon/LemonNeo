@@ -14,6 +14,7 @@ using LemonNeo.Desktop.Views.Library;
 using LemonNeo.Desktop.Views.Lyrics;
 using LemonNeo.Desktop.Views.Shared;
 using LemonNeo.Desktop.Controls.Shared;
+using LemonNeo.Desktop.Config;
 
 namespace LemonNeo.Desktop.Views.Shell;
 
@@ -24,6 +25,7 @@ public partial class MainWindow : Window
     public bool IsDesktopLyricsOpen { get => GetValue(IsDesktopLyricsOpenProperty); private set => SetValue(IsDesktopLyricsOpenProperty, value); }
     private DesktopLyricsWindow? _desktopLyrics;
     private PixelPoint? _desktopLyricsPosition;
+    private bool _preserveDesktopLyricsPreference;
     private bool _seeking;
     private CancellationTokenSource? _queueAnimation;
     public MainWindow()
@@ -55,8 +57,20 @@ public partial class MainWindow : Window
 
     private void OnToggleDesktopLyrics(object? sender, RoutedEventArgs args)
     {
-        if (_desktopLyrics is not null) { CloseDesktopLyrics(); return; }
-        if (DataContext is not MainViewModel vm) return;
+        if (_desktopLyrics is not null) { CloseDesktopLyrics(preservePreference: false); return; }
+        OpenDesktopLyrics(updatePreference: true);
+    }
+
+    public void RestoreDesktopLyrics()
+    {
+        if (DataContext is MainViewModel vm && vm.SharedContext.Settings.Get<DesktopLyricsPreferences>().IsEnabled)
+            OpenDesktopLyrics(updatePreference: false);
+    }
+
+    private void OpenDesktopLyrics(bool updatePreference)
+    {
+        if (_desktopLyrics is not null || DataContext is not MainViewModel vm) return;
+        _preserveDesktopLyricsPreference = false;
         var window = new DesktopLyricsWindow { DataContext = vm.Lyrics };
         _desktopLyrics = window;
         window.Closed += (_, _) =>
@@ -64,12 +78,22 @@ public partial class MainWindow : Window
             _desktopLyricsPosition = window.Position;
             _desktopLyrics = null;
             IsDesktopLyricsOpen = false;
+            if (!_preserveDesktopLyricsPreference)
+                vm.SharedContext.Settings.Apply<DesktopLyricsPreferences>(value => value with { IsEnabled = false });
+            _preserveDesktopLyricsPreference = false;
         };
         window.ShowNear(this, _desktopLyricsPosition);
         IsDesktopLyricsOpen = true;
+        if (updatePreference)
+            vm.SharedContext.Settings.Apply<DesktopLyricsPreferences>(value => value with { IsEnabled = true });
     }
 
-    public void CloseDesktopLyrics() => _desktopLyrics?.Close();
+    public void CloseDesktopLyrics(bool preservePreference = true)
+    {
+        if (_desktopLyrics is null) return;
+        _preserveDesktopLyricsPreference = preservePreference;
+        _desktopLyrics.Close();
+    }
 
     public void PrepareForBackground()
     {
