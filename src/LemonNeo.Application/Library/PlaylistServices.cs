@@ -53,7 +53,7 @@ public sealed class PlaylistService(
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         var playlist = new Playlist { Name = name.Trim(), Description = description };
         library.Current.Playlists.Add(playlist);
-        library.Touch();
+        library.Touch(playlist.Id);
         return playlist;
     }
 
@@ -68,7 +68,7 @@ public sealed class PlaylistService(
         };
         playlist.Items.Add(item);
         playlist.UpdatedAt = DateTimeOffset.UtcNow;
-        library.Touch();
+        library.Touch(playlist.Id);
         return item;
     }
 
@@ -79,7 +79,7 @@ public sealed class PlaylistService(
         if (removed)
         {
             playlist.UpdatedAt = DateTimeOffset.UtcNow;
-            library.Touch();
+            library.Touch(playlist.Id);
         }
 
         return removed;
@@ -137,7 +137,7 @@ public sealed class PlaylistService(
         }
 
         library.Current.Mirrors.RemoveAll(mirror => mirror.PlaylistId == playlistId);
-        library.Touch();
+        library.TouchDeleted(playlistId);
         return true;
     }
 
@@ -253,7 +253,7 @@ public sealed class PlaylistService(
     private void Touch(Playlist playlist)
     {
         playlist.UpdatedAt = DateTimeOffset.UtcNow;
-        library.Touch();
+        library.Touch(playlist.Id);
     }
 
     public Playlist GetRequired(Guid playlistId) =>

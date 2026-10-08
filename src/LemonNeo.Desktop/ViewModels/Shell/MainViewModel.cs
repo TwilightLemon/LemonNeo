@@ -16,7 +16,7 @@ using LemonNeo.Desktop.Config;
 
 namespace LemonNeo.Desktop.ViewModels.Shell;
 
-/// <summary>The shell owns startup and navigation; feature operations belong to their pages.</summary>
+/// <summary>The shell presents startup state and owns navigation; the controller owns startup execution.</summary>
 public sealed class MainViewModel : PageViewModel
 {
     private PlaylistMenuItemViewModel? _selectedPlaylist;
@@ -31,7 +31,6 @@ public sealed class MainViewModel : PageViewModel
         Navigation = new(CreatePage, Context, Playback);
         Navigation.PropertyChanged += OnNavigationChanged;
         Navigation.Initialize();
-        RefreshCommand = new(InitializeAsync);
         SearchCommand = new(SubmitSearchAsync, () => CanSearch);
         ToggleQueueCommand = new(ToggleQueue);
         CloseQueueCommand = new(() => IsQueueOpen = false, () => IsQueueOpen);
@@ -60,8 +59,6 @@ public sealed class MainViewModel : PageViewModel
     public ToolsViewModel Tools => Navigation.GetPage<ToolsViewModel>(DesktopRoutes.Tools);
     public SettingsViewModel Settings => Navigation.GetPage<SettingsViewModel>(DesktopRoutes.Settings);
     public LyricsViewModel Lyrics => Navigation.GetPage<LyricsViewModel>(DesktopRoutes.Lyrics);
-    public bool CanRetryStartup => !Context.IsInitialized;
-    public AsyncRelayCommand RefreshCommand { get; }
     public string SearchQuery
     {
         get => _searchQuery;
@@ -190,20 +187,35 @@ public sealed class MainViewModel : PageViewModel
         });
     }
 
-    public Task InitializeAsync() => RunOperationAsync(async ct =>
+    internal void BeginStartup()
     {
-        await _host.Settings.LoadAsync(ct);
-        await Task.Run(() => _host.InitializeAsync(ct), ct);
-        ct.ThrowIfCancellationRequested();
+        SetError(null);
+        SetStatus("Loading");
+        IsBusy = true;
+        RaiseInteractionProperties();
+    }
+
+    internal async Task CompleteStartupAsync()
+    {
         Context.IsInitialized = true;
         Context.RefreshLibrary();
         var report = _host.Plugins.LastReport;
         if (report.Failures.Count > 0)
             SetError("PluginFailures", [report.Failures.Count], string.Join(Environment.NewLine, report.Failures.Select(f => f.Error)));
         Playback.UpdateSnapshot();
-        _ = Navigation.Current.ActivateAsync();
-        OnPropertyChanged(nameof(CanRetryStartup));
-    }, "Loading", allowUninitialized: true);
+        await Navigation.Current.ActivateAsync();
+        SetStatus("Ready");
+        IsBusy = false;
+        RaiseInteractionProperties();
+    }
+
+    internal void ReportStartupFailure(string message)
+    {
+        SetError("StartupFailed", [message]);
+        SetStatus("Ready");
+        IsBusy = false;
+        RaiseInteractionProperties();
+    }
 
     public override async ValueTask DisposeAsync()
     {

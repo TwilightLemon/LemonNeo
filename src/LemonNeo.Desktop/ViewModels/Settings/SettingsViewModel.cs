@@ -6,6 +6,7 @@ using LemonNeo.Desktop.Config;
 using LemonNeo.Desktop.Services;
 using LemonNeo.Desktop.Utils;
 using LemonNeo.Desktop.ViewModels.Shared;
+using LemonNeo.Hosting;
 
 namespace LemonNeo.Desktop.ViewModels.Settings;
 
@@ -16,10 +17,15 @@ public sealed class SettingsViewModel : PageViewModel
     private readonly IDisposable _languageSubscription;
     private readonly ISettingsScope _playbackSettings;
     private readonly IDisposable _playbackSubscription;
+    private readonly HostStorageLocations _storage;
+    private readonly IDesktopStorageService _storageService;
     private bool _closing;
 
     public SettingsViewModel(DesktopContext context) : base(context, DesktopRoutes.Settings)
     {
+        _storage = _host.StorageLocations;
+        _storageService = _host.Get<IDesktopStorageService>();
+        _storage.Changed += OnStorageChanged;
         _playbackSettings = _host.Settings.ForPackage(PackageNames.Application);
         _playbackSubscription = _playbackSettings.Subscribe<PlaybackPreferences>(_ => OnPropertyChanged(nameof(SelectedAudioQuality)));
         ThemeCommand = new(value => ApplyAppearance(current => current with { Theme = Enum.Parse<ThemePreference>(value!) }));
@@ -71,9 +77,21 @@ public sealed class SettingsViewModel : PageViewModel
     public bool IsLanguageChinese => Context.Settings.Get<LanguagePreferences>().Language == LanguagePreference.Chinese;
     public bool IsLanguageEnglish => Context.Settings.Get<LanguagePreferences>().Language == LanguagePreference.English;
     public string PluginSummary => _text.Format("PluginCount", _host.Plugins.Loaded.Count);
-    public string LibraryPath => _host.Get<DesktopOptions>().LibraryDirectory;
+    public string LibraryPath => _storage.LibraryDirectory;
     public string ConfigurationPath => _host.Paths.ConfigurationDirectory;
-    public string CachePath => _host.Paths.CacheDirectory;
+    public string CachePath => _storage.CacheDirectory;
+
+    public Task ChangeLibraryAsync(string directory) =>
+        ExecuteAsync(ct => _storageService.ChangeLibraryAsync(directory, ct));
+
+    public Task ChangeCacheAsync(string directory) =>
+        ExecuteAsync(ct => _storageService.ChangeCacheAsync(directory, ct));
+
+    private void OnStorageChanged(object? sender, EventArgs args)
+    {
+        OnPropertyChanged(nameof(LibraryPath));
+        OnPropertyChanged(nameof(CachePath));
+    }
 
     private void ApplyAppearance(Func<AppearancePreferences, AppearancePreferences> update)
     {
@@ -104,6 +122,7 @@ public sealed class SettingsViewModel : PageViewModel
     public override async ValueTask DisposeAsync()
     {
         _closing = true;
+        _storage.Changed -= OnStorageChanged;
         _playbackSubscription.Dispose();
         _appearanceSubscription.Dispose();
         _languageSubscription.Dispose();

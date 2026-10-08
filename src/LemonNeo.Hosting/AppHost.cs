@@ -16,6 +16,10 @@ public class AppHost : IAsyncDisposable
 {
     private readonly ServiceProvider _services;
     private readonly HostOptions _options;
+    private readonly SemaphoreSlim _initializeGate = new(1, 1);
+    private readonly object _stateGate = new();
+    private bool _initializationStarted;
+    private bool _initialized;
     private bool _pluginsLoaded;
     private bool _libraryLoaded;
     private Task? _disposeTask;
@@ -24,9 +28,10 @@ public class AppHost : IAsyncDisposable
     {
         Paths = paths;
         _options = options;
+        StorageLocations = new(options.LibraryDirectory, options.CacheDirectory);
         var services = new ServiceCollection();
-        services.AddInfrastructure(paths, options);
-        services.AddApplication(paths);
+        services.AddInfrastructure(paths, StorageLocations);
+        services.AddApplication(StorageLocations);
         configure?.Invoke(services);
         _services = services.BuildServiceProvider();
     }
@@ -35,22 +40,104 @@ public class AppHost : IAsyncDisposable
 
     public IPluginDiagnostics Plugins => Get<IPluginDiagnostics>();
     public IAppPathProvider Paths { get; }
+    public HostStorageLocations StorageLocations { get; }
     public IAppSettingsService Settings => Get<IAppSettingsService>();
     public T Get<T>() where T : notnull => _services.GetRequiredService<T>();
 
+    /// <summary>Sets host storage after bootstrap configuration is loaded and before runtime initialization begins.</summary>
+    public void ConfigureInitialStorage(string libraryDirectory, string cacheDirectory)
+    {
+        lock (_stateGate)
+        {
+            if (_initializationStarted)
+                throw new InvalidOperationException("Initial storage must be configured before host initialization.");
+            StorageLocations.SetLibraryDirectory(libraryDirectory);
+            StorageLocations.SetCacheDirectory(cacheDirectory);
+        }
+    }
+
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
-        await Settings.LoadAsync(cancellationToken);
-        await Get<PlaybackSessionService>().InitializeAsync(cancellationToken);
-        if (!_pluginsLoaded)
+        await _initializeGate.WaitAsync(cancellationToken);
+        try
         {
-            await Get<PluginLoader>().LoadFromDirectoryAsync(_options.PluginDirectory, cancellationToken);
-            _pluginsLoaded = true;
+            if (_initialized) return;
+            lock (_stateGate) _initializationStarted = true;
+
+            await Settings.LoadAsync(cancellationToken);
+            var playbackTask = Get<PlaybackSessionService>().InitializeAsync(cancellationToken);
+            var libraryTask = InitializeLibraryAsync(cancellationToken);
+            try
+            {
+                await Task.WhenAll(playbackTask, libraryTask);
+            }
+            catch
+            {
+                // Preserve the relevant failure when both independent branches were active.
+                await playbackTask;
+                await libraryTask;
+                throw;
+            }
+
+            if (!_pluginsLoaded)
+            {
+                await Get<PluginLoader>().LoadFromDirectoryAsync(_options.PluginDirectory, cancellationToken);
+                _pluginsLoaded = true;
+            }
+            Settings.Start();
+            _initialized = true;
         }
-        await Get<LibraryService>().LoadAsync(cancellationToken);
-        _libraryLoaded = true;
-        Settings.Start();
+        finally { _initializeGate.Release(); }
     }
+
+    private async Task InitializeLibraryAsync(CancellationToken cancellationToken)
+    {
+        if (_libraryLoaded) return;
+        var library = Get<LibraryService>();
+        await library.LoadAsync(cancellationToken);
+        await library.EnsureCreatedAsync(cancellationToken);
+        _libraryLoaded = true;
+    }
+
+    /// <summary>Switches the backing Library while keeping the host and all plugins alive.</summary>
+    public async Task ChangeLibraryDirectoryAsync(string directory, CancellationToken cancellationToken = default)
+    {
+        var next = Path.GetFullPath(directory);
+        var previous = StorageLocations.LibraryDirectory;
+        if (PathEquals(previous, next)) return;
+
+        var library = Get<LibraryService>();
+        await library.SaveAsync(cancellationToken);
+        StorageLocations.SetLibraryDirectory(next);
+        try
+        {
+            await library.LoadAsync(cancellationToken);
+            await library.EnsureCreatedAsync(cancellationToken);
+            _libraryLoaded = true;
+        }
+        catch (Exception changeError)
+        {
+            StorageLocations.SetLibraryDirectory(previous);
+            try
+            {
+                await library.LoadAsync(CancellationToken.None);
+            }
+            catch (Exception restoreError)
+            {
+                throw new AggregateException("Could not change the music library or restore the previous library.",
+                    changeError, restoreError);
+            }
+            throw;
+        }
+    }
+
+    /// <summary>Changes where subsequent cache operations persist their values.</summary>
+    public void ChangeCacheDirectory(string directory) => StorageLocations.SetCacheDirectory(directory);
+
+    private static bool PathEquals(string first, string second) =>
+        string.Equals(first, second, OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal);
 
     public ValueTask DisposeAsync() => new(_disposeTask ??= DisposeCoreAsync());
 
@@ -68,6 +155,7 @@ public class AppHost : IAsyncDisposable
         if (_libraryLoaded) await Finish(() => Get<LibraryService>().SaveAsync());
         await Finish(() => Settings.SaveAsync());
         await Finish(() => _services.DisposeAsync().AsTask());
+        _initializeGate.Dispose();
         if (errors.Count > 0) throw new AggregateException("Host shutdown failed.", errors);
     }
 }

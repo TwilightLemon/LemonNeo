@@ -3,12 +3,10 @@ using LemonNeo.Abstractions.Plugins;
 using LemonNeo.Abstractions.Providers;
 using LemonNeo.Abstractions.Settings;
 using LemonNeo.Abstractions.Storage;
-using LemonNeo.Abstractions.Sync;
 using LemonNeo.Application.Library;
 using LemonNeo.Application.Lyrics;
 using LemonNeo.Application.Playback;
 using LemonNeo.Application.Providers;
-using LemonNeo.Application.Sync;
 using LemonNeo.Core.Exceptions;
 using LemonNeo.Core.Library;
 using LemonNeo.Core.Lyrics;
@@ -35,7 +33,6 @@ internal sealed partial class CommandProcessor(
     FolderImportService folderImporter,
     PlaybackSessionService playback,
     PlaybackSourceDiscoveryService sourceDiscovery,
-    SyncService sync,
     StartupCommands startup,
     IAppSettingsService appSettings,
     CommandCompletionService completions,
@@ -346,10 +343,6 @@ internal sealed partial class CommandProcessor(
                 {
                     throw new ArgumentException("Usage: queue [clear]");
                 }
-                break;
-            case "sync":
-                Require(arguments, 2, "sync <status|pull|push>");
-                await SyncAsync(arguments[1], cancellationToken);
                 break;
             case "save":
                 await library.SaveAsync(cancellationToken);
@@ -747,7 +740,7 @@ internal sealed partial class CommandProcessor(
         if (matched > 0)
         {
             playlist.UpdatedAt = DateTimeOffset.UtcNow;
-            library.Touch();
+            library.Touch(playlist.Id);
         }
 
         await library.SaveAsync(cancellationToken);
@@ -1177,47 +1170,6 @@ internal sealed partial class CommandProcessor(
     private static string FormatTime(TimeSpan value) => value.TotalHours >= 1
         ? $"{(int)value.TotalHours}:{value.Minutes:00}:{value.Seconds:00}"
         : $"{(int)value.TotalMinutes}:{value.Seconds:00}";
-
-    private async Task SyncAsync(string action, CancellationToken cancellationToken)
-    {
-        const string providerId = "mock-git";
-        switch (action.ToLowerInvariant())
-        {
-            case "status":
-                var status = await sync.GetStatusAsync(providerId, cancellationToken);
-                _output.WriteLine($"Status: {status.State}");
-                _output.WriteLine($"Local revision: {status.LocalRevision ?? "n/a"}");
-                _output.WriteLine($"Remote revision: {status.RemoteRevision ?? "n/a"}");
-                if (status.Message is not null) _output.WriteLine(status.Message);
-                break;
-            case "pull":
-                var pull = await sync.PullAsync(providerId, cancellationToken);
-                _output.WriteLine(pull.ProviderResult.Message);
-                _output.WriteLine($"Remote revision: {pull.ProviderResult.RemoteRevision ?? "n/a"}");
-                _output.WriteLine($"Local revision: {pull.ProviderResult.LocalRevision ?? "n/a"}");
-                if (pull.MergeResult is { } merge)
-                {
-                    _output.WriteLine("Merging...");
-                    _output.WriteLine($"+ {merge.AddedPlaylistItems} playlist items");
-                    _output.WriteLine($"~ {merge.ChangedPlaylists} playlists");
-                    _output.WriteLine($"{merge.Conflicts.Count} conflicts");
-                    foreach (var conflict in merge.Conflicts)
-                    {
-                        _output.WriteLine($"! {conflict.Type}: {conflict.Path}");
-                    }
-
-                    _output.WriteLine("Library updated.");
-                }
-
-                break;
-            case "push":
-                var push = await sync.PushAsync(providerId, cancellationToken);
-                _output.WriteLine(push.Message);
-                break;
-            default:
-                throw new ArgumentException("Usage: sync <status|pull|push>");
-        }
-    }
 
     private Playlist ResolvePlaylist(string value)
     {

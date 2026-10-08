@@ -10,6 +10,7 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
     protected readonly DesktopContext Context;
     protected DesktopHost _host => Context.Host;
     protected LocalizationService _text => Context.Text;
+    protected CancellationToken LifetimeToken => _lifetime.Token;
     private readonly CancellationTokenSource _lifetime = new();
     private CancellationTokenSource? _operationCancellation;
     private Task _operation = Task.CompletedTask;
@@ -35,7 +36,7 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
     public virtual string PageTitle => _text[Route];
     public virtual string PageDescription => _text[$"{Route}Description"];
     public virtual string? PageSummary => null;
-    public bool IsBusy { get => _isBusy; private set => SetProperty(ref _isBusy, value); }
+    public bool IsBusy { get => _isBusy; protected set => SetProperty(ref _isBusy, value); }
     public virtual bool CanInteract => _operationCancellation is null && Context.IsInitialized && !_closing;
     public bool HasStatus => _statusKey != "Ready";
     public string Status => HasStatus ? _text.Format(_statusKey, _statusArguments) : "";
@@ -47,11 +48,11 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
     public virtual Task ActivateAsync() => Task.CompletedTask;
 
     protected Task ExecuteAsync(Func<CancellationToken, Task> action) => RunOperationAsync(action);
-    protected Task RunOperationAsync(Func<CancellationToken, Task> action, string status = "Working", bool allowUninitialized = false,
+    protected Task RunOperationAsync(Func<CancellationToken, Task> action, string status = "Working",
         bool showBusy = true, TimeSpan? busyDelay = null)
     {
         // Operation ownership controls reentrancy; IsBusy only controls visible progress.
-        if (_operationCancellation is not null || _closing || !Context.IsInitialized && !allowUninitialized) return Task.CompletedTask;
+        if (_operationCancellation is not null || _closing || !Context.IsInitialized) return Task.CompletedTask;
         var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
         _operationCancellation = cancellation;
         _operation = RunCoreAsync(action, status, cancellation, showBusy, busyDelay ?? TimeSpan.Zero);
@@ -77,7 +78,7 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
         }
         catch (Exception exception)
         {
-            SetError(Context.IsInitialized ? "OperationFailed" : "StartupFailed", [exception.Message]);
+            SetError("OperationFailed", [exception.Message]);
             if (showBusy) SetStatus("Ready");
         }
         finally

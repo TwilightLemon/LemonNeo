@@ -27,7 +27,7 @@ internal static class Program
         try
         {
             await using var host = new AppHost(paths,
-                new(options.PluginDirectory, options.LibraryDirectory, options.EnableMockSync), services =>
+                new(options.PluginDirectory, options.LibraryDirectory, paths.CacheDirectory), services =>
                 {
                     services.AddSingleton(options);
                     services.AddSingleton(provider => new StartupCommands(provider.GetRequiredService<IAppSettingsService>(),
@@ -61,13 +61,15 @@ internal static class Program
     }
 }
 
-internal sealed record ConsoleOptions(string PluginDirectory, string LibraryDirectory, string? StartupFile, bool EnableMockSync = false)
+internal sealed record ConsoleOptions(
+    string PluginDirectory,
+    string LibraryDirectory,
+    string? StartupFile)
 {
     public static ConsoleOptions Parse(string[] args, IAppPathProvider paths)
     {
         var plugins = Path.Combine(AppContext.BaseDirectory, "plugins");
         var library = paths.MusicLibraryDirectory;
-        var mockSync = false;
         string? startup = null;
         for (var index = 0; index < args.Length; index++)
         {
@@ -76,10 +78,9 @@ internal sealed record ConsoleOptions(string PluginDirectory, string LibraryDire
                 case "--plugins" when index + 1 < args.Length: plugins = Path.GetFullPath(args[++index]); break;
                 case "--library" when index + 1 < args.Length: library = Path.GetFullPath(args[++index]); break;
                 case "--startup" when index + 1 < args.Length: startup = Path.GetFullPath(args[++index]); break;
-                case "--mock-sync": mockSync = true; break;
                 default: throw new ArgumentException($"Unknown or incomplete option '{args[index]}'.");
             }
         }
-        return new(plugins, library, startup, mockSync);
+        return new(plugins, library, startup);
     }
 }

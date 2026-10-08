@@ -8,11 +8,13 @@ namespace LemonNeo.Infrastructure.Credentials;
 internal sealed class PluginDataStoreFactory : IPluginDataStoreFactory
 {
     private readonly IAppPathProvider _paths;
+    private readonly Func<string> _getCacheDirectory;
     private readonly IDataProtectionProvider _dataProtection;
 
-    public PluginDataStoreFactory(IAppPathProvider paths)
+    public PluginDataStoreFactory(IAppPathProvider paths, Func<string> getCacheDirectory)
     {
         _paths = paths;
+        _getCacheDirectory = getCacheDirectory;
         SecureDirectory(paths.DataProtectionKeysDirectory);
         _dataProtection = DataProtectionProvider.Create(
             new DirectoryInfo(paths.DataProtectionKeysDirectory),
@@ -30,9 +32,18 @@ internal sealed class PluginDataStoreFactory : IPluginDataStoreFactory
 
     public string GetCacheDirectory(string pluginId)
     {
-        var directory = _paths.GetPluginCacheDirectory(pluginId);
+        ValidateSegment(pluginId, nameof(pluginId));
+        var directory = Path.Combine(Path.GetFullPath(_getCacheDirectory()), "Plugins", pluginId);
         Directory.CreateDirectory(directory);
         return directory;
+    }
+
+    internal static void ValidateSegment(string value, string parameterName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value, parameterName);
+        if (value is "." or ".." || value.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
+            value.Contains(Path.DirectorySeparatorChar) || value.Contains(Path.AltDirectorySeparatorChar))
+            throw new ArgumentException("The value is not a safe path segment.", parameterName);
     }
 
     private static void SecureDirectory(string path)

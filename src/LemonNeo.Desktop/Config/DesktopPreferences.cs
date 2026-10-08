@@ -7,6 +7,11 @@ public static class DesktopPreferences
 {
     public static void Register(ISettingsScope settings)
     {
+        settings.Register(nameof(DesktopStoragePreferences), new DesktopStoragePreferences(), value => value with
+        {
+            LibraryDirectory = NormalizeOptionalPath(value.LibraryDirectory),
+            CacheDirectory = NormalizeOptionalPath(value.CacheDirectory)
+        });
         settings.Register(nameof(LibraryPreferences), new LibraryPreferences(), value => value with
         {
             PlaylistOrder = (value.PlaylistOrder ?? []).Distinct().ToArray()
@@ -33,4 +38,7 @@ public static class DesktopPreferences
             WindowHeight = double.IsFinite(value.WindowHeight) ? Math.Clamp(value.WindowHeight, 110, 1200) : 300
         });
     }
+
+    private static string? NormalizeOptionalPath(string? path) =>
+        string.IsNullOrWhiteSpace(path) ? null : Path.GetFullPath(path);
 }

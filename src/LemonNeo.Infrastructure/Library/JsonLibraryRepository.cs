@@ -6,7 +6,7 @@ using System.Text.Json.Serialization;
 
 namespace LemonNeo.Infrastructure.Library;
 
-internal sealed class JsonLibraryRepository(string libraryDirectory) : ILibraryRepository
+internal sealed class JsonLibraryRepository(Func<string> getLibraryDirectory) : ILibraryRepository
 {
     private const string IndexFileName = "library.json";
 
@@ -18,11 +18,27 @@ internal sealed class JsonLibraryRepository(string libraryDirectory) : ILibraryR
         PropertyNameCaseInsensitive = true
     };
 
-    private readonly string _root = Path.GetFullPath(libraryDirectory);
+    public Task EnsureCreatedAsync(CancellationToken cancellationToken = default)
+    {
+        var root = GetRoot();
+        var indexPath = Path.Combine(root, IndexFileName);
+        if (File.Exists(indexPath)) return Task.CompletedTask;
+        return SaveAsync(new LibrarySaveSnapshot
+        {
+            FormatVersion = 1,
+            UpdatedAt = DateTimeOffset.UtcNow,
+            PlaylistIds = [],
+            Mirrors = [],
+            ChangedPlaylists = [],
+            DeletedPlaylistIds = [],
+            WriteIndex = true
+        }, cancellationToken);
+    }
 
     public async Task<MusicLibrary> LoadAsync(CancellationToken cancellationToken = default)
     {
-        var indexPath = Path.Combine(_root, IndexFileName);
+        var root = GetRoot();
+        var indexPath = Path.Combine(root, IndexFileName);
         if (!File.Exists(indexPath))
         {
             return new MusicLibrary();
@@ -36,7 +52,7 @@ internal sealed class JsonLibraryRepository(string libraryDirectory) : ILibraryR
 
             foreach (var relativePath in index.PlaylistFiles.Order(StringComparer.Ordinal))
             {
-                var path = ResolveLibraryPath(relativePath);
+                var path = ResolveLibraryPath(root, relativePath);
                 var playlist = await ReadAsync<Playlist>(path, cancellationToken)
                     ?? throw new LibraryException($"Playlist file is empty: {path}");
                 playlists.Add(playlist);
@@ -56,52 +72,52 @@ internal sealed class JsonLibraryRepository(string libraryDirectory) : ILibraryR
         }
         catch (Exception exception) when (exception is IOException or JsonException or UnauthorizedAccessException)
         {
-            throw new LibraryException($"Could not load library from '{_root}'.", exception);
+            throw new LibraryException($"Could not load library from '{root}'.", exception);
         }
     }
 
-    public async Task SaveAsync(MusicLibrary library, CancellationToken cancellationToken = default)
+    public async Task SaveAsync(LibrarySaveSnapshot snapshot, CancellationToken cancellationToken = default)
     {
+        var root = GetRoot();
         try
         {
-            var playlistsDirectory = Path.Combine(_root, "playlists");
+            var playlistsDirectory = Path.Combine(root, "playlists");
             Directory.CreateDirectory(playlistsDirectory);
 
-            var playlistFiles = new List<string>();
-            foreach (var playlist in library.Playlists.OrderBy(item => item.Id))
+            foreach (var playlist in snapshot.ChangedPlaylists.OrderBy(item => item.Id))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var relativePath = Path.Combine("playlists", $"{playlist.Id:N}.json").Replace('\\', '/');
-                playlistFiles.Add(relativePath);
                 await WriteAtomicAsync(
-                    ResolveLibraryPath(relativePath),
+                    ResolveLibraryPath(root, relativePath),
                     StablePlaylist(playlist),
                     cancellationToken);
             }
 
-            var index = new LibraryIndex
+            if (snapshot.WriteIndex)
             {
-                FormatVersion = library.FormatVersion,
-                UpdatedAt = library.UpdatedAt,
-                PlaylistFiles = playlistFiles,
-                Mirrors = library.Mirrors.OrderBy(mirror => mirror.PlaylistId).ToArray()
-            };
-            await WriteAtomicAsync(Path.Combine(_root, IndexFileName), index, cancellationToken);
+                var index = new LibraryIndex
+                {
+                    FormatVersion = snapshot.FormatVersion,
+                    UpdatedAt = snapshot.UpdatedAt,
+                    PlaylistFiles = snapshot.PlaylistIds.Order()
+                        .Select(id => $"playlists/{id:N}.json").ToArray(),
+                    Mirrors = snapshot.Mirrors.OrderBy(mirror => mirror.PlaylistId).ToArray()
+                };
+                await WriteAtomicAsync(Path.Combine(root, IndexFileName), index, cancellationToken);
+            }
 
             // Publish the new index before removing playlist files it no longer references.
-            var retainedIds = library.Playlists.Select(playlist => playlist.Id).ToHashSet();
-            foreach (var path in Directory.EnumerateFiles(playlistsDirectory, "*.json"))
+            foreach (var id in snapshot.DeletedPlaylistIds)
             {
-                if (Guid.TryParseExact(Path.GetFileNameWithoutExtension(path), "N", out var id) &&
-                    !retainedIds.Contains(id))
-                {
-                    File.Delete(path);
-                }
+                cancellationToken.ThrowIfCancellationRequested();
+                var path = ResolveLibraryPath(root, $"playlists/{id:N}.json");
+                if (File.Exists(path)) File.Delete(path);
             }
         }
         catch (Exception exception) when (exception is IOException or JsonException or UnauthorizedAccessException)
         {
-            throw new LibraryException($"Could not save library to '{_root}'.", exception);
+            throw new LibraryException($"Could not save library to '{root}'.", exception);
         }
     }
 
@@ -118,15 +134,17 @@ internal sealed class JsonLibraryRepository(string libraryDirectory) : ILibraryR
             .ToList()
     };
 
-    private string ResolveLibraryPath(string relativePath)
+    private string GetRoot() => Path.TrimEndingDirectorySeparator(Path.GetFullPath(getLibraryDirectory()));
+
+    private static string ResolveLibraryPath(string root, string relativePath)
     {
         if (Path.IsPathRooted(relativePath))
         {
             throw new LibraryException($"Library contains an absolute path: {relativePath}");
         }
 
-        var path = Path.GetFullPath(Path.Combine(_root, relativePath));
-        if (!path.StartsWith(_root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+        var path = Path.GetFullPath(Path.Combine(root, relativePath));
+        if (!path.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
         {
             throw new LibraryException($"Library path escapes its root: {relativePath}");
         }

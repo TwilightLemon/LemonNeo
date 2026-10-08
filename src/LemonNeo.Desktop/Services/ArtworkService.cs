@@ -37,7 +37,7 @@ public sealed class ArtworkService(ImageCache cache, ILogger<ArtworkService> log
         if (cancellationToken.IsCancellationRequested)
         {
             bitmap.Dispose();
-            cancellationToken.ThrowIfCancellationRequested();
+            
         }
         return bitmap;
     }

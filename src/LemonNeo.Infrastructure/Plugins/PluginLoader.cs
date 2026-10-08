@@ -188,7 +188,7 @@ internal sealed class PluginLoader(
                 playerRegistry,
                 settings.ForPackage(manifest.Id),
                 dataStoreFactory.CreateCredentialVault(manifest.Id),
-                dataStoreFactory.GetCacheDirectory(manifest.Id),
+                () => dataStoreFactory.GetCacheDirectory(manifest.Id),
                 playback);
             try
             {

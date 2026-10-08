@@ -59,7 +59,6 @@ internal static class CommandCatalog
         new("resume", "resume", "Resume playback."),
         new("stop", "stop", "Stop playback."),
         new("queue", "queue [clear]", "Show or clear the playback queue."),
-        new("sync", "sync <status|pull|push>", "Synchronize the library."),
         new("save", "save", "Save the library and playback state."),
         new("exit", "exit", "Save and exit.", "quit")
     ];

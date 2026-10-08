@@ -7,14 +7,16 @@
 
 | 数据 | 管理者 | 存放位置 | 保存方式 |
 | --- | --- | --- | --- |
-| 用户歌单、索引和镜像关系 | `LibraryService`、`JsonLibraryRepository` | 独立 Library 目录 | 保留显式保存、同步和退出保存 |
+| 用户歌单、索引和镜像关系 | `LibraryService`、`JsonLibraryRepository` | 独立 Library 目录 | 编辑后增量保存及退出保存 |
 | Application、Desktop、Console、插件的普通配置 | Hosting 的 `AppSettingsService` | Configuration 下的包目录 | Apply 内存，固定周期与退出保存 |
 | 当前队列、恢复进度、音量 | `PlaybackSessionService` 负责业务，配置服务负责持久化 | Application 包配置目录 | 同上 |
 | 插件认证凭据 | `ICredentialVault` | Data/Credentials 下的包目录 | 保留加密与显式提交 |
 | 图片、歌词、音频和插件缓存 | 各缓存服务 | Cache 目录 | 保留现有机制 |
 
 Library 的仓储和数据结构保持现状：`library.json`、`playlists/<id>.json` 以及现有镜像元数据。
-未来 Git 同步可以覆盖独立 Library 目录。配置、播放状态、凭据和缓存各自有独立路径。
+Library 在内存中记录发生变化和删除的歌单；保存只重写变化的歌单文件，并在 Library 元数据变化时更新索引。
+保存期间再次发生的变化会保留为待保存状态，由下一次保存提交。
+Desktop 首次启动直接使用平台默认 Library，之后可在设置中打开其他 Library；缓存目录也可独立选择。配置、播放状态、凭据和插件目录使用固定的应用路径。
 
 ```text
 <LibraryDirectory>/
@@ -27,6 +29,7 @@ Library 的仓储和数据结构保持现状：`library.json`、`playlists/<id>.
     PlaybackResumeState.json
     PlaybackPreferences.json
   LemonNeo.Desktop/
+    DesktopStoragePreferences.json
     AppearancePreferences.json
     LanguagePreferences.json
     LyricsPreferences.json
@@ -46,7 +49,7 @@ Library 的仓储和数据结构保持现状：`library.json`、`playlists/<id>.
 
 Configuration、Data、Cache 的平台默认根目录沿用 `AppHost.CreateDefaultPaths()`。
 可用 `LEMONNEO_CONFIG_HOME`、`LEMONNEO_DATA_HOME`、`LEMONNEO_CACHE_HOME`、`LEMONNEO_LIBRARY_HOME` 覆盖。
-Desktop 和 Console 的 `--library`、`--plugins` 继续选择 Library 和插件根目录。
+Desktop 不解析命令行路径；Library 和 Cache 均在程序内选择，插件目录保持固定。Console 继续支持 `--library`、`--plugins` 和 `--startup`。
 
 ## 依赖与生命周期
 
@@ -58,12 +61,16 @@ Desktop 和 Console 的 `--library`、`--plugins` 继续选择 Library 和插件
 `LemonNeo.Abstractions.Settings`，Application 和插件无需依赖 Desktop 或 JSON 实现。
 Hosting 持有唯一服务实例与保存循环。包入口只绑定包名，不创建计时器、写盘队列或保存任务。
 
+Desktop 创建唯一的 `DesktopHost` 后，先通过该 Host 的配置服务加载包含
+`DesktopStoragePreferences` 在内的 Desktop 实体，再于运行时初始化开始前设置实际 Library 与 Cache。
+Desktop 不再为存储路径维护独立 JSON Store。
+
 启动顺序：
 
-1. 登记并加载宿主配置。Desktop 先在 UI 线程加载其预登记实体，应用主题与语言。
-2. 登记 Application 播放实体，恢复队列、进度、音量。
-3. 加载插件，由插件主动登记自己的实体。
-4. 加载 Library，启动配置服务的固定周期保存。
+1. Desktop 在 UI 线程加载其预登记实体，应用主题、语言并确定 Library/Cache；Shell 此时已经显示但不可交互。
+2. 后台并行加载 Library，并登记 Application 播放实体、恢复队列、进度和音量。
+3. 两个分支完成后加载插件，由插件主动登记自己的实体。
+4. 启动配置服务的固定周期保存，并在 UI 线程发布 Library 与 Playback 快照。
 
 Console 随后加载自己的启动脚本并执行命令，再进入交互；Desktop 直接打开图形界面。
 
@@ -170,14 +177,10 @@ JSON 序列化元数据使用每次操作独立的选项，配置存储不长期
 
 ## 验收
 
-新验收项目为 `tests/LemonNeo.Hosting.Tests`，测试插件位于 `tests/LemonNeo.Plugin.ConfigurationFixture`。
-测试插件不会部署到正式 Desktop 插件目录。已删除的旧测试不再引用或恢复。
+项目尚未发布，本次重构不保留历史数据迁移或兼容入口，并移除了原有测试项目。验收以完整构建、静态残留检查和 Desktop 实机操作为准。
 
 ```sh
 dotnet build LemonNeo.slnx -p:SkipHostPlugins=true --disable-build-servers -m:1
-dotnet test tests/LemonNeo.Hosting.Tests/LemonNeo.Hosting.Tests.csproj -p:SkipHostPlugins=true --disable-build-servers -m:1
 ```
 
-覆盖包与实体隔离、通知范围、周期合并与重试、写入期间的新修改、取消与失败恢复、退出保存、
-慢磁盘下的音量和 seek、队列与恢复实体分离、恢复项匹配、插件关闭与释放、启动脚本，以及实际窗口中的封面稳定性。
-周期测试使用可控时间和可阻塞的存储，不等待真实的 10 秒周期。文件测试全部使用独立临时目录。
+Desktop 实机检查首次启动使用默认 Library、打开已有 Library、切换 Library、切换 Cache、取消选择、无效目录提示，以及重启后恢复所选路径。

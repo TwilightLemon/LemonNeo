@@ -24,7 +24,7 @@ public sealed class LocalMusicPlugin :
     };
 
     private readonly ConcurrentDictionary<string, Track> _catalog = new(StringComparer.Ordinal);
-    private string? _artworkDirectory;
+    private IPluginContext? _context;
     private ILogger _logger = NullLogger.Instance;
 
     public PluginDescriptor Descriptor { get; } = new(
@@ -46,7 +46,7 @@ public sealed class LocalMusicPlugin :
     public ValueTask InitializeAsync(IPluginContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        _artworkDirectory = Path.Combine(context.CacheDirectory, "Artwork");
+        _context = context;
         _logger = context.LoggerFactory.CreateLogger<LocalMusicPlugin>();
         context.RegisterProvider(this);
         return ValueTask.CompletedTask;
@@ -56,6 +56,7 @@ public sealed class LocalMusicPlugin :
     {
         cancellationToken.ThrowIfCancellationRequested();
         _catalog.Clear();
+        _context = null;
         return ValueTask.CompletedTask;
     }
 
@@ -208,7 +209,8 @@ public sealed class LocalMusicPlugin :
 
     private Uri? ReadArtwork(IEnumerable<TagLib.IPicture> pictures)
     {
-        if (_artworkDirectory is null) return null;
+        if (_context is null) return null;
+        var artworkDirectory = Path.Combine(_context.CacheDirectory, "Artwork");
         foreach (var picture in pictures.OrderByDescending(picture => picture.Type == TagLib.PictureType.FrontCover))
         {
             // Match the host image size limit. Do not persist URLs or arbitrary attachments as artwork.
@@ -219,11 +221,11 @@ public sealed class LocalMusicPlugin :
             string? temporary = null;
             try
             {
-                Directory.CreateDirectory(_artworkDirectory);
-                var path = Path.Combine(_artworkDirectory, Convert.ToHexStringLower(SHA256.HashData(bytes)) + extension);
+                Directory.CreateDirectory(artworkDirectory);
+                var path = Path.Combine(artworkDirectory, Convert.ToHexStringLower(SHA256.HashData(bytes)) + extension);
                 if (!File.Exists(path))
                 {
-                    temporary = Path.Combine(_artworkDirectory, Guid.NewGuid().ToString("N") + ".part");
+                    temporary = Path.Combine(artworkDirectory, Guid.NewGuid().ToString("N") + ".part");
                     File.WriteAllBytes(temporary, bytes);
                     File.Move(temporary, path, overwrite: true);
                 }

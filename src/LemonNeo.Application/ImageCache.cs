@@ -13,6 +13,7 @@ public sealed class ImageCache : IAsyncDisposable
     public const int MaximumImageBytes = 16 * 1024 * 1024;
     private readonly HttpClient _httpClient;
     private readonly ILogger<ImageCache> _logger;
+    private readonly Func<string> _getCacheDirectory;
     private readonly long _maximumMemoryBytes;
     private readonly object _gate = new();
     private readonly MemoryCache _memory;
@@ -21,18 +22,18 @@ public sealed class ImageCache : IAsyncDisposable
     private readonly CancellationTokenSource _lifetime = new();
     private bool _closing;
 
-    public ImageCache(string cacheDirectory, HttpClient httpClient, ILogger<ImageCache> logger,
+    public ImageCache(Func<string> getCacheDirectory, HttpClient httpClient, ILogger<ImageCache> logger,
         long maximumMemoryBytes = 64 * 1024 * 1024)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(maximumMemoryBytes);
-        DirectoryPath = Path.Combine(Path.GetFullPath(cacheDirectory), "Images");
+        _getCacheDirectory = getCacheDirectory;
         _httpClient = httpClient;
         _logger = logger;
         _maximumMemoryBytes = maximumMemoryBytes;
         _memory = new MemoryCache(new MemoryCacheOptions { SizeLimit = maximumMemoryBytes });
     }
 
-    public string DirectoryPath { get; }
+    public string DirectoryPath => Path.Combine(Path.GetFullPath(_getCacheDirectory()), "Images");
 
     public async Task<CachedImage?> GetAsync(Uri uri, CancellationToken cancellationToken = default)
     {
@@ -61,6 +62,7 @@ public sealed class ImageCache : IAsyncDisposable
     {
         CachedImage? result = null;
         var cancelled = false;
+        var directory = DirectoryPath;
         try
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
@@ -68,10 +70,10 @@ public sealed class ImageCache : IAsyncDisposable
             try
             {
                 timeout.CancelAfter(TimeSpan.FromSeconds(15));
-                var data = await ReadDiskAsync(key, timeout.Token).ConfigureAwait(false);
+                var data = await ReadDiskAsync(directory, key, timeout.Token).ConfigureAwait(false);
                 var isCached = data is not null;
                 data ??= await ReadSourceAsync(uri, timeout.Token).ConfigureAwait(false);
-                if (!isCached) await StoreDiskAsync(key, data, timeout.Token).ConfigureAwait(false);
+                if (!isCached) await StoreDiskAsync(directory, key, data, timeout.Token).ConfigureAwait(false);
                 timeout.Token.ThrowIfCancellationRequested();
                 lock (_gate) Remember(key, data);
                 result = new CachedImage(data, isCached);
@@ -97,11 +99,11 @@ public sealed class ImageCache : IAsyncDisposable
         }
     }
 
-    private async Task<byte[]?> ReadDiskAsync(string key, CancellationToken cancellationToken)
+    private async Task<byte[]?> ReadDiskAsync(string directory, string key, CancellationToken cancellationToken)
     {
         try
         {
-            await using var file = new FileStream(GetPath(key), FileMode.Open, FileAccess.Read,
+            await using var file = new FileStream(GetPath(directory, key), FileMode.Open, FileAccess.Read,
                 FileShare.Read | FileShare.Delete, 81920, FileOptions.Asynchronous | FileOptions.SequentialScan);
             return await ReadBytesAsync(file, cancellationToken).ConfigureAwait(false);
         }
@@ -144,15 +146,15 @@ public sealed class ImageCache : IAsyncDisposable
         return data.ToArray();
     }
 
-    private async Task StoreDiskAsync(string key, byte[] data, CancellationToken cancellationToken)
+    private async Task StoreDiskAsync(string directory, string key, byte[] data, CancellationToken cancellationToken)
     {
-        var temporaryPath = Path.Combine(DirectoryPath, Guid.NewGuid().ToString("N") + ".part");
+        var temporaryPath = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".part");
         try
         {
-            Directory.CreateDirectory(DirectoryPath);
+            Directory.CreateDirectory(directory);
             await File.WriteAllBytesAsync(temporaryPath, data, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
-            File.Move(temporaryPath, GetPath(key), overwrite: true);
+            File.Move(temporaryPath, GetPath(directory, key), overwrite: true);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
@@ -171,11 +173,12 @@ public sealed class ImageCache : IAsyncDisposable
     public Task InvalidateAsync(Uri uri)
     {
         var key = GetKey(uri);
+        var directory = DirectoryPath;
         lock (_gate)
         {
             if (!_closing) _memory.Remove(key);
         }
-        return Task.Run(() => RemoveFile(GetPath(key)));
+        return Task.Run(() => RemoveFile(GetPath(directory, key)));
     }
 
     private void RemoveFile(string path)
@@ -188,7 +191,7 @@ public sealed class ImageCache : IAsyncDisposable
     }
 
     private static string GetKey(Uri uri) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(uri.AbsoluteUri)));
-    private string GetPath(string key) => Path.Combine(DirectoryPath, key + ".image");
+    private static string GetPath(string directory, string key) => Path.Combine(directory, key + ".image");
 
     public async ValueTask DisposeAsync()
     {

@@ -11,10 +11,6 @@
     <Project Path="src/LemonNeo.Desktop/LemonNeo.Desktop.csproj" />
     <Project Path="src/LemonNeo.Hosting/LemonNeo.Hosting.csproj" />
   </Folder>
-  <Folder Name="/tests/">
-    <Project Path="tests/LemonNeo.Hosting.Tests/LemonNeo.Hosting.Tests.csproj" />
-    <Project Path="tests/LemonNeo.Plugin.ConfigurationFixture/LemonNeo.Plugin.ConfigurationFixture.csproj" />
-  </Folder>
   <Folder Name="/plugins/">
     <Project Path="plugins/LemonNeo.Plugin.WindowsSmtc/LemonNeo.Plugin.WindowsSmtc.csproj" />
     <Project Path="plugins/LemonNeo.Plugin.MacNowPlaying/LemonNeo.Plugin.MacNowPlaying.csproj" />

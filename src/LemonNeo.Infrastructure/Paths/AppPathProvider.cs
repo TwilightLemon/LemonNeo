@@ -24,6 +24,7 @@ internal sealed class AppPathProvider : IAppPathProvider
     public string DataDirectory { get; }
     public string CacheDirectory { get; }
     public string MusicLibraryDirectory { get; }
+    public string PluginDirectory { get; } = Path.Combine(AppContext.BaseDirectory, "plugins");
     public string DataProtectionKeysDirectory { get; }
 
     public static AppPathProvider CreateDefault()
@@ -88,9 +89,6 @@ internal sealed class AppPathProvider : IAppPathProvider
 
     public string GetPluginCredentialDirectory(string pluginId) =>
         Path.Combine(DataDirectory, "Credentials", SafeSegment(pluginId));
-
-    public string GetPluginCacheDirectory(string pluginId) =>
-        Path.Combine(CacheDirectory, "Plugins", SafeSegment(pluginId));
 
     private static string RequiredSpecialFolder(Environment.SpecialFolder folder)
     {

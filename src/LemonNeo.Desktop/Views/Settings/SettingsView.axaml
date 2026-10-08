@@ -89,9 +89,14 @@
           <Border Classes="card">
             <StackPanel Spacing="12">
               <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.Storage}}" />
-              <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.LibraryPath}}" /><SelectableTextBlock Text="{Binding LibraryPath}" TextWrapping="Wrap" />
+              <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Translate {x:Static i18n:LanguageManager+Keys.StorageDescription}}" />
+              <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.LibraryPath}}" />
+              <SelectableTextBlock Text="{Binding LibraryPath}" TextWrapping="Wrap" />
+              <Button HorizontalAlignment="Left" Content="{Translate {x:Static i18n:LanguageManager+Keys.ChangeLibraryPath}}" Click="OnChangeLibraryPath" />
               <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.ConfigurationPath}}" /><SelectableTextBlock Text="{Binding ConfigurationPath}" TextWrapping="Wrap" />
-              <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.CachePath}}" /><SelectableTextBlock Text="{Binding CachePath}" TextWrapping="Wrap" />
+              <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.CachePath}}" />
+              <SelectableTextBlock Text="{Binding CachePath}" TextWrapping="Wrap" />
+              <Button HorizontalAlignment="Left" Content="{Translate {x:Static i18n:LanguageManager+Keys.ChangeCachePath}}" Click="OnChangeCachePath" />
             </StackPanel>
           </Border>
         </StackPanel>

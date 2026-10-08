@@ -9,16 +9,17 @@ using Microsoft.Extensions.Logging;
 namespace LemonNeo.Application;
 
 /// <summary>Audio indexed by one namespace-kind-id identity and its actual quality.</summary>
-public sealed class PlaybackAudioCache(string cacheDirectory, ILogger<PlaybackAudioCache> logger)
+public sealed class PlaybackAudioCache(Func<string> getCacheDirectory, ILogger<PlaybackAudioCache> logger)
 {
     private const int FormatVersion = 1;
-    private readonly string _directory = Path.Combine(Path.GetFullPath(cacheDirectory), "Music");
+    public string DirectoryPath => Path.Combine(Path.GetFullPath(getCacheDirectory()), "Music");
 
     public async Task<FilePlaybackSource?> TryGetAsync(
         ExternalMusicId identifier, AudioQuality quality, CancellationToken cancellationToken = default)
     {
-        var entry = await TryGetEntryAsync(MusicCacheIdentity.Normalize(identifier), quality, cancellationToken);
-        return entry is null ? null : new FilePlaybackSource(Path.Combine(_directory, entry.FileName))
+        var directory = DirectoryPath;
+        var entry = await TryGetEntryAsync(directory, MusicCacheIdentity.Normalize(identifier), quality, cancellationToken);
+        return entry is null ? null : new FilePlaybackSource(Path.Combine(directory, entry.FileName))
         {
             Quality = entry.Quality,
             BitrateKbps = entry.BitrateKbps
@@ -26,10 +27,10 @@ public sealed class PlaybackAudioCache(string cacheDirectory, ILogger<PlaybackAu
     }
 
     private async Task<CacheEntry?> TryGetEntryAsync(
-        ExternalMusicId identifier, AudioQuality quality, CancellationToken cancellationToken)
+        string directory, ExternalMusicId identifier, AudioQuality quality, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var indexPath = GetIndexPath(identifier, quality);
+        var indexPath = GetIndexPath(directory, identifier, quality);
         if (!File.Exists(indexPath)) return null;
         try
         {
@@ -44,7 +45,7 @@ public sealed class PlaybackAudioCache(string cacheDirectory, ILogger<PlaybackAu
                 return null;
             }
 
-            var path = Path.Combine(_directory, entry.FileName);
+            var path = Path.Combine(directory, entry.FileName);
             await using var file = new FileStream(path, FileMode.Open, FileAccess.Read,
                 FileShare.Read | FileShare.Delete, 65536, FileOptions.Asynchronous | FileOptions.SequentialScan);
             if (file.Length != entry.Length ||
@@ -71,11 +72,12 @@ public sealed class PlaybackAudioCache(string cacheDirectory, ILogger<PlaybackAu
             ? source.Quality : null;
         if (quality is null && !awaitDecoderInfo) return null;
         identifier = MusicCacheIdentity.Normalize(identifier);
+        var directory = DirectoryPath;
         try
         {
-            Directory.CreateDirectory(_directory);
-            return new DownloadWriter(_directory, identifier, quality, source.BitrateKbps,
-                actual => GetIndexPath(identifier, actual), AudioExtension(Path.GetExtension(source.Uri.AbsolutePath)), logger, awaitDecoderInfo);
+            Directory.CreateDirectory(directory);
+            return new DownloadWriter(directory, identifier, quality, source.BitrateKbps,
+                actual => GetIndexPath(directory, identifier, actual), AudioExtension(Path.GetExtension(source.Uri.AbsolutePath)), logger, awaitDecoderInfo);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
@@ -99,19 +101,20 @@ public sealed class PlaybackAudioCache(string cacheDirectory, ILogger<PlaybackAu
         var bitrate = info.BitrateKbps is > 0 ? info.BitrateKbps : source.BitrateKbps;
         if (quality == previous && bitrate == source.BitrateKbps) return;
         identifier = MusicCacheIdentity.Normalize(identifier);
-        var previousPath = GetIndexPath(identifier, previous);
+        var directory = DirectoryPath;
+        var previousPath = GetIndexPath(directory, identifier, previous);
         string? temporaryPath = null;
         try
         {
             // Discovery already checked the audio digest; only read the small index again.
             var entry = JsonSerializer.Deserialize<CacheEntry>(await File.ReadAllTextAsync(previousPath, cancellationToken));
             if (entry is null || entry.FormatVersion != FormatVersion || entry.Identifier != identifier ||
-                entry.Quality != previous || Path.Combine(_directory, entry.FileName) != source.Path) return;
+                entry.Quality != previous || Path.Combine(directory, entry.FileName) != source.Path) return;
             if (quality is { } actual)
             {
-                temporaryPath = Path.Combine(_directory, Guid.NewGuid().ToString("N") + ".json.part");
+                temporaryPath = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".json.part");
                 await File.WriteAllTextAsync(temporaryPath, JsonSerializer.Serialize(entry with { Quality = actual, BitrateKbps = bitrate }), cancellationToken);
-                File.Move(temporaryPath, GetIndexPath(identifier, actual), overwrite: true);
+                File.Move(temporaryPath, GetIndexPath(directory, identifier, actual), overwrite: true);
             }
             if (quality != previous) RemoveIndex(previousPath);
         }
@@ -125,13 +128,16 @@ public sealed class PlaybackAudioCache(string cacheDirectory, ILogger<PlaybackAu
         }
     }
 
-    public void Invalidate(ExternalMusicId identifier, AudioQuality quality) =>
-        RemoveIndex(GetIndexPath(identifier, quality));
+    public void Invalidate(ExternalMusicId identifier, AudioQuality quality)
+    {
+        var directory = DirectoryPath;
+        RemoveIndex(GetIndexPath(directory, identifier, quality));
+    }
 
-    private string GetIndexPath(ExternalMusicId identifier, AudioQuality quality)
+    private static string GetIndexPath(string directory, ExternalMusicId identifier, AudioQuality quality)
     {
         var identity = JsonSerializer.Serialize(new { MusicId = MusicCacheIdentity.GetKey(identifier), Quality = quality });
-        return Path.Combine(_directory,
+        return Path.Combine(directory,
             Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(identity))) + ".json");
     }
 

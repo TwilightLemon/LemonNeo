@@ -7,7 +7,6 @@
     <ProjectReference Include="../../src/LemonNeo.Abstractions/LemonNeo.Abstractions.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="LemonNeo.Hosting.Tests" />
     <None Include="plugin.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

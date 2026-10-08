@@ -6,9 +6,9 @@ public interface IAppPathProvider
     string DataDirectory { get; }
     string CacheDirectory { get; }
     string MusicLibraryDirectory { get; }
+    string PluginDirectory { get; }
     string DataProtectionKeysDirectory { get; }
     string GetPackageConfigurationDirectory(string packageId);
     string GetEntityConfigurationFile(string packageId, string entityName);
     string GetPluginCredentialDirectory(string pluginId);
-    string GetPluginCacheDirectory(string pluginId);
 }

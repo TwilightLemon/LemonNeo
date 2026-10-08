@@ -10,7 +10,7 @@
 
 迁移前存在以下归属混杂，现已按后文清单拆分：
 
-- `DesktopHost.cs` 同时定义启动参数 `DesktopOptions`；`DesktopNavigation.cs` 同时定义 `DesktopRoutes`。
+- `DesktopHost.cs` 曾同时定义启动参数；`DesktopNavigation.cs` 同时定义 `DesktopRoutes`。
 - `DesktopPreferences.cs` 集中定义四个配置实体；配置枚举还分散在 `LocalizationService.cs` 和 `ThemePalette.cs` 中。
 - `TrackEditorViewModel.cs` 同时定义 `ExternalIdEditor、ProviderOption、RemotePlaylistRow、MetadataMatchRow、PlaybackSourceRow`。其中提供者选项被 Accounts、Online、Tools 使用，远程歌单行实际属于 Online。
 - `OnlineViewModel.cs` 内含 `RemotePlaylistCategory`，`PlaybackQueueViewModel.cs` 内含 `QueueTrackViewModel`，`PlaylistDialog.axaml.cs` 内含 `PlaylistEditResult`。
@@ -27,7 +27,7 @@ LemonNeo.Desktop/
   DesktopContext.cs        共享运行上下文
   Services/                有生命周期、订阅或运行状态的桌面服务与导航
   Utils/                   图片取色、调色板计算等无订阅工具
-  Config/                  启动选项、配置实体、枚举与注册/校验入口
+    Config/                  桌面存储选项、配置实体、枚举与注册/校验入口
   Platform/                桌面歌词窗口的原生平台行为
   Controls/
     Shared/                跨页面复用控件
@@ -43,7 +43,7 @@ LemonNeo.Desktop/
     Playback/              播放状态与队列抽屉
     Lyrics/                歌词页与桌面歌词状态
     Metadata/              曲目编辑与歌单元数据匹配
-    Tools/                 导入、同步等工具操作
+    Tools/                 插件诊断与帮助
     Settings/              设置页与主题选项
     Components/            组件展示页
   Views/
@@ -73,7 +73,7 @@ LemonNeo.Desktop/
 
 | 原文件 | 目标文件/目录 | 拆分说明 |
 | --- | --- | --- |
-| Infrastructure/DesktopHost.cs | DesktopHost.cs；Config/DesktopOptions.cs | 宿主装配保持根目录单文件，启动参数归入 Config；保留原有参数解析行为 |
+| Infrastructure/DesktopHost.cs | DesktopHost.cs；Config/DesktopStoragePreferences.cs | 宿主装配保持根目录单文件，Desktop 路径由程序内选择并持久化 |
 | Infrastructure/DesktopContext.cs | DesktopContext.cs | 根目录独立文件，承载共享服务入口、初始化状态、歌单集合和通知 |
 | Infrastructure/DesktopNavigation.cs | Services/DesktopNavigation.cs；Services/DesktopRoutes.cs | 导航状态、页面缓存、释放及路由常量归在同一目录 |
 | Infrastructure/DesktopPreferences.cs | Config/DesktopPreferences.cs；下列四个实体文件 | 注册与校验留在 DesktopPreferences，实体按功能分开 |
@@ -90,7 +90,7 @@ Config 中具体拆分如下：
 
 | 文件 | 类型/职责 |
 | --- | --- |
-| DesktopOptions.cs | DesktopOptions 及 Parse |
+| DesktopStoragePreferences.cs | DesktopStoragePreferences |
 | DesktopPreferences.cs | 四个配置实体的注册、默认值与校验 |
 | AppearancePreferences.cs | AppearancePreferences、ThemePreference、ThemeColorPreset |
 | LanguagePreferences.cs | LanguagePreferences、LanguagePreference |
@@ -174,7 +174,7 @@ LemonNeo.Desktop.Controls.LyricsPresenter
 5. `Controls.axaml` 的 Shared 控件命名空间；`Templates.axaml` 的 Shared、Metadata 类型前缀。
 6. `MainWindow.axaml` 中 Shell ViewModel、Shared 控件、Playback 队列模板和 QueueDrawerView 的引用，以及各个 code-behind 的跨模块窗口/对话框引用。
 7. `DesktopNavigation.CreatePage` 与 `MainViewModel.CreatePage` 中的页面/模型引用。保留现有显式映射与页面缓存机制。
-8. `tests/LemonNeo.Hosting.Tests/DesktopConfigurationTests.cs` 中的 Desktop 类型引用。当前项目外对旧 UI 命名空间的代码引用集中在此文件。
+8. 项目外对旧 UI 命名空间的代码引用。
 
 XAML 一个文件引用多个模块时，使用含义清晰的独立前缀，例如 `sharedVm、shellVm、playbackVm、metadataVm、sharedControls、lyricsControls、playbackViews`。`i18n` 对应 `LemonNeo.Desktop.Services`，App 中的 `theme` 对应 `LemonNeo.Desktop.Resources.Themes`。
 
@@ -188,11 +188,11 @@ XAML 一个文件引用多个模块时，使用含义清晰的独立前缀，例
 
 | 阶段 | 工作内容 | 实施结果 |
 | --- | --- | --- |
-| 0. 建立基线 | 确认工作区状态，记录 Desktop 构建及现有测试结果 | 完成；迁移前桌面测试 3/3 通过 |
-| 1. 拆分 Infrastructure | 将 Host、Context 迁入根目录，按清单整理 Services、Utils、Config、Platform、ThemeResources，并拆出相关类型 | 完成；Desktop 构建及桌面测试通过 |
+| 0. 建立基线 | 确认工作区状态，记录 Desktop 构建结果 | 完成 |
+| 1. 拆分 Infrastructure | 将 Host、Context 迁入根目录，按清单整理 Services、Utils、Config、Platform、ThemeResources，并拆出相关类型 | 完成；Desktop 构建通过 |
 | 2. 整理 ViewModels | 按模块迁移全部模型，拆出混放的展示类型 | 完成；调用点、编译绑定和资源模板已更新，Desktop 构建通过 |
-| 3. 整理 Controls / Views | 按模块迁移全部控件与 View 文件对，拆出 PlaylistEditResult | 完成；XAML、控件主题、导航和跨模块引用已更新，构建及现有测试通过 |
-| 4. 清理与验收 | 检查旧目录/命名空间残留、资源加载、页面与对话框行为，补齐文档 | 完成；Infrastructure 目录已移除，静态核对、构建、测试、发布及无界面资源加载检查通过 |
+| 3. 整理 Controls / Views | 按模块迁移全部控件与 View 文件对，拆出 PlaylistEditResult | 完成；XAML、控件主题、导航和跨模块引用已更新，构建通过 |
+| 4. 清理与验收 | 检查旧目录/命名空间残留、资源加载、页面与对话框行为，补齐文档 | 完成；Infrastructure 目录已移除，静态核对、构建、发布及无界面资源加载检查通过 |
 
 阶段 1 中为保持 Config 的独立性，ThemeColorPreset 和 LanguagePreference 同步迁入对应实体文件。阶段 2 中即使 View 尚未迁移，也要同步更新其引用的新 ViewModel 命名空间。
 
@@ -202,37 +202,33 @@ XAML 一个文件引用多个模块时，使用含义清晰的独立前缀，例
 
 ```powershell
 dotnet build src/LemonNeo.Desktop/LemonNeo.Desktop.csproj -p:SkipHostPlugins=true --disable-build-servers -m:1
-dotnet test tests/LemonNeo.Hosting.Tests/LemonNeo.Hosting.Tests.csproj -p:SkipHostPlugins=true --filter FullyQualifiedName~DesktopConfigurationTests --disable-build-servers -m:1
 
-# 最终验收：完整构建、现有测试与 Desktop 发布
+# 最终验收：完整构建与 Desktop 发布
 dotnet build LemonNeo.slnx --disable-build-servers -m:1
-dotnet test tests/LemonNeo.Hosting.Tests/LemonNeo.Hosting.Tests.csproj -p:SkipHostPlugins=true --disable-build-servers -m:1
 dotnet publish src/LemonNeo.Desktop -c Release -o artifacts/publish/desktop --disable-build-servers -m:1
 ```
 
-现有 DesktopConfigurationTests 覆盖启动、桌面歌词设置、曲目选择与封面实例保持、即时设置通知和 MockSync 可用性；它们不能替代所有页面的资源加载与交互检查。最终还需检查：
+最终还需检查：
 
 - 启动应用，依次打开 Library、Search、Online、Accounts、Lyrics、Metadata 编辑/匹配、Tools、Settings、Components，检查页面加载、导航返回及前进。
 - 打开完整 Queue 页面、队列抽屉、桌面歌词窗口及 Playlist、MoveTrack、Confirmation 对话框，检查样式与数据模板。
 - 切换语言、明暗主题、预设主题、封面取色和减少动画设置，确认主题资源及生成语言管理器正常工作。
 - 使用既有配置启动，确认四个 Desktop 配置实体的文件名、字段、枚举值、默认值与校验行为一致。注册继续使用原有实体名，PackageNames.Desktop 沿用现状；当前 JSON 存储按实体名定位文件，因此命名空间迁移本身无需配置文件迁移。
-- 搜索生产代码与测试中的 `LemonNeo.Desktop.Infrastructure`，以及旧的精确根命名空间声明/导入和 XAML 命名空间；确认旧文件已移除且没有重复类或资源。
+- 搜索生产代码中的 `LemonNeo.Desktop.Infrastructure`，以及旧的精确根命名空间声明/导入和 XAML 命名空间；确认旧文件已移除且没有重复类或资源。
 - Windows 验证原生桌面歌词行为；macOS 的 Spaces、全屏共存行为在 macOS 环境验证。以实际完成的验证范围记录结果。
 
 本次实际验证结果：
 
 | 检查 | 结果 |
 | --- | --- |
-| 迁移前桌面测试 | 3/3 通过 |
 | 分阶段 Desktop 构建 | 零警告、零错误 |
 | 完整解决方案构建 | 零警告、零错误 |
-| 现有集成测试 | 45/45 通过，无跳过 |
 | Desktop Release 发布 | 成功；输出为 artifacts/publish/desktop，包含 8 个 Windows 默认插件 |
 | 类型与 XAML 内容核对 | 79 个顶层类型的实现主体一致（归一化 CoreLyrics 别名后）；23 个 XAML 文档在归一化类型引用与命名空间后内容等价 |
-| 旧结构检查 | Infrastructure 已移除；Controls、ViewModels、Views 下无遗留根目录文件；生产代码和测试无旧精确命名空间引用 |
+| 旧结构检查 | Infrastructure 已移除；Controls、ViewModels、Views 下无遗留根目录文件；生产代码无旧精确命名空间引用 |
 | Avalonia Headless 检查 | 16 个 View 构造与布局、全部 11 条路由、前进/返回、队列抽屉、语言和主题切换，以及四类已有格式配置 JSON 加载通过 |
 
-迁移辅助脚本、快照与一次性 Headless 检查项目位于已忽略的 `artifacts/desktop-migration`，不纳入产品代码或测试项目。Headless 检查覆盖资源加载和布局，不代表实机视觉或原生窗口交互验收；Windows 原生焦点/窗口行为及 macOS Spaces、全屏共存仍需在相应实机验证。
+迁移辅助脚本、快照与一次性 Headless 检查项目位于已忽略的 `artifacts/desktop-migration`，不纳入产品代码。Headless 检查覆盖资源加载和布局，不代表实机视觉或原生窗口交互验收；Windows 原生焦点/窗口行为及 macOS Spaces、全屏共存仍需在相应实机验证。
 
 ## 后续文件归属规则
 

@@ -24,8 +24,8 @@ public interface IPluginContext
     ISettingsScope Settings { get; }
     ICredentialVault Credentials { get; }
     /// <summary>
-    /// Gets the plugin's private cache directory. Its contents are disposable and
-    /// must not be used for settings, credentials, or other durable user data.
+    /// Gets the plugin's current private cache directory. Plugins should read this
+    /// property when starting an operation instead of retaining the returned path.
     /// </summary>
     string CacheDirectory { get; }
     /// <summary>Access to the host session for Interactive plugins.</summary>

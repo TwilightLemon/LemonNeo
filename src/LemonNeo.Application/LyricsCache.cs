@@ -11,7 +11,7 @@ namespace LemonNeo.Application;
 /// Host-owned lyrics storage. The host supplies its resolved cache directory;
 /// providers do not choose paths or need to be available for a cache hit.
 /// </summary>
-public sealed class LyricsCache(string cacheDirectory, ILogger<LyricsCache> logger)
+public sealed class LyricsCache(Func<string> getCacheDirectory, ILogger<LyricsCache> logger)
 {
     private const int FormatVersion = 1;
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -20,13 +20,14 @@ public sealed class LyricsCache(string cacheDirectory, ILogger<LyricsCache> logg
         IgnoreReadOnlyProperties = true,
         RespectNullableAnnotations = true
     };
-    private readonly string _directory = Path.Combine(Path.GetFullPath(cacheDirectory), "Lyrics");
+    public string DirectoryPath => Path.Combine(Path.GetFullPath(getCacheDirectory()), "Lyrics");
 
     public async Task<LyricsLookupResult?> TryGetAsync(ExternalMusicId identifier, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         identifier = MusicCacheIdentity.Normalize(identifier);
-        var path = GetPath(identifier);
+        var directory = DirectoryPath;
+        var path = GetPath(directory, identifier);
         try
         {
             await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read,
@@ -55,10 +56,11 @@ public sealed class LyricsCache(string cacheDirectory, ILogger<LyricsCache> logg
         cancellationToken.ThrowIfCancellationRequested();
         if (!IsValid(lyrics)) return;
         identifier = MusicCacheIdentity.Normalize(identifier);
-        var temporaryPath = Path.Combine(_directory, Guid.NewGuid().ToString("N") + ".part");
+        var directory = DirectoryPath;
+        var temporaryPath = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".part");
         try
         {
-            Directory.CreateDirectory(_directory);
+            Directory.CreateDirectory(directory);
             await using (var stream = new FileStream(temporaryPath, FileMode.CreateNew, FileAccess.Write,
                              FileShare.None, 4096, FileOptions.Asynchronous))
             {
@@ -66,7 +68,7 @@ public sealed class LyricsCache(string cacheDirectory, ILogger<LyricsCache> logg
                     new CacheEntry(FormatVersion, identifier, providerId, lyrics), JsonOptions, cancellationToken);
             }
             cancellationToken.ThrowIfCancellationRequested();
-            File.Move(temporaryPath, GetPath(identifier), overwrite: true);
+            File.Move(temporaryPath, GetPath(directory, identifier), overwrite: true);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
         {
@@ -82,8 +84,8 @@ public sealed class LyricsCache(string cacheDirectory, ILogger<LyricsCache> logg
         }
     }
 
-    private string GetPath(ExternalMusicId identifier) =>
-        Path.Combine(_directory, MusicCacheIdentity.GetKey(identifier) + ".json");
+    private static string GetPath(string directory, ExternalMusicId identifier) =>
+        Path.Combine(directory, MusicCacheIdentity.GetKey(identifier) + ".json");
 
     private static bool IsValid(LyricsModel? lyrics) => lyrics is not null && lyrics.Text is not null &&
         (!string.IsNullOrWhiteSpace(lyrics.Text) || lyrics.Lines?.Any(line => !string.IsNullOrWhiteSpace(line?.Text)) == true) &&

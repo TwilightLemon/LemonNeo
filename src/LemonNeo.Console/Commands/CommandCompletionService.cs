@@ -144,14 +144,6 @@ internal sealed class CommandCompletionService(
                 ("shuffle", "Randomized queue order"));
         }
 
-        if (string.Equals(commandName, "sync", StringComparison.OrdinalIgnoreCase) && argumentIndex == 1)
-        {
-            return CompleteValues(target, hint, "Sync actions",
-                ("status", "Compare local and remote revisions"),
-                ("pull", "Fetch and merge the remote library"),
-                ("push", "Publish the local library"));
-        }
-
         if (string.Equals(commandName, "queue", StringComparison.OrdinalIgnoreCase) && argumentIndex == 1)
         {
             return CompleteValues(target, hint, "Queue actions", ("clear", "Remove every queued track"));

@@ -126,33 +126,6 @@
             </StackPanel>
           </ScrollViewer>
         </TabItem>
-        <TabItem Header="{Translate {x:Static i18n:LanguageManager+Keys.Sync}}">
-          <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Spacing="18" Margin="0,16,12,16" IsEnabled="{Binding CanInteract}">
-              <Border Classes="card">
-                <StackPanel Spacing="12">
-                  <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Library}}" Classes="section" />
-                  <WrapPanel>
-                    <Button Content="{Translate {x:Static i18n:LanguageManager+Keys.Save}}" Command="{Binding SaveCommand}" Margin="0,0,10,8" />
-                    <Button Content="{Translate {x:Static i18n:LanguageManager+Keys.Refresh}}" Command="{Binding RefreshCommand}" Margin="0,0,0,8" />
-                  </WrapPanel>
-                </StackPanel>
-              </Border>
-              <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.SyncDescription}}" Classes="muted" TextWrapping="Wrap" />
-              <ComboBox ItemsSource="{Binding SyncProviders}" SelectedItem="{Binding SelectedSyncProvider}" ItemTemplate="{StaticResource ProviderOptionTemplate}"
-                        HorizontalAlignment="Stretch" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.SyncProvider}}" />
-              <WrapPanel>
-                <Button Content="{Translate {x:Static i18n:LanguageManager+Keys.SyncStatus}}" Command="{Binding SyncCommand}" CommandParameter="status" Margin="0,0,10,8" />
-                <Button Content="{Translate {x:Static i18n:LanguageManager+Keys.SyncPull}}" Command="{Binding SyncCommand}" CommandParameter="pull" Margin="0,0,10,8" />
-                <Button Content="{Translate {x:Static i18n:LanguageManager+Keys.SyncPush}}" Command="{Binding SyncCommand}" CommandParameter="push" Margin="0,0,10,8" />
-              </WrapPanel>
-              <SelectableTextBlock Text="{Binding SyncDetails}" TextWrapping="Wrap" />
-              <ItemsControl ItemsSource="{Binding SyncConflicts}">
-                <ItemsControl.ItemTemplate><DataTemplate x:DataType="x:String"><TextBlock Text="{Binding}" TextWrapping="Wrap" Foreground="{DynamicResource Brush.Danger}" Margin="0,5" /></DataTemplate></ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </StackPanel>
-          </ScrollViewer>
-        </TabItem>
         <TabItem Header="{Translate {x:Static i18n:LanguageManager+Keys.Help}}">
           <ScrollViewer HorizontalScrollBarVisibility="Disabled">
             <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.HelpText}}" TextWrapping="Wrap" LineHeight="26" Margin="0,16,12,16" />

@@ -301,7 +301,7 @@
         Background="{DynamicResource Brush.DangerSoft}"
         CornerRadius="10"
         IsVisible="{Binding HasError}">
-        <Grid ColumnDefinitions="*,Auto,Auto">
+        <Grid ColumnDefinitions="*,Auto">
           <TextBlock
             MaxHeight="90"
             Foreground="{DynamicResource Brush.Danger}"
@@ -309,13 +309,6 @@
             TextWrapping="Wrap" />
           <Button
             Grid.Column="1"
-            Classes="ghost"
-            Command="{Binding RefreshCommand}"
-            Content="{Translate {x:Static i18n:LanguageManager+Keys.Retry}}"
-            IsEnabled="{Binding !IsBusy}"
-            IsVisible="{Binding CanRetryStartup}" />
-          <Button
-            Grid.Column="2"
             AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}"
             Classes="ghost icon"
             Command="{Binding DismissErrorCommand}">

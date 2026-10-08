@@ -14,7 +14,7 @@ internal sealed class PluginContext(
     PlayerRegistry playerRegistry,
     ISettingsScope settings,
     ICredentialVault credentials,
-    string cacheDirectory,
+    Func<string> getCacheDirectory,
     IPlaybackInteraction? playback) : IPluginContext
 {
     private readonly List<IMusicProvider> _registeredProviders = [];
@@ -24,7 +24,7 @@ internal sealed class PluginContext(
     public IHttpClientFactory HttpClientFactory { get; } = httpClientFactory;
     public ISettingsScope Settings { get; } = settings;
     public ICredentialVault Credentials { get; } = credentials;
-    public string CacheDirectory { get; } = cacheDirectory;
+    public string CacheDirectory => getCacheDirectory();
     public IPlaybackInteraction Playback => playback ?? throw new NotSupportedException("This host does not expose playback interaction.");
     public IReadOnlyList<IMusicProvider> RegisteredProviders => _registeredProviders;
     public IReadOnlyList<IPlayerProvider> RegisteredPlayers => _registeredPlayers;

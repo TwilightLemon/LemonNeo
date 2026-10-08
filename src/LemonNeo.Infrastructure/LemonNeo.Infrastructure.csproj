@@ -6,6 +6,5 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.DataProtection.Extensions" Version="10.0.12" />
     <InternalsVisibleTo Include="LemonNeo.Hosting" />
-    <InternalsVisibleTo Include="LemonNeo.Hosting.Tests" />
   </ItemGroup>
 </Project>

@@ -1,13 +1,7 @@
 using LemonNeo.Abstractions.Playback;
 using LemonNeo.Abstractions.Plugins;
 using LemonNeo.Abstractions.Providers;
-using LemonNeo.Abstractions.Sync;
-using LemonNeo.Application.Library;
-using LemonNeo.Application.Playback;
-using LemonNeo.Application.Sync;
-using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
 using LemonNeo.Desktop.Services;
 using LemonNeo.Desktop.ViewModels.Shared;
 
@@ -15,31 +9,11 @@ namespace LemonNeo.Desktop.ViewModels.Tools;
 
 public sealed partial class ToolsViewModel : PageViewModel
 {
-    private readonly PlaybackSessionService _session;
     public ToolsViewModel(DesktopContext context) : base(context, DesktopRoutes.Tools)
     {
-        _session = _host.Get<PlaybackSessionService>();
-        RefreshCommand = new(() => ExecuteAsync(async ct => { await _host.Get<LibraryService>().LoadAsync(ct); Context.RefreshLibrary(); }));
-        RefreshSyncProviders();
         RefreshPluginInformation();
-        SaveCommand = new(() => ExecuteAsync(async ct =>
-        {
-            await _host.Get<LibraryService>().SaveAsync(ct);
-            await _session.CaptureStateAsync(ct);
-            await _host.Settings.SaveAsync(ct);
-            SetStatus("LibrarySaved");
-        }));
-        SyncCommand = new(action => SynchronizeAsync(action ?? "status"), _ => SelectedSyncProvider is not null);
     }
 
-    [ObservableProperty] private string _syncDetails = "";
-    private SyncStatus? _syncStatus;
-    private SyncResult? _syncResult;
-    private MergeResult? _syncMerge;
-    [ObservableProperty] private ProviderOption? _selectedSyncProvider;
-    partial void OnSelectedSyncProviderChanged(ProviderOption? value) => SyncCommand?.NotifyCanExecuteChanged();
-    public ObservableCollection<ProviderOption> SyncProviders { get; } = [];
-    public ObservableCollection<string> SyncConflicts { get; } = [];
     [ObservableProperty] private IReadOnlyList<string> _supportedNamespaces = [];
     [ObservableProperty] private IReadOnlyList<string> _playableNamespaces = [];
     [ObservableProperty] private IReadOnlyList<PluginProviderGroup> _providerGroups = [];
@@ -50,66 +24,6 @@ public sealed partial class ToolsViewModel : PageViewModel
     public bool HasPluginFailures => PluginFailures.Count > 0;
     public string PluginSummary => _text.Format("LoadedPluginSummary", _host.Plugins.Loaded.Count,
         _host.Get<IProviderRegistry>().Providers.Count, _host.Get<IPlayerRegistry>().Players.Count);
-    public AsyncRelayCommand RefreshCommand { get; }
-    public AsyncRelayCommand SaveCommand { get; }
-    public AsyncRelayCommand<string> SyncCommand { get; }
-
-    private void RefreshSyncProviders()
-    {
-        var selectedId = SelectedSyncProvider?.Id;
-        SyncProviders.Clear();
-        foreach (var id in _host.Get<SyncService>().ProviderIds) SyncProviders.Add(new(id, id));
-        SelectedSyncProvider = SyncProviders.FirstOrDefault(p => p.Id == selectedId) ?? SyncProviders.FirstOrDefault();
-    }
-
-    public Task SynchronizeAsync(string action) => ExecuteAsync(async ct =>
-    {
-        var id = SelectedSyncProvider?.Id ?? throw new ArgumentException(_text["ProviderUnavailable"]);
-        _syncStatus = null; _syncResult = null; _syncMerge = null;
-        SyncConflicts.Clear();
-        switch (action)
-        {
-            case "status":
-                var status = await Task.Run(() => _host.Get<SyncService>().GetStatusAsync(id, ct), ct);
-                _syncStatus = status;
-                break;
-            case "pull":
-                var sync = _host.Get<SyncService>();
-                var remote = await Task.Run(() => sync.FetchRemoteAsync(id, ct), ct);
-                var pull = await sync.ApplyRemoteAsync(id, remote, ct);
-                _syncResult = pull.ProviderResult;
-                if (!pull.ProviderResult.Success) throw new InvalidOperationException(pull.ProviderResult.Message);
-                if (pull.MergeResult is { } merge)
-                {
-                    _syncMerge = merge;
-                    Context.RefreshLibrary();
-                }
-                break;
-            case "push":
-                await _host.Get<LibraryService>().SaveAsync(ct);
-                var push = await Task.Run(() => _host.Get<SyncService>().PushRemoteAsync(id, ct), ct);
-                _syncResult = push;
-                if (!push.Success) throw new InvalidOperationException(push.Message);
-                break;
-            default: throw new ArgumentException(_text["SyncActionInvalid"]);
-        }
-        RefreshSyncText();
-        SetStatus("SyncCompleted");
-    });
-
-    private void RefreshSyncText()
-    {
-        if (_syncStatus is { } status) SyncDetails = $"{_text[$"Sync{status.State}"]}\n" +
-            _text.Format("SyncRevisions", status.LocalRevision ?? "—", status.RemoteRevision ?? "—") + $"\n{status.Message}";
-        else if (_syncResult is { } result) SyncDetails = result.Message + "\n" + _text.Format("SyncRevisions", result.LocalRevision ?? "—", result.RemoteRevision ?? "—");
-        if (_syncMerge is { } merge)
-        {
-            SyncDetails += "\n" + _text.Format("SyncMergeSummary", merge.AddedPlaylistItems, merge.ChangedPlaylists, merge.Conflicts.Count);
-            SyncConflicts.Clear();
-            foreach (var conflict in merge.Conflicts) SyncConflicts.Add($"{_text[$"Conflict{conflict.Type}"]}: {conflict.Path}");
-        }
-    }
-
     private void RefreshPluginInformation()
     {
         var plugins = _host.Plugins.Loaded;
@@ -205,12 +119,11 @@ public sealed partial class ToolsViewModel : PageViewModel
 
     public override Task ActivateAsync()
     {
-        RefreshSyncProviders();
         RefreshPluginInformation();
         return Task.CompletedTask;
     }
     protected override void RefreshLocalizedProperties()
     {
-        base.RefreshLocalizedProperties(); RefreshSyncText(); RefreshPluginInformation();
+        base.RefreshLocalizedProperties(); RefreshPluginInformation();
     }
 }

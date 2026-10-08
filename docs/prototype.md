@@ -1,4 +1,4 @@
-> 早期原型设计记录，以下项目结构和 MockGit 项目名称仅反映历史设计。当前模块结构以 [项目与模块结构](module-architecture-plan.md) 为准，持久化实现以 [Hosting 统一配置与 Library 持久化](persistence-design.md) 为准。
+> 早期原型设计记录，以下项目结构仅反映历史设计。当前模块结构以 [项目与模块结构](module-architecture-plan.md) 为准，持久化实现以 [Hosting 统一配置与 Library 持久化](persistence-design.md) 为准。
 
 # Lemon Neo Prototype
 
@@ -15,7 +15,6 @@ Lemon Neo 是一个跨平台、插件驱动的音乐客户端。
 - 插件运行时
 - 外部音乐平台能力抽象
 - 本地 Library 持久化
-- Git 等方式的跨设备同步
 - 后续 Avalonia UI 所需的 Application Service
 
 核心理念：
@@ -47,9 +46,7 @@ Lemon Neo 是一个跨平台、插件驱动的音乐客户端。
 8. PlaybackSource Resolution
 9. 播放队列抽象
 10. 本地 JSON/YAML 持久化
-11. Git Sync Provider 抽象
-12. 模拟 Git Pull / Merge / Push 流程
-13. 插件与 Host 解耦
+11. 插件与 Host 解耦
 
 暂时不要实现：
 
@@ -60,7 +57,6 @@ Lemon Neo 是一个跨平台、插件驱动的音乐客户端。
 - OAuth/WebView 登录
 - 真正的插件 Sandbox
 - CRDT
-- 实时多设备同步
 
 使用 Mock Plugin 验证整个架构。
 
@@ -80,12 +76,10 @@ src/
 ├── LemonNeo.Playback/
 ├── LemonNeo.Persistence/
 ├── LemonNeo.Plugin.Abstractions/
-├── LemonNeo.Plugin.Runtime/
-└── LemonNeo.Sync.Abstractions/
+└── LemonNeo.Plugin.Runtime/
 
 plugins/
-├── LemonNeo.Plugin.MockMusic/
-└── LemonNeo.Sync.MockGit/
+└── LemonNeo.Plugin.MockMusic/
 ```
 
 各项目职责如下。
@@ -158,7 +152,6 @@ PlaylistService
 LibraryService
 PlaybackResolver
 ImportService
-SyncService
 ```
 
 UI 将来只调用这一层。
@@ -200,19 +193,6 @@ LemonLibrary/
 ```
 
 不要使用数据库。
-
----
-
-## LemonNeo.Sync.Abstractions
-
-定义：
-
-```text
-ILibrarySyncProvider
-SyncResult
-SyncStatus
-SyncConflict
-```
 
 ---
 
@@ -776,7 +756,7 @@ LemonLibrary/
 完整 Track 快照（包括 ArtworkUri 和 ExternalIds），搜索结果则保持临时状态，
 避免搜索导致 Library 无界增长。
 
-不要把以下内容存进 Git Library：
+不要把以下内容存进 Music Library：
 
 ```text
 Cookie
@@ -815,7 +795,7 @@ JsonLibraryRepository
 优先保证：
 
 - 文件内容可读
-- Git diff 友好
+- 文件差异清晰
 - 字段顺序稳定
 - 使用缩进 JSON
 - 不产生无意义随机变化
@@ -866,7 +846,7 @@ Lemon → Remote
 Lemon ↔ Remote
 ```
 
-持续绑定同步。
+持续绑定。
 
 当前原型定义：
 
@@ -874,199 +854,7 @@ Lemon ↔ Remote
 PlaylistMirror
 ```
 
-数据模型即可，不实现真实双向同步。
-
----
-
-# 19. Sync Provider
-
-Git 不应该写死在 Library Core 中。
-
-定义：
-
-```csharp
-public interface ILibrarySyncProvider
-{
-    string Id { get; }
-
-    Task<SyncResult> PullAsync(
-        CancellationToken cancellationToken = default);
-
-    Task<SyncResult> PushAsync(
-        CancellationToken cancellationToken = default);
-
-    Task<SyncStatus> GetStatusAsync(
-        CancellationToken cancellationToken = default);
-}
-```
-
-以后允许实现：
-
-```text
-Git
-WebDAV
-OneDrive
-iCloud
-LocalFolder
-```
-
----
-
-# 20. Git Sync 原型
-
-创建：
-
-```text
-LemonNeo.Sync.MockGit
-```
-
-第一版可以：
-
-- 模拟 Repository
-- 模拟 Pull
-- 模拟 Push
-- 打印提交过程
-- 不真正调用 Git
-
-但同时提供：
-
-```csharp
-public interface IGitBackend
-{
-    Task FetchAsync(...);
-
-    Task PullAsync(...);
-
-    Task CommitAsync(
-        string message,
-        ...);
-
-    Task PushAsync(...);
-}
-```
-
-后续真实实现优先使用系统：
-
-```text
-git
-```
-
-而不是立即绑定 LibGit2Sharp。
-
----
-
-# 21. Git Sync 流程
-
-未来真实流程设计为：
-
-```text
-Local changes
-     ↓
-Save Library
-     ↓
-git fetch
-     ↓
-Compare revisions
-     ↓
-Semantic Merge
-     ↓
-Save merged library
-     ↓
-git add
-     ↓
-git commit
-     ↓
-git push
-```
-
-不要直接依赖 Git textual merge 来解决歌单冲突。
-
----
-
-# 22. Semantic Merge
-
-定义：
-
-```text
-ILibraryMergeService
-```
-
-输入：
-
-```text
-Base
-Local
-Remote
-```
-
-输出：
-
-```text
-Merged
-Conflicts
-```
-
-第一版实现简单策略。
-
-Playlist 根据：
-
-```text
-Playlist.Id
-```
-
-匹配。
-
-PlaylistItem 根据：
-
-```text
-PlaylistItem.Id
-```
-
-匹配。
-
-例如：
-
-- Local 新增 item，Remote 未修改 → 保留
-- Remote 新增 item，Local 未修改 → 保留
-- 双方新增不同 item → 都保留
-- 一边删除、一边修改 → 产生 Conflict
-- 同一个 PlaylistName 双方修改 → Conflict
-
-不要依赖 JSON 文本 Diff。
-
----
-
-# 23. Sync Conflict
-
-定义：
-
-```csharp
-public sealed record SyncConflict
-{
-    public required string Path { get; init; }
-
-    public required SyncConflictType Type { get; init; }
-
-    public object? BaseValue { get; init; }
-
-    public object? LocalValue { get; init; }
-
-    public object? RemoteValue { get; init; }
-}
-```
-
-例如：
-
-```text
-PlaylistNameConflict
-PlaylistItemConflict
-DeleteModifyConflict
-OrderConflict
-```
-
-Console 中打印冲突即可。
-
-暂时不用交互解决 UI。
+数据模型即可，不实现真实双向写入。
 
 ---
 
@@ -1164,9 +952,6 @@ add <playlist-id> <provider> <track-id>
 remove <playlist-id> <item-id>
 play <provider> <track-id>
 queue
-sync status
-sync pull
-sync push
 save
 exit
 ```
@@ -1263,30 +1048,6 @@ https://example.invalid/audio/track-001.flac
 
 ---
 
-## Git Sync
-
-```text
-> sync pull
-```
-
-输出：
-
-```text
-Fetching remote library...
-Remote revision: mock-13
-Local revision: mock-12
-
-Merging...
-
-+ 2 playlist items
-~ 1 playlist
-0 conflicts
-
-Library updated.
-```
-
----
-
 # 27. Dependency Injection
 
 使用：
@@ -1317,7 +1078,6 @@ App.Current
 Network
 IO
 Plugin
-Sync
 Playback resolve
 ```
 
@@ -1348,7 +1108,6 @@ ProviderException
 PluginLoadException
 LibraryException
 PlaybackResolutionException
-SyncException
 ```
 
 Console 统一捕获后输出。
@@ -1468,16 +1227,6 @@ Playback
 Core
 ```
 
-Sync：
-
-```text
-Sync Provider
-      ↓
-Sync.Abstractions
-      ↓
-Core
-```
-
 避免循环引用。
 
 ---
@@ -1510,14 +1259,6 @@ Core
 11. Resolve PlaybackSource
 
 12. 使用 ConsolePlayer 模拟播放
-
-13. 调用 MockGit Pull
-
-14. 执行 Semantic Merge
-
-15. 输出 Merge Result
-
-16. MockGit Push
 ```
 
 ---
@@ -1530,8 +1271,6 @@ Core
 真正 QQ Music API
 网易云 API
 Spotify API
-实际 GitHub OAuth
-真实 Git Credential
 Avalonia UI
 数据库
 EF Core
@@ -1545,7 +1284,6 @@ WebView
 完整 Sandbox
 IPC
 CRDT
-实时同步
 云服务器
 账号系统
 ```
@@ -1557,26 +1295,6 @@ CRDT
 # 35. 后续阶段
 
 原型稳定后再进入：
-
-## Phase 2
-
-真实 Git Backend：
-
-```text
-SystemGitBackend
-```
-
-支持：
-
-```text
-clone
-fetch
-pull
-commit
-push
-```
-
----
 
 ## Phase 3
 
@@ -1622,12 +1340,7 @@ Lemon Neo Library
        │      ├── Playback
        │      └── Lyrics
        │
-       ├── Player
-       │
-       └── Sync Providers
-              ├── Git
-              ├── WebDAV
-              └── Others
+       └── Player
 ```
 
 其中：
@@ -1640,10 +1353,6 @@ Remote Playlist != Lemon Playlist
 Track != PlaybackSource
 
 Music Plugin != UI Plugin
-
-Git != Library Storage
-
-Sync Provider != Music Provider
 ```
 
 Lemon Neo 自己的 Library 始终处于整个系统中心。
@@ -1661,15 +1370,5 @@ Subsonic
 ```
 
 都只是 Lemon Neo 的 Provider。
-
-而：
-
-```text
-Git
-WebDAV
-Cloud Drive
-```
-
-只是 Lemon Neo Library 的同步方式。
 
 Lemon Neo 本身则负责提供统一、漂亮、一致的音乐管理与播放体验。
