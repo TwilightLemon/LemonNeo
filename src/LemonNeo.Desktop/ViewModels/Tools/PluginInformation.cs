@@ -2,6 +2,17 @@ namespace LemonNeo.Desktop.ViewModels.Tools;
 
 public sealed record PluginDetail(string Label, string Value);
 
+public sealed record DecoderInformation(
+    string Name,
+    string Id,
+    string Description,
+    IReadOnlyList<string> SupportedExtensions,
+    bool IsPreferred)
+{
+    public bool HasDescription => !string.IsNullOrWhiteSpace(Description);
+    public bool HasSupportedExtensions => SupportedExtensions.Count > 0;
+}
+
 public sealed record PluginInformation(
     string Name,
     string Id,

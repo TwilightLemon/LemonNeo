@@ -25,8 +25,7 @@ internal sealed class PlayerRegistry : IPlayerRegistry
             lock (_gate)
             {
                 return _players.Values
-                    .OrderByDescending(player => player.Priority)
-                    .ThenBy(player => player.Id, StringComparer.Ordinal)
+                    .OrderBy(player => player.Id, StringComparer.Ordinal)
                     .ToArray();
             }
         }
@@ -40,15 +39,14 @@ internal sealed class PlayerRegistry : IPlayerRegistry
         }
     }
 
-    public IPlayerProvider GetRequiredPlayer(PlaybackSource source)
+    public IPlayerProvider GetRequiredPlayer(PlaybackSource source, string? preferredPlayerId = null)
     {
         lock (_gate)
         {
-            return _players.Values
-                       .Where(player => player.CanPlay(source))
-                       .OrderByDescending(player => player.Priority)
-                       .ThenBy(player => player.Id, StringComparer.Ordinal)
-                       .FirstOrDefault()
+            var supported = _players.Values.Where(player => player.CanPlay(source)).ToArray();
+            return supported.FirstOrDefault(player => string.Equals(
+                       player.Id, preferredPlayerId, StringComparison.OrdinalIgnoreCase))
+                   ?? supported.OrderBy(player => player.Id, StringComparer.Ordinal).FirstOrDefault()
                    ?? throw new PlaybackResolutionException(
                        $"No registered player supports source '{source.GetType().Name}'.");
         }

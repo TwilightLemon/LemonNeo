@@ -1,6 +1,8 @@
 using LemonNeo.Abstractions.Playback;
 using LemonNeo.Abstractions.Plugins;
 using LemonNeo.Abstractions.Providers;
+using LemonNeo.Abstractions.Settings;
+using LemonNeo.Application.Playback;
 using CommunityToolkit.Mvvm.ComponentModel;
 using LemonNeo.Desktop.Services;
 using LemonNeo.Desktop.ViewModels.Shared;
@@ -9,8 +11,15 @@ namespace LemonNeo.Desktop.ViewModels.Tools;
 
 public sealed partial class ToolsViewModel : PageViewModel
 {
+    private readonly ISettingsScope _playbackSettings;
+    private readonly IDisposable _playbackSubscription;
+    private string?[] _decoderIds = [];
+    private bool _closing;
+
     public ToolsViewModel(DesktopContext context) : base(context, DesktopRoutes.Tools)
     {
+        _playbackSettings = _host.Settings.ForPackage(PackageNames.Application);
+        _playbackSubscription = _playbackSettings.Subscribe<PlaybackPreferences>(_ => RefreshDecoders());
         RefreshPluginInformation();
     }
 
@@ -18,10 +27,30 @@ public sealed partial class ToolsViewModel : PageViewModel
     [ObservableProperty] private IReadOnlyList<string> _playableNamespaces = [];
     [ObservableProperty] private IReadOnlyList<PluginProviderGroup> _providerGroups = [];
     [ObservableProperty] private IReadOnlyList<PluginDetail> _pluginFailures = [];
+    [ObservableProperty] private IReadOnlyList<string> _decoderOptions = [];
+    [ObservableProperty] private IReadOnlyList<DecoderInformation> _decoders = [];
     public bool HasSupportedNamespaces => SupportedNamespaces.Count > 0;
     public bool HasPlayableNamespaces => PlayableNamespaces.Count > 0;
     public bool HasProviderGroups => ProviderGroups.Count > 0;
     public bool HasPluginFailures => PluginFailures.Count > 0;
+    public bool HasDecoders => Decoders.Count > 0;
+    public int SelectedDecoderIndex
+    {
+        get
+        {
+            var preferred = _playbackSettings.Get<PlaybackPreferences>().PreferredPlayerId;
+            var index = Array.FindIndex(_decoderIds, id => string.Equals(id, preferred, StringComparison.OrdinalIgnoreCase));
+            return Math.Max(0, index);
+        }
+        set
+        {
+            if (_closing || value < 0 || value >= _decoderIds.Length) return;
+            var id = _decoderIds[value];
+            if (string.Equals(id, _playbackSettings.Get<PlaybackPreferences>().PreferredPlayerId,
+                    StringComparison.OrdinalIgnoreCase)) return;
+            _playbackSettings.Apply<PlaybackPreferences>(preferences => preferences with { PreferredPlayerId = id });
+        }
+    }
     public string PluginSummary => _text.Format("LoadedPluginSummary", _host.Plugins.Loaded.Count,
         _host.Get<IProviderRegistry>().Providers.Count, _host.Get<IPlayerRegistry>().Players.Count);
     private void RefreshPluginInformation()
@@ -44,7 +73,7 @@ public sealed partial class ToolsViewModel : PageViewModel
             Capability(provider is IPlaylistProvider, "CapabilityPlaylist");
             Capability(provider is IPlaylistCollectionProvider, "CapabilityCollections"); Capability(provider is IPlaybackProvider, "CapabilityPlayback");
             Capability(provider is IMetadataProvider, "CapabilityMetadata"); Capability(provider is ILyricsProvider, "CapabilityLyrics");
-            Capability(provider is IAuthenticationProvider, "CapabilityAuthentication"); Capability(provider is IFolderImportProvider, "CapabilityFolder");
+            Capability(provider is IAuthenticationProvider, "CapabilityAuthentication");
             Capability(provider is IPlaylistExportProvider, "CapabilityPlaylistExport");
             var details = new List<PluginDetail>();
             if (provider is ISearchNamespaceProvider search) details.Add(new(_text["SearchSources"], string.Join(", ", NormalizeNamespaces(search.SearchNamespaces))));
@@ -69,7 +98,7 @@ public sealed partial class ToolsViewModel : PageViewModel
             var plugin = plugins.FirstOrDefault(p => p.PlayerIds.Contains(player.Id, StringComparer.OrdinalIgnoreCase));
             groups["PlayerProviders"].Add(new(player.Descriptor.Name, player.Id, player.Descriptor.Description,
                 GetPluginSummary(plugin), [_text["PlayerEngine"]], [], [],
-                [new(_text["Priority"], player.Priority.ToString(_text.Culture)), .. GetPluginDetails(plugin)]));
+                [new(_text["SupportedFormats"], FormatExtensions(player.SupportedExtensions)), .. GetPluginDetails(plugin)]));
         }
         foreach (var plugin in plugins)
         {
@@ -86,6 +115,30 @@ public sealed partial class ToolsViewModel : PageViewModel
         SupportedNamespaces = NormalizeNamespaces(ProviderGroups.SelectMany(g => g.Items).SelectMany(p => p.SupportedNamespaces).Concat(PlayableNamespaces));
         PluginFailures = _host.Plugins.LastReport.Failures.Select(f => new PluginDetail(Path.GetFileName(Path.GetDirectoryName(f.ManifestPath)) ?? f.ManifestPath, f.Error)).ToArray();
         foreach (var name in new[] { nameof(HasSupportedNamespaces), nameof(HasPlayableNamespaces), nameof(HasProviderGroups), nameof(HasPluginFailures), nameof(PluginSummary) }) OnPropertyChanged(name);
+        RefreshDecoders();
+    }
+
+    private void RefreshDecoders()
+    {
+        if (_closing) return;
+        var players = _host.Get<IPlayerRegistry>().Players.OrderBy(player => player.Id, StringComparer.Ordinal).ToArray();
+        var preferred = _playbackSettings.Get<PlaybackPreferences>().PreferredPlayerId;
+        _decoderIds = [null, .. players.Select(player => player.Id)];
+        DecoderOptions = [_text["AutomaticDecoder"], .. players.Select(player => player.Descriptor.Name)];
+        Decoders = players.Select(player => new DecoderInformation(
+            player.Descriptor.Name,
+            player.Id,
+            player.Descriptor.Description,
+            player.SupportedExtensions.Order(StringComparer.OrdinalIgnoreCase).ToArray(),
+            string.Equals(player.Id, preferred, StringComparison.OrdinalIgnoreCase))).ToArray();
+        OnPropertyChanged(nameof(SelectedDecoderIndex));
+        OnPropertyChanged(nameof(HasDecoders));
+    }
+
+    private string FormatExtensions(IEnumerable<string> extensions)
+    {
+        var values = extensions.Order(StringComparer.OrdinalIgnoreCase).ToArray();
+        return values.Length == 0 ? _text["NoSupportedFormats"] : string.Join(", ", values);
     }
 
     private string GetPluginSummary(PluginInfo? plugin) => plugin is null ? "" :
@@ -125,5 +178,11 @@ public sealed partial class ToolsViewModel : PageViewModel
     protected override void RefreshLocalizedProperties()
     {
         base.RefreshLocalizedProperties(); RefreshPluginInformation();
+    }
+    public override async ValueTask DisposeAsync()
+    {
+        _closing = true;
+        _playbackSubscription.Dispose();
+        await base.DisposeAsync();
     }
 }

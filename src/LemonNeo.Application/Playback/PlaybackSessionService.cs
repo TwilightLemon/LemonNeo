@@ -155,7 +155,10 @@ public sealed class PlaybackSessionService(
             await _settings.RegisterAsync(nameof(PlaybackPreferences), new PlaybackPreferences(), value => value with
             {
                 Volume = double.IsFinite(value.Volume) ? Math.Clamp(value.Volume, 0, 1) : 1,
-                Quality = Enum.IsDefined(value.Quality) ? value.Quality : AudioQuality.Automatic
+                Quality = Enum.IsDefined(value.Quality) ? value.Quality : AudioQuality.Automatic,
+                PreferredPlayerId = string.IsNullOrWhiteSpace(value.PreferredPlayerId)
+                    ? null
+                    : value.PreferredPlayerId.Trim()
             }, cancellationToken);
             var saved = _settings.Get<PlaybackQueueState>();
             var resume = _settings.Get<PlaybackResumeState>();
@@ -665,9 +668,17 @@ public sealed class PlaybackSessionService(
             audioInfo);
     }
 
-    private PlaybackRequest EffectiveRequest() => queue.Request.UseQualityPreference
-        ? queue.Request with { Quality = _settings.Get<PlaybackPreferences>().Quality, UseQualityPreference = false }
-        : queue.Request;
+    private PlaybackRequest EffectiveRequest()
+    {
+        if (!queue.Request.UseQualityPreference) return queue.Request;
+        var preferences = _settings.Get<PlaybackPreferences>();
+        return queue.Request with
+        {
+            Quality = preferences.Quality,
+            PreferredPlayerId = preferences.PreferredPlayerId,
+            UseQualityPreference = false
+        };
+    }
 
     private void ResetRestoredState()
     {

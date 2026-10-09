@@ -12,6 +12,10 @@ namespace LemonNeo.Plugin.Bass;
 
 public sealed class BassPlayerPlugin : ILemonPlugin, IPlayerProvider
 {
+    private static readonly HashSet<string> Extensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".aiff", ".flac", ".mp3", ".ogg", ".wav"
+    };
     private BassPlayer? _player;
 
     public PluginDescriptor Descriptor { get; } = new(
@@ -23,10 +27,17 @@ public sealed class BassPlayerPlugin : ILemonPlugin, IPlayerProvider
     PlayerDescriptor IPlayerProvider.Descriptor { get; } = new(
         "BASS Player",
         "Native BASS decoder and audio output for local files and direct HTTP streams.");
-    public int Priority => 100;
+    public IReadOnlyCollection<string> SupportedExtensions => Extensions;
     public IPlayer Player => _player ?? throw new InvalidOperationException("The BASS player is not initialized.");
-    public bool CanPlay(PlaybackSource source) =>
-        source is FilePlaybackSource or HttpPlaybackSource { IsDirectAudio: true };
+    public bool CanPlay(PlaybackSource source) => source switch
+    {
+        FilePlaybackSource file => SupportsExtension(file.Path),
+        // Remote URLs frequently omit or disguise the filename; BASS probes the stream itself.
+        HttpPlaybackSource { IsDirectAudio: true } => true,
+        _ => false
+    };
+
+    private static bool SupportsExtension(string path) => Extensions.Contains(Path.GetExtension(path));
 
     public ValueTask InitializeAsync(IPluginContext context, CancellationToken cancellationToken)
     {

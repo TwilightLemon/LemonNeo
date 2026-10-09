@@ -37,11 +37,16 @@ public sealed class PlaybackSourceDiscoveryService(
         var candidates = new List<PlaybackSourceCandidate>();
         foreach (var identity in GetIdentities(track))
         {
-            PlaybackSourceCandidate? candidate = null;
-            foreach (var quality in AudioQualities.SearchOrder(request.Quality))
+            var candidate = LocalFileScheme.Accepts(identity.Id)
+                ? search.ResolveLocalFile(identity)
+                : null;
+            if (candidate is null)
             {
-                candidate = await search.ResolveAsync(identity, quality);
-                if (candidate is not null) break;
+                foreach (var quality in AudioQualities.SearchOrder(request.Quality))
+                {
+                    candidate = await search.ResolveAsync(identity, quality);
+                    if (candidate is not null) break;
+                }
             }
             candidate ??= search.UnknownFor(identity);
             if (candidate is not null) candidates.Add(candidate);
@@ -59,7 +64,7 @@ public sealed class PlaybackSourceDiscoveryService(
             MusicCacheIdentity.GetKey(identity.Id) == MusicCacheIdentity.GetKey(request.RequiredSourceId)).ToArray();
         var qualities = AudioQualities.SearchOrder(request.Quality).ToArray();
         foreach (var identity in known.Where(identity => LocalFileScheme.Accepts(identity.Id)))
-            if (await search.ResolveLocalFileAsync(identity, qualities[0]) is { } local)
+            if (search.ResolveLocalFile(identity) is { } local)
                 return new([local], search.Errors, track);
 
         // Multiple external namespaces mean this track has already been expanded, regardless of ID kind.
@@ -146,16 +151,19 @@ public sealed class PlaybackSourceDiscoveryService(
 
         public Dictionary<string, string> Errors { get; } = new(StringComparer.OrdinalIgnoreCase);
 
-        public async Task<PlaybackSourceCandidate?> ResolveLocalFileAsync(SourceIdentity identity, AudioQuality quality)
+        public PlaybackSourceCandidate? ResolveLocalFile(SourceIdentity identity)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (request.RequiredSourceProviderId is not null &&
+                !string.Equals(request.RequiredSourceProviderId, "local", StringComparison.OrdinalIgnoreCase))
+                return null;
             if (!File.Exists(identity.Id.Value)) return null;
-            // Use the normal provider restrictions, but do not compare an original file's
-            // quality (which may be unknown) with cache entries or remote replacements.
-            foreach (var provider in owner.ProvidersFor(identity, request))
-                if (await ResolveProviderAsync(identity, provider, quality) is { Source: FilePlaybackSource file } candidate &&
-                    File.Exists(file.Path)) return candidate;
-            return null;
+            return new PlaybackSourceCandidate(
+                "local",
+                identity.Track,
+                new FilePlaybackSource(identity.Id.Value),
+                identity.Id,
+                identity.Method);
         }
 
         public async Task<PlaybackSourceCandidate?> ResolveAsync(SourceIdentity identity, AudioQuality quality)

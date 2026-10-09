@@ -372,7 +372,6 @@ internal sealed partial class CommandProcessor(
         if (provider is IMetadataProvider) capabilities.Add("Metadata");
         if (provider is ILyricsProvider) capabilities.Add("Lyrics");
         if (provider is IAuthenticationProvider) capabilities.Add("Authentication");
-        if (provider is IFolderImportProvider) capabilities.Add("Folder Import");
         return capabilities;
     }
 
@@ -437,8 +436,10 @@ internal sealed partial class CommandProcessor(
             }
             foreach (var player in plugin.PlayerIds.Select(playersRegistry.Get).OfType<IPlayerProvider>())
             {
-                _output.WriteLine($"  Player: {player.Id} | {player.Descriptor.Name} | priority={player.Priority}");
+                _output.WriteLine($"  Player: {player.Id} | {player.Descriptor.Name}");
                 _output.WriteLine($"    {player.Descriptor.Description}");
+                if (player.SupportedExtensions.Count > 0)
+                    _output.WriteLine($"    Formats: {string.Join(", ", player.SupportedExtensions.Order(StringComparer.OrdinalIgnoreCase))}");
             }
         }
         foreach (var failure in plugins.LastReport.Failures)
@@ -460,8 +461,10 @@ internal sealed partial class CommandProcessor(
     {
         foreach (var player in playersRegistry.Players)
         {
-            _output.WriteLine($"{player.Id} | {player.Descriptor.Name} | priority {player.Priority}");
+            _output.WriteLine($"{player.Id} | {player.Descriptor.Name}");
             _output.WriteLine($"  {player.Descriptor.Description}");
+            if (player.SupportedExtensions.Count > 0)
+                _output.WriteLine($"  Formats: {string.Join(", ", player.SupportedExtensions.Order(StringComparer.OrdinalIgnoreCase))}");
         }
     }
 

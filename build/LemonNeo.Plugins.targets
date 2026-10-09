@@ -1,4 +1,9 @@
 <Project>
+  <Target Name="CleanHostPluginDeployment" BeforeTargets="BuildHostPlugins"
+          Condition="'$(IsLemonNeoHost)' == 'true' and '$(SkipHostPlugins)' != 'true'">
+    <RemoveDir Directories="$(TargetDir)plugins" />
+  </Target>
+
   <Target Name="BuildHostPlugins" BeforeTargets="Build"
           Condition="'$(IsLemonNeoHost)' == 'true' and '$(SkipHostPlugins)' != 'true'">
     <MSBuild Projects="@(DefaultPluginProjects)" Targets="Restore;Build"

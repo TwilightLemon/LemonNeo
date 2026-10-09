@@ -16,7 +16,11 @@ internal static class ApplicationRegistration
         services.AddSingleton<LibraryService>();
         services.AddSingleton<IPlaylistOrderingService, FractionalPlaylistOrderingService>();
         services.AddSingleton<PlaylistService>();
-        services.AddSingleton<FolderImportService>();
+        services.AddSingleton(provider => new FolderImportService(
+            provider.GetRequiredService<IPlayerRegistry>(),
+            provider.GetRequiredService<PlaylistService>(),
+            () => storage.CacheDirectory,
+            provider.GetRequiredService<ILogger<FolderImportService>>()));
         services.AddSingleton<ImportService>();
         services.AddSingleton<SearchService>();
         services.AddSingleton<TrackLookupService>();

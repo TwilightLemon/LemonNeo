@@ -126,6 +126,43 @@
             </StackPanel>
           </ScrollViewer>
         </TabItem>
+        <TabItem Header="{Translate {x:Static i18n:LanguageManager+Keys.Decoders}}">
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Spacing="18" Margin="0,16,12,16">
+              <Border Classes="card">
+                <StackPanel Spacing="10">
+                  <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.PreferredDecoder}}" Classes="section" />
+                  <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.PreferredDecoderDescription}}" Classes="muted" TextWrapping="Wrap" />
+                  <ComboBox ItemsSource="{Binding DecoderOptions}" SelectedIndex="{Binding SelectedDecoderIndex}" HorizontalAlignment="Stretch" />
+                </StackPanel>
+              </Border>
+              <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.NoDecoders}}" Classes="muted" IsVisible="{Binding !HasDecoders}" TextWrapping="Wrap" />
+              <ItemsControl ItemsSource="{Binding Decoders}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="toolsVm:DecoderInformation">
+                    <Border Classes="card" Margin="0,0,0,12">
+                      <StackPanel Spacing="10">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                          <TextBlock Text="{Binding Name}" Classes="section" TextWrapping="Wrap" />
+                          <Border Classes="capabilityTag" IsVisible="{Binding IsPreferred}">
+                            <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Preferred}}" Classes="caption" />
+                          </Border>
+                        </StackPanel>
+                        <SelectableTextBlock Text="{Binding Id}" FontFamily="{DynamicResource Font.Code}" FontSize="12" Foreground="{DynamicResource Brush.TextSecondary}" />
+                        <TextBlock Text="{Binding Description}" Classes="muted" IsVisible="{Binding HasDescription}" TextWrapping="Wrap" />
+                        <StackPanel Spacing="6">
+                          <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.SupportedFormats}}" Classes="caption" />
+                          <ItemsControl ItemsSource="{Binding SupportedExtensions}" ItemsPanel="{StaticResource PluginTagsPanel}" ItemTemplate="{StaticResource PluginNamespaceTemplate}" />
+                          <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.NoSupportedFormats}}" Classes="caption" IsVisible="{Binding !HasSupportedExtensions}" />
+                        </StackPanel>
+                      </StackPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </ScrollViewer>
+        </TabItem>
         <TabItem Header="{Translate {x:Static i18n:LanguageManager+Keys.Help}}">
           <ScrollViewer HorizontalScrollBarVisibility="Disabled">
             <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.HelpText}}" TextWrapping="Wrap" LineHeight="26" Margin="0,16,12,16" />

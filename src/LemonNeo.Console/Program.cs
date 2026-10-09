@@ -1,4 +1,3 @@
-using LemonNeo.Abstractions.Playback;
 using LemonNeo.Abstractions.Settings;
 using LemonNeo.Abstractions.Storage;
 using System.Text;
@@ -37,7 +36,6 @@ internal static class Program
                         console.SingleLine = true;
                         console.TimestampFormat = "HH:mm:ss ";
                     }));
-                    services.AddSingleton<IPlayerProvider>(_ => new ConsolePlayerProvider(global::System.Console.Out));
                     services.AddSingleton<CommandCompletionService>();
                     services.AddSingleton<CommandHistory>();
                     services.AddSingleton<CommandProcessor>();

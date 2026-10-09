@@ -78,7 +78,7 @@ public sealed class PlaybackResolver(
             }
             try
             {
-                await PlaySourceAsync(candidate, CurrentQueueTrack, cancellationToken);
+                await PlaySourceAsync(candidate, CurrentQueueTrack, playbackRequest.PreferredPlayerId, cancellationToken);
             }
             catch (Exception exception) when (candidate.IsCached && exception is not OperationCanceledException)
             {
@@ -88,7 +88,8 @@ public sealed class PlaybackResolver(
                 await SaveDiscoveredIdsAsync(CurrentQueueTrack, discovery.UpdatedTrack ?? CurrentQueueTrack, cancellationToken);
                 candidate = discovery.Candidates.FirstOrDefault()
                     ?? throw new PlaybackResolutionException($"No playable source could be found for '{track.Title}'.", exception);
-                await PlaySourceAsync(candidate, discovery.UpdatedTrack ?? CurrentQueueTrack, cancellationToken);
+                await PlaySourceAsync(candidate, discovery.UpdatedTrack ?? CurrentQueueTrack,
+                    playbackRequest.PreferredPlayerId, cancellationToken);
             }
             return CurrentSource!;
         }
@@ -107,11 +108,12 @@ public sealed class PlaybackResolver(
     private async Task PlaySourceAsync(
         PlaybackSourceCandidate candidate,
         Track queueTrack,
+        string? preferredPlayerId,
         CancellationToken cancellationToken)
     {
         var source = candidate.Source;
         var resolvedTrack = candidate.Track;
-        var player = players.GetRequiredPlayer(source);
+        var player = players.GetRequiredPlayer(source, preferredPlayerId);
         try
         {
             if (player.Player is IVolumePlayer volumePlayer)

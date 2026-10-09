@@ -28,14 +28,6 @@ public sealed record RemotePlaylist
     public IReadOnlyList<Track> Tracks { get; init; } = [];
 }
 
-public sealed record FolderScanRequest(string DirectoryPath, bool Recursive = true);
-
-public sealed record FolderScanResult(
-    string DirectoryPath,
-    string SuggestedPlaylistName,
-    IReadOnlyList<Track> Tracks,
-    IReadOnlyList<string> SkippedFiles);
-
 public sealed record MetadataLookupRequest
 {
     public required Track Track { get; init; }
@@ -130,13 +122,6 @@ public interface IPlaylistExportProvider
     Task ExportPlaylistAsync(
         Playlist playlist,
         string? remotePlaylistId = null,
-        CancellationToken cancellationToken = default);
-}
-
-public interface IFolderImportProvider
-{
-    Task<FolderScanResult> ScanFolderAsync(
-        FolderScanRequest request,
         CancellationToken cancellationToken = default);
 }
 

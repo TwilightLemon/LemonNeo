@@ -1,5 +1,4 @@
 using LemonNeo.Core.Playback;
-using Microsoft.Extensions.Logging;
 
 namespace LemonNeo.Abstractions.Playback;
 
@@ -9,7 +8,8 @@ public interface IPlayerProvider
 {
     string Id { get; }
     PlayerDescriptor Descriptor { get; }
-    int Priority { get; }
+    /// <summary>Audio filename extensions understood by this decoder, including the leading dot.</summary>
+    IReadOnlyCollection<string> SupportedExtensions { get; }
     IPlayer Player { get; }
     bool CanPlay(PlaybackSource source);
 }
@@ -18,5 +18,5 @@ public interface IPlayerRegistry
 {
     IReadOnlyCollection<IPlayerProvider> Players { get; }
     IPlayerProvider? Get(string playerId);
-    IPlayerProvider GetRequiredPlayer(PlaybackSource source);
+    IPlayerProvider GetRequiredPlayer(PlaybackSource source, string? preferredPlayerId = null);
 }

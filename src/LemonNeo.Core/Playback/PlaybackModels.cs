@@ -63,8 +63,9 @@ public sealed record PlaybackRequest(
     AudioQuality Quality = AudioQuality.Automatic,
     string? RequiredSourceProviderId = null,
     ExternalMusicId? RequiredSourceId = null,
-    // Host-only: resolve the saved preference at each queue playback; explicit Auto still means highest.
-    bool UseQualityPreference = false);
+    // Host-only: resolve saved playback preferences at each queue playback; explicit Auto still means highest.
+    bool UseQualityPreference = false,
+    string? PreferredPlayerId = null);
 
 public enum PlaybackMode
 {
