@@ -138,7 +138,7 @@
                 IsVisible="{Binding !Playback.HasCurrentTrack}"
                 Title="{Translate {x:Static i18n:LanguageManager+Keys.NoTrack}}" />
             <Grid
-                ColumnDefinitions="0.9*,1.25*"
+                ColumnDefinitions="3*,4*"
                 IsVisible="{Binding Playback.HasCurrentTrack}"
                 Margin="{DynamicResource Space.PlaybackInset}"
                 Name="ListeningGrid">

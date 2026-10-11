@@ -131,6 +131,7 @@
                             <RepeatButton
                                 Background="{TemplateBinding Background}"
                                 Focusable="False"
+                                Margin="-6,0,0,0"
                                 Name="PART_IncreaseButton"
                                 Theme="{StaticResource PlaybackTrackButton}" />
                         </Track.IncreaseButton>

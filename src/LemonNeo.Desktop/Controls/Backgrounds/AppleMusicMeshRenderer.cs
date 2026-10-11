@@ -146,8 +146,8 @@ internal sealed class AppleMusicMeshRenderer : IDisposable
             var processedPulse = SmootherStep(Math.Clamp(frame.LowFrequencyPulse, 0f, 1f));
             var imageScale = 1f + ImagePulseIntensity * processedPulse * processedPulse *
                 (float)Math.Clamp(frame.BassPulseScale, 0d, 10d);
-            UpdateRotatingQuads(pixelWidth, pixelHeight, time,
-                (float)Math.Clamp(frame.RotationScale, 0d, 10d), imageScale);
+            var rotationScale = (float)Math.Clamp(frame.RotationScale, 0d, 10d);
+            UpdateRotatingQuads(pixelWidth, pixelHeight, time, rotationScale, imageScale);
 
             RenderRotationPass(rotationSurface.Canvas, pixelWidth, pixelHeight, transitionMix,
                 frame.IsDarkTheme);
@@ -165,7 +165,7 @@ internal sealed class AppleMusicMeshRenderer : IDisposable
             };
             if (frame.IsMeshEnabled)
             {
-                DrawPinchMesh(canvas, blurredImage, frame, time, outputPaint);
+                DrawPinchMesh(canvas, blurredImage, frame, time, rotationScale, outputPaint);
             }
             else
             {
@@ -259,14 +259,17 @@ internal sealed class AppleMusicMeshRenderer : IDisposable
         canvas.DrawImage(source, new SKRect(0, 0, width, height), Sampling, paint);
     }
 
-    private void DrawPinchMesh(SKCanvas canvas, SKImage material, RenderFrame frame, float time, SKPaint paint)
+    private void DrawPinchMesh(SKCanvas canvas, SKImage material, RenderFrame frame, float time,
+        float rotationScale, SKPaint paint)
     {
         var vertical = frame.Height > frame.Width;
         var slot = frame.PresetSlot is >= 0 and < AppleMusicIosMesh.PresetSlotCount
             ? frame.PresetSlot
             : _randomPresetSlot;
         var mesh = GetMesh(vertical, slot);
-        var phase = MathF.Acos(MathF.Sin(time * MathF.PI / 5f)) / MathF.PI;
+        // The pinch morph is the motion the eye reads as rotation while the mesh is
+        // active, so it shares the rotation speed instead of running on raw time.
+        var phase = MathF.Acos(MathF.Sin(time * rotationScale * MathF.PI / 5f)) / MathF.PI;
         var mix = phase * phase * (3f - 2f * phase);
         var textureScale = vertical ? 1f : .8f;
         var textureOffset = (1f - textureScale) * .5f;

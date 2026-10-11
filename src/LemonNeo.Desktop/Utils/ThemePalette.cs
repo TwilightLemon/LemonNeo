@@ -80,13 +80,14 @@ public static class ThemePalette
         var backgrounds = new[] { background, sidebar, surface, raised, soft, hover };
         var text = EnsureContrast(dark ? Color.Parse("#EEF1F4") : Color.Parse("#20252C"), backgrounds, 7, dark);
         // Leave headroom for the intermediate colors and hover opacity during transitions.
-        var secondary = EnsureContrast(Mix(text, background, .32), backgrounds, 5.3, dark);
+        var secondary = Color.Parse(dark ? "#C0FEFEFE" : "#C0000000");
         var accentText = EnsureContrast(dark ? accent : HslColor.ToRgb(hsl.H, Math.Min(hsl.S, .60), .32), backgrounds,
             5.5, dark);
         var onAccent = Color.Parse("#172027");
         var lyricHighlighter = Color.Parse(dark ? "#E0EFEFEF" : "#0f0e0e");
-        var lyricText = Color.Parse(dark ? "#5FEFEFEF" : "#5F000000");
+        var lyricText = Color.Parse(dark ? "#90FEFEFE" : "#90000000");
         var playbackSurface = Color.Parse(dark ? "#4E000000" : "#4EEFEFEF");
+        var border=Color.Parse(dark ? "#2EFFFFFF" : "#2E000000");
         // Blue/purple can be dark at the same HSL lightness as yellow. Lift the fill itself
         // so button labels retain a stable dark foreground throughout palette transitions.
         accent = EnsureContrast(accent, [onAccent], 5.5, true);
@@ -96,7 +97,7 @@ public static class ThemePalette
         {
             ["Canvas"] = background, ["Sidebar"] = sidebar, ["SidebarTranslucent"] = sidebar,
             ["Surface"] = surface, ["SurfaceRaised"] = raised, ["Text"] = text,
-            ["TextSecondary"] = secondary, ["Border"] = Mix(raised, text, .16),
+            ["TextSecondary"] = secondary, ["Border"] = border,
             ["Accent"] = accent, ["OnAccent"] = onAccent, ["AccentText"] = accentText,
             ["LyricText"] = lyricText, ["LyricHighlight"] = lyricHighlighter,
             ["AccentSoft"] = soft, ["Hover"] = hover, ["Danger"] = danger,
