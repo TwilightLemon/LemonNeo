@@ -4,10 +4,18 @@ using Microsoft.Extensions.Logging;
 
 namespace LemonNeo.Desktop.Services;
 
+public sealed record LoadedArtwork(Bitmap Bitmap, ReadOnlyMemory<byte> EncodedData);
+
 /// <summary>Decodes shared cached image bytes off the UI thread. The caller owns each returned bitmap.</summary>
 public sealed class ArtworkService(ImageCache cache, ILogger<ArtworkService> logger)
 {
     public async Task<Bitmap?> LoadAsync(Uri uri, CancellationToken cancellationToken = default, int decodeWidth = 512)
+    {
+        return (await LoadWithDataAsync(uri, cancellationToken, decodeWidth).ConfigureAwait(false))?.Bitmap;
+    }
+
+    public async Task<LoadedArtwork?> LoadWithDataAsync(Uri uri, CancellationToken cancellationToken = default,
+        int decodeWidth = 512)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(decodeWidth);
@@ -17,8 +25,9 @@ public sealed class ArtworkService(ImageCache cache, ILogger<ArtworkService> log
             if (image is null) return null;
             try
             {
-                return await Task.Run(() => Decode(image.Data, decodeWidth, cancellationToken), cancellationToken)
+                var bitmap = await Task.Run(() => Decode(image.Data, decodeWidth, cancellationToken), cancellationToken)
                     .ConfigureAwait(false);
+                return new LoadedArtwork(bitmap, image.Data);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {

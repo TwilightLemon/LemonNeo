@@ -76,6 +76,11 @@ public sealed class PlaybackSessionService(
     public IPlaybackQueue Queue => queue;
     public double Volume => resolver.Volume;
     public bool CanAdjustVolume => resolver.CanAdjustVolume;
+    public bool CanReadFftData => resolver.ActivePlayer?.Player is IFftPlayer { FftBinCount: > 1 };
+
+    public int FftBinCount => resolver.ActivePlayer?.Player is IFftPlayer player
+        ? Math.Max(0, player.FftBinCount)
+        : 0;
 
     public PlaybackSessionSnapshot Snapshot
     {
@@ -88,7 +93,12 @@ public sealed class PlaybackSessionService(
         }
     }
 
-    public bool CanSeek => resolver.ActivePlayer?.Player is ISeekablePlayer;
+    public bool CanSeek => resolver.ActivePlayer is not null;
+
+    public bool TryGetFftData(Span<float> destination)
+    {
+        return resolver.ActivePlayer?.Player is IFftPlayer player && player.TryGetFftData(destination);
+    }
 
     public async ValueTask DisposeAsync()
     {
@@ -323,13 +333,7 @@ public sealed class PlaybackSessionService(
             PublishSelectedTrack();
             await resolver.PlayAsync(item.Track, EffectiveRequest(), cancellationToken);
             if (_restoredItemId == item.Id && _restoredPosition > TimeSpan.Zero)
-            {
-                if (resolver.ActivePlayer?.Player is ISeekablePlayer seekable)
-                    await seekable.SeekAsync(_restoredPosition, cancellationToken);
-                else
-                    logger.LogInformation("Player {PlayerId} does not support seeking; starting from the beginning.",
-                        resolver.ActivePlayer?.Id);
-            }
+                await resolver.ActivePlayer!.Player.SeekAsync(_restoredPosition, cancellationToken);
 
             ResetRestoredState();
             UpdateSettings();
@@ -414,8 +418,8 @@ public sealed class PlaybackSessionService(
         try
         {
             EnsureReady();
-            if (resolver.ActivePlayer?.Player is not ISeekablePlayer player)
-                throw new NotSupportedException("The active player does not support seeking.");
+            var player = resolver.ActivePlayer?.Player
+                         ?? throw new InvalidOperationException("No active player is available for seeking.");
             var duration = player.Timeline.Duration ?? queue.CurrentItem?.Track.Duration;
             if (duration is { } end && position > end) position = end;
             await player.SeekAsync(position, cancellationToken);

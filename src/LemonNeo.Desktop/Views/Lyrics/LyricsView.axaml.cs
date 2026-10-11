@@ -28,7 +28,7 @@ public partial class LyricsView : UserControl
 
         var size = compact
             ? Math.Clamp(Bounds.Height * .24, 96, 140)
-            : Math.Clamp(Math.Min(Bounds.Width * .36, Bounds.Height * .7), 180, 360);
+            : Math.Clamp(Math.Min(Bounds.Width * .36, Bounds.Height * .7), 180, 512);
         NowPlayingCover.Width = NowPlayingCover.Height = size;
     }
 }

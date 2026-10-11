@@ -14,6 +14,7 @@
     <Thickness x:Key="Space.PlaybackInset">0</Thickness>
     <Thickness x:Key="Space.PlaybackFooterInset">0,12,0,0</Thickness>
     <Thickness x:Key="Space.PlaybackFloatingInset">0,0,16,16</Thickness>
+    <sys:Double x:Key="Opacity.DynamicArtworkBackground">0.24</sys:Double>
     <sys:TimeSpan x:Key="Motion.Fast">0:0:0.140</sys:TimeSpan>
     <sys:TimeSpan x:Key="Motion.Normal">0:0:0.220</sys:TimeSpan>
 </ResourceDictionary>

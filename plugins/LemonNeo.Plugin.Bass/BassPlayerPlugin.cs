@@ -68,9 +68,11 @@ public sealed class BassPlayerPlugin : ILemonPlugin, IPlayerProvider
     }
 }
 
-internal sealed class BassPlayer : ISeekablePlayer, IStreamingPlayer, IVolumePlayer, IAudioInfoPlayer, IAsyncDisposable
+internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, IFftPlayer, IAsyncDisposable
 {
+    private const int FftBinCountValue = 512;
     private const int InvalidStream = 0;
+    private readonly float[] _fftData = new float[FftBinCountValue];
     private readonly object _gate = new();
     private readonly ILogger<BassPlayer> _logger;
     private bool _disposed;
@@ -148,6 +150,7 @@ internal sealed class BassPlayer : ISeekablePlayer, IStreamingPlayer, IVolumePla
 
     public PlayerState State { get; private set; } = PlayerState.Stopped;
     public Track? CurrentTrack { get; private set; }
+    public int FftBinCount => FftBinCountValue;
 
     public PlayerTimeline Timeline
     {
@@ -163,6 +166,22 @@ internal sealed class BassPlayer : ISeekablePlayer, IStreamingPlayer, IVolumePla
                                BassApi.BASS_ChannelIsActive(_stream) == BASSActive.BASS_ACTIVE_STOPPED;
                 return new PlayerTimeline(position, duration, hasEnded);
             }
+        }
+    }
+
+    public bool TryGetFftData(Span<float> destination)
+    {
+        if (destination.Length < FftBinCountValue) return false;
+        lock (_gate)
+        {
+            if (_disposed || _stream == InvalidStream || State != PlayerState.Playing) return false;
+            var read = BassApi.BASS_ChannelGetData(
+                _stream,
+                _fftData,
+                (int)(BASSData.BASS_DATA_FFT1024 | BASSData.BASS_DATA_FFT_REMOVEDC));
+            if (read < 0) return false;
+            _fftData.AsSpan().CopyTo(destination);
+            return true;
         }
     }
 

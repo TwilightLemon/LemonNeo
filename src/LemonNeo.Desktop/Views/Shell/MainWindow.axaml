@@ -16,7 +16,9 @@
     x:Class="LemonNeo.Desktop.Views.Shell.MainWindow"
     x:DataType="shellVm:MainViewModel"
     xmlns="https://github.com/avaloniaui"
+    xmlns:backgroundControls="using:LemonNeo.Desktop.Controls.Backgrounds"
     xmlns:i18n="using:LemonNeo.Desktop.Services"
+    xmlns:playbackControls="using:LemonNeo.Desktop.Controls.Playback"
     xmlns:playbackViews="using:LemonNeo.Desktop.Views.Playback"
     xmlns:playbackVm="using:LemonNeo.Desktop.ViewModels.Playback"
     xmlns:sharedControls="using:LemonNeo.Desktop.Controls.Shared"
@@ -38,6 +40,46 @@
         <Style Selector="Border#Sidebar.macos">
             <Setter Property="Padding" Value="16,32,16,12" />
         </Style>
+        <Style Selector="backgroundControls|AppleMusicMeshBackground#DynamicArtworkBackground">
+            <Setter Property="Grid.Column" Value="1" />
+            <Setter Property="Grid.RowSpan" Value="2" />
+            <Setter Property="Opacity" Value="{DynamicResource Opacity.DynamicArtworkBackground}" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Duration="{DynamicResource Motion.Normal}" Property="Opacity" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="backgroundControls|AppleMusicMeshBackground#DynamicArtworkBackground.lyrics">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="Border#ContentBackground">
+            <Setter Property="Grid.Column" Value="1" />
+            <Setter Property="Grid.RowSpan" Value="2" />
+        </Style>
+        <Style Selector="Grid#PageArea">
+            <Setter Property="Grid.Column" Value="1" />
+            <Setter Property="Grid.Row" Value="1" />
+            <Setter Property="Margin" Value="32,20,32,0" />
+        </Style>
+        <Style Selector="Border#PlaybackBar">
+            <Setter Property="Grid.Column" Value="1" />
+            <Setter Property="Grid.Row" Value="1" />
+        </Style>
+        <Style Selector="Border#Sidebar.lyricsExpanded, Border#TopBar.lyricsExpanded">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="Border#ContentBackground.lyricsExpanded, backgroundControls|AppleMusicMeshBackground#DynamicArtworkBackground.lyricsExpanded, Border#PlaybackBar.lyricsExpanded">
+            <Setter Property="Grid.Column" Value="0" />
+            <Setter Property="Grid.ColumnSpan" Value="2" />
+        </Style>
+        <Style Selector="Grid#PageArea.lyricsExpanded">
+            <Setter Property="Grid.Column" Value="0" />
+            <Setter Property="Grid.ColumnSpan" Value="2" />
+            <Setter Property="Grid.Row" Value="0" />
+            <Setter Property="Grid.RowSpan" Value="2" />
+            <Setter Property="Margin" Value="32,48,32,0" />
+        </Style>
         <Style Selector="ContentControl#PageContent ListBox:not(.serviceTabs):not(.playlistPicker) /template/ ItemsPresenter#PART_ItemsPresenter">
             <Setter Property="Margin" Value="{DynamicResource Space.PlaybackInset}" />
         </Style>
@@ -52,12 +94,29 @@
         RowDefinitions="56,*">
         <Border
             Background="{DynamicResource Brush.Canvas}"
-            Grid.Column="1"
-            Grid.RowSpan="2"
+            Classes.lyricsExpanded="{Binding IsLyricsExpanded}"
             IsHitTestVisible="False"
             Name="ContentBackground" />
+        <backgroundControls:AppleMusicMeshBackground
+            ArtworkSource="{Binding Playback}"
+            BassPulseScale="{Binding VisualEffects.AppleMusicMeshBassPulseScale}"
+            BlurScale="{Binding VisualEffects.AppleMusicMeshBlurScale}"
+            Classes.lyrics="{Binding Navigation.IsLyrics}"
+            Classes.lyricsExpanded="{Binding IsLyricsExpanded}"
+            FrameRateLimit="{Binding VisualEffects.AppleMusicMeshFrameRateLimit}"
+            IsAnimationEnabled="{Binding Playback.CanAnimateBackground}"
+            IsHitTestVisible="False"
+            IsMeshEnabled="True"
+            IsPlaying="{Binding Playback.IsPlaying}"
+            IsVisible="{Binding IsAppleMusicMeshBackgroundVisible}"
+            Name="DynamicArtworkBackground"
+            PresetSlot="{Binding VisualEffects.AppleMusicMeshPresetSlot}"
+            PulseSource="{Binding Playback}"
+            RenderScale="{Binding VisualEffects.AppleMusicMeshRenderScale}"
+            RotationScale="{Binding VisualEffects.AppleMusicMeshRotationScale}" />
         <Border
             Background="{DynamicResource Brush.SidebarTranslucent}"
+            Classes.lyricsExpanded="{Binding IsLyricsExpanded}"
             Grid.RowSpan="2"
             Name="Sidebar">
             <Grid RowDefinitions="Auto,Auto,*,Auto">
@@ -222,6 +281,7 @@
         <Border
             BorderBrush="{DynamicResource Brush.Border}"
             BorderThickness="0,0,0,0"
+            Classes.lyricsExpanded="{Binding IsLyricsExpanded}"
             Grid.Column="1"
             Name="TopBar"
             WindowDecorationProperties.ElementRole="TitleBar">
@@ -292,9 +352,7 @@
             </Grid>
         </Border>
         <Grid
-            Grid.Column="1"
-            Grid.Row="1"
-            Margin="32,20,32,0"
+            Classes.lyricsExpanded="{Binding IsLyricsExpanded}"
             Name="PageArea"
             RowDefinitions="Auto,*">
             <Border
@@ -332,16 +390,41 @@
                     </LinearGradientBrush>
                 </ContentControl.OpacityMask>
             </ContentControl>
+            <Grid
+                Grid.Row="1"
+                HorizontalAlignment="Left"
+                IsVisible="{Binding Navigation.IsLyrics}"
+                VerticalAlignment="Top"
+                ZIndex="2">
+                <Button
+                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.ExpandLyricsView}}"
+                    Classes="ghost compact"
+                    Command="{Binding ToggleLyricsExpandedCommand}"
+                    IsVisible="{Binding !IsLyricsExpanded}"
+                    Name="ExpandLyricsViewButton"
+                    ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.ExpandLyricsView}}">
+                    <Path Classes="icon" Data="{StaticResource Icon.Expand}" />
+                </Button>
+                <Button
+                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.RestoreLyricsView}}"
+                    Classes="ghost compact"
+                    Command="{Binding ToggleLyricsExpandedCommand}"
+                    IsVisible="{Binding IsLyricsExpanded}"
+                    Name="RestoreLyricsViewButton"
+                    ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.RestoreLyricsView}}">
+                    <Path Classes="icon" Data="{StaticResource Icon.Restore}" />
+                </Button>
+            </Grid>
         </Grid>
         <Border
             Background="Transparent"
             BorderBrush="{DynamicResource Brush.Border}"
             BorderThickness="1"
             BoxShadow="0 8 28 0 #24000000"
+            Classes.lyricsExpanded="{Binding IsLyricsExpanded}"
             CornerRadius="20"
-            Grid.Column="1"
-            Grid.Row="1"
             Margin="20,0,20,20"
+            MaxWidth="1020"
             MinHeight="100"
             Name="PlaybackBar"
             SizeChanged="OnPlaybackBarSizeChanged"
@@ -352,6 +435,17 @@
                     Background="{DynamicResource Brush.PlaybackSurface}"
                     CornerRadius="20"
                     IsHitTestVisible="False" />
+                <playbackControls:AudioVisualizer
+                    Fill="{DynamicResource Brush.Accent}"
+                    Height="64"
+                    IsHitTestVisible="False"
+                    IsPlaying="{Binding Playback.IsPlaying}"
+                    IsVisible="{Binding Playback.CanVisualizeAudio}"
+                    Margin="20,0,20,2"
+                    Opacity="0.34"
+                    Source="{Binding Playback}"
+                    StripCount="{Binding VisualEffects.AudioVisualizerStripCount}"
+                    VerticalAlignment="Bottom" />
                 <Grid Margin="16,24,16,16" RowDefinitions="Auto,*">
                     <Grid
                         ColumnDefinitions="*,Auto"

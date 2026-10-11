@@ -29,6 +29,15 @@ public interface IPlayer
     Task PauseAsync(CancellationToken cancellationToken = default);
     Task ResumeAsync(CancellationToken cancellationToken = default);
     Task StopAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Moves playback to the requested position in the loaded stream.</summary>
+    Task SeekAsync(TimeSpan position, CancellationToken cancellationToken = default);
+
+    /// <summary>Returns application volume from 0 (muted) to 1 (full volume), including while stopped.</summary>
+    Task<double> GetVolumeAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Sets application volume independently of the system volume and retains it for subsequent streams.</summary>
+    Task SetVolumeAsync(double volume, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Optional decoder capability reporting the currently loaded audio's original format.</summary>
@@ -36,6 +45,20 @@ public interface IAudioInfoPlayer : IPlayer
 {
     /// <summary>Null when no stream is loaded. Individual fields may be unknown; reads must not perform network I/O.</summary>
     AudioStreamInfo? AudioInfo { get; }
+}
+
+/// <summary>Optional decoder capability providing frequency-domain data for visualizations.</summary>
+public interface IFftPlayer : IPlayer
+{
+    /// <summary>Number of frequency bins written by <see cref="TryGetFftData"/>.</summary>
+    int FftBinCount { get; }
+
+    /// <summary>
+    ///     Tries to synchronously write non-negative FFT magnitudes ordered from low to high frequency.
+    ///     The read must not perform network I/O. Returns false when no frame is available or
+    ///     <paramref name="destination"/> is too small.
+    /// </summary>
+    bool TryGetFftData(Span<float> destination);
 }
 
 /// <summary>
@@ -79,20 +102,4 @@ public interface IStreamingPlayer : IPlayer
         HttpPlaybackSource source,
         IPlaybackDownloadSink downloadSink,
         CancellationToken cancellationToken = default);
-}
-
-/// <summary>Optional capability for restoring a saved playback position.</summary>
-public interface ISeekablePlayer : IPlayer
-{
-    Task SeekAsync(TimeSpan position, CancellationToken cancellationToken = default);
-}
-
-/// <summary>Optional capability for application volume, independent of the system volume.</summary>
-public interface IVolumePlayer : IPlayer
-{
-    /// <summary>Returns volume from 0 (muted) to 1 (full volume), including while stopped.</summary>
-    Task<double> GetVolumeAsync(CancellationToken cancellationToken = default);
-
-    /// <summary>Sets a finite volume between 0 and 1 and retains it for subsequent streams.</summary>
-    Task SetVolumeAsync(double volume, CancellationToken cancellationToken = default);
 }

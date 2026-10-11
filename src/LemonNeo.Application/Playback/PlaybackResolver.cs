@@ -23,14 +23,12 @@ public sealed class PlaybackResolver(
     public PlaybackSource? CurrentSource => CurrentSourceDetails?.Source;
     public double Volume { get; private set; } = 1;
 
-    public bool CanAdjustVolume => ActivePlayer is { } active
-        ? active.Player is IVolumePlayer
-        : players.Players.Any(player => player.Player is IVolumePlayer);
+    public bool CanAdjustVolume => players.Players.Count > 0;
 
     public async Task<double> GetVolumeAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (ActivePlayer?.Player is IVolumePlayer player)
+        if (ActivePlayer?.Player is { } player)
         {
             var volume = await player.GetVolumeAsync(cancellationToken);
             ValidateVolume(volume);
@@ -44,7 +42,7 @@ public sealed class PlaybackResolver(
     {
         cancellationToken.ThrowIfCancellationRequested();
         ValidateVolume(volume);
-        if (ActivePlayer?.Player is IVolumePlayer player)
+        if (ActivePlayer?.Player is { } player)
             await player.SetVolumeAsync(volume, cancellationToken);
         // Retain the preference before a player is selected and across decoder switches.
         Volume = volume;
@@ -127,8 +125,7 @@ public sealed class PlaybackResolver(
         var player = players.GetRequiredPlayer(source, preferredPlayerId);
         try
         {
-            if (player.Player is IVolumePlayer volumePlayer)
-                await volumePlayer.SetVolumeAsync(Volume, cancellationToken);
+            await player.Player.SetVolumeAsync(Volume, cancellationToken);
             if (source is HttpPlaybackSource { IsDirectAudio: true } http &&
                 player.Player is IStreamingPlayer streaming)
             {

@@ -81,7 +81,7 @@ public sealed class LyricsViewModel : PageViewModel
         get => _desktopPreferences.FontSize;
         set
         {
-            var size = double.IsFinite(value) ? Math.Clamp(Math.Round(value), 16, 48) : 28;
+            var size = double.IsFinite(value) ? value : 28;
             if (size == DesktopLyricFontSize) return;
             ApplyDesktopPreferences(p => p with { FontSize = size });
         }
@@ -116,7 +116,7 @@ public sealed class LyricsViewModel : PageViewModel
         get => _lyricsPreferences.FontSize;
         set
         {
-            var size = double.IsFinite(value) ? Math.Clamp(Math.Round(value), 16, 48) : 24;
+            var size = double.IsFinite(value) ? value : 24;
             if (size == LyricFontSize) return;
             ApplyLyricsPreferences(p => p with { FontSize = size });
         }

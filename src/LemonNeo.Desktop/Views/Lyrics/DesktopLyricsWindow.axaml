@@ -156,7 +156,7 @@
                                             <Slider
                                                 AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.LyricsFontSize}}"
                                                 IsSnapToTickEnabled="True"
-                                                Maximum="48"
+                                                Maximum="64"
                                                 Minimum="16"
                                                 TickFrequency="1"
                                                 Value="{Binding DesktopLyricFontSize, Mode=TwoWay}" />
@@ -193,7 +193,7 @@
                 MinHeight="40"
                 Name="DesktopLyricsTimeline"
                 PositionMilliseconds="{Binding PositionMilliseconds}"
-                ReachedBrush="{DynamicResource Brush.LyricHighlight}"
+                ReachedBrush="{DynamicResource Brush.Accent}"
                 ReduceMotion="{Binding ReduceMotion}"
                 ShowRomanization="{Binding DesktopShowRomanization}"
                 ShowTranslation="{Binding DesktopShowTranslation}"

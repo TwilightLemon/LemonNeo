@@ -49,16 +49,10 @@ public sealed partial class ToolsViewModel : PageViewModel
     public IReadOnlyList<DependencyInformation> ApplicationDependencies { get; } =
     [
         new("Avalonia.Desktop", "12.1.3", "MIT", "https://github.com/AvaloniaUI/Avalonia"),
+        new("Irihi.Lingua", "1.0.0", "MIT", "https://github.com/irihitech/Irihi.Lingua"),
+        new("Lyricify-Backgrounds", "cbef8a6", "Apache-2.0", "https://github.com/WXRIW/Lyricify-Backgrounds"),
         new("Avalonia.Themes.Fluent", "12.1.3", "MIT", "https://github.com/AvaloniaUI/Avalonia"),
         new("CommunityToolkit.Mvvm", "8.4.2", "MIT", "https://github.com/CommunityToolkit/dotnet"),
-        new("Irihi.Lingua", "1.0.0", "MIT", "https://github.com/irihitech/Irihi.Lingua"),
-        new("Microsoft.AspNetCore.DataProtection.Extensions", "10.0.12", "MIT", "https://github.com/dotnet/dotnet"),
-        new("Microsoft.Extensions.Caching.Memory", "10.0.12", "MIT", "https://github.com/dotnet/dotnet"),
-        new("Microsoft.Extensions.DependencyInjection", "10.0.12", "MIT", "https://github.com/dotnet/dotnet"),
-        new("Microsoft.Extensions.Http", "10.0.12", "MIT", "https://github.com/dotnet/dotnet"),
-        new("Microsoft.Extensions.Logging", "10.0.12", "MIT", "https://github.com/dotnet/dotnet"),
-        new("Microsoft.Extensions.Logging.Abstractions", "10.0.12", "MIT", "https://github.com/dotnet/dotnet"),
-        new("Microsoft.Extensions.Logging.Debug", "10.0.12", "MIT", "https://github.com/dotnet/dotnet"),
         new("TagLibSharp", "2.3.0", "LGPL-2.1-only", "https://github.com/mono/taglib-sharp")
     ];
 

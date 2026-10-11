@@ -8,11 +8,6 @@
     xmlns:sharedControls="using:LemonNeo.Desktop.Controls.Shared"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Grid ClipToBounds="True" RowDefinitions="Auto,Auto,*">
-        <Border
-            Background="{DynamicResource Brush.NowPlayingGlow}"
-            CornerRadius="24"
-            Grid.RowSpan="3"
-            IsHitTestVisible="False" />
         <Grid ColumnDefinitions="44,*,44" Margin="0,0,0,18">
             <StackPanel
                 Grid.Column="1"
@@ -29,12 +24,12 @@
                     Text="{Binding Playback.NowArtist}"
                     TextAlignment="Center"
                     TextTrimming="CharacterEllipsis" />
-                <TextBlock
+                <!--<TextBlock
                     Classes="caption"
                     IsVisible="{Binding Playback.HasSourceDetails}"
                     Text="{Binding Playback.AudioFormatLabel}"
                     TextAlignment="Center"
-                    TextWrapping="Wrap" />
+                    TextWrapping="Wrap" />-->
             </StackPanel>
             <Button
                 AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.LyricsDisplaySettings}}"
@@ -77,7 +72,7 @@
                                 <Slider
                                     AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.LyricsFontSize}}"
                                     IsSnapToTickEnabled="True"
-                                    Maximum="48"
+                                    Maximum="100"
                                     Minimum="16"
                                     Name="LyricsFontSizeSlider"
                                     TickFrequency="1"
@@ -157,10 +152,8 @@
                     <sharedControls:Artwork
                         AutomationProperties.Name="{Binding Playback.NowTitle}"
                         CornerRadius="24"
-                        Height="300"
                         Name="NowPlayingCover"
-                        Source="{Binding Playback.NowArtwork}"
-                        Width="300" />
+                        Source="{Binding Playback.NowArtwork}" />
                 </Border>
                 <lyricsControls:LyricsPresenter
                     BoldLyrics="{Binding BoldLyrics}"
@@ -173,6 +166,7 @@
                     Grid.Column="1"
                     IsPlaying="{Binding Playback.IsPlaying}"
                     IsStopped="{Binding IsStopped}"
+                    MaxWidth="880"
                     Name="LyricsTimeline"
                     PositionMilliseconds="{Binding PositionMilliseconds}"
                     ReachedBrush="{DynamicResource Brush.LyricHighlight}"

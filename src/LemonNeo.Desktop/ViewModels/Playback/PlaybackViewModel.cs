@@ -5,26 +5,35 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using LemonNeo.Abstractions.Playback;
 using LemonNeo.Application.Playback;
+using LemonNeo.Desktop.Controls.Backgrounds;
 using LemonNeo.Core.Playback;
+using LemonNeo.Desktop.Config;
+using LemonNeo.Desktop.Controls.Playback;
 using LemonNeo.Desktop.Services;
 using LemonNeo.Desktop.Utils;
 using LemonNeo.Desktop.ViewModels.Shared;
 
 namespace LemonNeo.Desktop.ViewModels.Playback;
 
-public sealed class PlaybackViewModel : PageViewModel
+public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
+    IBackgroundArtworkSource, ILowFrequencyPulseSource
 {
+    private readonly IDisposable _appearanceSubscription;
     private readonly ArtworkService _artwork;
     private readonly List<Task> _artworkTasks = [];
     private readonly IPlaybackInteraction _interaction;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly PlaybackSessionService _session;
+    private readonly IDisposable _visualEffectsSubscription;
+    private readonly LowFrequencyPulseAnalyzer _pulseAnalyzer = new();
     private CancellationTokenSource? _artworkCancellation;
+    private BackgroundArtworkFrame? _backgroundArtwork;
     private Uri? _artworkUri;
     private bool _closing;
     private bool _isSourceDetailsOpen;
     private bool _isUpdatingVolume;
     private Bitmap? _nowArtwork;
+    private float[] _pulseSpectrum = [];
     private double _volumePercent;
     private Task _volumeReadTask = Task.CompletedTask;
     private bool _volumeUpdatePending;
@@ -63,6 +72,13 @@ public sealed class PlaybackViewModel : PageViewModel
         _session.StateChanged += OnPlaybackChanged;
         _session.TimelineChanged += OnPlaybackChanged;
         _session.VolumeChanged += OnVolumeChanged;
+        _appearanceSubscription = Context.Settings.Subscribe<AppearancePreferences>(_ =>
+        {
+            OnPropertyChanged(nameof(CanVisualizeAudio));
+            OnPropertyChanged(nameof(CanAnimateBackground));
+        });
+        _visualEffectsSubscription = Context.Settings.Subscribe<VisualEffectsPreferences>(_ =>
+            OnPropertyChanged(nameof(CanVisualizeAudio)));
     }
 
     public bool IsSeeking { get; set; }
@@ -87,6 +103,7 @@ public sealed class PlaybackViewModel : PageViewModel
 
     public bool HasCurrentTrack => Snapshot.CurrentTrack is not null;
     public Bitmap? NowArtwork => _nowArtwork;
+    public BackgroundArtworkFrame? CurrentArtwork => _backgroundArtwork;
     public bool IsPlaying => Snapshot.State == PlayerState.Playing;
     public string PlayLabel => _text[IsPlaying ? LanguageManager.Keys.Pause : LanguageManager.Keys.Play];
 
@@ -105,6 +122,33 @@ public sealed class PlaybackViewModel : PageViewModel
                            Snapshot.Timeline.Duration is { Ticks: > 0 };
 
     public bool CanAdjustVolume => CanInteract && _session.CanAdjustVolume;
+    public bool CanVisualizeAudio => CanInteract && Context.Settings.Get<VisualEffectsPreferences>()
+        .AudioVisualizerEnabled && !Context.Appearance.Current.ReduceMotion && _session.CanReadFftData;
+    public bool CanAnimateBackground => CanInteract && HasCurrentTrack && !Context.Appearance.Current.ReduceMotion;
+    public int FftBinCount => _session.FftBinCount;
+
+    public event EventHandler? ArtworkChanged;
+
+    public bool TryGetFftData(Span<float> destination)
+    {
+        return _session.TryGetFftData(destination);
+    }
+
+    public bool TryGetLowFrequencyPulse(out float pulse)
+    {
+        pulse = 0f;
+        var binCount = _session.FftBinCount;
+        if (!IsPlaying || !_session.CanReadFftData || binCount <= 0)
+        {
+            _pulseAnalyzer.Reset();
+            return false;
+        }
+
+        if (_pulseSpectrum.Length != binCount) _pulseSpectrum = new float[binCount];
+        if (!_session.TryGetFftData(_pulseSpectrum)) return false;
+        pulse = _pulseAnalyzer.Process(_pulseSpectrum, Snapshot.AudioInfo?.SampleRateHz ?? 48000);
+        return true;
+    }
 
     public double VolumePercent
     {
@@ -331,11 +375,19 @@ public sealed class PlaybackViewModel : PageViewModel
         // Tracking the URI separately also loads covers from an already restored session.
         if (_closing || Equals(uri, _artworkUri)) return;
         _artworkUri = uri;
+        _pulseAnalyzer.Reset();
         _artworkCancellation?.Cancel();
         _artworkCancellation?.Dispose();
         _artworkCancellation = null;
-        SetArtwork(null);
-        if (uri is null) return;
+        if (uri is null)
+        {
+            SetArtwork(null);
+            return;
+        }
+        // Keep the old background frame until the new encoded image is ready,
+        // allowing the renderer to cross-fade artwork without affecting the
+        // foreground cover placeholder.
+        SetArtwork(null, backgroundArtwork: _backgroundArtwork);
         _artworkCancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
         _artworkTasks.RemoveAll(t => t.IsCompleted);
         _artworkTasks.Add(LoadArtworkAsync(uri, _artworkCancellation.Token));
@@ -346,7 +398,8 @@ public sealed class PlaybackViewModel : PageViewModel
         Bitmap? bitmap = null;
         try
         {
-            bitmap = await _artwork.LoadAsync(uri, cancellationToken);
+            var loaded = await _artwork.LoadWithDataAsync(uri, cancellationToken);
+            bitmap = loaded?.Bitmap;
             Color? color = null;
             if (bitmap is not null)
                 try
@@ -364,7 +417,9 @@ public sealed class PlaybackViewModel : PageViewModel
                 }
 
             if (_closing || cancellationToken.IsCancellationRequested || !Equals(uri, _artworkUri)) return;
-            SetArtwork(bitmap, color);
+            SetArtwork(bitmap, color, loaded is null
+                ? null
+                : new BackgroundArtworkFrame(uri.AbsoluteUri, loaded.EncodedData));
             bitmap = null;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -376,10 +431,16 @@ public sealed class PlaybackViewModel : PageViewModel
         }
     }
 
-    private void SetArtwork(Bitmap? bitmap, Color? color = null)
+    private void SetArtwork(Bitmap? bitmap, Color? color = null, BackgroundArtworkFrame? backgroundArtwork = null)
     {
         var previous = _nowArtwork;
         if (SetProperty(ref _nowArtwork, bitmap, nameof(NowArtwork))) previous?.Dispose();
+        if (!Equals(_backgroundArtwork, backgroundArtwork))
+        {
+            _backgroundArtwork = backgroundArtwork;
+            OnPropertyChanged(nameof(CurrentArtwork));
+            ArtworkChanged?.Invoke(this, EventArgs.Empty);
+        }
         Context.Appearance.SetArtworkColor(color);
     }
 
@@ -399,8 +460,9 @@ public sealed class PlaybackViewModel : PageViewModel
                      nameof(QualityLabel), nameof(NowTitle), nameof(NowArtist), nameof(HasCurrentTrack),
                      nameof(IsPlaying), nameof(PlayLabel), nameof(PlaybackLabel), nameof(ModeLabel),
                      nameof(IsSequential), nameof(IsRepeatAll), nameof(IsShuffle), nameof(CanPrevious), nameof(CanNext),
-                     nameof(CanTogglePlayback), nameof(CanSeek), nameof(CanAdjustVolume), nameof(DurationSeconds),
-                     nameof(PositionText), nameof(DurationText)
+                     nameof(CanTogglePlayback), nameof(CanSeek), nameof(CanAdjustVolume), nameof(CanVisualizeAudio),
+                     nameof(CanAnimateBackground),
+                     nameof(DurationSeconds), nameof(PositionText), nameof(DurationText)
                  }) OnPropertyChanged(name);
         if (!IsSeeking) OnPropertyChanged(nameof(PositionSeconds));
         OnPropertyChanged(nameof(PlaybackDetails));
@@ -425,6 +487,8 @@ public sealed class PlaybackViewModel : PageViewModel
         _session.StateChanged -= OnPlaybackChanged;
         _session.TimelineChanged -= OnPlaybackChanged;
         _session.VolumeChanged -= OnVolumeChanged;
+        _appearanceSubscription.Dispose();
+        _visualEffectsSubscription.Dispose();
         await _lifetime.CancelAsync();
         await base.DisposeAsync();
         await Task.WhenAll(_volumeUpdateTask, _volumeReadTask);

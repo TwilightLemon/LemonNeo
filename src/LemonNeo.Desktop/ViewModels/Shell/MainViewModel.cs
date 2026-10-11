@@ -19,11 +19,13 @@ namespace LemonNeo.Desktop.ViewModels.Shell;
 /// <summary>The shell presents startup state and owns navigation; the controller owns startup execution.</summary>
 public sealed class MainViewModel : PageViewModel
 {
+    private bool _isLyricsExpanded;
     private bool _isQueueOpen;
     private PlaybackQueueViewModel? _queueDrawer;
     private SearchViewModel? _searchPage;
     private string _searchQuery = "";
     private PlaylistMenuItemViewModel? _selectedPlaylist;
+    private readonly IDisposable _visualEffectsSubscription;
 
     public MainViewModel(DesktopHost host, LocalizationService text, AppearanceService appearance,
         ArtworkService artwork)
@@ -31,11 +33,14 @@ public sealed class MainViewModel : PageViewModel
     {
         Playback = new PlaybackViewModel(Context, artwork);
         Navigation = new DesktopNavigation(CreatePage, Context, Playback);
-        Navigation.PropertyChanged += OnNavigationChanged;
-        Navigation.Initialize();
         SearchCommand = new AsyncRelayCommand(SubmitSearchAsync, () => CanSearch);
+        ToggleLyricsExpandedCommand = new RelayCommand(ToggleLyricsExpanded, () => Navigation.IsLyrics);
         ToggleQueueCommand = new RelayCommand(ToggleQueue);
         CloseQueueCommand = new RelayCommand(() => IsQueueOpen = false, () => IsQueueOpen);
+        _visualEffectsSubscription =
+            Context.Settings.Subscribe<VisualEffectsPreferences>(_ => RefreshVisualEffectsProperties());
+        Navigation.PropertyChanged += OnNavigationChanged;
+        Navigation.Initialize();
         Context.LibraryChanged += OnLibraryChanged;
     }
 
@@ -43,6 +48,10 @@ public sealed class MainViewModel : PageViewModel
     public PlaybackViewModel Playback { get; }
     public DesktopNavigation Navigation { get; }
     public ObservableCollection<PlaylistMenuItemViewModel> Playlists { get; } = [];
+    public VisualEffectsPreferences VisualEffects => Context.Settings.Get<VisualEffectsPreferences>();
+
+    public bool IsAppleMusicMeshBackgroundVisible => VisualEffects.AppleMusicMeshEnabled &&
+                                                      (!VisualEffects.AppleMusicMeshLyricsOnly || Navigation.IsLyrics);
 
     public PlaylistMenuItemViewModel? SelectedPlaylist
     {
@@ -83,6 +92,13 @@ public sealed class MainViewModel : PageViewModel
                              _searchPage?.CanInteract != false;
 
     public AsyncRelayCommand SearchCommand { get; }
+    public RelayCommand ToggleLyricsExpandedCommand { get; }
+
+    public bool IsLyricsExpanded
+    {
+        get => _isLyricsExpanded;
+        private set => SetProperty(ref _isLyricsExpanded, value);
+    }
 
     public PlaybackQueueViewModel? QueueDrawer
     {
@@ -101,6 +117,13 @@ public sealed class MainViewModel : PageViewModel
 
     public RelayCommand ToggleQueueCommand { get; }
     public RelayCommand CloseQueueCommand { get; }
+
+    private void ToggleLyricsExpanded()
+    {
+        if (!Navigation.IsLyrics) return;
+        IsQueueOpen = false;
+        IsLyricsExpanded = !IsLyricsExpanded;
+    }
 
     private void ToggleQueue()
     {
@@ -172,7 +195,10 @@ public sealed class MainViewModel : PageViewModel
     private void OnNavigationChanged(object? sender, PropertyChangedEventArgs args)
     {
         if (args.PropertyName != nameof(DesktopNavigation.Current)) return;
+        if (!Navigation.IsLyrics) IsLyricsExpanded = false;
         IsQueueOpen = false;
+        ToggleLyricsExpandedCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(IsAppleMusicMeshBackgroundVisible));
         SyncPlaylistSelection();
         if (Navigation.Current is SearchViewModel search) SearchQuery = search.SearchQuery;
     }
@@ -207,6 +233,12 @@ public sealed class MainViewModel : PageViewModel
         }
 
         SyncPlaylistSelection();
+    }
+
+    private void RefreshVisualEffectsProperties()
+    {
+        OnPropertyChanged(nameof(VisualEffects));
+        OnPropertyChanged(nameof(IsAppleMusicMeshBackgroundVisible));
     }
 
     public Task ReorderPlaylistsAsync(PlaylistMenuItemViewModel source, PlaylistMenuItemViewModel target, bool after)
@@ -259,6 +291,7 @@ public sealed class MainViewModel : PageViewModel
     {
         Context.LibraryChanged -= OnLibraryChanged;
         Navigation.PropertyChanged -= OnNavigationChanged;
+        _visualEffectsSubscription.Dispose();
         if (_searchPage is not null) _searchPage.PropertyChanged -= OnSearchChanged;
         await base.DisposeAsync();
         IsQueueOpen = false;

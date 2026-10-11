@@ -14,6 +14,8 @@
     <StreamGeometry x:Key="Icon.Search">M10,2 A8,8 0 1 0 10,18 A8,8 0 1 0 10,2 Z M10,4 A6,6 0 1 1 10,16 A6,6 0 1 1 10,4 Z M15,16 L17,14 L23,20 L21,22 Z</StreamGeometry>
     <StreamGeometry x:Key="Icon.Back">M15,3 L6,12 L15,21 L16.5,19.5 L9,12 L16.5,4.5 Z</StreamGeometry>
     <StreamGeometry x:Key="Icon.Forward">M9,3 L18,12 L9,21 L7.5,19.5 L15,12 L7.5,4.5 Z</StreamGeometry>
+    <StreamGeometry x:Key="Icon.Expand">M3,9 V3 H9 V5 H5 V9 Z M15,3 H21 V9 H19 V5 H15 Z M3,15 H5 V19 H9 V21 H3 Z M19,15 H21 V21 H15 V19 H19 Z</StreamGeometry>
+    <StreamGeometry x:Key="Icon.Restore">M9,3 H11 V11 H3 V9 H9 Z M13,3 H15 V9 H21 V11 H13 Z M3,13 H11 V21 H9 V15 H3 Z M13,13 H21 V15 H15 V21 H13 Z</StreamGeometry>
     <StreamGeometry x:Key="Icon.Queue">M3,4 L21,4 L21,6 L3,6 Z M3,10 L21,10 L21,12 L3,12 Z M3,16 L13,16 L13,18 L3,18 Z M17,15 L23,19 L17,23 Z</StreamGeometry>
     <StreamGeometry x:Key="Icon.Volume">M3,8 H7 L12,3 V21 L7,16 H3 Z M15,6 C19,9 19,15 15,18 L14,16 C17,14 17,10 14,8 Z M18,3 C24,7 24,17 18,21 L17,19 C22,16 22,8 17,5 Z</StreamGeometry>
     <StreamGeometry x:Key="Icon.VolumeMuted">M3,8 H7 L12,3 V21 L7,16 H3 Z M16,7 L19,10 L22,7 L23.5,8.5 L20.5,11.5 L23.5,14.5 L22,16 L19,13 L16,16 L14.5,14.5 L17.5,11.5 L14.5,8.5 Z</StreamGeometry>
