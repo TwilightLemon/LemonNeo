@@ -22,7 +22,8 @@ public static class ArtworkColorExtractor
         return ExtractPixels(data, size.Width, size.Height, framebuffer.RowBytes, cancellationToken);
     }
 
-    public static Color? ExtractPixels(byte[] bgra, int width, int height, int stride, CancellationToken cancellationToken = default)
+    public static Color? ExtractPixels(byte[] bgra, int width, int height, int stride,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(bgra);
         if (width <= 0 || height <= 0 || stride < (long)width * 4 || (long)stride * height > bgra.Length)
@@ -39,16 +40,22 @@ public static class ArtworkColorExtractor
                 var alpha = bgra[offset + 3];
                 if (alpha < 128) continue;
                 hasVisibleSamples = true;
-                var r = bgra[offset + 2]; var g = bgra[offset + 1]; var b = bgra[offset];
+                var r = bgra[offset + 2];
+                var g = bgra[offset + 1];
+                var b = bgra[offset];
                 var average = (r + g + b) / 3;
                 if (average is < 24 or > 230) continue;
                 // Sixteen-value RGB bins preserve accents that the previous coarser bins merged.
-                var key = (r >> 4) << 8 | (g >> 4) << 4 | b >> 4;
-                if (!bins.TryGetValue(key, out var bin)) bins[key] = bin = new();
+                var key = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
+                if (!bins.TryGetValue(key, out var bin)) bins[key] = bin = new ColorBin();
                 var weight = alpha / 255d;
-                bin.Weight += weight; bin.R += r * weight; bin.G += g * weight; bin.B += b * weight;
+                bin.Weight += weight;
+                bin.R += r * weight;
+                bin.G += g * weight;
+                bin.B += b * weight;
             }
         }
+
         if (bins.Count == 0) return hasVisibleSamples ? Colors.Gray : null;
         // As in GetMajorColor, favor saturation and lightness near 0.6 as well as population.
         // Population breaks zero-score ties so grayscale art follows its largest region.
@@ -59,17 +66,21 @@ public static class ArtworkColorExtractor
     {
         public double Weight, R, G, B;
         public Color Color => Color.FromRgb((byte)(R / Weight), (byte)(G / Weight), (byte)(B / Weight));
+
         public double Score
         {
             get
             {
                 // Keep the mean channels unrounded while scoring, as GetMajorColor does.
-                var r = R / Weight / 255; var g = G / Weight / 255; var b = B / Weight / 255;
+                var r = R / Weight / 255;
+                var g = G / Weight / 255;
+                var b = B / Weight / 255;
                 var maximum = Math.Max(r, Math.Max(g, b));
                 var minimum = Math.Min(r, Math.Min(g, b));
                 var lightness = (maximum + minimum) / 2;
-                var saturation = maximum == minimum ? 0 :
-                    (maximum - minimum) / (lightness > .5 ? 2 - maximum - minimum : maximum + minimum);
+                var saturation = maximum == minimum
+                    ? 0
+                    : (maximum - minimum) / (lightness > .5 ? 2 - maximum - minimum : maximum + minimum);
                 return Weight * saturation * (1 - Math.Abs(lightness - .6) * 1.8);
             }
         }

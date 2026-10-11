@@ -1,4 +1,5 @@
 using LemonNeo.Core.Library;
+
 namespace LemonNeo.Abstractions.Storage;
 
 public interface ILibraryRepository

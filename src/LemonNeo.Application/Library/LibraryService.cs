@@ -5,17 +5,19 @@ namespace LemonNeo.Application.Library;
 
 public sealed class LibraryService(ILibraryRepository repository)
 {
-    private readonly SemaphoreSlim _gate = new(1, 1);
-    private readonly object _changesGate = new();
     private readonly Dictionary<Guid, long> _changedPlaylists = [];
+    private readonly object _changesGate = new();
     private readonly Dictionary<Guid, long> _deletedPlaylists = [];
+    private readonly SemaphoreSlim _gate = new(1, 1);
     private long _changeVersion;
     private long _indexVersion;
 
     public MusicLibrary Current { get; private set; } = new();
 
-    public Task EnsureCreatedAsync(CancellationToken cancellationToken = default) =>
-        repository.EnsureCreatedAsync(cancellationToken);
+    public Task EnsureCreatedAsync(CancellationToken cancellationToken = default)
+    {
+        return repository.EnsureCreatedAsync(cancellationToken);
+    }
 
     public async Task<MusicLibrary> LoadAsync(CancellationToken cancellationToken = default)
     {
@@ -49,10 +51,7 @@ public sealed class LibraryService(ILibraryRepository repository)
             long indexVersion;
             lock (_changesGate)
             {
-                if (_changedPlaylists.Count == 0 && _deletedPlaylists.Count == 0 && _indexVersion == 0)
-                {
-                    return;
-                }
+                if (_changedPlaylists.Count == 0 && _deletedPlaylists.Count == 0 && _indexVersion == 0) return;
 
                 changedVersions = new Dictionary<Guid, long>(_changedPlaylists);
                 deletedVersions = new Dictionary<Guid, long>(_deletedPlaylists);
@@ -79,13 +78,11 @@ public sealed class LibraryService(ILibraryRepository repository)
             lock (_changesGate)
             {
                 foreach (var (id, version) in changedVersions)
-                {
-                    if (_changedPlaylists.GetValueOrDefault(id) == version) _changedPlaylists.Remove(id);
-                }
+                    if (_changedPlaylists.GetValueOrDefault(id) == version)
+                        _changedPlaylists.Remove(id);
                 foreach (var (id, version) in deletedVersions)
-                {
-                    if (_deletedPlaylists.GetValueOrDefault(id) == version) _deletedPlaylists.Remove(id);
-                }
+                    if (_deletedPlaylists.GetValueOrDefault(id) == version)
+                        _deletedPlaylists.Remove(id);
                 if (_indexVersion == indexVersion) _indexVersion = 0;
             }
         }
@@ -147,24 +144,27 @@ public sealed class LibraryService(ILibraryRepository repository)
         }
     }
 
-    private static Playlist Clone(Playlist playlist) => new()
+    private static Playlist Clone(Playlist playlist)
     {
-        Id = playlist.Id,
-        Name = playlist.Name,
-        Description = playlist.Description,
-        CreatedAt = playlist.CreatedAt,
-        UpdatedAt = playlist.UpdatedAt,
-        Items = playlist.Items.Select(item => new PlaylistItem
+        return new Playlist
         {
-            Id = item.Id,
-            SortKey = item.SortKey,
-            AddedAt = item.AddedAt,
-            Track = item.Track with
+            Id = playlist.Id,
+            Name = playlist.Name,
+            Description = playlist.Description,
+            CreatedAt = playlist.CreatedAt,
+            UpdatedAt = playlist.UpdatedAt,
+            Items = playlist.Items.Select(item => new PlaylistItem
             {
-                Artists = item.Track.Artists.ToArray(),
-                Album = item.Track.Album is { } album ? album with { } : null,
-                ExternalIds = item.Track.ExternalIds.ToArray()
-            }
-        }).ToList()
-    };
+                Id = item.Id,
+                SortKey = item.SortKey,
+                AddedAt = item.AddedAt,
+                Track = item.Track with
+                {
+                    Artists = item.Track.Artists.ToArray(),
+                    Album = item.Track.Album is { } album ? album with { } : null,
+                    ExternalIds = item.Track.ExternalIds.ToArray()
+                }
+            }).ToList()
+        };
+    }
 }

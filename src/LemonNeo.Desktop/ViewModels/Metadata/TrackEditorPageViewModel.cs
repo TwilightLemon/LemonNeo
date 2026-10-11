@@ -1,71 +1,97 @@
-using LemonNeo.Core.Playback;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Text;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using LemonNeo.Abstractions.Providers;
 using LemonNeo.Application.Library;
 using LemonNeo.Application.Lyrics;
 using LemonNeo.Application.Playback;
 using LemonNeo.Application.Providers;
 using LemonNeo.Core.Library;
-using LemonNeo.Core.Lyrics;
 using LemonNeo.Core.Music;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Text;
-using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
-using CoreLyrics = LemonNeo.Core.Lyrics.Lyrics;
+using LemonNeo.Core.Playback;
 using LemonNeo.Desktop.Services;
 using LemonNeo.Desktop.ViewModels.Playback;
 using LemonNeo.Desktop.ViewModels.Shared;
+using CoreLyrics = LemonNeo.Core.Lyrics.Lyrics;
 
 namespace LemonNeo.Desktop.ViewModels.Metadata;
 
 public sealed partial class TrackEditorPageViewModel : PageViewModel
 {
     private readonly DesktopNavigation Navigation;
+    private LyricsLookupResult? _inspectedLyrics;
+    [ObservableProperty] private string _inspectionMessages = "";
+    [ObservableProperty] private string _lyricsDetails = "";
+    [ObservableProperty] private string _metadataSearchQuery = "";
+    [ObservableProperty] private PlaybackSourceRow? _selectedSource;
+    private Track? _sourceTrack;
     private Playlist? _targetPlaylist;
-    public TrackEditorPageViewModel(DesktopContext context, DesktopNavigation navigation, PlaybackViewModel playback, TrackRow? row, bool isNew = false) : base(context, DesktopRoutes.Editor)
+
+    public TrackEditorPageViewModel(DesktopContext context, DesktopNavigation navigation, PlaybackViewModel playback,
+        TrackRow? row, bool isNew = false) : base(context, DesktopRoutes.Editor)
     {
         Navigation = navigation;
-        Editor = row is null ? null : new(row.Track, _text, row.PlaylistId, row.PlaylistItemId, isNew);
+        Editor = row is null
+            ? null
+            : new TrackEditorViewModel(row.Track, _text, row.PlaylistId, row.PlaylistItemId, isNew);
         _targetPlaylist = Playlists.FirstOrDefault();
-        CloseEditorCommand = new(Navigation.GoBackAsync);
-        SaveEditorCommand = new(SaveEditorAsync);
-        MetadataCommand = new(InspectMetadataAsync, () => CanFindMetadata);
-        UseTrackSearchQueryCommand = new(UseTrackSearchQuery, () => CanInteract && Editor is not null);
-        ReplaceMatchMetadataCommand = new(row =>
+        CloseEditorCommand = new AsyncRelayCommand(Navigation.GoBackAsync);
+        SaveEditorCommand = new AsyncRelayCommand(SaveEditorAsync);
+        MetadataCommand = new AsyncRelayCommand(InspectMetadataAsync, () => CanFindMetadata);
+        UseTrackSearchQueryCommand = new RelayCommand(UseTrackSearchQuery, () => CanInteract && Editor is not null);
+        ReplaceMatchMetadataCommand = new RelayCommand<MetadataMatchRow>(row =>
         {
             if (!CanUseMetadataMatch(row) || string.IsNullOrWhiteSpace(row!.Match.Track.Title)) return;
             Editor!.ApplyMetadata(row!.Match.Track);
             row.MarkMetadataReplaced();
             SetStatus("MetadataApplied");
         }, row => CanUseMetadataMatch(row) && !string.IsNullOrWhiteSpace(row!.Match.Track.Title));
-        AddMatchExternalIdsCommand = new(row =>
+        AddMatchExternalIdsCommand = new RelayCommand<MetadataMatchRow>(row =>
         {
             if (!CanUseMetadataMatch(row)) return;
             var added = Editor!.AddExternalIds(row!.Match.Track.ExternalIds);
             row.MarkExternalIdsAdded();
             SetStatus("MetadataIdsAdded", added);
         }, row => CanUseMetadataMatch(row) && row!.Match.Track.ExternalIds.Count > 0);
-        MetadataSources = MetadataSourceOption.Create(_host.Get<IProviderRegistry>(), _host.Get<IPlaybackSourceProviderRegistry>());
+        MetadataSources = MetadataSourceOption.Create(_host.Get<IProviderRegistry>(),
+            _host.Get<IPlaybackSourceProviderRegistry>());
         foreach (var source in MetadataSources) source.PropertyChanged += OnMetadataSourceChanged;
         UseTrackSearchQuery();
-        LyricsDetailsCommand = new(InspectLyricsAsync); SourcesCommand = new(InspectSourcesAsync);
-        PlaySourceCommand = new(() => SelectedSource is { } source && _sourceTrack is { } track
+        LyricsDetailsCommand = new AsyncRelayCommand(InspectLyricsAsync);
+        SourcesCommand = new AsyncRelayCommand(InspectSourcesAsync);
+        PlaySourceCommand = new AsyncRelayCommand(() => SelectedSource is { } source && _sourceTrack is { } track
             ? playback.ExecutePlaybackAsync(ct =>
-                _host.Get<PlaybackSessionService>().PlayTrackAsync(track, new(
+                _host.Get<PlaybackSessionService>().PlayTrackAsync(track, new PlaybackRequest(
                     source.Candidate.Source.Quality ?? AudioQuality.Automatic,
-                    source.Candidate.IsCached ? null : source.Provider, source.Candidate.SourceId), ct)) : Task.CompletedTask);
+                    source.Candidate.IsCached ? null : source.Provider, source.Candidate.SourceId), ct))
+            : Task.CompletedTask);
         Context.LibraryChanged += OnLibraryChanged;
     }
+
     public TrackEditorViewModel? Editor { get; }
     public ObservableCollection<Playlist> Playlists => Context.Playlists;
-    public Playlist? TargetPlaylist { get => _targetPlaylist; set { if (SetProperty(ref _targetPlaylist, value)) RaiseInteractionProperties(); } }
-    public bool CanSaveEditor => CanInteract && Editor is { } editor && (editor.PlaylistId is not null || TargetPlaylist is not null);
+
+    public Playlist? TargetPlaylist
+    {
+        get => _targetPlaylist;
+        set
+        {
+            if (SetProperty(ref _targetPlaylist, value)) RaiseInteractionProperties();
+        }
+    }
+
+    public bool CanSaveEditor => CanInteract && Editor is { } editor &&
+                                 (editor.PlaylistId is not null || TargetPlaylist is not null);
+
     public bool EditorNeedsPlaylist => Editor is { PlaylistId: null };
     public IReadOnlyList<MetadataSourceOption> MetadataSources { get; }
     public bool HasMetadataSources => MetadataSources.Count > 0;
+
     public bool CanFindMetadata => CanInteract && Editor is not null && !string.IsNullOrWhiteSpace(MetadataSearchQuery)
-        && MetadataSources.Any(source => source.IsSelected);
+                                   && MetadataSources.Any(source => source.IsSelected);
+
     public ObservableCollection<MetadataMatchRow> MetadataMatches { get; } = [];
     public ObservableCollection<PlaybackSourceRow> DiscoveredSources { get; } = [];
     public AsyncRelayCommand CloseEditorCommand { get; }
@@ -77,12 +103,7 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
     public AsyncRelayCommand LyricsDetailsCommand { get; }
     public AsyncRelayCommand SourcesCommand { get; }
     public AsyncRelayCommand PlaySourceCommand { get; }
-    private Track? _sourceTrack;
-    private LyricsLookupResult? _inspectedLyrics;
-    [ObservableProperty] private string _metadataSearchQuery = "";
-    [ObservableProperty] private string _inspectionMessages = "";
-    [ObservableProperty] private string _lyricsDetails = "";
-    [ObservableProperty] private PlaybackSourceRow? _selectedSource;
+
     public Task SaveEditorAsync()
     {
         if (!CanSaveEditor || Editor is not { } editor) return Task.CompletedTask;
@@ -101,20 +122,42 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
         });
     }
 
-    private Track GetInspectionTrack() => Editor?.Build(validateExternalIdSchemes: false) ?? throw new ArgumentException(_text["SelectTrackFirst"]);
-    private static string FormatErrors(IEnumerable<KeyValuePair<string, string>> errors) => string.Join(Environment.NewLine, errors.Select(e => $"{e.Key}: {e.Value}"));
+    private Track GetInspectionTrack()
+    {
+        return Editor?.Build(false) ??
+               throw new ArgumentException(_text["SelectTrackFirst"]);
+    }
 
-    private bool CanUseMetadataMatch(MetadataMatchRow? row) => CanInteract && Editor is not null && row is not null
-        && MetadataMatches.Any(candidate => ReferenceEquals(candidate, row));
+    private static string FormatErrors(IEnumerable<KeyValuePair<string, string>> errors)
+    {
+        return string.Join(Environment.NewLine, errors.Select(e => $"{e.Key}: {e.Value}"));
+    }
 
-    private void UseTrackSearchQuery() => MetadataSearchQuery = Editor is { } editor
-        ? string.Join(" ", new[] { editor.Title.Trim() }.Concat(editor.Artists.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))) : "";
+    private bool CanUseMetadataMatch(MetadataMatchRow? row)
+    {
+        return CanInteract && Editor is not null && row is not null
+               && MetadataMatches.Any(candidate => ReferenceEquals(candidate, row));
+    }
 
-    partial void OnMetadataSearchQueryChanged(string value) => RefreshMetadataCommands();
+    private void UseTrackSearchQuery()
+    {
+        MetadataSearchQuery = Editor is { } editor
+            ? string.Join(" ",
+                new[] { editor.Title.Trim() }.Concat(editor.Artists.Split(';',
+                    StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)))
+            : "";
+    }
+
+    partial void OnMetadataSearchQueryChanged(string value)
+    {
+        RefreshMetadataCommands();
+    }
+
     private void OnMetadataSourceChanged(object? sender, PropertyChangedEventArgs args)
     {
         if (args.PropertyName == nameof(MetadataSourceOption.IsSelected)) RefreshMetadataCommands();
     }
+
     private void RefreshMetadataCommands()
     {
         OnPropertyChanged(nameof(CanFindMetadata));
@@ -124,44 +167,62 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
         AddMatchExternalIdsCommand?.NotifyCanExecuteChanged();
     }
 
-    public Task InspectMetadataAsync() => ExecuteAsync(async ct =>
+    public Task InspectMetadataAsync()
     {
-        var track = GetInspectionTrack();
-        if (string.IsNullOrWhiteSpace(MetadataSearchQuery)) throw new ArgumentException(_text["SearchQueryRequired"]);
-        var targets = MetadataSources.Where(source => source.IsSelected).Select(source => source.Namespace).ToArray();
-        if (targets.Length == 0) throw new ArgumentException(_text["SelectMetadataSources"]);
-        var query = MetadataSearchQuery.Trim();
-        var result = await Task.Run(() => _host.Get<MetadataService>().LookupAsync(track, targets, limitPerSource: 20,
-            minimumConfidence: 0, cancellationToken: ct, searchKeyword: query), ct);
-        ct.ThrowIfCancellationRequested();
-        MetadataMatches.Clear();
-        foreach (var match in result.Matches) MetadataMatches.Add(new(match, _text, ReplaceMatchMetadataCommand, AddMatchExternalIdsCommand)
-            { ArtworkLoader = _host.Get<ArtworkService>() });
-        RefreshMetadataCommands();
-        InspectionMessages = FormatErrors(result.SourceErrors);
-        SetStatus("MetadataCompleted", result.Matches.Count);
-    });
+        return ExecuteAsync(async ct =>
+        {
+            var track = GetInspectionTrack();
+            if (string.IsNullOrWhiteSpace(MetadataSearchQuery))
+                throw new ArgumentException(_text["SearchQueryRequired"]);
+            var targets = MetadataSources.Where(source => source.IsSelected).Select(source => source.Namespace)
+                .ToArray();
+            if (targets.Length == 0) throw new ArgumentException(_text["SelectMetadataSources"]);
+            var query = MetadataSearchQuery.Trim();
+            var result = await Task.Run(() => _host.Get<MetadataService>().LookupAsync(track, targets,
+                20,
+                0, cancellationToken: ct, searchKeyword: query), ct);
+            ct.ThrowIfCancellationRequested();
+            MetadataMatches.Clear();
+            foreach (var match in result.Matches)
+                MetadataMatches.Add(
+                    new MetadataMatchRow(match, _text, ReplaceMatchMetadataCommand, AddMatchExternalIdsCommand)
+                        { ArtworkLoader = _host.Get<ArtworkService>() });
+            RefreshMetadataCommands();
+            InspectionMessages = FormatErrors(result.SourceErrors);
+            SetStatus("MetadataCompleted", result.Matches.Count);
+        });
+    }
 
-    public Task InspectLyricsAsync() => ExecuteAsync(async ct =>
+    public Task InspectLyricsAsync()
     {
-        var track = GetInspectionTrack();
-        var result = await Task.Run(() => _host.Get<LyricsService>().GetLyricsAsync(track, ct), ct);
-        _inspectedLyrics = result;
-        LyricsDetails = result.Lyrics is { } lyrics ? FormatLyricsDetails(lyrics, result.ProviderId) : _text["NoLyrics"];
-        InspectionMessages = FormatErrors(result.ProviderErrors);
-    });
+        return ExecuteAsync(async ct =>
+        {
+            var track = GetInspectionTrack();
+            var result = await Task.Run(() => _host.Get<LyricsService>().GetLyricsAsync(track, ct), ct);
+            _inspectedLyrics = result;
+            LyricsDetails = result.Lyrics is { } lyrics
+                ? FormatLyricsDetails(lyrics, result.ProviderId)
+                : _text["NoLyrics"];
+            InspectionMessages = FormatErrors(result.ProviderErrors);
+        });
+    }
 
-    public Task InspectSourcesAsync() => ExecuteAsync(async ct =>
+    public Task InspectSourcesAsync()
     {
-        var track = GetInspectionTrack();
-        var result = await Task.Run(() => _host.Get<PlaybackSourceDiscoveryService>().FindKnownAsync(track, cancellationToken: ct), ct);
-        DiscoveredSources.Clear();
-        foreach (var candidate in result.Candidates) DiscoveredSources.Add(new(candidate, _text));
-        _sourceTrack = track;
-        SelectedSource = DiscoveredSources.FirstOrDefault();
-        InspectionMessages = FormatErrors(result.ProviderErrors);
-        SetStatus("SourcesCompleted", result.Candidates.Count);
-    });
+        return ExecuteAsync(async ct =>
+        {
+            var track = GetInspectionTrack();
+            var result =
+                await Task.Run(
+                    () => _host.Get<PlaybackSourceDiscoveryService>().FindKnownAsync(track, cancellationToken: ct), ct);
+            DiscoveredSources.Clear();
+            foreach (var candidate in result.Candidates) DiscoveredSources.Add(new PlaybackSourceRow(candidate, _text));
+            _sourceTrack = track;
+            SelectedSource = DiscoveredSources.FirstOrDefault();
+            InspectionMessages = FormatErrors(result.ProviderErrors);
+            SetStatus("SourcesCompleted", result.Candidates.Count);
+        });
+    }
 
     private string FormatLyricsDetails(CoreLyrics lyrics, string? providerId)
     {
@@ -172,35 +233,55 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
             foreach (var line in lyrics.Lines)
             {
                 text.AppendLine($"{LyricTime(line.EffectiveStartTimeMs)}{line.Text}");
-                if (line.Translations is not null) foreach (var translation in line.Translations.Values) text.AppendLine(translation);
+                if (line.Translations is not null)
+                    foreach (var translation in line.Translations.Values)
+                        text.AppendLine(translation);
                 if (!string.IsNullOrWhiteSpace(line.Romanization)) text.AppendLine(line.Romanization);
             }
         else text.AppendLine(lyrics.Text);
+
         text.AppendLine().AppendLine(_text["TranslationLabel"]);
-        if (lyrics.TranslationLines is { Count: > 0 }) foreach (var line in lyrics.TranslationLines) text.AppendLine($"{LyricTime(line.EffectiveStartTimeMs)}{line.Text}");
+        if (lyrics.TranslationLines is { Count: > 0 })
+            foreach (var line in lyrics.TranslationLines)
+                text.AppendLine($"{LyricTime(line.EffectiveStartTimeMs)}{line.Text}");
         else if (!string.IsNullOrWhiteSpace(lyrics.Translation)) text.AppendLine(lyrics.Translation);
         text.AppendLine().AppendLine(_text["RomanizationLabel"]);
-        if (lyrics.RomanizationLines is { Count: > 0 }) foreach (var line in lyrics.RomanizationLines) text.AppendLine($"{LyricTime(line.StartTimeMs)}{line.Text}");
+        if (lyrics.RomanizationLines is { Count: > 0 })
+            foreach (var line in lyrics.RomanizationLines)
+                text.AppendLine($"{LyricTime(line.StartTimeMs)}{line.Text}");
         else if (!string.IsNullOrWhiteSpace(lyrics.Romanization)) text.AppendLine(lyrics.Romanization);
         return text.ToString();
     }
-    private static string LyricTime(int? milliseconds) => milliseconds is { } time ? $"[{TimeSpan.FromMilliseconds(time):mm\\:ss\\.fff}] " : "";
+
+    private static string LyricTime(int? milliseconds)
+    {
+        return milliseconds is { } time ? $"[{TimeSpan.FromMilliseconds(time):mm\\:ss\\.fff}] " : "";
+    }
 
     private void OnLibraryChanged(object? sender, EventArgs args)
     {
         TargetPlaylist = Playlists.FirstOrDefault(p => p.Id == TargetPlaylist?.Id) ?? Playlists.FirstOrDefault();
     }
+
     protected override void RaiseInteractionProperties()
     {
-        base.RaiseInteractionProperties(); OnPropertyChanged(nameof(CanSaveEditor)); RefreshMetadataCommands();
+        base.RaiseInteractionProperties();
+        OnPropertyChanged(nameof(CanSaveEditor));
+        RefreshMetadataCommands();
     }
+
     protected override void RefreshLocalizedProperties()
     {
         base.RefreshLocalizedProperties();
-        if (_inspectedLyrics is { } result) LyricsDetails = result.Lyrics is { } lyrics ? FormatLyricsDetails(lyrics, result.ProviderId) : _text["NoLyrics"];
+        if (_inspectedLyrics is { } result)
+            LyricsDetails = result.Lyrics is { } lyrics
+                ? FormatLyricsDetails(lyrics, result.ProviderId)
+                : _text["NoLyrics"];
         foreach (var row in MetadataMatches) row.RefreshLocalizedProperties();
-        for (var i = 0; i < DiscoveredSources.Count; i++) DiscoveredSources[i] = new(DiscoveredSources[i].Candidate, _text);
+        for (var i = 0; i < DiscoveredSources.Count; i++)
+            DiscoveredSources[i] = new PlaybackSourceRow(DiscoveredSources[i].Candidate, _text);
     }
+
     public override async ValueTask DisposeAsync()
     {
         Context.LibraryChanged -= OnLibraryChanged;

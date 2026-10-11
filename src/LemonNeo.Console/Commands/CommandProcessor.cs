@@ -1,3 +1,4 @@
+using System.Text;
 using LemonNeo.Abstractions.Playback;
 using LemonNeo.Abstractions.Plugins;
 using LemonNeo.Abstractions.Providers;
@@ -9,10 +10,8 @@ using LemonNeo.Application.Playback;
 using LemonNeo.Application.Providers;
 using LemonNeo.Core.Exceptions;
 using LemonNeo.Core.Library;
-using LemonNeo.Core.Lyrics;
 using LemonNeo.Core.Music;
 using LemonNeo.Core.Playback;
-using System.Text;
 
 namespace LemonNeo.ConsoleApp;
 
@@ -38,26 +37,22 @@ internal sealed partial class CommandProcessor(
     CommandCompletionService completions,
     CommandHistory history)
 {
-    private readonly TextWriter _output = global::System.Console.Out;
+    private readonly TextWriter _output = Console.Out;
 
     public async Task<bool> RunStartupAsync(CancellationToken cancellationToken)
     {
         var lines = await startup.LoadAsync(cancellationToken);
         for (var index = 0; index < lines.Length; index++)
-        {
             try
             {
-                if (!await ExecuteAsync(lines[index], cancellationToken))
-                {
-                    return false;
-                }
+                if (!await ExecuteAsync(lines[index], cancellationToken)) return false;
             }
             catch (Exception exception) when (exception is LemonNeoException or ArgumentException or
-                                             InvalidOperationException or IOException or UnauthorizedAccessException)
+                                                  InvalidOperationException or IOException
+                                                  or UnauthorizedAccessException)
             {
                 _output.WriteLine($"Startup error ({startup.FilePath}:{index + 1}): {exception.Message}");
             }
-        }
 
         return true;
     }
@@ -76,28 +71,23 @@ internal sealed partial class CommandProcessor(
             if (editor is null)
             {
                 _output.Write("lemon > ");
-                line = await global::System.Console.In.ReadLineAsync(cancellationToken);
+                line = await Console.In.ReadLineAsync(cancellationToken);
             }
             else
             {
                 line = editor.ReadLine(cancellationToken);
             }
 
-            if (line is null)
-            {
-                return;
-            }
+            if (line is null) return;
 
             try
             {
                 await history.RecordAsync(line, cancellationToken);
-                if (!await ExecuteAsync(line, cancellationToken))
-                {
-                    return;
-                }
+                if (!await ExecuteAsync(line, cancellationToken)) return;
             }
             catch (Exception exception) when (exception is LemonNeoException or ArgumentException or
-                                             InvalidOperationException or IOException or UnauthorizedAccessException)
+                                                  InvalidOperationException or IOException
+                                                  or UnauthorizedAccessException)
             {
                 _output.WriteLine($"Error: {exception.Message}");
             }
@@ -106,16 +96,10 @@ internal sealed partial class CommandProcessor(
 
     public async Task<bool> ExecuteAsync(string line, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(line) || line.TrimStart().StartsWith('#'))
-        {
-            return true;
-        }
+        if (string.IsNullOrWhiteSpace(line) || line.TrimStart().StartsWith('#')) return true;
 
         var arguments = Tokenize(line);
-        if (arguments.Count == 0)
-        {
-            return true;
-        }
+        if (arguments.Count == 0) return true;
 
         var command = arguments[0].ToLowerInvariant();
         switch (command)
@@ -212,13 +196,9 @@ internal sealed partial class CommandProcessor(
                 break;
             case "playlist":
                 if (arguments.Count == 1)
-                {
                     PrintPlaylists();
-                }
                 else
-                {
                     PrintPlaylist(ResolvePlaylist(string.Join(' ', arguments.Skip(1))));
-                }
                 break;
             case "show-playlist":
                 Require(arguments, 2, "show-playlist <id>");
@@ -253,9 +233,7 @@ internal sealed partial class CommandProcessor(
                 var movedPlaylist = ResolvePlaylist(arguments[1]);
                 var movedItem = ResolvePlaylistItem(movedPlaylist, arguments[2]);
                 if (!int.TryParse(arguments[3], out var position))
-                {
                     throw new ArgumentException("Position must be a positive integer.");
-                }
                 playlists.Move(movedPlaylist.Id, movedItem.Id, position);
                 await library.SaveAsync(cancellationToken);
                 _output.WriteLine($"Moved item {movedItem.Id} to position {position}.");
@@ -343,6 +321,7 @@ internal sealed partial class CommandProcessor(
                 {
                     throw new ArgumentException("Usage: queue [clear]");
                 }
+
                 break;
             case "save":
                 await library.SaveAsync(cancellationToken);
@@ -380,9 +359,7 @@ internal sealed partial class CommandProcessor(
         _output.WriteLine("COMMANDS");
         var usageWidth = CommandCatalog.Commands.Max(command => command.Usage.Length) + 2;
         foreach (var command in CommandCatalog.Commands)
-        {
             _output.WriteLine($"  {command.Usage.PadRight(usageWidth)}{command.Description}");
-        }
 
         _output.WriteLine();
         _output.WriteLine("PROVIDER PARAMETERS");
@@ -413,7 +390,8 @@ internal sealed partial class CommandProcessor(
             _output.WriteLine($"[Plugin] {manifest.Id} | {manifest.Name} {manifest.Version}");
             _output.WriteLine($"  Entry assembly: {manifest.EntryAssembly}");
             if (plugin.IsInteractive) _output.WriteLine("  Type: Interactive");
-            if (manifest.Platforms.Count > 0) _output.WriteLine($"  Platforms: {string.Join(", ", manifest.Platforms)}");
+            if (manifest.Platforms.Count > 0)
+                _output.WriteLine($"  Platforms: {string.Join(", ", manifest.Platforms)}");
             _output.WriteLine($"  Minimum host version: {manifest.MinimumHostVersion}");
             _output.WriteLine($"  Permissions: {string.Join(", ", manifest.Permissions)}");
             foreach (var provider in plugin.ProviderIds.Select(providers.Get).OfType<IMusicProvider>())
@@ -422,30 +400,27 @@ internal sealed partial class CommandProcessor(
                 _output.WriteLine($"    {provider.Descriptor.Description}");
                 _output.WriteLine($"    Capabilities: {string.Join(", ", GetCapabilities(provider))}");
                 if (provider is ISearchNamespaceProvider searchProvider)
-                {
                     _output.WriteLine($"    Search namespaces: {string.Join(", ", searchProvider.SearchNamespaces)}");
-                }
                 if (provider is IMetadataProvider metadataProvider)
-                {
-                    _output.WriteLine($"    Metadata namespaces: {string.Join(", ", metadataProvider.MetadataNamespaces)}");
-                }
+                    _output.WriteLine(
+                        $"    Metadata namespaces: {string.Join(", ", metadataProvider.MetadataNamespaces)}");
                 if (provider is IPlaybackProvider sourceProvider && sourceProvider.AcceptedIdSchemes.Count > 0)
-                {
-                    _output.WriteLine($"    Accepted IDs: {string.Join(", ", sourceProvider.AcceptedIdSchemes.Select(scheme => $"{scheme.Namespace}:{scheme.Kind ?? "-"}"))}");
-                }
+                    _output.WriteLine(
+                        $"    Accepted IDs: {string.Join(", ", sourceProvider.AcceptedIdSchemes.Select(scheme => $"{scheme.Namespace}:{scheme.Kind ?? "-"}"))}");
             }
+
             foreach (var player in plugin.PlayerIds.Select(playersRegistry.Get).OfType<IPlayerProvider>())
             {
                 _output.WriteLine($"  Player: {player.Id} | {player.Descriptor.Name}");
                 _output.WriteLine($"    {player.Descriptor.Description}");
                 if (player.SupportedExtensions.Count > 0)
-                    _output.WriteLine($"    Formats: {string.Join(", ", player.SupportedExtensions.Order(StringComparer.OrdinalIgnoreCase))}");
+                    _output.WriteLine(
+                        $"    Formats: {string.Join(", ", player.SupportedExtensions.Order(StringComparer.OrdinalIgnoreCase))}");
             }
         }
+
         foreach (var failure in plugins.LastReport.Failures)
-        {
             _output.WriteLine($"Plugin load failed ({failure.ManifestPath}): {failure.Error}");
-        }
     }
 
     private void PrintProviders()
@@ -464,7 +439,8 @@ internal sealed partial class CommandProcessor(
             _output.WriteLine($"{player.Id} | {player.Descriptor.Name}");
             _output.WriteLine($"  {player.Descriptor.Description}");
             if (player.SupportedExtensions.Count > 0)
-                _output.WriteLine($"  Formats: {string.Join(", ", player.SupportedExtensions.Order(StringComparer.OrdinalIgnoreCase))}");
+                _output.WriteLine(
+                    $"  Formats: {string.Join(", ", player.SupportedExtensions.Order(StringComparer.OrdinalIgnoreCase))}");
         }
     }
 
@@ -493,10 +469,7 @@ internal sealed partial class CommandProcessor(
         _output.WriteLine(
             $"Authenticated: {provider.State.AccountName ?? provider.State.UserId ?? providerId} " +
             $"({provider.State.UserId ?? "unknown id"})");
-        if (provider.State.AvatarUri is not null)
-        {
-            _output.WriteLine($"Avatar: {provider.State.AvatarUri}");
-        }
+        if (provider.State.AvatarUri is not null) _output.WriteLine($"Avatar: {provider.State.AvatarUri}");
     }
 
     private async Task LoginAsync(
@@ -506,9 +479,7 @@ internal sealed partial class CommandProcessor(
         var provider = GetAuthenticationProvider(arguments[1]);
         var methods = await provider.GetAvailableMethodsAsync(cancellationToken);
         if (!methods.Contains(AuthMethod.Cookie))
-        {
             throw new ProviderException($"Provider '{arguments[1]}' does not support cookie login.");
-        }
 
         string? cookie;
         if (arguments.Count > 2)
@@ -518,13 +489,10 @@ internal sealed partial class CommandProcessor(
         else
         {
             _output.Write("Paste the complete site cookie: ");
-            cookie = await global::System.Console.In.ReadLineAsync(cancellationToken);
+            cookie = await Console.In.ReadLineAsync(cancellationToken);
         }
 
-        if (string.IsNullOrWhiteSpace(cookie))
-        {
-            throw new ArgumentException("A cookie value is required.");
-        }
+        if (string.IsNullOrWhiteSpace(cookie)) throw new ArgumentException("A cookie value is required.");
 
         var state = await provider.AuthenticateAsync(
             new AuthenticationRequest(
@@ -562,9 +530,9 @@ internal sealed partial class CommandProcessor(
     {
         var results = await search.SearchAsync(
             keyword,
-            providerId: null,
-            sourceNamespace: sourceNamespace,
-            cancellationToken: cancellationToken);
+            null,
+            sourceNamespace,
+            cancellationToken);
         var populatedResults = results.Where(result => result.Tracks.Count > 0).ToArray();
         if (populatedResults.Length == 0)
         {
@@ -603,18 +571,14 @@ internal sealed partial class CommandProcessor(
                 index + 1 >= arguments.Count ||
                 string.IsNullOrWhiteSpace(arguments[index + 1]) ||
                 arguments[index + 1].StartsWith("--", StringComparison.Ordinal))
-            {
                 throw new ArgumentException("Usage: search <keyword> [--source <namespace>]");
-            }
 
             sourceNamespace = arguments[++index];
         }
 
         var keyword = string.Join(' ', keywordParts);
         if (string.IsNullOrWhiteSpace(keyword))
-        {
             throw new ArgumentException("Usage: search <keyword> [--source <namespace>]");
-        }
 
         return (keyword, sourceNamespace);
     }
@@ -635,10 +599,7 @@ internal sealed partial class CommandProcessor(
             track,
             targetNamespaces,
             cancellationToken: cancellationToken);
-        if (result.Matches.Count == 0)
-        {
-            _output.WriteLine("No metadata matches found.");
-        }
+        if (result.Matches.Count == 0) _output.WriteLine("No metadata matches found.");
 
         foreach (var match in result.Matches)
         {
@@ -646,20 +607,11 @@ internal sealed partial class CommandProcessor(
             _output.WriteLine(
                 $"{match.SourceNamespace} | {match.Confidence:P0} | {match.MatchLevel} | " +
                 $"{value.Title} - {string.Join(", ", value.Artists.Select(artist => artist.Name))}");
-            if (!string.IsNullOrWhiteSpace(value.Album?.Title))
-            {
-                _output.WriteLine($"  Album: {value.Album.Title}");
-            }
+            if (!string.IsNullOrWhiteSpace(value.Album?.Title)) _output.WriteLine($"  Album: {value.Album.Title}");
 
-            if (value.Duration is { } duration)
-            {
-                _output.WriteLine($"  Duration: {duration:mm\\:ss}");
-            }
+            if (value.Duration is { } duration) _output.WriteLine($"  Duration: {duration:mm\\:ss}");
 
-            foreach (var id in value.ExternalIds)
-            {
-                PrintExternalId(id);
-            }
+            foreach (var id in value.ExternalIds) PrintExternalId(id);
         }
 
         PrintErrors("Metadata source errors", result.SourceErrors);
@@ -676,13 +628,11 @@ internal sealed partial class CommandProcessor(
             return;
         }
 
-        _output.WriteLine($"Enriched: {enriched.Title} - {string.Join(", ", enriched.Artists.Select(artist => artist.Name))}");
+        _output.WriteLine(
+            $"Enriched: {enriched.Title} - {string.Join(", ", enriched.Artists.Select(artist => artist.Name))}");
         _output.WriteLine("This standalone result is transient; use match-playlist to persist metadata in a playlist.");
         _output.WriteLine($"External IDs: {enriched.ExternalIds.Count}");
-        foreach (var id in enriched.ExternalIds)
-        {
-            PrintExternalId(id);
-        }
+        foreach (var id in enriched.ExternalIds) PrintExternalId(id);
 
         PrintErrors("Metadata source errors", lookup.SourceErrors);
     }
@@ -709,7 +659,7 @@ internal sealed partial class CommandProcessor(
             try
             {
                 var result = await metadata.MatchAndReplaceAsync(track, targetNamespaces, cancellationToken);
-                return (Original: track, Track: result.Track, Lookup: result.Lookup);
+                return (Original: track, result.Track, result.Lookup);
             }
             finally
             {
@@ -729,9 +679,7 @@ internal sealed partial class CommandProcessor(
             }
 
             foreach (var item in playlist.Items.Where(item => item.Track.Id == result.Original.Id))
-            {
                 item.Track = result.Track;
-            }
 
             matched++;
             var namespaces = result.Track.ExternalIds
@@ -769,13 +717,9 @@ internal sealed partial class CommandProcessor(
         _output.WriteLine(
             $"Lyrics: provider={result.ProviderId}, source={value.Source ?? "unknown"}, " +
             $"synchronized={value.IsSynchronized}, word-synchronized={value.IsWordSynchronized}");
-        if (value.SourceId is { } sourceId)
-        {
-            PrintExternalId(sourceId);
-        }
+        if (value.SourceId is { } sourceId) PrintExternalId(sourceId);
 
         if (value.Lines is { Count: > 0 } lines)
-        {
             foreach (var line in lines)
             {
                 var timestamp = line.StartTimeMs is { } milliseconds
@@ -783,19 +727,11 @@ internal sealed partial class CommandProcessor(
                     : string.Empty;
                 _output.WriteLine($"{timestamp}{line.Text}");
                 if (line.Translations is { Count: > 0 })
-                {
                     _output.WriteLine($"  {string.Join(" / ", line.Translations.Values)}");
-                }
-                if (!string.IsNullOrWhiteSpace(line.Romanization))
-                {
-                    _output.WriteLine($"  {line.Romanization}");
-                }
+                if (!string.IsNullOrWhiteSpace(line.Romanization)) _output.WriteLine($"  {line.Romanization}");
             }
-        }
         else
-        {
             _output.WriteLine(value.Text);
-        }
 
         if (value.TranslationLines is { Count: > 0 })
         {
@@ -803,7 +739,8 @@ internal sealed partial class CommandProcessor(
             foreach (var line in value.TranslationLines)
             {
                 var timestamp = line.EffectiveStartTimeMs is { } start
-                    ? $"[{TimeSpan.FromMilliseconds(start):mm\\:ss\\.fff}] " : string.Empty;
+                    ? $"[{TimeSpan.FromMilliseconds(start):mm\\:ss\\.fff}] "
+                    : string.Empty;
                 _output.WriteLine($"  {timestamp}{line.Text}");
             }
         }
@@ -811,14 +748,14 @@ internal sealed partial class CommandProcessor(
         {
             _output.WriteLine($"Translation:{Environment.NewLine}{value.Translation}");
         }
+
         if (value.RomanizationLines is { Count: > 0 })
         {
             _output.WriteLine(value.RomanizationLines.All(line => line.IsWordSynchronized)
-                ? "Romanization (word-synchronized):" : "Romanization:");
+                ? "Romanization (word-synchronized):"
+                : "Romanization:");
             foreach (var line in value.RomanizationLines)
-            {
                 _output.WriteLine($"  [{TimeSpan.FromMilliseconds(line.StartTimeMs ?? 0):mm\\:ss\\.fff}] {line.Text}");
-            }
         }
         else if (!string.IsNullOrWhiteSpace(value.Romanization))
         {
@@ -832,10 +769,7 @@ internal sealed partial class CommandProcessor(
     {
         var track = await GetTrackAsync(providerId, trackId, cancellationToken);
         var result = await sourceDiscovery.FindKnownAsync(track, cancellationToken: cancellationToken);
-        if (result.Candidates.Count == 0)
-        {
-            _output.WriteLine("No playable source found.");
-        }
+        if (result.Candidates.Count == 0) _output.WriteLine("No playable source found.");
 
         foreach (var candidate in result.Candidates)
         {
@@ -853,22 +787,18 @@ internal sealed partial class CommandProcessor(
         PrintErrors("Source discovery errors", result.ProviderErrors);
     }
 
-    private void PrintExternalId(ExternalMusicId id) =>
+    private void PrintExternalId(ExternalMusicId id)
+    {
         _output.WriteLine(
             $"  ID: namespace={id.Namespace}, kind={id.Kind ?? "-"}, value={id.Value}");
+    }
 
     private void PrintErrors(string heading, IReadOnlyDictionary<string, string> errors)
     {
-        if (errors.Count == 0)
-        {
-            return;
-        }
+        if (errors.Count == 0) return;
 
         _output.WriteLine($"{heading}:");
-        foreach (var error in errors)
-        {
-            _output.WriteLine($"  {error.Key}: {error.Value}");
-        }
+        foreach (var error in errors) _output.WriteLine($"  {error.Key}: {error.Value}");
     }
 
     private async Task PrintRemotePlaylistsAsync(string providerId, CancellationToken cancellationToken)
@@ -904,11 +834,9 @@ internal sealed partial class CommandProcessor(
 
         var flatIndex = 1;
         await foreach (var playlist in playlistProvider.GetUserPlaylistsAsync(cancellationToken))
-        {
             _output.WriteLine(
                 $"{flatIndex++}. {playlist.Name} ({playlist.Id}) " +
                 $"[{playlist.TrackCount?.ToString() ?? "unknown"} tracks]");
-        }
     }
 
     private async Task ImportAsync(string providerId, string remoteId, CancellationToken cancellationToken)
@@ -948,18 +876,13 @@ internal sealed partial class CommandProcessor(
         }
 
         foreach (var playlist in library.Current.Playlists.OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase))
-        {
             _output.WriteLine($"{playlist.Id} | {playlist.Name} | {playlist.Items.Count} tracks");
-        }
     }
 
     private void PrintPlaylist(Playlist playlist)
     {
         _output.WriteLine($"{playlist.Name} ({playlist.Id})");
-        if (!string.IsNullOrWhiteSpace(playlist.Description))
-        {
-            _output.WriteLine(playlist.Description);
-        }
+        if (!string.IsNullOrWhiteSpace(playlist.Description)) _output.WriteLine(playlist.Description);
 
         var index = 1;
         foreach (var item in playlist.Items
@@ -969,20 +892,20 @@ internal sealed partial class CommandProcessor(
             var externalIdInitials = string.Concat(item.Track.ExternalIds
                 .Where(id => !string.IsNullOrEmpty(id.Namespace))
                 .Select(id => id.Namespace[0]));
-            _output.WriteLine($"{index++} | {item.Track.Title ?? item.Track.Id.RemoteId} | {item.Track.Id} | {externalIdInitials}");
+            _output.WriteLine(
+                $"{index++} | {item.Track.Title ?? item.Track.Id.RemoteId} | {item.Track.Id} | {externalIdInitials}");
         }
     }
 
     private async Task CreatePlaylistAsync(IReadOnlyList<string> arguments, CancellationToken cancellationToken)
     {
         var fieldStart = 1;
-        while (fieldStart < arguments.Count && !arguments[fieldStart].StartsWith("--", StringComparison.Ordinal))
-        {
-            fieldStart++;
-        }
+        while (fieldStart < arguments.Count &&
+               !arguments[fieldStart].StartsWith("--", StringComparison.Ordinal)) fieldStart++;
         var name = string.Join(' ', arguments.Skip(1).Take(fieldStart - 1));
         var fields = ParseFields(arguments, fieldStart, "description");
-        var playlist = playlists.Create(name, fields.TryGetValue("description", out var description) ? NullIfEmpty(description) : null);
+        var playlist = playlists.Create(name,
+            fields.TryGetValue("description", out var description) ? NullIfEmpty(description) : null);
         await library.SaveAsync(cancellationToken);
         _output.WriteLine($"Created \"{playlist.Name}\" ({playlist.Id}).");
     }
@@ -1006,9 +929,7 @@ internal sealed partial class CommandProcessor(
         var parsedItemId = ResolvePlaylistItem(playlist, itemId).Id;
 
         if (!playlists.Remove(playlist.Id, parsedItemId))
-        {
             throw new ArgumentException($"Playlist item '{itemId}' was not found.");
-        }
 
         await library.SaveAsync(cancellationToken);
         _output.WriteLine("Playlist item removed.");
@@ -1053,17 +974,12 @@ internal sealed partial class CommandProcessor(
 
     private static string? ParseRequiredSource(IReadOnlyList<string> arguments)
     {
-        if (arguments.Count == 3)
-        {
-            return null;
-        }
+        if (arguments.Count == 3) return null;
 
         if (arguments.Count == 5 &&
             string.Equals(arguments[3], "--source", StringComparison.OrdinalIgnoreCase) &&
             !string.IsNullOrWhiteSpace(arguments[4]))
-        {
             return arguments[4];
-        }
 
         throw new ArgumentException(
             "Usage: play <track-provider> <track-id> [--source <source-provider>]");
@@ -1078,9 +994,7 @@ internal sealed partial class CommandProcessor(
             !string.Equals(arguments[argumentIndex], "--source", StringComparison.OrdinalIgnoreCase))
         {
             if (!int.TryParse(arguments[argumentIndex], out startNumber) || startNumber < 1)
-            {
                 throw new ArgumentException("Playlist start number must be a positive integer.");
-            }
 
             argumentIndex++;
         }
@@ -1091,10 +1005,8 @@ internal sealed partial class CommandProcessor(
             if (argumentIndex + 2 != arguments.Count ||
                 !string.Equals(arguments[argumentIndex], "--source", StringComparison.OrdinalIgnoreCase) ||
                 string.IsNullOrWhiteSpace(arguments[argumentIndex + 1]))
-            {
                 throw new ArgumentException(
                     "Usage: play-playlist <playlist> [start-number] [--source <source-provider>]");
-            }
 
             requiredSourceProviderId = arguments[argumentIndex + 1];
         }
@@ -1102,21 +1014,27 @@ internal sealed partial class CommandProcessor(
         return (startNumber - 1, requiredSourceProviderId);
     }
 
-    private static PlaybackMode ParsePlaybackMode(string value) => value.ToLowerInvariant() switch
+    private static PlaybackMode ParsePlaybackMode(string value)
     {
-        "sequential" or "sequence" => PlaybackMode.Sequential,
-        "repeat" or "loop" => PlaybackMode.RepeatAll,
-        "shuffle" or "random" => PlaybackMode.Shuffle,
-        _ => throw new ArgumentException("Playback mode must be sequential, repeat, or shuffle.")
-    };
+        return value.ToLowerInvariant() switch
+        {
+            "sequential" or "sequence" => PlaybackMode.Sequential,
+            "repeat" or "loop" => PlaybackMode.RepeatAll,
+            "shuffle" or "random" => PlaybackMode.Shuffle,
+            _ => throw new ArgumentException("Playback mode must be sequential, repeat, or shuffle.")
+        };
+    }
 
-    private static string FormatPlaybackMode(PlaybackMode mode) => mode switch
+    private static string FormatPlaybackMode(PlaybackMode mode)
     {
-        PlaybackMode.Sequential => "sequential",
-        PlaybackMode.RepeatAll => "repeat",
-        PlaybackMode.Shuffle => "shuffle",
-        _ => mode.ToString()
-    };
+        return mode switch
+        {
+            PlaybackMode.Sequential => "sequential",
+            PlaybackMode.RepeatAll => "repeat",
+            PlaybackMode.Shuffle => "shuffle",
+            _ => mode.ToString()
+        };
+    }
 
     private void PrintQueue()
     {
@@ -1143,9 +1061,7 @@ internal sealed partial class CommandProcessor(
         var snapshot = playback.GetCurrentSnapshot();
         _output.WriteLine($"State: {snapshot.State}");
         if (snapshot.RestoredStatus is { } restoredStatus)
-        {
             _output.WriteLine($"Saved state: {restoredStatus} (use resume or play-current to continue)");
-        }
         _output.WriteLine($"Mode: {FormatPlaybackMode(snapshot.Mode)}");
         if (snapshot.CurrentTrack is not { } track)
         {
@@ -1153,13 +1069,11 @@ internal sealed partial class CommandProcessor(
             return;
         }
 
-        _output.WriteLine($"Track: {track.Title} - {string.Join(", ", track.Artists.Select(a => a.Name))} ({track.Id})");
+        _output.WriteLine(
+            $"Track: {track.Title} - {string.Join(", ", track.Artists.Select(a => a.Name))} ({track.Id})");
         _output.WriteLine($"Album: {track.Album?.Title}");
         _output.WriteLine($"External IDs: {track.ExternalIds.Count}");
-        foreach (var id in track.ExternalIds)
-        {
-            PrintExternalId(id);
-        }
+        foreach (var id in track.ExternalIds) PrintExternalId(id);
 
         _output.WriteLine(
             $"Timeline: {FormatTime(snapshot.Timeline.Position)} / " +
@@ -1170,17 +1084,17 @@ internal sealed partial class CommandProcessor(
             $"Source: {snapshot.RequiredSourceProviderId ?? "automatic"}");
     }
 
-    private static string FormatTime(TimeSpan value) => value.TotalHours >= 1
-        ? $"{(int)value.TotalHours}:{value.Minutes:00}:{value.Seconds:00}"
-        : $"{(int)value.TotalMinutes}:{value.Seconds:00}";
+    private static string FormatTime(TimeSpan value)
+    {
+        return value.TotalHours >= 1
+            ? $"{(int)value.TotalHours}:{value.Minutes:00}:{value.Seconds:00}"
+            : $"{(int)value.TotalMinutes}:{value.Seconds:00}";
+    }
 
     private Playlist ResolvePlaylist(string value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value);
-        if (Guid.TryParse(value, out var id))
-        {
-            return playlists.GetRequired(id);
-        }
+        if (Guid.TryParse(value, out var id)) return playlists.GetRequired(id);
 
         var matches = library.Current.Playlists
             .Where(playlist => playlist.Id.ToString().StartsWith(value, StringComparison.OrdinalIgnoreCase) ||
@@ -1210,21 +1124,16 @@ internal sealed partial class CommandProcessor(
     private void ValidatePlaybackSourceProvider(string? providerId)
     {
         if (providerId is not null)
-        {
             ProviderParameterRules.GetRequired(
                 providers,
                 providerId,
                 ProviderParameterRole.PlaybackSource,
                 playbackSources);
-        }
     }
 
     private static void Require(IReadOnlyCollection<string> arguments, int count, string usage)
     {
-        if (arguments.Count < count)
-        {
-            throw new ArgumentException($"Usage: {usage}");
-        }
+        if (arguments.Count < count) throw new ArgumentException($"Usage: {usage}");
     }
 
     internal static IReadOnlyList<string> Tokenize(string input)
@@ -1235,7 +1144,6 @@ internal sealed partial class CommandProcessor(
         var tokenStarted = false;
 
         foreach (var character in input)
-        {
             if (character == '"')
             {
                 quoted = !quoted;
@@ -1255,17 +1163,10 @@ internal sealed partial class CommandProcessor(
                 current.Append(character);
                 tokenStarted = true;
             }
-        }
 
-        if (quoted)
-        {
-            throw new ArgumentException("Unterminated quoted argument.");
-        }
+        if (quoted) throw new ArgumentException("Unterminated quoted argument.");
 
-        if (tokenStarted)
-        {
-            result.Add(current.ToString());
-        }
+        if (tokenStarted) result.Add(current.ToString());
 
         return result;
     }

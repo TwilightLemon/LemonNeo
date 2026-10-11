@@ -1,20 +1,28 @@
+using System.Runtime.CompilerServices;
 using LemonNeo.Core.Lyrics;
 using LyricsModel = LemonNeo.Core.Lyrics.Lyrics;
-using System.Runtime.CompilerServices;
 
 namespace LemonNeo.Application.Lyrics;
 
 /// <summary>One main lyric row and the auxiliary lines associated with its timeline.</summary>
-public sealed record LyricDocumentRow(LyricsLine Main, IReadOnlyList<LyricsLine> Romanization, IReadOnlyList<LyricsLine> Translation)
+public sealed record LyricDocumentRow(
+    LyricsLine Main,
+    IReadOnlyList<LyricsLine> Romanization,
+    IReadOnlyList<LyricsLine> Translation)
 {
     // Auxiliary files may contain empty end cues. They must not erase the content of a main lyric row.
-    public static LyricsLine? SelectAuxiliary(IReadOnlyList<LyricsLine> lines, double positionMs) =>
-        lines.LastOrDefault(l => HasContent(l) && l.EffectiveStartTimeMs is { } start && start <= positionMs)
-        ?? lines.FirstOrDefault(HasContent);
+    public static LyricsLine? SelectAuxiliary(IReadOnlyList<LyricsLine> lines, double positionMs)
+    {
+        return lines.LastOrDefault(l => HasContent(l) && l.EffectiveStartTimeMs is { } start && start <= positionMs)
+               ?? lines.FirstOrDefault(HasContent);
+    }
 
-    private static bool HasContent(LyricsLine line) => line.IsWordSynchronized
-        ? line.Words!.Any(word => !string.IsNullOrWhiteSpace(word.Text))
-        : !string.IsNullOrWhiteSpace(line.Text);
+    private static bool HasContent(LyricsLine line)
+    {
+        return line.IsWordSynchronized
+            ? line.Words!.Any(word => !string.IsNullOrWhiteSpace(word.Text))
+            : !string.IsNullOrWhiteSpace(line.Text);
+    }
 }
 
 /// <summary>Aligns independent lyric files to the main timeline without changing the provider's original data.</summary>
@@ -23,7 +31,10 @@ public static class LyricsDocument
     public const int AuxiliaryToleranceMs = 250;
     private static readonly ConditionalWeakTable<LyricsModel, IReadOnlyList<LyricDocumentRow>> Documents = new();
 
-    public static IReadOnlyList<LyricDocumentRow> Create(LyricsModel lyrics) => Documents.GetValue(lyrics, Build);
+    public static IReadOnlyList<LyricDocumentRow> Create(LyricsModel lyrics)
+    {
+        return Documents.GetValue(lyrics, Build);
+    }
 
     private static IReadOnlyList<LyricDocumentRow> Build(LyricsModel lyrics)
     {
@@ -32,24 +43,32 @@ public static class LyricsDocument
             : PlainLines(lyrics.Text).Select(text => new LyricsLine(text)).ToArray();
         var timed = main.Select((line, index) => (Index: index, Start: line.EffectiveStartTimeMs))
             .Where(line => line.Start is not null).Select(line => (line.Index, Start: line.Start!.Value)).ToArray();
-        var romanization = Associate(lyrics.RomanizationLines?.Select(l => new LyricsLine(l.Text, l.StartTimeMs, l.EndTimeMs, Words: l.Words)).ToArray() ?? [], main, timed);
+        var romanization =
+            Associate(
+                lyrics.RomanizationLines
+                    ?.Select(l => new LyricsLine(l.Text, l.StartTimeMs, l.EndTimeMs, Words: l.Words)).ToArray() ?? [],
+                main, timed);
         var translation = Associate(lyrics.TranslationLines ?? [], main, timed);
         var plainRomanization = LyricsTimeline.PlainAuxiliaryLines(lyrics.Romanization);
         var plainTranslation = LyricsTimeline.PlainAuxiliaryLines(lyrics.Translation);
         return main.Select((line, index) =>
         {
-            IReadOnlyList<LyricsLine> romanized = romanization[index];
-            IReadOnlyList<LyricsLine> translated = translation[index];
-            if (romanized.Count == 0 && (line.Romanization ?? plainRomanization.ElementAtOrDefault(index)) is { Length: > 0 } romanizedText)
-                romanized = [new(romanizedText, line.EffectiveStartTimeMs, line.EffectiveEndTimeMs)];
-            if (translated.Count == 0 && (line.Translations?.GetValueOrDefault("zh") ?? line.Translations?.Values.FirstOrDefault()
-                ?? plainTranslation.ElementAtOrDefault(index)) is { Length: > 0 } translatedText)
-                translated = [new(translatedText, line.EffectiveStartTimeMs, line.EffectiveEndTimeMs)];
+            var romanized = romanization[index];
+            var translated = translation[index];
+            if (romanized.Count == 0 && (line.Romanization ?? plainRomanization.ElementAtOrDefault(index)) is
+                { Length: > 0 } romanizedText)
+                romanized = [new LyricsLine(romanizedText, line.EffectiveStartTimeMs, line.EffectiveEndTimeMs)];
+            if (translated.Count == 0 && (line.Translations?.GetValueOrDefault("zh") ??
+                                          line.Translations?.Values.FirstOrDefault()
+                                          ?? plainTranslation.ElementAtOrDefault(index)) is
+                { Length: > 0 } translatedText)
+                translated = [new LyricsLine(translatedText, line.EffectiveStartTimeMs, line.EffectiveEndTimeMs)];
             return new LyricDocumentRow(line, romanized, translated);
         }).ToArray();
     }
 
-    private static IReadOnlyList<LyricsLine>[] Associate(IReadOnlyList<LyricsLine> auxiliary, LyricsLine[] main, (int Index, int Start)[] timed)
+    private static IReadOnlyList<LyricsLine>[] Associate(IReadOnlyList<LyricsLine> auxiliary, LyricsLine[] main,
+        (int Index, int Start)[] timed)
     {
         var result = main.Select(_ => new List<LyricsLine>()).ToArray();
         for (var index = 0; index < auxiliary.Count; index++)
@@ -60,15 +79,19 @@ public static class LyricsDocument
                 if (index < result.Length) result[index].Add(line);
                 continue;
             }
-            var low = 0; var high = timed.Length - 1;
+
+            var low = 0;
+            var high = timed.Length - 1;
             while (low <= high)
             {
                 var middle = (low + high) / 2;
                 if (timed[middle].Start <= start) low = middle + 1;
                 else high = middle - 1;
             }
+
             var nearest = Math.Clamp(high, 0, timed.Length - 1);
-            if (low < timed.Length && Math.Abs((long)timed[low].Start - start) < Math.Abs((long)timed[nearest].Start - start)) nearest = low;
+            if (low < timed.Length &&
+                Math.Abs((long)timed[low].Start - start) < Math.Abs((long)timed[nearest].Start - start)) nearest = low;
             if (Math.Abs((long)timed[nearest].Start - start) <= AuxiliaryToleranceMs)
             {
                 var target = timed[nearest];
@@ -77,11 +100,14 @@ public static class LyricsDocument
                 result[target.Index].Add(line with
                 {
                     StartTimeMs = target.Start,
-                    EndTimeMs = main[target.Index].EffectiveEndTimeMs ?? nextStart ?? (line.EffectiveEndTimeMs is { } end ? end + delta : null),
-                    Words = delta == 0 ? line.Words : line.Words?.Select(word => word with
-                    {
-                        StartTimeMs = word.StartTimeMs + delta, EndTimeMs = word.EndTimeMs + delta
-                    }).ToArray()
+                    EndTimeMs = main[target.Index].EffectiveEndTimeMs ??
+                                nextStart ?? (line.EffectiveEndTimeMs is { } end ? end + delta : null),
+                    Words = delta == 0
+                        ? line.Words
+                        : line.Words?.Select(word => word with
+                        {
+                            StartTimeMs = word.StartTimeMs + delta, EndTimeMs = word.EndTimeMs + delta
+                        }).ToArray()
                 });
             }
             else if (high >= 0)
@@ -93,9 +119,14 @@ public static class LyricsDocument
                 if (start < end) result[target.Index].Add(line);
             }
         }
-        return result.Select(lines => (IReadOnlyList<LyricsLine>)lines.OrderBy(l => l.EffectiveStartTimeMs).ToArray()).ToArray();
+
+        return result.Select(lines => (IReadOnlyList<LyricsLine>)lines.OrderBy(l => l.EffectiveStartTimeMs).ToArray())
+            .ToArray();
     }
 
-    private static string[] PlainLines(string? text) => text?.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
-        .Where(l => !string.IsNullOrWhiteSpace(l)).ToArray() ?? [];
+    private static string[] PlainLines(string? text)
+    {
+        return text?.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .Where(l => !string.IsNullOrWhiteSpace(l)).ToArray() ?? [];
+    }
 }

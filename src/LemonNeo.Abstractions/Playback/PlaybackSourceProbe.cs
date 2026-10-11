@@ -7,10 +7,10 @@ namespace LemonNeo.Abstractions.Playback;
 public static class PlaybackSourceProbe
 {
     /// <summary>
-    /// Reads the first 42 bytes of a FLAC resource using the supplied client and source headers.
-    /// Reports HiRes for bit depths above 16 or sample rates above 48 kHz, otherwise Lossless.
-    /// Returns null for unavailable or invalid headers, including a three-second probe timeout.
-    /// Cancellation requested by the caller is propagated.
+    ///     Reads the first 42 bytes of a FLAC resource using the supplied client and source headers.
+    ///     Reports HiRes for bit depths above 16 or sample rates above 48 kHz, otherwise Lossless.
+    ///     Returns null for unavailable or invalid headers, including a three-second probe timeout.
+    ///     Cancellation requested by the caller is propagated.
     /// </summary>
     public static async Task<AudioQuality?> ReadFlacQualityAsync(
         HttpClient httpClient,
@@ -27,7 +27,8 @@ public static class PlaybackSourceProbe
         message.Headers.Range = new RangeHeaderValue(0, 41);
         try
         {
-            using var response = await httpClient.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+            using var response =
+                await httpClient.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
             response.EnsureSuccessStatusCode();
             if (response.Content.Headers.ContentRange?.From is > 0) return null;
             await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);
@@ -41,7 +42,8 @@ public static class PlaybackSourceProbe
             var sampleRate = (header[18] << 12) | (header[19] << 4) | (header[20] >> 4);
             var bitDepth = (((header[20] & 1) << 4) | (header[21] >> 4)) + 1;
             if (sampleRate == 0 || bitDepth < 4) return null;
-            return AudioQualities.Classify(new AudioStreamInfo(SampleRateHz: sampleRate, BitsPerSample: bitDepth, IsLossless: true));
+            return AudioQualities.Classify(new AudioStreamInfo(SampleRateHz: sampleRate, BitsPerSample: bitDepth,
+                IsLossless: true));
         }
         catch (Exception exception) when (
             !cancellationToken.IsCancellationRequested &&

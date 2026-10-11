@@ -1,15 +1,19 @@
-using LemonNeo.Hosting;
+using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using LemonNeo.Desktop.Services;
 using LemonNeo.Desktop.Views.Shell;
+using LemonNeo.Hosting;
 
 namespace LemonNeo.Desktop;
 
-public partial class App : Avalonia.Application
+public class App : Avalonia.Application
 {
-    public override void Initialize() => AvaloniaXamlLoader.Load(this);
+    public override void Initialize()
+    {
+        AvaloniaXamlLoader.Load(this);
+    }
 
     public override void OnFrameworkInitializationCompleted()
     {
@@ -22,6 +26,7 @@ public partial class App : Avalonia.Application
             var applicationService = new DesktopApplicationService(this, window, paths);
             DesktopApplicationMenu? menu = null;
             DesktopLifetimeService? lifetime = null;
+
             async Task ShutdownAsync()
             {
                 menu?.Dispose();
@@ -32,9 +37,10 @@ public partial class App : Avalonia.Application
                 }
                 catch (Exception exception)
                 {
-                    System.Diagnostics.Trace.WriteLine($"Desktop shutdown failed: {exception}");
+                    Trace.WriteLine($"Desktop shutdown failed: {exception}");
                 }
             }
+
             async Task InitializeAsync()
             {
                 if (!await applicationService.InitializeAsync())
@@ -42,15 +48,19 @@ public partial class App : Avalonia.Application
                     desktop.Shutdown();
                     return;
                 }
+
                 if (lifetime is not null && (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()))
-                    menu = new DesktopApplicationMenu(this, lifetime, applicationService.ViewModel.Playback, applicationService.Text,
-                        useTrayIcon: OperatingSystem.IsWindows());
+                    menu = new DesktopApplicationMenu(this, lifetime, applicationService.ViewModel.Playback,
+                        applicationService.Text,
+                        OperatingSystem.IsWindows());
             }
+
             lifetime = new DesktopLifetimeService(desktop, window,
-                keepRunningOnClose: OperatingSystem.IsWindows() || OperatingSystem.IsMacOS(),
+                OperatingSystem.IsWindows() || OperatingSystem.IsMacOS(),
                 InitializeAsync, ShutdownAsync, this.TryGetFeature<IActivatableLifetime>(),
                 window.PrepareForBackground);
         }
+
         base.OnFrameworkInitializationCompleted();
     }
 }

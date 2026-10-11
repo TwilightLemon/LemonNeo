@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Logging;
-
 namespace LemonNeo.Abstractions.Providers;
 
 public sealed record ProviderDescriptor(string Name, string Description);

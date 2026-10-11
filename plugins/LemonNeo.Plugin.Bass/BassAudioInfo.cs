@@ -9,7 +9,8 @@ internal static class BassAudioInfo
     {
         var (codec, lossless) = channel?.ctype switch
         {
-            BASSChannelType.BASS_CTYPE_STREAM_FLAC or BASSChannelType.BASS_CTYPE_STREAM_FLAC_OGG => ("FLAC", (bool?)true),
+            BASSChannelType.BASS_CTYPE_STREAM_FLAC or BASSChannelType.BASS_CTYPE_STREAM_FLAC_OGG => ("FLAC",
+                (bool?)true),
             BASSChannelType.BASS_CTYPE_STREAM_ALAC => ("ALAC", true),
             BASSChannelType.BASS_CTYPE_STREAM_APE => ("APE", true),
             BASSChannelType.BASS_CTYPE_STREAM_WAV_PCM => ("PCM", true),
@@ -22,11 +23,13 @@ internal static class BassAudioInfo
             BASSChannelType.BASS_CTYPE_STREAM_OPUS => ("Opus", false),
             // Containers/platform codecs can contain lossy or lossless audio.
             // Do not claim losslessness based on an extension or a high bitrate.
-            _ => ((string?)null, null)
+            _ => (null, null)
         };
         var bits = channel?.origres & 0xffff; // BASS_ORIGRES_FLOAT lives outside the LOWORD.
-        return new(
-            bitrate is > 0 and < int.MaxValue && float.IsFinite(bitrate.Value) ? Math.Max(1, (int)Math.Round(bitrate.Value)) : null,
+        return new AudioStreamInfo(
+            bitrate is > 0 and < int.MaxValue && float.IsFinite(bitrate.Value)
+                ? Math.Max(1, (int)Math.Round(bitrate.Value))
+                : null,
             channel?.freq is > 0 ? channel.freq : null,
             bits is > 0 ? bits : null,
             channel?.chans is > 0 ? channel.chans : null,

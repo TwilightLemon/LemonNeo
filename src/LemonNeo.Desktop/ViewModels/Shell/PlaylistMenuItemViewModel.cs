@@ -1,5 +1,5 @@
-using LemonNeo.Core.Library;
 using CommunityToolkit.Mvvm.ComponentModel;
+using LemonNeo.Core.Library;
 
 namespace LemonNeo.Desktop.ViewModels.Shell;
 
@@ -15,8 +15,18 @@ public sealed class PlaylistMenuItemViewModel : ObservableObject
     }
 
     public Guid Id { get; }
-    public string Name { get => _name; private set => SetProperty(ref _name, value); }
-    public int TrackCount { get => _trackCount; private set => SetProperty(ref _trackCount, value); }
+
+    public string Name
+    {
+        get => _name;
+        private set => SetProperty(ref _name, value);
+    }
+
+    public int TrackCount
+    {
+        get => _trackCount;
+        private set => SetProperty(ref _trackCount, value);
+    }
 
     public void Update(Playlist playlist)
     {

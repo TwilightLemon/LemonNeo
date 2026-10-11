@@ -1,10 +1,11 @@
+using System.Text.Json;
 using LemonNeo.Abstractions.Plugins;
 using LemonNeo.Abstractions.Providers;
-using LemonNeo.Core.Lyrics;
 using LemonNeo.Core.Music;
-using System.Text.Json;
+using Lyricify.Lyrics.Decrypter.Krc;
 using Lyricify.Lyrics.Helpers;
 using Lyricify.Lyrics.Models;
+using Lyricify.Lyrics.Providers.Web.Spotify;
 using Lyricify.Lyrics.Searchers;
 using Lyricify.Lyrics.Searchers.Helpers;
 using Microsoft.Extensions.Logging;
@@ -25,6 +26,7 @@ public sealed class LyricifyMetadataPlugin :
 {
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan CatalogSearchRetryDelay = TimeSpan.FromMilliseconds(250);
+
     private static readonly SourceDefinition[] Sources =
     [
         new(MusicIdNamespaces.QQMusic, HelperSearchers.QQMusic),
@@ -36,6 +38,7 @@ public sealed class LyricifyMetadataPlugin :
         new(MusicIdNamespaces.SodaMusic, HelperSearchers.SodaMusic),
         new(MusicIdNamespaces.LrcLib, HelperSearchers.LRCLIB)
     ];
+
     private static readonly MusicIdScheme[] LyricsIdSchemes =
     [
         new(MusicIdNamespaces.QQMusic, "song-id"),
@@ -57,17 +60,6 @@ public sealed class LyricifyMetadataPlugin :
         "Lyricify Metadata & Lyrics",
         "1.0.0");
 
-    public string Id => "lyricify";
-
-    ProviderDescriptor IMusicProvider.Descriptor { get; } = new(
-        "Lyricify Metadata & Lyrics",
-        "Cross-platform search, metadata matching, and synchronized lyrics backed by Lyricify Lyrics Helper.");
-
-    public IReadOnlyCollection<string> MetadataNamespaces { get; } =
-        Sources.Select(source => source.Namespace).ToArray();
-
-    public IReadOnlyCollection<string> SearchNamespaces => MetadataNamespaces;
-
     public ValueTask InitializeAsync(IPluginContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -86,319 +78,6 @@ public sealed class LyricifyMetadataPlugin :
         _httpClient = null;
         _logger = null;
         return ValueTask.CompletedTask;
-    }
-
-    private static void ConfigureOptionalCredentials()
-    {
-        var spotifySpDc = Environment.GetEnvironmentVariable("LEMONNEO_SPOTIFY_SP_DC");
-        if (!string.IsNullOrWhiteSpace(spotifySpDc))
-        {
-            new global::Lyricify.Lyrics.Providers.Web.Spotify.Api().SetSpDc(spotifySpDc);
-        }
-
-        var appleMediaUserToken = Environment.GetEnvironmentVariable("LEMONNEO_APPLE_MUSIC_USER_TOKEN");
-        if (!string.IsNullOrWhiteSpace(appleMediaUserToken))
-        {
-            new global::Lyricify.Lyrics.Providers.Web.AppleMusic.Api()
-                .SetMediaUserToken(appleMediaUserToken);
-        }
-
-        var musixmatchUserToken = Environment.GetEnvironmentVariable("LEMONNEO_MUSIXMATCH_USER_TOKEN");
-        if (!string.IsNullOrWhiteSpace(musixmatchUserToken))
-        {
-            new global::Lyricify.Lyrics.Providers.Web.Musixmatch.Api()
-                .SetUserToken(musixmatchUserToken);
-        }
-    }
-
-    public async Task<SearchResult> SearchAsync(
-        SearchRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (request.Limit <= 0 || string.IsNullOrWhiteSpace(request.Keyword))
-        {
-            return new SearchResult(Id, []);
-        }
-
-        var sourceNamespace = request.SourceNamespace?.Trim();
-        var catalogSources = string.IsNullOrWhiteSpace(sourceNamespace)
-            ? Sources
-            : Sources
-                .Where(source => string.Equals(
-                    source.Namespace,
-                    sourceNamespace,
-                    StringComparison.OrdinalIgnoreCase))
-                .ToArray();
-        if (catalogSources.Length == 0)
-        {
-            return new SearchResult(Id, []);
-        }
-
-        var limitPerSource = Math.Max(1, (int)Math.Ceiling(request.Limit / (double)catalogSources.Length));
-        var searches = catalogSources.Select(source =>
-            SearchCatalogSourceAsync(source, request.Keyword.Trim(), limitPerSource, cancellationToken));
-        var sourceResults = await Task.WhenAll(searches);
-        foreach (var failed in sourceResults.Where(result => result.Error is not null))
-        {
-            _logger?.LogWarning(
-                "Lyricify catalog search failed for {Source}: {Error}",
-                failed.Namespace,
-                failed.Error);
-        }
-
-        var tracks = sourceResults
-            .SelectMany(result => result.Results.Select(item => ToSearchTrack(result.Namespace, item)))
-            .DistinctBy(track => track.Id)
-            .Take(request.Limit)
-            .ToArray();
-        return new SearchResult(Id, tracks);
-    }
-
-    public async Task<Track?> GetTrackAsync(
-        string trackId,
-        CancellationToken cancellationToken = default)
-    {
-        var parts = trackId.Split(':', 3);
-        if (parts.Length != 3)
-        {
-            return null;
-        }
-
-        var sourceNamespace = parts[0];
-        var kind = parts[1];
-        var value = Uri.UnescapeDataString(parts[2]);
-        ISearchResult? result = sourceNamespace.ToLowerInvariant() switch
-        {
-            MusicIdNamespaces.QQMusic when kind is "song-mid" or "song-id" =>
-                await GetQqTrackAsync(value, cancellationToken),
-            MusicIdNamespaces.NeteaseMusic when kind == "song-id" =>
-                await GetNeteaseTrackAsync(value, cancellationToken),
-            MusicIdNamespaces.KugouMusic when kind == "audio-hash" =>
-                await GetKugouTrackAsync(value, cancellationToken),
-            _ => null
-        };
-        return result is null
-            ? null
-            : ToSearchTrack(sourceNamespace, result) with { Id = new MusicItemId(Id, trackId) };
-    }
-
-    private static async Task<ISearchResult?> GetQqTrackAsync(
-        string id,
-        CancellationToken cancellationToken)
-    {
-        var response = await new global::Lyricify.Lyrics.Providers.Web.QQMusic.Api()
-            .GetSong(id)
-            .WaitAsync(RequestTimeout, cancellationToken);
-        var song = response?.Data?.FirstOrDefault();
-        return song is null ? null : new QQMusicSearchResult(song);
-    }
-
-    private async Task<ISearchResult?> GetNeteaseTrackAsync(
-        string id,
-        CancellationToken cancellationToken)
-    {
-        if (!id.All(char.IsAsciiDigit))
-        {
-            return null;
-        }
-
-        var client = _httpClient ?? throw new InvalidOperationException("The Lyricify provider is not initialized.");
-        var requestValue = Uri.EscapeDataString($"[{{\"id\":{id}}}]");
-        using var message = new HttpRequestMessage(
-            HttpMethod.Get,
-            $"https://music.163.com/api/v3/song/detail?c={requestValue}");
-        message.Headers.TryAddWithoutValidation("User-Agent", "Mozilla/5.0");
-        message.Headers.Referrer = new Uri("https://music.163.com/");
-        using var response = await client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-        if (!response.IsSuccessStatusCode)
-        {
-            return null;
-        }
-
-        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-        if (!document.RootElement.TryGetProperty("songs", out var songs) ||
-            songs.ValueKind != JsonValueKind.Array ||
-            songs.GetArrayLength() == 0)
-        {
-            return null;
-        }
-
-        var song = songs[0];
-        var title = ReadJsonString(song, "name");
-        if (string.IsNullOrWhiteSpace(title))
-        {
-            return null;
-        }
-
-        var artists = song.TryGetProperty("ar", out var artistValues) &&
-                      artistValues.ValueKind == JsonValueKind.Array
-            ? artistValues.EnumerateArray()
-                .Select(artist => ReadJsonString(artist, "name"))
-                .OfType<string>()
-                .ToArray()
-            : [];
-        var album = song.TryGetProperty("al", out var albumValue) &&
-                    albumValue.ValueKind == JsonValueKind.Object
-            ? ReadJsonString(albumValue, "name") ?? string.Empty
-            : string.Empty;
-        var duration = int.TryParse(ReadJsonString(song, "dt"), out var milliseconds)
-            ? milliseconds
-            : 0;
-        return new NeteaseSearchResult(title, artists, album, null, duration, id)
-        {
-            ArtworkUrl = albumValue.ValueKind == JsonValueKind.Object
-                ? ReadJsonString(albumValue, "picUrl")
-                : null
-        };
-    }
-
-    private async Task<ISearchResult?> GetKugouTrackAsync(
-        string hash,
-        CancellationToken cancellationToken)
-    {
-        var client = _httpClient ?? throw new InvalidOperationException("The Lyricify provider is not initialized.");
-        var uri = new Uri(
-            $"https://wwwapi.kugou.com/yy/index.php?r=play/getdata&hash={Uri.EscapeDataString(hash)}");
-        using var message = new HttpRequestMessage(HttpMethod.Get, uri);
-        message.Headers.TryAddWithoutValidation("User-Agent", "Mozilla/5.0");
-        message.Headers.Referrer = new Uri("https://www.kugou.com/");
-        using var response = await client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-        if (!response.IsSuccessStatusCode)
-        {
-            return null;
-        }
-
-        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-        if (!document.RootElement.TryGetProperty("data", out var data) ||
-            data.ValueKind != JsonValueKind.Object)
-        {
-            return null;
-        }
-
-        var title = ReadJsonString(data, "song_name");
-        if (string.IsNullOrWhiteSpace(title))
-        {
-            return null;
-        }
-
-        var artists = (ReadJsonString(data, "author_name") ?? string.Empty)
-            .Split(['、', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        var duration = int.TryParse(ReadJsonString(data, "timelength"), out var milliseconds)
-            ? milliseconds
-            : 0;
-        return new KugouSearchResult(
-            title,
-            artists,
-            ReadJsonString(data, "album_name") ?? string.Empty,
-            null,
-            duration,
-            hash)
-        {
-            ArtworkUrl = ArtworkHelper.WithSize(ReadJsonString(data, "img"))
-        };
-    }
-
-    private static string? ReadJsonString(JsonElement value, string property) =>
-        value.TryGetProperty(property, out var child) && child.ValueKind != JsonValueKind.Null
-            ? child.ValueKind == JsonValueKind.String ? child.GetString() : child.ToString()
-            : null;
-
-    private static async Task<CatalogSearchResult> SearchCatalogSourceAsync(
-        SourceDefinition source,
-        string keyword,
-        int limit,
-        CancellationToken cancellationToken)
-    {
-        var attempts = source.Searcher == HelperSearchers.Netease ? 2 : 1;
-        string? lastError = null;
-        for (var attempt = 1; attempt <= attempts; attempt++)
-        {
-            try
-            {
-                var results = await source.Searcher.GetSearcher()
-                    .SearchForResults(keyword)
-                    .WaitAsync(RequestTimeout, cancellationToken);
-                if (results is not null)
-                {
-                    return new CatalogSearchResult(
-                        source.Namespace,
-                        results.Take(limit).ToArray(),
-                        null);
-                }
-
-                lastError = "The searcher returned no response.";
-            }
-            catch (TimeoutException exception)
-            {
-                return new CatalogSearchResult(source.Namespace, [], exception.Message);
-            }
-            catch (Exception exception) when (exception is not OperationCanceledException)
-            {
-                lastError = exception.Message;
-            }
-
-            if (attempt < attempts)
-            {
-                await Task.Delay(CatalogSearchRetryDelay, cancellationToken);
-            }
-        }
-
-        return new CatalogSearchResult(
-            source.Namespace,
-            [],
-            $"Search failed after {attempts} attempt(s): {lastError}");
-    }
-
-    internal static Track ToSearchTrack(string sourceNamespace, ISearchResult result)
-    {
-        var identifiers = GetIdentifiers(sourceNamespace, result);
-        var primaryId = identifiers.FirstOrDefault(identifier =>
-                            string.Equals(identifier.Kind, "song-mid", StringComparison.OrdinalIgnoreCase))
-                        ?? identifiers.First();
-        return new Track
-        {
-            Id = new MusicItemId(
-                "lyricify",
-                $"{sourceNamespace}:{primaryId.Kind}:{Uri.EscapeDataString(primaryId.Value)}"),
-            Title = result.Title,
-            Artists = result.Artists.Select(artist => new ArtistRef { Name = artist }).ToArray(),
-            Album = string.IsNullOrWhiteSpace(result.Album)
-                ? null
-                : new AlbumRef { Title = result.Album },
-            Duration = result.DurationMs is null
-                ? null
-                : TimeSpan.FromMilliseconds(result.DurationMs.Value),
-            ArtworkUri = GetArtworkUri(result),
-            ExternalIds = identifiers
-        };
-    }
-
-    private static Uri? GetArtworkUri(ISearchResult result) =>
-        ArtworkHelper.NormalizeUrl(result.ArtworkUrl) is { } url ? new Uri(url) : null;
-
-    public async Task<MetadataLookupResult> LookupMetadataAsync(
-        MetadataLookupRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        var requestedNamespaces = request.TargetNamespaces.Count == 0
-            ? null
-            : request.TargetNamespaces.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var searches = Sources
-            .Where(source => requestedNamespaces is null || requestedNamespaces.Contains(source.Namespace))
-            .Select(source => SearchSourceAsync(source, request, cancellationToken));
-        var sourceResults = await Task.WhenAll(searches);
-
-        var matches = sourceResults.SelectMany(result => result.Matches)
-            .OrderByDescending(match => match.Confidence)
-            .ThenBy(match => match.SourceNamespace, StringComparer.Ordinal)
-            .ToArray();
-        var errors = sourceResults
-            .Where(result => result.Error is not null)
-            .ToDictionary(result => result.Namespace, result => result.Error!, StringComparer.OrdinalIgnoreCase);
-        return new MetadataLookupResult(matches, errors);
     }
 
     public async Task<LemonLyrics?> GetLyricsAsync(
@@ -448,18 +127,12 @@ public sealed class LyricifyMetadataPlugin :
                 .Where(id => string.Equals(id.Namespace, sourceNamespace, StringComparison.OrdinalIgnoreCase) &&
                              IsSupportedLyricsIdentifier(id))
                 .ToArray();
-            if (sourceIds.Length == 0)
-            {
-                continue;
-            }
+            if (sourceIds.Length == 0) continue;
 
             try
             {
                 var lyrics = await FetchLyricsAsync(sourceNamespace, sourceIds, track, cancellationToken);
-                if (lyrics is not null)
-                {
-                    return lyrics;
-                }
+                if (lyrics is not null) return lyrics;
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -474,6 +147,294 @@ public sealed class LyricifyMetadataPlugin :
         return null;
     }
 
+    public IReadOnlyCollection<string> MetadataNamespaces { get; } =
+        Sources.Select(source => source.Namespace).ToArray();
+
+    public async Task<MetadataLookupResult> LookupMetadataAsync(
+        MetadataLookupRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var requestedNamespaces = request.TargetNamespaces.Count == 0
+            ? null
+            : request.TargetNamespaces.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var searches = Sources
+            .Where(source => requestedNamespaces is null || requestedNamespaces.Contains(source.Namespace))
+            .Select(source => SearchSourceAsync(source, request, cancellationToken));
+        var sourceResults = await Task.WhenAll(searches);
+
+        var matches = sourceResults.SelectMany(result => result.Matches)
+            .OrderByDescending(match => match.Confidence)
+            .ThenBy(match => match.SourceNamespace, StringComparer.Ordinal)
+            .ToArray();
+        var errors = sourceResults
+            .Where(result => result.Error is not null)
+            .ToDictionary(result => result.Namespace, result => result.Error!, StringComparer.OrdinalIgnoreCase);
+        return new MetadataLookupResult(matches, errors);
+    }
+
+    public string Id => "lyricify";
+
+    ProviderDescriptor IMusicProvider.Descriptor { get; } = new(
+        "Lyricify Metadata & Lyrics",
+        "Cross-platform search, metadata matching, and synchronized lyrics backed by Lyricify Lyrics Helper.");
+
+    public IReadOnlyCollection<string> SearchNamespaces => MetadataNamespaces;
+
+    public async Task<SearchResult> SearchAsync(
+        SearchRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (request.Limit <= 0 || string.IsNullOrWhiteSpace(request.Keyword)) return new SearchResult(Id, []);
+
+        var sourceNamespace = request.SourceNamespace?.Trim();
+        var catalogSources = string.IsNullOrWhiteSpace(sourceNamespace)
+            ? Sources
+            : Sources
+                .Where(source => string.Equals(
+                    source.Namespace,
+                    sourceNamespace,
+                    StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+        if (catalogSources.Length == 0) return new SearchResult(Id, []);
+
+        var limitPerSource = Math.Max(1, (int)Math.Ceiling(request.Limit / (double)catalogSources.Length));
+        var searches = catalogSources.Select(source =>
+            SearchCatalogSourceAsync(source, request.Keyword.Trim(), limitPerSource, cancellationToken));
+        var sourceResults = await Task.WhenAll(searches);
+        foreach (var failed in sourceResults.Where(result => result.Error is not null))
+            _logger?.LogWarning(
+                "Lyricify catalog search failed for {Source}: {Error}",
+                failed.Namespace,
+                failed.Error);
+
+        var tracks = sourceResults
+            .SelectMany(result => result.Results.Select(item => ToSearchTrack(result.Namespace, item)))
+            .DistinctBy(track => track.Id)
+            .Take(request.Limit)
+            .ToArray();
+        return new SearchResult(Id, tracks);
+    }
+
+    public async Task<Track?> GetTrackAsync(
+        string trackId,
+        CancellationToken cancellationToken = default)
+    {
+        var parts = trackId.Split(':', 3);
+        if (parts.Length != 3) return null;
+
+        var sourceNamespace = parts[0];
+        var kind = parts[1];
+        var value = Uri.UnescapeDataString(parts[2]);
+        var result = sourceNamespace.ToLowerInvariant() switch
+        {
+            MusicIdNamespaces.QQMusic when kind is "song-mid" or "song-id" =>
+                await GetQqTrackAsync(value, cancellationToken),
+            MusicIdNamespaces.NeteaseMusic when kind == "song-id" =>
+                await GetNeteaseTrackAsync(value, cancellationToken),
+            MusicIdNamespaces.KugouMusic when kind == "audio-hash" =>
+                await GetKugouTrackAsync(value, cancellationToken),
+            _ => null
+        };
+        return result is null
+            ? null
+            : ToSearchTrack(sourceNamespace, result) with { Id = new MusicItemId(Id, trackId) };
+    }
+
+    private static void ConfigureOptionalCredentials()
+    {
+        var spotifySpDc = Environment.GetEnvironmentVariable("LEMONNEO_SPOTIFY_SP_DC");
+        if (!string.IsNullOrWhiteSpace(spotifySpDc)) new Api().SetSpDc(spotifySpDc);
+
+        var appleMediaUserToken = Environment.GetEnvironmentVariable("LEMONNEO_APPLE_MUSIC_USER_TOKEN");
+        if (!string.IsNullOrWhiteSpace(appleMediaUserToken))
+            new global::Lyricify.Lyrics.Providers.Web.AppleMusic.Api()
+                .SetMediaUserToken(appleMediaUserToken);
+
+        var musixmatchUserToken = Environment.GetEnvironmentVariable("LEMONNEO_MUSIXMATCH_USER_TOKEN");
+        if (!string.IsNullOrWhiteSpace(musixmatchUserToken))
+            new global::Lyricify.Lyrics.Providers.Web.Musixmatch.Api()
+                .SetUserToken(musixmatchUserToken);
+    }
+
+    private static async Task<ISearchResult?> GetQqTrackAsync(
+        string id,
+        CancellationToken cancellationToken)
+    {
+        var response = await new global::Lyricify.Lyrics.Providers.Web.QQMusic.Api()
+            .GetSong(id)
+            .WaitAsync(RequestTimeout, cancellationToken);
+        var song = response?.Data?.FirstOrDefault();
+        return song is null ? null : new QQMusicSearchResult(song);
+    }
+
+    private async Task<ISearchResult?> GetNeteaseTrackAsync(
+        string id,
+        CancellationToken cancellationToken)
+    {
+        if (!id.All(char.IsAsciiDigit)) return null;
+
+        var client = _httpClient ?? throw new InvalidOperationException("The Lyricify provider is not initialized.");
+        var requestValue = Uri.EscapeDataString($"[{{\"id\":{id}}}]");
+        using var message = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"https://music.163.com/api/v3/song/detail?c={requestValue}");
+        message.Headers.TryAddWithoutValidation("User-Agent", "Mozilla/5.0");
+        message.Headers.Referrer = new Uri("https://music.163.com/");
+        using var response =
+            await client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        if (!response.IsSuccessStatusCode) return null;
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+        if (!document.RootElement.TryGetProperty("songs", out var songs) ||
+            songs.ValueKind != JsonValueKind.Array ||
+            songs.GetArrayLength() == 0)
+            return null;
+
+        var song = songs[0];
+        var title = ReadJsonString(song, "name");
+        if (string.IsNullOrWhiteSpace(title)) return null;
+
+        var artists = song.TryGetProperty("ar", out var artistValues) &&
+                      artistValues.ValueKind == JsonValueKind.Array
+            ? artistValues.EnumerateArray()
+                .Select(artist => ReadJsonString(artist, "name"))
+                .OfType<string>()
+                .ToArray()
+            : [];
+        var album = song.TryGetProperty("al", out var albumValue) &&
+                    albumValue.ValueKind == JsonValueKind.Object
+            ? ReadJsonString(albumValue, "name") ?? string.Empty
+            : string.Empty;
+        var duration = int.TryParse(ReadJsonString(song, "dt"), out var milliseconds)
+            ? milliseconds
+            : 0;
+        return new NeteaseSearchResult(title, artists, album, null, duration, id)
+        {
+            ArtworkUrl = albumValue.ValueKind == JsonValueKind.Object
+                ? ReadJsonString(albumValue, "picUrl")
+                : null
+        };
+    }
+
+    private async Task<ISearchResult?> GetKugouTrackAsync(
+        string hash,
+        CancellationToken cancellationToken)
+    {
+        var client = _httpClient ?? throw new InvalidOperationException("The Lyricify provider is not initialized.");
+        var uri = new Uri(
+            $"https://wwwapi.kugou.com/yy/index.php?r=play/getdata&hash={Uri.EscapeDataString(hash)}");
+        using var message = new HttpRequestMessage(HttpMethod.Get, uri);
+        message.Headers.TryAddWithoutValidation("User-Agent", "Mozilla/5.0");
+        message.Headers.Referrer = new Uri("https://www.kugou.com/");
+        using var response =
+            await client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        if (!response.IsSuccessStatusCode) return null;
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+        if (!document.RootElement.TryGetProperty("data", out var data) ||
+            data.ValueKind != JsonValueKind.Object)
+            return null;
+
+        var title = ReadJsonString(data, "song_name");
+        if (string.IsNullOrWhiteSpace(title)) return null;
+
+        var artists = (ReadJsonString(data, "author_name") ?? string.Empty)
+            .Split(['、', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var duration = int.TryParse(ReadJsonString(data, "timelength"), out var milliseconds)
+            ? milliseconds
+            : 0;
+        return new KugouSearchResult(
+            title,
+            artists,
+            ReadJsonString(data, "album_name") ?? string.Empty,
+            null,
+            duration,
+            hash)
+        {
+            ArtworkUrl = ArtworkHelper.WithSize(ReadJsonString(data, "img"))
+        };
+    }
+
+    private static string? ReadJsonString(JsonElement value, string property)
+    {
+        return value.TryGetProperty(property, out var child) && child.ValueKind != JsonValueKind.Null
+            ? child.ValueKind == JsonValueKind.String ? child.GetString() : child.ToString()
+            : null;
+    }
+
+    private static async Task<CatalogSearchResult> SearchCatalogSourceAsync(
+        SourceDefinition source,
+        string keyword,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        var attempts = source.Searcher == HelperSearchers.Netease ? 2 : 1;
+        string? lastError = null;
+        for (var attempt = 1; attempt <= attempts; attempt++)
+        {
+            try
+            {
+                var results = await source.Searcher.GetSearcher()
+                    .SearchForResults(keyword)
+                    .WaitAsync(RequestTimeout, cancellationToken);
+                if (results is not null)
+                    return new CatalogSearchResult(
+                        source.Namespace,
+                        results.Take(limit).ToArray(),
+                        null);
+
+                lastError = "The searcher returned no response.";
+            }
+            catch (TimeoutException exception)
+            {
+                return new CatalogSearchResult(source.Namespace, [], exception.Message);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                lastError = exception.Message;
+            }
+
+            if (attempt < attempts) await Task.Delay(CatalogSearchRetryDelay, cancellationToken);
+        }
+
+        return new CatalogSearchResult(
+            source.Namespace,
+            [],
+            $"Search failed after {attempts} attempt(s): {lastError}");
+    }
+
+    internal static Track ToSearchTrack(string sourceNamespace, ISearchResult result)
+    {
+        var identifiers = GetIdentifiers(sourceNamespace, result);
+        var primaryId = identifiers.FirstOrDefault(identifier =>
+                            string.Equals(identifier.Kind, "song-mid", StringComparison.OrdinalIgnoreCase))
+                        ?? identifiers.First();
+        return new Track
+        {
+            Id = new MusicItemId(
+                "lyricify",
+                $"{sourceNamespace}:{primaryId.Kind}:{Uri.EscapeDataString(primaryId.Value)}"),
+            Title = result.Title,
+            Artists = result.Artists.Select(artist => new ArtistRef { Name = artist }).ToArray(),
+            Album = string.IsNullOrWhiteSpace(result.Album)
+                ? null
+                : new AlbumRef { Title = result.Album },
+            Duration = result.DurationMs is null
+                ? null
+                : TimeSpan.FromMilliseconds(result.DurationMs.Value),
+            ArtworkUri = GetArtworkUri(result),
+            ExternalIds = identifiers
+        };
+    }
+
+    private static Uri? GetArtworkUri(ISearchResult result)
+    {
+        return ArtworkHelper.NormalizeUrl(result.ArtworkUrl) is { } url ? new Uri(url) : null;
+    }
+
     private static async Task<SourceSearchResult> SearchSourceAsync(
         SourceDefinition source,
         MetadataLookupRequest request,
@@ -481,7 +442,8 @@ public sealed class LyricifyMetadataPlugin :
     {
         try
         {
-            var matches = await SearchMetadataMatchesAsync(source.Searcher.GetSearcher(), source.Namespace, request, cancellationToken);
+            var matches = await SearchMetadataMatchesAsync(source.Searcher.GetSearcher(), source.Namespace, request,
+                cancellationToken);
             return new SourceSearchResult(source.Namespace, matches, null);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -500,7 +462,8 @@ public sealed class LyricifyMetadataPlugin :
         var helperTrack = ToHelperMetadata(request.Track);
         var customKeyword = !string.IsNullOrWhiteSpace(request.SearchKeyword);
         var results = customKeyword
-            ? await searcher.SearchForResults(request.SearchKeyword!.Trim()).WaitAsync(RequestTimeout, cancellationToken) ?? []
+            ? await searcher.SearchForResults(request.SearchKeyword!.Trim())
+                .WaitAsync(RequestTimeout, cancellationToken) ?? []
             : await searcher.SearchForResults(helperTrack).WaitAsync(RequestTimeout, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         return results.Select(result => ToMetadataMatch(sourceNamespace, result,
@@ -510,7 +473,8 @@ public sealed class LyricifyMetadataPlugin :
             .Take(Math.Max(0, request.LimitPerSource)).ToArray();
     }
 
-    private static MetadataMatch ToMetadataMatch(string sourceNamespace, ISearchResult result, CompareHelper.MatchType? matchType = null)
+    private static MetadataMatch ToMetadataMatch(string sourceNamespace, ISearchResult result,
+        CompareHelper.MatchType? matchType = null)
     {
         var level = matchType ?? result.MatchType ?? CompareHelper.MatchType.NoMatch;
         return new MetadataMatch
@@ -529,16 +493,16 @@ public sealed class LyricifyMetadataPlugin :
         {
             QQMusicSearchResult qq =>
             [
-                new(sourceNamespace, qq.Id, "song-id"),
-                new(sourceNamespace, qq.Mid, "song-mid")
+                new ExternalMusicId(sourceNamespace, qq.Id, "song-id"),
+                new ExternalMusicId(sourceNamespace, qq.Mid, "song-mid")
             ],
-            NeteaseSearchResult netease => [new(sourceNamespace, netease.Id, "song-id")],
-            KugouSearchResult kugou => [new(sourceNamespace, kugou.Hash, "audio-hash")],
-            AppleMusicSearchResult apple => [new(sourceNamespace, apple.Id, "catalog-song-id")],
-            SpotifySearchResult spotify => [new(sourceNamespace, spotify.Id, "track-id")],
+            NeteaseSearchResult netease => [new ExternalMusicId(sourceNamespace, netease.Id, "song-id")],
+            KugouSearchResult kugou => [new ExternalMusicId(sourceNamespace, kugou.Hash, "audio-hash")],
+            AppleMusicSearchResult apple => [new ExternalMusicId(sourceNamespace, apple.Id, "catalog-song-id")],
+            SpotifySearchResult spotify => [new ExternalMusicId(sourceNamespace, spotify.Id, "track-id")],
             MusixmatchSearchResult musixmatch => CreateMusixmatchIds(sourceNamespace, musixmatch),
-            SodaMusicSearchResult soda => [new(sourceNamespace, soda.Id, "track-id")],
-            LRCLIBSearchResult lrcLib => [new(sourceNamespace, lrcLib.Id.ToString(), "lyrics-id")],
+            SodaMusicSearchResult soda => [new ExternalMusicId(sourceNamespace, soda.Id, "track-id")],
+            LRCLIBSearchResult lrcLib => [new ExternalMusicId(sourceNamespace, lrcLib.Id.ToString(), "lyrics-id")],
             _ => []
         };
     }
@@ -551,29 +515,31 @@ public sealed class LyricifyMetadataPlugin :
         {
             new(sourceNamespace, result.Id.ToString(), "track-id")
         };
-        if (!string.IsNullOrWhiteSpace(result.Isrc))
-        {
-            ids.Add(new ExternalMusicId(MusicIdNamespaces.Isrc, result.Isrc));
-        }
+        if (!string.IsNullOrWhiteSpace(result.Isrc)) ids.Add(new ExternalMusicId(MusicIdNamespaces.Isrc, result.Isrc));
 
         return ids;
     }
 
-    private static TrackMultiArtistMetadata ToHelperMetadata(Track track) => new()
+    private static TrackMultiArtistMetadata ToHelperMetadata(Track track)
     {
-        Title = track.Title,
-        Artists = track.Artists.Select(artist => artist.Name).ToList(),
-        Album = track.Album?.Title,
-        DurationMs = track.Duration is null ? null : (int)track.Duration.Value.TotalMilliseconds,
-        Isrc = track.ExternalIds.FirstOrDefault(id =>
-            string.Equals(id.Namespace, MusicIdNamespaces.Isrc, StringComparison.OrdinalIgnoreCase))?.Value
-    };
+        return new TrackMultiArtistMetadata
+        {
+            Title = track.Title,
+            Artists = track.Artists.Select(artist => artist.Name).ToList(),
+            Album = track.Album?.Title,
+            DurationMs = track.Duration is null ? null : (int)track.Duration.Value.TotalMilliseconds,
+            Isrc = track.ExternalIds.FirstOrDefault(id =>
+                string.Equals(id.Namespace, MusicIdNamespaces.Isrc, StringComparison.OrdinalIgnoreCase))?.Value
+        };
+    }
 
     private static async Task<LemonLyrics?> FetchLyricsAsync(
         string sourceNamespace,
         IReadOnlyList<ExternalMusicId> ids,
         Track track,
-        CancellationToken cancellationToken) => sourceNamespace switch
+        CancellationToken cancellationToken)
+    {
+        return sourceNamespace switch
         {
             MusicIdNamespaces.AppleMusic => await FetchAppleLyricsAsync(ids, cancellationToken),
             MusicIdNamespaces.Spotify => await FetchSpotifyLyricsAsync(ids, cancellationToken),
@@ -585,6 +551,7 @@ public sealed class LyricifyMetadataPlugin :
             MusicIdNamespaces.Musixmatch => await FetchMusixmatchLyricsAsync(ids, cancellationToken),
             _ => null
         };
+    }
 
     private static async Task<LemonLyrics?> FetchAppleLyricsAsync(
         IReadOnlyList<ExternalMusicId> ids,
@@ -606,7 +573,7 @@ public sealed class LyricifyMetadataPlugin :
     {
         var id = Find(ids, "track-id");
         if (id is null) return null;
-        var raw = await new global::Lyricify.Lyrics.Providers.Web.Spotify.Api()
+        var raw = await new Api()
             .GetLyrics(id.Value)
             .WaitAsync(RequestTimeout, cancellationToken);
         return string.IsNullOrWhiteSpace(raw)
@@ -649,7 +616,6 @@ public sealed class LyricifyMetadataPlugin :
         {
             var qrc = await api.GetLyricsAsync(numericId.Value).WaitAsync(RequestTimeout, cancellationToken);
             if (!string.IsNullOrWhiteSpace(qrc?.Lyrics))
-            {
                 return ParseLyrics(
                     qrc.Lyrics,
                     LyricsRawTypes.Qrc,
@@ -657,7 +623,6 @@ public sealed class LyricifyMetadataPlugin :
                     numericId,
                     qrc.Trans,
                     qrc.Romaji);
-            }
         }
 
         var mid = Find(ids, "song-mid");
@@ -687,14 +652,14 @@ public sealed class LyricifyMetadataPlugin :
                           ?? source.LangTranslations?.Values
                               .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value.Content))?.Content;
         return ParseLyrics(
-            source.Content,
-            rawType,
-            MusicIdNamespaces.SodaMusic,
-            id,
-            translation) with
-        {
-            Language = string.IsNullOrWhiteSpace(source.Lang) ? null : source.Lang
-        };
+                source.Content,
+                rawType,
+                MusicIdNamespaces.SodaMusic,
+                id,
+                translation) with
+            {
+                Language = string.IsNullOrWhiteSpace(source.Lang) ? null : source.Lang
+            };
     }
 
     private static async Task<LemonLyrics?> FetchLrcLibLyricsAsync(
@@ -707,9 +672,7 @@ public sealed class LyricifyMetadataPlugin :
             .GetById(numericId)
             .WaitAsync(RequestTimeout, cancellationToken);
         if (!string.IsNullOrWhiteSpace(result?.SyncedLyrics))
-        {
             return ParseLyrics(result.SyncedLyrics, LyricsRawTypes.Lrc, MusicIdNamespaces.LrcLib, id);
-        }
 
         return string.IsNullOrWhiteSpace(result?.PlainLyrics)
             ? null
@@ -731,7 +694,7 @@ public sealed class LyricifyMetadataPlugin :
             .WaitAsync(RequestTimeout, cancellationToken);
         var candidate = search?.Candidates?.FirstOrDefault();
         if (candidate is null) return null;
-        var raw = await global::Lyricify.Lyrics.Decrypter.Krc.Helper
+        var raw = await Helper
             .GetLyricsAsync(candidate.Id, candidate.AccessKey)
             .WaitAsync(RequestTimeout, cancellationToken);
         return string.IsNullOrWhiteSpace(raw)
@@ -759,38 +722,51 @@ public sealed class LyricifyMetadataPlugin :
         string source,
         ExternalMusicId sourceId,
         string? translation = null,
-        string? romanization = null) =>
-        LyricsConverter.Parse(raw, type, source, sourceId, translation, romanization);
+        string? romanization = null)
+    {
+        return LyricsConverter.Parse(raw, type, source, sourceId, translation, romanization);
+    }
 
-    private static string? FirstNonEmpty(params string?[] values) =>
-        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+    private static string? FirstNonEmpty(params string?[] values)
+    {
+        return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+    }
 
     private static LemonLyrics CreatePlainLyrics(
         string text,
         string source,
         ExternalMusicId sourceId,
-        string? translation = null) => new(
-        text,
-        IsSynchronized: false,
-        Lines: text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
-            .Select(line => new LemonLyricsLine(line))
-            .ToArray(),
-        Source: source,
-        SourceId: sourceId,
-        Translation: translation);
+        string? translation = null)
+    {
+        return new LemonLyrics(
+            text,
+            IsSynchronized: false,
+            Lines: text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+                .Select(line => new LemonLyricsLine(line))
+                .ToArray(),
+            Source: source,
+            SourceId: sourceId,
+            Translation: translation);
+    }
 
-    private static ExternalMusicId? Find(IEnumerable<ExternalMusicId> ids, string kind) =>
-        ids.FirstOrDefault(id => string.Equals(id.Kind, kind, StringComparison.OrdinalIgnoreCase));
+    private static ExternalMusicId? Find(IEnumerable<ExternalMusicId> ids, string kind)
+    {
+        return ids.FirstOrDefault(id => string.Equals(id.Kind, kind, StringComparison.OrdinalIgnoreCase));
+    }
 
     /// <summary>
-    /// Accepts identifiers by the platform schema consumed by the lyrics API.
-    /// Namespace and kind distinguish values with different platform semantics.
+    ///     Accepts identifiers by the platform schema consumed by the lyrics API.
+    ///     Namespace and kind distinguish values with different platform semantics.
     /// </summary>
-    private static bool IsSupportedLyricsIdentifier(ExternalMusicId id) =>
-        LyricsIdSchemes.Any(scheme => scheme.Accepts(id));
+    private static bool IsSupportedLyricsIdentifier(ExternalMusicId id)
+    {
+        return LyricsIdSchemes.Any(scheme => scheme.Accepts(id));
+    }
 
-    private static double Confidence(CompareHelper.MatchType? matchType) =>
-        Math.Clamp(((int)(matchType ?? CompareHelper.MatchType.NoMatch)) / 100d, 0, 1);
+    private static double Confidence(CompareHelper.MatchType? matchType)
+    {
+        return Math.Clamp(((int)(matchType ?? CompareHelper.MatchType.NoMatch)) / 100d, 0, 1);
+    }
 
     private sealed record SourceDefinition(string Namespace, HelperSearchers Searcher);
 

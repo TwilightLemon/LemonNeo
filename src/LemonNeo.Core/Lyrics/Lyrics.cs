@@ -3,8 +3,8 @@ using LemonNeo.Core.Music;
 namespace LemonNeo.Core.Lyrics;
 
 /// <summary>
-/// A word, character, or syllable. Times are absolute milliseconds from the start
-/// of the track; EndTimeMs is exclusive. Text includes any intervening spaces.
+///     A word, character, or syllable. Times are absolute milliseconds from the start
+///     of the track; EndTimeMs is exclusive. Text includes any intervening spaces.
 /// </summary>
 public sealed record LyricsWord(string Text, int StartTimeMs, int EndTimeMs);
 
@@ -24,8 +24,8 @@ public sealed record LyricsLine(
 }
 
 /// <summary>
-/// Romanization preserves word timing when available. Line timing and text are
-/// retained as a fallback when the provider does not supply word timestamps.
+///     Romanization preserves word timing when available. Line timing and text are
+///     retained as a fallback when the provider does not supply word timestamps.
 /// </summary>
 public sealed record LyricsRomanizationLine(
     IReadOnlyList<LyricsWord> Words,

@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Logging;
-
 namespace LemonNeo.Abstractions.Storage;
 
 public interface ICredentialVault

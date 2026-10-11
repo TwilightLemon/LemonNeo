@@ -1,11 +1,14 @@
 using Avalonia.Media;
 using LemonNeo.Desktop.Config;
-using LemonNeo.Desktop.Controls.Lyrics;
-using LemonNeo.Desktop.Controls.Shared;
 
 namespace LemonNeo.Desktop.Utils;
 
-public sealed record ThemeColorDefinition(ThemeColorPreset Id, string NameKey, Color Accent, Color DarkBase, Color LightBase,
+public sealed record ThemeColorDefinition(
+    ThemeColorPreset Id,
+    string NameKey,
+    Color Accent,
+    Color DarkBase,
+    Color LightBase,
     bool IsArtwork = false);
 
 /// <summary>Reference colors describe a mood; semantic UI colors are adapted to each brightness mode.</summary>
@@ -24,20 +27,26 @@ public static class ThemePalette
         Define(ThemeColorPreset.Twilight, "#977DBF", "#96A7C9", "#D6AAC2")
     });
 
-    public static ThemeColorDefinition Get(ThemeColorPreset id) => BuiltIn.FirstOrDefault(p => p.Id == id) ?? BuiltIn[0];
+    public static ThemeColorDefinition Get(ThemeColorPreset id)
+    {
+        return BuiltIn.FirstOrDefault(p => p.Id == id) ?? BuiltIn[0];
+    }
 
-    private static ThemeColorDefinition Define(ThemeColorPreset id, string accent, string dark, string light) =>
-        new(id, $"ThemeColor{id}", Color.Parse(accent), Color.Parse(dark), Color.Parse(light));
+    private static ThemeColorDefinition Define(ThemeColorPreset id, string accent, string dark, string light)
+    {
+        return new ThemeColorDefinition(id, $"ThemeColor{id}", Color.Parse(accent), Color.Parse(dark),
+            Color.Parse(light));
+    }
 
     public static ThemeColorDefinition FromArtwork(Color color)
     {
         var hsl = color.ToHsl();
         // Black/white covers stay neutral. Highly saturated art never becomes a neon UI.
         var saturation = Math.Min(hsl.S, .58);
-        return new(ThemeColorPreset.Classic, "ThemeColorArtwork",
+        return new ThemeColorDefinition(ThemeColorPreset.Classic, "ThemeColorArtwork",
             HslColor.ToRgb(hsl.H, saturation, Math.Clamp(hsl.L, .56, .72)),
             HslColor.ToRgb(hsl.H, saturation * .35, .12),
-            HslColor.ToRgb(hsl.H, saturation * .22, .90), IsArtwork: true);
+            HslColor.ToRgb(hsl.H, saturation * .22, .90), true);
     }
 
     public static IReadOnlyDictionary<string, Color> Create(ThemeColorDefinition definition, bool dark)
@@ -51,7 +60,8 @@ public static class ThemePalette
         var sidebar = dark ? Mix(background, Colors.Black, .16) : Mix(definition.LightBase, Colors.White, .80);
         var surface = dark ? Mix(background, Colors.White, .035) : Mix(background, Colors.White, .75);
         var raised = dark ? Mix(background, Colors.White, .075) : Mix(definition.LightBase, Colors.White, .86);
-        var accent = HslColor.ToRgb(hsl.H, Math.Min(hsl.S, .65), dark ? Math.Clamp(hsl.L, .65, .76) : Math.Clamp(hsl.L, .57, .73));
+        var accent = HslColor.ToRgb(hsl.H, Math.Min(hsl.S, .65),
+            dark ? Math.Clamp(hsl.L, .65, .76) : Math.Clamp(hsl.L, .57, .73));
         var soft = Mix(raised, seed, dark ? .13 : .16);
         var hover = Mix(raised, seed, dark ? .07 : .08);
 
@@ -71,7 +81,8 @@ public static class ThemePalette
         var text = EnsureContrast(dark ? Color.Parse("#EEF1F4") : Color.Parse("#20252C"), backgrounds, 7, dark);
         // Leave headroom for the intermediate colors and hover opacity during transitions.
         var secondary = EnsureContrast(Mix(text, background, .32), backgrounds, 5.3, dark);
-        var accentText = EnsureContrast(dark ? accent : HslColor.ToRgb(hsl.H, Math.Min(hsl.S, .60), .32), backgrounds, 5.5, dark);
+        var accentText = EnsureContrast(dark ? accent : HslColor.ToRgb(hsl.H, Math.Min(hsl.S, .60), .32), backgrounds,
+            5.5, dark);
         var onAccent = Color.Parse("#172027");
         var lyricText = Color.Parse(dark ? "#EEF1F4" : "#a2a6ac");
         // Blue/purple can be dark at the same HSL lightness as yellow. Lift the fill itself
@@ -95,8 +106,14 @@ public static class ThemePalette
     public static Color Mix(Color from, Color to, double amount)
     {
         amount = Math.Clamp(amount, 0, 1);
-        byte Channel(byte a, byte b) => (byte)Math.Round(a + (b - a) * amount);
-        return Color.FromArgb(Channel(from.A, to.A), Channel(from.R, to.R), Channel(from.G, to.G), Channel(from.B, to.B));
+
+        byte Channel(byte a, byte b)
+        {
+            return (byte)Math.Round(a + (b - a) * amount);
+        }
+
+        return Color.FromArgb(Channel(from.A, to.A), Channel(from.R, to.R), Channel(from.G, to.G),
+            Channel(from.B, to.B));
     }
 
     public static double Contrast(Color first, Color second)
@@ -108,8 +125,10 @@ public static class ThemePalette
                 var value = channel / 255d;
                 return value <= .04045 ? value / 12.92 : Math.Pow((value + .055) / 1.055, 2.4);
             }
+
             return .2126 * Linear(c.R) + .7152 * Linear(c.G) + .0722 * Linear(c.B);
         }
+
         var a = Luminance(first);
         var b = Luminance(second);
         return (Math.Max(a, b) + .05) / (Math.Min(a, b) + .05);
@@ -127,6 +146,7 @@ public static class ThemePalette
             if (backgrounds.All(b => Contrast(Mix(color, end, mid), b) >= minimum)) high = mid;
             else low = mid;
         }
+
         return Mix(color, end, high);
     }
 }

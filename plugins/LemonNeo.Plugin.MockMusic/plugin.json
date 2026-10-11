@@ -6,5 +6,6 @@
   "minimumHostVersion": "0.1.0",
   "permissions": [
     "network"
-  ]
+  ],
+  "dependencies": []
 }

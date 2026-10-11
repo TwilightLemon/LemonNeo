@@ -1,10 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <ProjectReference Include="../LemonNeo.Core/LemonNeo.Core.csproj" />
-    <ProjectReference Include="../LemonNeo.Abstractions/LemonNeo.Abstractions.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.DataProtection.Extensions" Version="10.0.12" />
-    <InternalsVisibleTo Include="LemonNeo.Hosting" />
-  </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="../LemonNeo.Core/LemonNeo.Core.csproj"/>
+        <ProjectReference Include="../LemonNeo.Abstractions/LemonNeo.Abstractions.csproj"/>
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="Microsoft.AspNetCore.DataProtection.Extensions" Version="10.0.12"/>
+        <InternalsVisibleTo Include="LemonNeo.Hosting"/>
+    </ItemGroup>
 </Project>

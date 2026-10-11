@@ -5,7 +5,9 @@ namespace LemonNeo.Desktop.Views.Shared;
 
 public partial class MessageDialog : Window
 {
-    public MessageDialog() : this("", "", "") { }
+    public MessageDialog() : this("", "", "")
+    {
+    }
 
     public MessageDialog(string title, string message, string acceptText)
     {
@@ -15,5 +17,8 @@ public partial class MessageDialog : Window
         AcceptButton.Content = acceptText;
     }
 
-    private void OnAccept(object? sender, RoutedEventArgs args) => Close();
+    private void OnAccept(object? sender, RoutedEventArgs args)
+    {
+        Close();
+    }
 }

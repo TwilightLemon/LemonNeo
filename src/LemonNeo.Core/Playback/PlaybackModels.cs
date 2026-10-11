@@ -1,5 +1,4 @@
 using LemonNeo.Core.Music;
-using System.Collections.Immutable;
 
 namespace LemonNeo.Core.Playback;
 
@@ -7,14 +6,17 @@ public abstract record PlaybackSource
 {
     /// <summary>Actual resource quality; null means the provider cannot determine it.</summary>
     public AudioQuality? Quality { get; init; }
+
     public int? BitrateKbps { get; init; }
 }
 
 public sealed record HttpPlaybackSource : PlaybackSource
 {
     public required Uri Uri { get; init; }
+
     public IReadOnlyDictionary<string, string> Headers { get; init; }
         = new Dictionary<string, string>();
+
     public DateTimeOffset? ExpiresAt { get; init; }
     public bool IsDirectAudio { get; init; } = true;
 }
@@ -33,6 +35,9 @@ public enum AudioQuality
 
 public static class AudioQualities
 {
+    public static IReadOnlyList<AudioQuality> Descending { get; } =
+        [AudioQuality.HiRes, AudioQuality.Lossless, AudioQuality.High, AudioQuality.Medium, AudioQuality.Low];
+
     /// <summary>Prefers measurements, retaining a provider's declaration only when it is not contradicted.</summary>
     public static AudioQuality? Resolve(AudioStreamInfo? info, AudioQuality? reported)
     {
@@ -42,21 +47,26 @@ public static class AudioQualities
     }
 
     /// <summary>Classifies measured audio. Bitrate alone cannot establish lossless or HiRes quality.</summary>
-    public static AudioQuality? Classify(AudioStreamInfo? info) => info switch
+    public static AudioQuality? Classify(AudioStreamInfo? info)
     {
-        { IsLossless: true, BitsPerSample: > 16 } or { IsLossless: true, SampleRateHz: > 48000 } => AudioQuality.HiRes,
-        { IsLossless: true } => AudioQuality.Lossless,
-        { IsLossless: false, BitrateKbps: > 192 } => AudioQuality.High,
-        { IsLossless: false, BitrateKbps: > 128 } => AudioQuality.Medium,
-        { IsLossless: false, BitrateKbps: > 0 } => AudioQuality.Low,
-        _ => null
-    };
+        return info switch
+        {
+            { IsLossless: true, BitsPerSample: > 16 } or { IsLossless: true, SampleRateHz: > 48000 } => AudioQuality
+                .HiRes,
+            { IsLossless: true } => AudioQuality.Lossless,
+            { IsLossless: false, BitrateKbps: > 192 } => AudioQuality.High,
+            { IsLossless: false, BitrateKbps: > 128 } => AudioQuality.Medium,
+            { IsLossless: false, BitrateKbps: > 0 } => AudioQuality.Low,
+            _ => null
+        };
+    }
 
-    public static IReadOnlyList<AudioQuality> Descending { get; } =
-        [AudioQuality.HiRes, AudioQuality.Lossless, AudioQuality.High, AudioQuality.Medium, AudioQuality.Low];
-
-    public static IEnumerable<AudioQuality> SearchOrder(AudioQuality preferred) =>
-        preferred == AudioQuality.Automatic ? Descending : new[] { preferred }.Concat(Descending.Where(q => q != preferred));
+    public static IEnumerable<AudioQuality> SearchOrder(AudioQuality preferred)
+    {
+        return preferred == AudioQuality.Automatic
+            ? Descending
+            : new[] { preferred }.Concat(Descending.Where(q => q != preferred));
+    }
 }
 
 public sealed record PlaybackRequest(

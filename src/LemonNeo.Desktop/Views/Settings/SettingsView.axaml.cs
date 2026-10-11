@@ -9,12 +9,16 @@ namespace LemonNeo.Desktop.Views.Settings;
 
 public partial class SettingsView : UserControl
 {
-    public SettingsView() => InitializeComponent();
+    public SettingsView()
+    {
+        InitializeComponent();
+    }
 
     private async void OnChangeLibraryPath(object? sender, RoutedEventArgs args)
     {
         var path = await PickFolderAsync(
-            ((LinguaObservableString)LanguageManager.Instance.ChooseLibraryPath).CurrentValue ?? "Choose a music library folder");
+            ((LinguaObservableString)LanguageManager.Instance.ChooseLibraryPath).CurrentValue ??
+            "Choose a music library folder");
         if (path is not null && DataContext is SettingsViewModel model) await model.ChangeLibraryAsync(path);
     }
 
@@ -35,10 +39,11 @@ public partial class SettingsView : UserControl
             AllowMultiple = false
         });
         foreach (var folder in folders)
-        {
             using (folder)
+            {
                 if (folder.TryGetLocalPath() is { } path) return path;
-        }
+            }
+
         return null;
     }
 }

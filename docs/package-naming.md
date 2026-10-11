@@ -21,9 +21,21 @@ Hosting 拒绝无效包名、不同大小写的重复配置包与已加载的重
   "name": "Netease Cloud Music",
   "version": "1.0.0",
   "minimumHostVersion": "0.1.0",
-  "entryAssembly": "LemonNeo.Plugin.Netease.dll"
+  "entryAssembly": "LemonNeo.Plugin.Netease.dll",
+  "dependencies": [
+    {
+      "name": "Example.Client",
+      "version": "2.0.0",
+      "license": "MIT",
+      "website": "https://example.com/example-client"
+    }
+  ]
 }
 ```
+
+`dependencies` 用于声明插件随附或运行时使用的第三方软件包。每一项必须提供名称、版本和许可证；
+项目地址可通过 `website` 提供。没有第三方依赖时使用空数组。Desktop 的“关于”页面会直接展示这些声明，
+因此发布插件时应同步更新版本和许可信息，并随包附上许可证要求的完整声明或许可证副本。
 
 配置实体文件名使用 PascalCase 标识符，例如 `AccountSettings`，对应 `AccountSettings.json`。
 同一包内类型和实体文件一一对应；不同包可以使用相同实体名。文件中的属性名采用 camelCase。

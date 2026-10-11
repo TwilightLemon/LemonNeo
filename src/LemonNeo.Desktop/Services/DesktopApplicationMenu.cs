@@ -1,4 +1,3 @@
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Platform;
 using CommunityToolkit.Mvvm.Input;
@@ -10,14 +9,14 @@ namespace LemonNeo.Desktop.Services;
 public sealed class DesktopApplicationMenu : IDisposable
 {
     private readonly Avalonia.Application _application;
-    private readonly PlaybackViewModel _playback;
-    private readonly LocalizationService _text;
-    private readonly NativeMenu _menu;
-    private readonly NativeMenuItem _showWindow;
-    private readonly NativeMenuItem _previous;
-    private readonly NativeMenuItem _togglePlayback;
-    private readonly NativeMenuItem _next;
     private readonly NativeMenuItem _exit;
+    private readonly NativeMenu _menu;
+    private readonly NativeMenuItem _next;
+    private readonly PlaybackViewModel _playback;
+    private readonly NativeMenuItem _previous;
+    private readonly NativeMenuItem _showWindow;
+    private readonly LocalizationService _text;
+    private readonly NativeMenuItem _togglePlayback;
     private readonly TrayIcon? _trayIcon;
 
     public DesktopApplicationMenu(Avalonia.Application application, DesktopLifetimeService lifetime,
@@ -50,24 +49,10 @@ public sealed class DesktopApplicationMenu : IDisposable
         {
             NativeDock.SetMenu(application, _menu);
         }
+
         text.Changed += OnChanged;
         playback.Changed += OnChanged;
         Refresh();
-    }
-
-    private void OnChanged(object? sender, EventArgs args) => Refresh();
-
-    private void Refresh()
-    {
-        _showWindow.Header = _text["ShowMainWindow"];
-        _previous.Header = _text["Previous"];
-        _togglePlayback.Header = _playback.PlayLabel;
-        _next.Header = _text["Next"];
-        _exit.Header = _text["ExitApplication"];
-        _previous.IsEnabled = _playback.CanPrevious;
-        _togglePlayback.IsEnabled = _playback.CanTogglePlayback;
-        _next.IsEnabled = _playback.CanNext;
-        if (_trayIcon is not null) _trayIcon.ToolTipText = _text["AppName"];
     }
 
     public void Dispose()
@@ -83,5 +68,23 @@ public sealed class DesktopApplicationMenu : IDisposable
         {
             NativeDock.SetMenu(_application, null);
         }
+    }
+
+    private void OnChanged(object? sender, EventArgs args)
+    {
+        Refresh();
+    }
+
+    private void Refresh()
+    {
+        _showWindow.Header = _text["ShowMainWindow"];
+        _previous.Header = _text["Previous"];
+        _togglePlayback.Header = _playback.PlayLabel;
+        _next.Header = _text["Next"];
+        _exit.Header = _text["ExitApplication"];
+        _previous.IsEnabled = _playback.CanPrevious;
+        _togglePlayback.IsEnabled = _playback.CanTogglePlayback;
+        _next.IsEnabled = _playback.CanNext;
+        if (_trayIcon is not null) _trayIcon.ToolTipText = _text["AppName"];
     }
 }

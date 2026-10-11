@@ -1,174 +1,481 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:sharedControls="using:LemonNeo.Desktop.Controls.Shared" xmlns:toolsVm="using:LemonNeo.Desktop.ViewModels.Tools" xmlns:i18n="using:LemonNeo.Desktop.Services"
-             x:Class="LemonNeo.Desktop.Views.Tools.ToolsView" x:DataType="toolsVm:ToolsViewModel">
-  <UserControl.Resources>
-    <ItemsPanelTemplate x:Key="PluginTagsPanel"><WrapPanel /></ItemsPanelTemplate>
-    <DataTemplate x:Key="PluginNamespaceTemplate" x:DataType="x:String">
-      <Border Classes="namespaceTag"><SelectableTextBlock Text="{Binding}" FontFamily="{DynamicResource Font.Code}" FontSize="12" TextWrapping="Wrap" /></Border>
-    </DataTemplate>
-    <DataTemplate x:Key="PluginCapabilityTemplate" x:DataType="x:String">
-      <Border Classes="capabilityTag"><TextBlock Text="{Binding}" Classes="caption" TextWrapping="Wrap" /></Border>
-    </DataTemplate>
-    <DataTemplate x:Key="PluginDetailTemplate" x:DataType="toolsVm:PluginDetail">
-      <Grid ColumnDefinitions="140,*" Margin="0,0,0,10">
-        <TextBlock Text="{Binding Label}" Classes="caption" TextWrapping="Wrap" Margin="0,2,12,0" />
-        <SelectableTextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap" />
-      </Grid>
-    </DataTemplate>
-  </UserControl.Resources>
-  <UserControl.Styles>
-    <Style Selector="Border.namespaceTag, Border.capabilityTag">
-      <Setter Property="CornerRadius" Value="6" />
-      <Setter Property="Padding" Value="9,5" />
-      <Setter Property="Margin" Value="0,0,8,6" />
-      <Setter Property="Background" Value="{DynamicResource Brush.Hover}" />
-    </Style>
-    <Style Selector="ItemsControl.playableNamespaces Border.namespaceTag"><Setter Property="Background" Value="{DynamicResource Brush.AccentSoft}" /></Style>
-    <Style Selector="ItemsControl.playableNamespaces SelectableTextBlock"><Setter Property="Foreground" Value="{DynamicResource Brush.AccentText}" /></Style>
-    <Style Selector="Expander.pluginDetails"><Setter Property="HorizontalAlignment" Value="Stretch" /><Setter Property="HorizontalContentAlignment" Value="Stretch" /></Style>
-  </UserControl.Styles>
-  <Grid RowDefinitions="Auto,Auto,*">
-    <sharedControls:PageHeader Title="{Binding PageTitle}" Summary="{Binding PageSummary}">
-      <sharedControls:PageHeader.Actions>
-        <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsBusy}" ToolTip.Tip="{Binding Status}">
-          <ProgressBar IsIndeterminate="True" Width="60" Height="3" VerticalAlignment="Center" AutomationProperties.Name="{Binding Status}" />
-          <Button Classes="ghost" Command="{Binding CancelOperationCommand}" Content="{Translate {x:Static i18n:LanguageManager+Keys.CancelOperation}}" />
-        </StackPanel>
-      </sharedControls:PageHeader.Actions>
-    </sharedControls:PageHeader>
-    <Border Grid.Row="1" IsVisible="{Binding HasError}" Background="{DynamicResource Brush.DangerSoft}" CornerRadius="10" Padding="14" Margin="0,0,0,12">
-      <Grid ColumnDefinitions="*,Auto">
-        <TextBlock Text="{Binding Error}" Foreground="{DynamicResource Brush.Danger}" TextWrapping="Wrap" MaxHeight="90" />
-        <Button Grid.Column="1" Classes="ghost icon" Command="{Binding DismissErrorCommand}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}">
-          <Path Classes="icon" Data="{StaticResource Icon.Close}" />
-        </Button>
-      </Grid>
-    </Border>
-    <Grid Grid.Row="2">
-      <TabControl>
-        <TabItem Header="{Translate {x:Static i18n:LanguageManager+Keys.Plugins}}">
-          <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Spacing="18" Margin="0,16,12,16">
-              <Border Classes="card">
-                <StackPanel Spacing="16">
-                  <StackPanel Spacing="4">
-                    <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.PluginOverview}}" Classes="section" />
-                    <TextBlock Text="{Binding PluginSummary}" Classes="muted" TextWrapping="Wrap" />
-                  </StackPanel>
-                  <StackPanel Spacing="8">
-                    <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.SupportedNamespaces}}" FontWeight="SemiBold" />
-                    <ItemsControl x:Name="SupportedNamespacesList" ItemsSource="{Binding SupportedNamespaces}" ItemsPanel="{StaticResource PluginTagsPanel}" ItemTemplate="{StaticResource PluginNamespaceTemplate}" />
-                    <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.NoSupportedNamespaces}}" Classes="caption" IsVisible="{Binding !HasSupportedNamespaces}" TextWrapping="Wrap" />
-                  </StackPanel>
-                  <StackPanel Spacing="8">
-                    <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.PlayableNamespaces}}" FontWeight="SemiBold" />
-                    <ItemsControl x:Name="PlayableNamespacesList" Classes="playableNamespaces" ItemsSource="{Binding PlayableNamespaces}" ItemsPanel="{StaticResource PluginTagsPanel}" ItemTemplate="{StaticResource PluginNamespaceTemplate}" />
-                    <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.NoPlayableNamespaces}}" Classes="caption" IsVisible="{Binding !HasPlayableNamespaces}" TextWrapping="Wrap" />
-                  </StackPanel>
-                </StackPanel>
-              </Border>
-              <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.NoLoadedPlugins}}" Classes="muted" IsVisible="{Binding !HasProviderGroups}" TextWrapping="Wrap" />
-              <ItemsControl x:Name="PluginProviderGroups" ItemsSource="{Binding ProviderGroups}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="toolsVm:PluginProviderGroup">
-                    <StackPanel Spacing="12" Margin="0,0,0,24">
-                      <StackPanel Orientation="Horizontal" Spacing="10">
-                        <TextBlock Text="{Binding Name}" Classes="section" />
-                        <TextBlock Text="{Binding Count}" Classes="caption" VerticalAlignment="Center" />
-                      </StackPanel>
-                      <ItemsControl ItemsSource="{Binding Items}">
-                        <ItemsControl.ItemTemplate>
-                          <DataTemplate x:DataType="toolsVm:PluginInformation">
-                            <Border Classes="card" Margin="0,0,0,12">
-                              <StackPanel Spacing="12">
-                                <StackPanel Spacing="4">
-                                  <TextBlock Text="{Binding Name}" Classes="section" TextWrapping="Wrap" />
-                                  <SelectableTextBlock Text="{Binding Id}" FontFamily="{DynamicResource Font.Code}" FontSize="12" Foreground="{DynamicResource Brush.TextSecondary}" TextWrapping="Wrap" />
-                                  <TextBlock Text="{Binding PluginSummary}" Classes="caption" IsVisible="{Binding HasPluginSummary}" TextWrapping="Wrap" />
-                                </StackPanel>
-                                <TextBlock Text="{Binding Description}" Classes="muted" IsVisible="{Binding HasDescription}" TextWrapping="Wrap" />
-                                <ItemsControl ItemsSource="{Binding Capabilities}" ItemsPanel="{StaticResource PluginTagsPanel}" ItemTemplate="{StaticResource PluginCapabilityTemplate}" />
-                                <StackPanel Spacing="6" IsVisible="{Binding HasSupportedNamespaces}">
-                                  <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.SupportedNamespaces}}" Classes="caption" />
-                                  <ItemsControl ItemsSource="{Binding SupportedNamespaces}" ItemsPanel="{StaticResource PluginTagsPanel}" ItemTemplate="{StaticResource PluginNamespaceTemplate}" />
-                                </StackPanel>
-                                <StackPanel Spacing="6" IsVisible="{Binding HasPlayableNamespaces}">
-                                  <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.PlayableNamespaces}}" Classes="caption" />
-                                  <ItemsControl Classes="playableNamespaces" ItemsSource="{Binding PlayableNamespaces}" ItemsPanel="{StaticResource PluginTagsPanel}" ItemTemplate="{StaticResource PluginNamespaceTemplate}" />
-                                </StackPanel>
-                                <Expander Classes="pluginDetails" Header="{Translate {x:Static i18n:LanguageManager+Keys.PluginDetails}}" IsVisible="{Binding HasDetails}">
-                                  <ItemsControl ItemsSource="{Binding Details}" ItemTemplate="{StaticResource PluginDetailTemplate}" Margin="0,12,0,0" />
-                                </Expander>
-                              </StackPanel>
-                            </Border>
-                          </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                      </ItemsControl>
-                    </StackPanel>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-              <Border Background="{DynamicResource Brush.DangerSoft}" CornerRadius="10" Padding="20" IsVisible="{Binding HasPluginFailures}">
-                <StackPanel Spacing="12">
-                  <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.PluginLoadFailures}}" Classes="section" Foreground="{DynamicResource Brush.Danger}" />
-                  <ItemsControl ItemsSource="{Binding PluginFailures}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="toolsVm:PluginDetail">
-                        <StackPanel Spacing="4" Margin="0,0,0,8">
-                          <TextBlock Text="{Binding Label}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                          <SelectableTextBlock Text="{Binding Value}" TextWrapping="Wrap" />
-                        </StackPanel>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </StackPanel>
-              </Border>
-            </StackPanel>
-          </ScrollViewer>
-        </TabItem>
-        <TabItem Header="{Translate {x:Static i18n:LanguageManager+Keys.Decoders}}">
-          <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Spacing="18" Margin="0,16,12,16">
-              <Border Classes="card">
-                <StackPanel Spacing="10">
-                  <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.PreferredDecoder}}" Classes="section" />
-                  <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.PreferredDecoderDescription}}" Classes="muted" TextWrapping="Wrap" />
-                  <ComboBox ItemsSource="{Binding DecoderOptions}" SelectedIndex="{Binding SelectedDecoderIndex}" HorizontalAlignment="Stretch" />
-                </StackPanel>
-              </Border>
-              <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.NoDecoders}}" Classes="muted" IsVisible="{Binding !HasDecoders}" TextWrapping="Wrap" />
-              <ItemsControl ItemsSource="{Binding Decoders}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="toolsVm:DecoderInformation">
-                    <Border Classes="card" Margin="0,0,0,12">
-                      <StackPanel Spacing="10">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                          <TextBlock Text="{Binding Name}" Classes="section" TextWrapping="Wrap" />
-                          <Border Classes="capabilityTag" IsVisible="{Binding IsPreferred}">
-                            <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Preferred}}" Classes="caption" />
-                          </Border>
-                        </StackPanel>
-                        <SelectableTextBlock Text="{Binding Id}" FontFamily="{DynamicResource Font.Code}" FontSize="12" Foreground="{DynamicResource Brush.TextSecondary}" />
-                        <TextBlock Text="{Binding Description}" Classes="muted" IsVisible="{Binding HasDescription}" TextWrapping="Wrap" />
-                        <StackPanel Spacing="6">
-                          <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.SupportedFormats}}" Classes="caption" />
-                          <ItemsControl ItemsSource="{Binding SupportedExtensions}" ItemsPanel="{StaticResource PluginTagsPanel}" ItemTemplate="{StaticResource PluginNamespaceTemplate}" />
-                          <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.NoSupportedFormats}}" Classes="caption" IsVisible="{Binding !HasSupportedExtensions}" />
-                        </StackPanel>
-                      </StackPanel>
+<UserControl
+    x:Class="LemonNeo.Desktop.Views.Tools.ToolsView"
+    x:DataType="toolsVm:ToolsViewModel"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:i18n="using:LemonNeo.Desktop.Services"
+    xmlns:sharedControls="using:LemonNeo.Desktop.Controls.Shared"
+    xmlns:toolsVm="using:LemonNeo.Desktop.ViewModels.Tools"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Resources>
+        <ItemsPanelTemplate x:Key="PluginTagsPanel">
+            <WrapPanel />
+        </ItemsPanelTemplate>
+        <DataTemplate x:DataType="x:String" x:Key="PluginNamespaceTemplate">
+            <Border Classes="namespaceTag">
+                <SelectableTextBlock
+                    FontFamily="{DynamicResource Font.Code}"
+                    FontSize="12"
+                    Text="{Binding}"
+                    TextWrapping="Wrap" />
+            </Border>
+        </DataTemplate>
+        <DataTemplate x:DataType="x:String" x:Key="PluginCapabilityTemplate">
+            <Border Classes="capabilityTag">
+                <TextBlock
+                    Classes="caption"
+                    Text="{Binding}"
+                    TextWrapping="Wrap" />
+            </Border>
+        </DataTemplate>
+        <DataTemplate x:DataType="toolsVm:PluginDetail" x:Key="PluginDetailTemplate">
+            <Grid ColumnDefinitions="auto,*" Margin="0,0,0,10">
+                <TextBlock
+                    Classes="caption"
+                    Margin="0,2,12,0"
+                    Text="{Binding Label}"
+                    TextWrapping="Wrap" />
+                <SelectableTextBlock
+                    Grid.Column="1"
+                    Text="{Binding Value}"
+                    TextWrapping="Wrap" />
+            </Grid>
+        </DataTemplate>
+        <DataTemplate x:DataType="toolsVm:DependencyInformation" x:Key="DependencyTemplate">
+            <Border Classes="dependencyRow">
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
+                    <TextBlock
+                        FontWeight="SemiBold"
+                        Margin="0,0,12,0"
+                        Text="{Binding Name}"
+                        TextWrapping="Wrap" />
+                    <Border Classes="licenseTag" Grid.Column="1">
+                        <TextBlock
+                            FontSize="12"
+                            Text="{Binding License}"
+                            TextWrapping="Wrap" />
                     </Border>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </StackPanel>
-          </ScrollViewer>
-        </TabItem>
-        <TabItem Header="{Translate {x:Static i18n:LanguageManager+Keys.Help}}">
-          <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-            <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.HelpText}}" TextWrapping="Wrap" LineHeight="26" Margin="0,16,12,16" />
-          </ScrollViewer>
-        </TabItem>
-      </TabControl>
+                    <TextBlock
+                        Classes="caption"
+                        Grid.Row="1"
+                        Margin="0,5,12,0"
+                        Text="{Binding Version}" />
+                    <Button
+                        Classes="ghost dependencyLink"
+                        Click="OnDependencyWebsiteClicked"
+                        Grid.ColumnSpan="2"
+                        Grid.Row="2"
+                        HorizontalAlignment="Left"
+                        IsVisible="{Binding HasWebsite}"
+                        Tag="{Binding Website}">
+                        <StackPanel Orientation="Horizontal" Spacing="7">
+                            <TextBlock Text="{Binding Website}" TextWrapping="Wrap" />
+                            <Path
+                                Classes="icon"
+                                Data="{StaticResource Icon.ExternalLink}"
+                                Height="14"
+                                Stretch="Uniform"
+                                VerticalAlignment="Center"
+                                Width="14" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+    <UserControl.Styles>
+        <Style Selector="Border.namespaceTag, Border.capabilityTag">
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="9,5" />
+            <Setter Property="Margin" Value="0,0,8,6" />
+            <Setter Property="Background" Value="{DynamicResource Brush.Hover}" />
+        </Style>
+        <Style Selector="ItemsControl.playableNamespaces Border.namespaceTag">
+            <Setter Property="Background" Value="{DynamicResource Brush.AccentSoft}" />
+        </Style>
+        <Style Selector="ItemsControl.playableNamespaces SelectableTextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Brush.AccentText}" />
+        </Style>
+        <Style Selector="Expander.pluginDetails">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        </Style>
+        <Style Selector="Border.dependencyRow">
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="12" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+            <Setter Property="Background" Value="{DynamicResource Brush.Hover}" />
+        </Style>
+        <Style Selector="Border.licenseTag">
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="9,4" />
+            <Setter Property="Background" Value="{DynamicResource Brush.AccentSoft}" />
+        </Style>
+        <Style Selector="Border.licenseTag TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Brush.AccentText}" />
+        </Style>
+        <Style Selector="Button.dependencyLink">
+            <Setter Property="Padding" Value="0,7,8,0" />
+            <Setter Property="Foreground" Value="{DynamicResource Brush.AccentText}" />
+        </Style>
+        <Style Selector="Button.dependencyLink Path.icon">
+            <Setter Property="Fill" Value="{DynamicResource Brush.AccentText}" />
+        </Style>
+    </UserControl.Styles>
+    <Grid RowDefinitions="Auto,Auto,*">
+        <sharedControls:PageHeader Summary="{Binding PageSummary}" Title="{Binding PageTitle}">
+            <sharedControls:PageHeader.Actions>
+                <StackPanel
+                    IsVisible="{Binding IsBusy}"
+                    Orientation="Horizontal"
+                    Spacing="10"
+                    ToolTip.Tip="{Binding Status}">
+                    <ProgressBar
+                        AutomationProperties.Name="{Binding Status}"
+                        Height="3"
+                        IsIndeterminate="True"
+                        VerticalAlignment="Center"
+                        Width="60" />
+                    <Button
+                        Classes="ghost"
+                        Command="{Binding CancelOperationCommand}"
+                        Content="{Translate {x:Static i18n:LanguageManager+Keys.CancelOperation}}" />
+                </StackPanel>
+            </sharedControls:PageHeader.Actions>
+        </sharedControls:PageHeader>
+        <Border
+            Background="{DynamicResource Brush.DangerSoft}"
+            CornerRadius="10"
+            Grid.Row="1"
+            IsVisible="{Binding HasError}"
+            Margin="0,0,0,12"
+            Padding="14">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock
+                    Foreground="{DynamicResource Brush.Danger}"
+                    MaxHeight="90"
+                    Text="{Binding Error}"
+                    TextWrapping="Wrap" />
+                <Button
+                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}"
+                    Classes="ghost icon"
+                    Command="{Binding DismissErrorCommand}"
+                    Grid.Column="1">
+                    <Path Classes="icon" Data="{StaticResource Icon.Close}" />
+                </Button>
+            </Grid>
+        </Border>
+        <Grid Grid.Row="2">
+            <TabControl>
+                <TabItem Header="{Translate {x:Static i18n:LanguageManager+Keys.Plugins}}">
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Margin="0,16,12,16" Spacing="18">
+                            <Border Classes="card">
+                                <StackPanel Spacing="16">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.PluginOverview}}" />
+                                        <TextBlock
+                                            Classes="muted"
+                                            Text="{Binding PluginSummary}"
+                                            TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <StackPanel Spacing="8">
+                                        <TextBlock FontWeight="SemiBold" Text="{Translate {x:Static i18n:LanguageManager+Keys.SupportedNamespaces}}" />
+                                        <ItemsControl
+                                            ItemTemplate="{StaticResource PluginNamespaceTemplate}"
+                                            ItemsPanel="{StaticResource PluginTagsPanel}"
+                                            ItemsSource="{Binding SupportedNamespaces}"
+                                            x:Name="SupportedNamespacesList" />
+                                        <TextBlock
+                                            Classes="caption"
+                                            IsVisible="{Binding !HasSupportedNamespaces}"
+                                            Text="{Translate {x:Static i18n:LanguageManager+Keys.NoSupportedNamespaces}}"
+                                            TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <StackPanel Spacing="8">
+                                        <TextBlock FontWeight="SemiBold" Text="{Translate {x:Static i18n:LanguageManager+Keys.PlayableNamespaces}}" />
+                                        <ItemsControl
+                                            Classes="playableNamespaces"
+                                            ItemTemplate="{StaticResource PluginNamespaceTemplate}"
+                                            ItemsPanel="{StaticResource PluginTagsPanel}"
+                                            ItemsSource="{Binding PlayableNamespaces}"
+                                            x:Name="PlayableNamespacesList" />
+                                        <TextBlock
+                                            Classes="caption"
+                                            IsVisible="{Binding !HasPlayableNamespaces}"
+                                            Text="{Translate {x:Static i18n:LanguageManager+Keys.NoPlayableNamespaces}}"
+                                            TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                            <TextBlock
+                                Classes="muted"
+                                IsVisible="{Binding !HasProviderGroups}"
+                                Text="{Translate {x:Static i18n:LanguageManager+Keys.NoLoadedPlugins}}"
+                                TextWrapping="Wrap" />
+                            <ItemsControl ItemsSource="{Binding ProviderGroups}" x:Name="PluginProviderGroups">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="toolsVm:PluginProviderGroup">
+                                        <StackPanel Margin="0,0,0,24" Spacing="12">
+                                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                                <TextBlock Classes="section" Text="{Binding Name}" />
+                                                <TextBlock
+                                                    Classes="caption"
+                                                    Text="{Binding Count}"
+                                                    VerticalAlignment="Center" />
+                                            </StackPanel>
+                                            <ItemsControl ItemsSource="{Binding Items}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="toolsVm:PluginInformation">
+                                                        <Border Classes="card" Margin="0,0,0,12">
+                                                            <StackPanel Spacing="12">
+                                                                <StackPanel Spacing="4">
+                                                                    <TextBlock
+                                                                        Classes="section"
+                                                                        Text="{Binding Name}"
+                                                                        TextWrapping="Wrap" />
+                                                                    <SelectableTextBlock
+                                                                        FontFamily="{DynamicResource Font.Code}"
+                                                                        FontSize="12"
+                                                                        Foreground="{DynamicResource Brush.TextSecondary}"
+                                                                        Text="{Binding Id}"
+                                                                        TextWrapping="Wrap" />
+                                                                    <TextBlock
+                                                                        Classes="caption"
+                                                                        IsVisible="{Binding HasPluginSummary}"
+                                                                        Text="{Binding PluginSummary}"
+                                                                        TextWrapping="Wrap" />
+                                                                </StackPanel>
+                                                                <TextBlock
+                                                                    Classes="muted"
+                                                                    IsVisible="{Binding HasDescription}"
+                                                                    Text="{Binding Description}"
+                                                                    TextWrapping="Wrap" />
+                                                                <ItemsControl
+                                                                    ItemTemplate="{StaticResource PluginCapabilityTemplate}"
+                                                                    ItemsPanel="{StaticResource PluginTagsPanel}"
+                                                                    ItemsSource="{Binding Capabilities}" />
+                                                                <StackPanel IsVisible="{Binding HasSupportedNamespaces}" Spacing="6">
+                                                                    <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.SupportedNamespaces}}" />
+                                                                    <ItemsControl
+                                                                        ItemTemplate="{StaticResource PluginNamespaceTemplate}"
+                                                                        ItemsPanel="{StaticResource PluginTagsPanel}"
+                                                                        ItemsSource="{Binding SupportedNamespaces}" />
+                                                                </StackPanel>
+                                                                <StackPanel IsVisible="{Binding HasPlayableNamespaces}" Spacing="6">
+                                                                    <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.PlayableNamespaces}}" />
+                                                                    <ItemsControl
+                                                                        Classes="playableNamespaces"
+                                                                        ItemTemplate="{StaticResource PluginNamespaceTemplate}"
+                                                                        ItemsPanel="{StaticResource PluginTagsPanel}"
+                                                                        ItemsSource="{Binding PlayableNamespaces}" />
+                                                                </StackPanel>
+                                                                <Expander
+                                                                    Classes="pluginDetails"
+                                                                    Header="{Translate {x:Static i18n:LanguageManager+Keys.PluginDetails}}"
+                                                                    IsVisible="{Binding HasDetails}">
+                                                                    <ItemsControl
+                                                                        ItemTemplate="{StaticResource PluginDetailTemplate}"
+                                                                        ItemsSource="{Binding Details}"
+                                                                        Margin="0,12,0,0" />
+                                                                </Expander>
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Border
+                                Background="{DynamicResource Brush.DangerSoft}"
+                                CornerRadius="10"
+                                IsVisible="{Binding HasPluginFailures}"
+                                Padding="20">
+                                <StackPanel Spacing="12">
+                                    <TextBlock
+                                        Classes="section"
+                                        Foreground="{DynamicResource Brush.Danger}"
+                                        Text="{Translate {x:Static i18n:LanguageManager+Keys.PluginLoadFailures}}" />
+                                    <ItemsControl ItemsSource="{Binding PluginFailures}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="toolsVm:PluginDetail">
+                                                <StackPanel Margin="0,0,0,8" Spacing="4">
+                                                    <TextBlock
+                                                        FontWeight="SemiBold"
+                                                        Text="{Binding Label}"
+                                                        TextWrapping="Wrap" />
+                                                    <SelectableTextBlock Text="{Binding Value}" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+                <TabItem Header="{Translate {x:Static i18n:LanguageManager+Keys.Decoders}}">
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Margin="0,16,12,16" Spacing="18">
+                            <Border Classes="card">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.PreferredDecoder}}" />
+                                    <TextBlock
+                                        Classes="muted"
+                                        Text="{Translate {x:Static i18n:LanguageManager+Keys.PreferredDecoderDescription}}"
+                                        TextWrapping="Wrap" />
+                                    <ComboBox
+                                        HorizontalAlignment="Stretch"
+                                        ItemsSource="{Binding DecoderOptions}"
+                                        SelectedIndex="{Binding SelectedDecoderIndex}" />
+                                </StackPanel>
+                            </Border>
+                            <TextBlock
+                                Classes="muted"
+                                IsVisible="{Binding !HasDecoders}"
+                                Text="{Translate {x:Static i18n:LanguageManager+Keys.NoDecoders}}"
+                                TextWrapping="Wrap" />
+                            <ItemsControl ItemsSource="{Binding Decoders}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="toolsVm:DecoderInformation">
+                                        <Border Classes="card" Margin="0,0,0,12">
+                                            <StackPanel Spacing="10">
+                                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                                    <TextBlock
+                                                        Classes="section"
+                                                        Text="{Binding Name}"
+                                                        TextWrapping="Wrap" />
+                                                    <Border Classes="capabilityTag" IsVisible="{Binding IsPreferred}">
+                                                        <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.Preferred}}" />
+                                                    </Border>
+                                                </StackPanel>
+                                                <SelectableTextBlock
+                                                    FontFamily="{DynamicResource Font.Code}"
+                                                    FontSize="12"
+                                                    Foreground="{DynamicResource Brush.TextSecondary}"
+                                                    Text="{Binding Id}" />
+                                                <TextBlock
+                                                    Classes="muted"
+                                                    IsVisible="{Binding HasDescription}"
+                                                    Text="{Binding Description}"
+                                                    TextWrapping="Wrap" />
+                                                <StackPanel Spacing="6">
+                                                    <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.SupportedFormats}}" />
+                                                    <ItemsControl
+                                                        ItemTemplate="{StaticResource PluginNamespaceTemplate}"
+                                                        ItemsPanel="{StaticResource PluginTagsPanel}"
+                                                        ItemsSource="{Binding SupportedExtensions}" />
+                                                    <TextBlock
+                                                        Classes="caption"
+                                                        IsVisible="{Binding !HasSupportedExtensions}"
+                                                        Text="{Translate {x:Static i18n:LanguageManager+Keys.NoSupportedFormats}}" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+                <TabItem Header="{Translate {x:Static i18n:LanguageManager+Keys.About}}">
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Margin="0,16,12,16" Spacing="18">
+                            <Border Classes="card">
+                                <StackPanel HorizontalAlignment="Center" Spacing="18">
+                                    <StackPanel HorizontalAlignment="Center" Spacing="10">
+                                        <Border
+                                            Background="{DynamicResource Brush.AccentSoft}"
+                                            CornerRadius="16"
+                                            Height="72"
+                                            Padding="10"
+                                            Width="72">
+                                            <Image Source="/Resources/Icons/App.ico" Stretch="Uniform" />
+                                        </Border>
+                                        <TextBlock
+                                            FontSize="28"
+                                            FontWeight="SemiBold"
+                                            HorizontalAlignment="Center"
+                                            Text="{Binding ApplicationName}" />
+                                        <TextBlock
+                                            Classes="muted"
+                                            HorizontalAlignment="Center"
+                                            Text="{Binding ApplicationVersion}" />
+                                    </StackPanel>
+                                    <ItemsControl
+                                        HorizontalAlignment="Center"
+                                        ItemTemplate="{StaticResource PluginDetailTemplate}"
+                                        ItemsSource="{Binding ApplicationDetails}" />
+                                    <StackPanel
+                                        HorizontalAlignment="Center"
+                                        Margin="0,4,0,0"
+                                        Spacing="12">
+                                        <TextBlock
+                                            Classes="caption"
+                                            HorizontalAlignment="Center"
+                                            Text="{Binding CopyrightNotice}" />
+                                        <Button
+                                            Classes="primary"
+                                            Command="{Binding OpenRepositoryCommand}"
+                                            HorizontalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <Path
+                                                    Classes="icon"
+                                                    Data="{StaticResource Icon.ExternalLink}"
+                                                    Height="16"
+                                                    Stretch="Uniform"
+                                                    Width="16" />
+                                                <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.SourceCode}}" />
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <StackPanel Spacing="10">
+                                <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.ApplicationDependencies}}" />
+                                <Border Classes="card">
+                                    <ItemsControl ItemTemplate="{StaticResource DependencyTemplate}" ItemsSource="{Binding ApplicationDependencies}" />
+                                </Border>
+                            </StackPanel>
+
+                            <StackPanel Spacing="10">
+                                <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.PluginDependencies}}" />
+                                <ItemsControl ItemsSource="{Binding PluginDependencies}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="toolsVm:PluginDependencyGroup">
+                                            <Border Classes="card" Margin="0,0,0,12">
+                                                <StackPanel Spacing="12">
+                                                    <StackPanel Orientation="Horizontal" Spacing="10">
+                                                        <TextBlock
+                                                            FontSize="17"
+                                                            FontWeight="SemiBold"
+                                                            Text="{Binding Name}"
+                                                            TextWrapping="Wrap" />
+                                                        <TextBlock
+                                                            Classes="caption"
+                                                            Text="{Binding Version}"
+                                                            VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                    <ItemsControl
+                                                        IsVisible="{Binding HasDependencies}"
+                                                        ItemTemplate="{StaticResource DependencyTemplate}"
+                                                        ItemsSource="{Binding Dependencies}" />
+                                                    <TextBlock
+                                                        Classes="muted"
+                                                        IsVisible="{Binding !HasDependencies}"
+                                                        Text="{Translate {x:Static i18n:LanguageManager+Keys.NoThirdPartyDependencies}}" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+            </TabControl>
+        </Grid>
     </Grid>
-  </Grid>
 </UserControl>

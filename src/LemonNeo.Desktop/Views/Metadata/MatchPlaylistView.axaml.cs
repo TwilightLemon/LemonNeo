@@ -4,5 +4,8 @@ namespace LemonNeo.Desktop.Views.Metadata;
 
 public partial class MatchPlaylistView : UserControl
 {
-    public MatchPlaylistView() => InitializeComponent();
+    public MatchPlaylistView()
+    {
+        InitializeComponent();
+    }
 }

@@ -1,13 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="../../src/LemonNeo.Core/LemonNeo.Core.csproj" />
-    <ProjectReference Include="../../src/LemonNeo.Abstractions/LemonNeo.Abstractions.csproj" />
-    <ProjectReference Include="../../external/Lyricify-Lyrics-Helper/Lyricify.Lyrics.Helper/Lyricify.Lyrics.Helper.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="plugin.json" CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
+    <PropertyGroup>
+        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="../../src/LemonNeo.Core/LemonNeo.Core.csproj"/>
+        <ProjectReference Include="../../src/LemonNeo.Abstractions/LemonNeo.Abstractions.csproj"/>
+        <ProjectReference Include="../../external/Lyricify-Lyrics-Helper/Lyricify.Lyrics.Helper/Lyricify.Lyrics.Helper.csproj"/>
+    </ItemGroup>
+    <ItemGroup>
+        <None Include="plugin.json" CopyToOutputDirectory="PreserveNewest"/>
+        <None Include="../../external/Lyricify-Lyrics-Helper/LICENSE"
+              Link="licenses/Lyricify-Lyrics-Helper.LICENSE"
+              CopyToOutputDirectory="PreserveNewest"
+              CopyToPublishDirectory="PreserveNewest"/>
+    </ItemGroup>
 </Project>

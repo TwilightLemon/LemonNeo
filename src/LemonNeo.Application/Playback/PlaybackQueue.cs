@@ -1,6 +1,6 @@
+using System.Collections.Immutable;
 using LemonNeo.Core.Music;
 using LemonNeo.Core.Playback;
-using System.Collections.Immutable;
 
 namespace LemonNeo.Application.Playback;
 
@@ -32,9 +32,9 @@ public sealed class PlaybackQueue : IPlaybackQueue
     private readonly List<PlaybackQueueItem> _items = [];
     private readonly List<Guid> _shuffleOrder = [];
     private Guid? _currentItemId;
-    private int _shuffleCursor = -1;
     private PlaybackMode _mode;
     private PlaybackRequest _request = new();
+    private int _shuffleCursor = -1;
 
     public IReadOnlyList<PlaybackQueueItem> Items
     {
@@ -117,9 +117,7 @@ public sealed class PlaybackQueue : IPlaybackQueue
             _shuffleOrder.AddRange(_items.Select(item => item.Id).Where(id => !_shuffleOrder.Contains(id)));
             _shuffleCursor = _currentItemId is { } id ? _shuffleOrder.IndexOf(id) : -1;
             if (_mode == PlaybackMode.Shuffle && _shuffleCursor < 0 && _items.Count > 0)
-            {
                 StartShuffleCycle(_items[0].Id);
-            }
         }
     }
 
@@ -153,21 +151,16 @@ public sealed class PlaybackQueue : IPlaybackQueue
             }
 
             if (startIndex < 0 || startIndex >= replacements.Count)
-            {
                 throw new ArgumentOutOfRangeException(
                     nameof(startIndex),
                     $"Start index must be between 0 and {replacements.Count - 1}.");
-            }
 
             _items.Clear();
             _items.AddRange(replacements);
             _currentItemId = _items[startIndex].Id;
             _shuffleOrder.Clear();
             _shuffleCursor = -1;
-            if (_mode == PlaybackMode.Shuffle)
-            {
-                StartShuffleCycle(_currentItemId.Value);
-            }
+            if (_mode == PlaybackMode.Shuffle) StartShuffleCycle(_currentItemId.Value);
         }
     }
 
@@ -178,10 +171,7 @@ public sealed class PlaybackQueue : IPlaybackQueue
         {
             var item = new PlaybackQueueItem { Track = track };
             _items.Add(item);
-            if (_currentItemId is null)
-            {
-                _currentItemId = item.Id;
-            }
+            if (_currentItemId is null) _currentItemId = item.Id;
 
             if (_mode == PlaybackMode.Shuffle)
             {
@@ -217,10 +207,7 @@ public sealed class PlaybackQueue : IPlaybackQueue
         lock (_gate)
         {
             var index = _items.FindIndex(item => item.Id == itemId);
-            if (index < 0)
-            {
-                return false;
-            }
+            if (index < 0) return false;
 
             var wasCurrent = _currentItemId == itemId;
             _items.RemoveAt(index);
@@ -228,10 +215,7 @@ public sealed class PlaybackQueue : IPlaybackQueue
             if (shuffleIndex >= 0)
             {
                 _shuffleOrder.RemoveAt(shuffleIndex);
-                if (shuffleIndex <= _shuffleCursor)
-                {
-                    _shuffleCursor--;
-                }
+                if (shuffleIndex <= _shuffleCursor) _shuffleCursor--;
             }
 
             if (wasCurrent)
@@ -240,9 +224,7 @@ public sealed class PlaybackQueue : IPlaybackQueue
                     ? null
                     : _items[Math.Min(index, _items.Count - 1)].Id;
                 if (_mode == PlaybackMode.Shuffle && _currentItemId is { } currentId)
-                {
                     _shuffleCursor = _shuffleOrder.IndexOf(currentId);
-                }
             }
 
             return true;
@@ -254,19 +236,13 @@ public sealed class PlaybackQueue : IPlaybackQueue
         lock (_gate)
         {
             var item = _items.FirstOrDefault(candidate => candidate.Id == itemId);
-            if (item is null)
-            {
-                return null;
-            }
+            if (item is null) return null;
 
             _currentItemId = item.Id;
             if (_mode == PlaybackMode.Shuffle)
             {
                 _shuffleCursor = _shuffleOrder.IndexOf(item.Id);
-                if (_shuffleCursor < 0)
-                {
-                    StartShuffleCycle(item.Id);
-                }
+                if (_shuffleCursor < 0) StartShuffleCycle(item.Id);
             }
 
             return item;
@@ -277,10 +253,7 @@ public sealed class PlaybackQueue : IPlaybackQueue
     {
         lock (_gate)
         {
-            if (_items.Count == 0)
-            {
-                return null;
-            }
+            if (_items.Count == 0) return null;
 
             if (_currentItemId is null)
             {
@@ -288,10 +261,7 @@ public sealed class PlaybackQueue : IPlaybackQueue
                 return _items[0];
             }
 
-            if (_mode == PlaybackMode.Shuffle)
-            {
-                return MoveNextShuffle();
-            }
+            if (_mode == PlaybackMode.Shuffle) return MoveNextShuffle();
 
             var currentIndex = _items.FindIndex(item => item.Id == _currentItemId);
             if (currentIndex < _items.Count - 1)
@@ -314,17 +284,11 @@ public sealed class PlaybackQueue : IPlaybackQueue
     {
         lock (_gate)
         {
-            if (_items.Count == 0 || _currentItemId is null)
-            {
-                return null;
-            }
+            if (_items.Count == 0 || _currentItemId is null) return null;
 
             if (_mode == PlaybackMode.Shuffle)
             {
-                if (_shuffleCursor <= 0)
-                {
-                    return null;
-                }
+                if (_shuffleCursor <= 0) return null;
 
                 _shuffleCursor--;
                 _currentItemId = _shuffleOrder[_shuffleCursor];
@@ -350,25 +314,16 @@ public sealed class PlaybackQueue : IPlaybackQueue
 
     public void SetMode(PlaybackMode mode)
     {
-        if (!Enum.IsDefined(mode))
-        {
-            throw new ArgumentOutOfRangeException(nameof(mode));
-        }
+        if (!Enum.IsDefined(mode)) throw new ArgumentOutOfRangeException(nameof(mode));
 
         lock (_gate)
         {
-            if (_mode == mode)
-            {
-                return;
-            }
+            if (_mode == mode) return;
 
             _mode = mode;
             _shuffleOrder.Clear();
             _shuffleCursor = -1;
-            if (mode == PlaybackMode.Shuffle && _currentItemId is { } currentId)
-            {
-                StartShuffleCycle(currentId);
-            }
+            if (mode == PlaybackMode.Shuffle && _currentItemId is { } currentId) StartShuffleCycle(currentId);
         }
     }
 
@@ -392,9 +347,7 @@ public sealed class PlaybackQueue : IPlaybackQueue
     private PlaybackQueueItem? MoveNextShuffle()
     {
         if (_shuffleOrder.Count != _items.Count || _shuffleCursor < 0)
-        {
             StartShuffleCycle(_currentItemId ?? _items[0].Id);
-        }
 
         if (_shuffleCursor < _shuffleOrder.Count - 1)
         {
@@ -406,9 +359,7 @@ public sealed class PlaybackQueue : IPlaybackQueue
         var previousId = _currentItemId!.Value;
         StartShuffleCycle(null);
         if (_shuffleOrder.Count > 1 && _shuffleOrder[0] == previousId)
-        {
             (_shuffleOrder[0], _shuffleOrder[1]) = (_shuffleOrder[1], _shuffleOrder[0]);
-        }
 
         _shuffleCursor = 0;
         _currentItemId = _shuffleOrder[0];
@@ -423,10 +374,7 @@ public sealed class PlaybackQueue : IPlaybackQueue
         if (firstItemId is { } first)
         {
             var index = _shuffleOrder.IndexOf(first);
-            if (index > 0)
-            {
-                (_shuffleOrder[0], _shuffleOrder[index]) = (_shuffleOrder[index], _shuffleOrder[0]);
-            }
+            if (index > 0) (_shuffleOrder[0], _shuffleOrder[index]) = (_shuffleOrder[index], _shuffleOrder[0]);
         }
 
         _shuffleCursor = _shuffleOrder.Count == 0 ? -1 : 0;
@@ -441,10 +389,12 @@ public sealed class PlaybackQueue : IPlaybackQueue
         }
     }
 
-    private PlaybackQueueItem? FindCurrent() =>
-        _currentItemId is { } id
+    private PlaybackQueueItem? FindCurrent()
+    {
+        return _currentItemId is { } id
             ? _items.FirstOrDefault(item => item.Id == id)
             : null;
+    }
 
     private void ClearCore()
     {

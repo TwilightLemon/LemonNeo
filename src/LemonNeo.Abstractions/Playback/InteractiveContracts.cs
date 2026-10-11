@@ -26,8 +26,8 @@ public enum PlaybackCommand
 }
 
 /// <summary>
-/// Uses the original queue track, including metadata and ArtworkUri, rather than
-/// a source provider's replacement track. Restored selections remain stopped.
+///     Uses the original queue track, including metadata and ArtworkUri, rather than
+///     a source provider's replacement track. Restored selections remain stopped.
 /// </summary>
 public sealed record InteractivePlaybackSnapshot(
     PlayerState State,
@@ -42,14 +42,15 @@ public sealed class InteractivePlaybackChangedEventArgs(InteractivePlaybackSnaps
 }
 
 /// <summary>
-/// Platform-independent access to the host's playback authority. Events can run
-/// on background threads; subscribers must return promptly and unsubscribe at
-/// shutdown. ExecuteAsync serializes external commands and propagates failures.
+///     Platform-independent access to the host's playback authority. Events can run
+///     on background threads; subscribers must return promptly and unsubscribe at
+///     shutdown. ExecuteAsync serializes external commands and propagates failures.
 /// </summary>
 public interface IPlaybackInteraction
 {
     InteractivePlaybackSnapshot Snapshot { get; }
     event EventHandler<InteractivePlaybackChangedEventArgs>? Changed;
+
     Task ExecuteAsync(PlaybackCommand command, TimeSpan? position = null,
         CancellationToken cancellationToken = default);
 }

@@ -5,6 +5,8 @@ using LemonNeo.Core.Library;
 using LemonNeo.Core.Music;
 using LemonNeo.Core.Playback;
 using Microsoft.Extensions.Logging;
+using TagLib;
+using File = TagLib.File;
 
 namespace LemonNeo.Application.Library;
 
@@ -77,7 +79,8 @@ public sealed class FolderImportService(
             {
                 tracks.Add(CreateTrack(path));
             }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
+                                                  or ArgumentException)
             {
                 logger.LogDebug(exception, "Could not import local audio file {Path}.", path);
                 skipped.Add(path);
@@ -117,7 +120,7 @@ public sealed class FolderImportService(
 
         try
         {
-            using var file = TagLib.File.Create(fullPath, TagLib.ReadStyle.Average);
+            using var file = File.Create(fullPath, ReadStyle.Average);
             var tag = file.Tag;
             var artists = CleanNames(tag.Performers);
             if (artists.Length == 0) artists = CleanNames(tag.AlbumArtists);
@@ -132,18 +135,18 @@ public sealed class FolderImportService(
                 ArtworkUri = ReadArtwork(tag.Pictures)
             };
         }
-        catch (Exception exception) when (exception is TagLib.CorruptFileException or TagLib.UnsupportedFormatException or
-            IOException or UnauthorizedAccessException or ArgumentException)
+        catch (Exception exception) when (exception is CorruptFileException or UnsupportedFormatException or
+                                              IOException or UnauthorizedAccessException or ArgumentException)
         {
             logger.LogDebug(exception, "Could not read tags from {Path}; using its filename.", fullPath);
             return fallback;
         }
     }
 
-    private Uri? ReadArtwork(IEnumerable<TagLib.IPicture> pictures)
+    private Uri? ReadArtwork(IEnumerable<IPicture> pictures)
     {
         var artworkDirectory = Path.Combine(getCacheDirectory(), "Artwork");
-        foreach (var picture in pictures.OrderByDescending(picture => picture.Type == TagLib.PictureType.FrontCover))
+        foreach (var picture in pictures.OrderByDescending(picture => picture.Type == PictureType.FrontCover))
         {
             if (picture.Data.Count is <= 0 or > 16 * 1024 * 1024) continue;
             var bytes = picture.Data.Data;
@@ -154,12 +157,13 @@ public sealed class FolderImportService(
             {
                 Directory.CreateDirectory(artworkDirectory);
                 var path = Path.Combine(artworkDirectory, Convert.ToHexStringLower(SHA256.HashData(bytes)) + extension);
-                if (!File.Exists(path))
+                if (!System.IO.File.Exists(path))
                 {
                     temporary = Path.Combine(artworkDirectory, Guid.NewGuid().ToString("N") + ".part");
-                    File.WriteAllBytes(temporary, bytes);
-                    File.Move(temporary, path, overwrite: true);
+                    System.IO.File.WriteAllBytes(temporary, bytes);
+                    System.IO.File.Move(temporary, path, true);
                 }
+
                 return new Uri(Path.GetFullPath(path));
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
@@ -170,10 +174,16 @@ public sealed class FolderImportService(
             finally
             {
                 if (temporary is not null)
-                    try { File.Delete(temporary); }
-                    catch (Exception exception) when (exception is IOException or UnauthorizedAccessException) { }
+                    try
+                    {
+                        System.IO.File.Delete(temporary);
+                    }
+                    catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+                    {
+                    }
             }
         }
+
         return null;
     }
 
@@ -184,16 +194,24 @@ public sealed class FolderImportService(
         return value[0] == '.' ? value : "." + value;
     }
 
-    private static string? CleanText(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-    private static string[] CleanNames(IEnumerable<string> names) => names.Select(CleanText).OfType<string>()
-        .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    private static string? CleanText(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static string[] CleanNames(IEnumerable<string> names)
+    {
+        return names.Select(CleanText).OfType<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    }
 
     private static string? ImageExtension(ReadOnlySpan<byte> data)
     {
         if (data.StartsWith(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 })) return ".png";
         if (data.StartsWith(new byte[] { 255, 216, 255 })) return ".jpg";
         if (data.StartsWith("GIF87a"u8) || data.StartsWith("GIF89a"u8)) return ".gif";
-        if (data.Length >= 12 && data[..4].SequenceEqual("RIFF"u8) && data.Slice(8, 4).SequenceEqual("WEBP"u8)) return ".webp";
+        if (data.Length >= 12 && data[..4].SequenceEqual("RIFF"u8) && data.Slice(8, 4).SequenceEqual("WEBP"u8))
+            return ".webp";
         return null;
     }
 }

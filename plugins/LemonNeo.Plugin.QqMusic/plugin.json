@@ -3,5 +3,6 @@
   "name": "QQ Music User Library",
   "version": "1.0.0",
   "minimumHostVersion": "0.1.0",
-  "entryAssembly": "LemonNeo.Plugin.QqMusic.dll"
+  "entryAssembly": "LemonNeo.Plugin.QqMusic.dll",
+  "dependencies": []
 }

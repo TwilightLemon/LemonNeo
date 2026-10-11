@@ -27,13 +27,29 @@ internal sealed class AppPathProvider : IAppPathProvider
     public string PluginDirectory { get; } = Path.Combine(AppContext.BaseDirectory, "plugins");
     public string DataProtectionKeysDirectory { get; }
 
+    public string GetPackageConfigurationDirectory(string packageId)
+    {
+        PackageNames.Validate(packageId);
+        return Path.Combine(ConfigurationDirectory, packageId);
+    }
+
+    public string GetEntityConfigurationFile(string packageId, string entityName)
+    {
+        if (!PackageNames.IsIdentifier(entityName))
+            throw new ArgumentException("Invalid configuration entity name.", nameof(entityName));
+        return Path.Combine(GetPackageConfigurationDirectory(packageId), entityName + ".json");
+    }
+
+    public string GetPluginCredentialDirectory(string pluginId)
+    {
+        return Path.Combine(DataDirectory, "Credentials", SafeSegment(pluginId));
+    }
+
     public static AppPathProvider CreateDefault()
     {
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         if (string.IsNullOrWhiteSpace(home))
-        {
             throw new InvalidOperationException("The current user's home directory could not be determined.");
-        }
 
         string configurationRoot;
         string dataRoot;
@@ -75,21 +91,6 @@ internal sealed class AppPathProvider : IAppPathProvider
             libraryDirectory);
     }
 
-    public string GetPackageConfigurationDirectory(string packageId)
-    {
-        PackageNames.Validate(packageId);
-        return Path.Combine(ConfigurationDirectory, packageId);
-    }
-
-    public string GetEntityConfigurationFile(string packageId, string entityName)
-    {
-        if (!PackageNames.IsIdentifier(entityName)) throw new ArgumentException("Invalid configuration entity name.", nameof(entityName));
-        return Path.Combine(GetPackageConfigurationDirectory(packageId), entityName + ".json");
-    }
-
-    public string GetPluginCredentialDirectory(string pluginId) =>
-        Path.Combine(DataDirectory, "Credentials", SafeSegment(pluginId));
-
     private static string RequiredSpecialFolder(Environment.SpecialFolder folder)
     {
         var path = Environment.GetFolderPath(folder);
@@ -103,9 +104,7 @@ internal sealed class AppPathProvider : IAppPathProvider
         ArgumentException.ThrowIfNullOrWhiteSpace(value);
         if (value is "." or ".." || value.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
             value.Contains(Path.DirectorySeparatorChar) || value.Contains(Path.AltDirectorySeparatorChar))
-        {
             throw new ArgumentException("The identifier is not a safe path segment.", nameof(value));
-        }
 
         return value;
     }

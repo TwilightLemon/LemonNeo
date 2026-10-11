@@ -9,31 +9,37 @@ internal sealed class InteractiveLineEditor(
 {
     private const string PromptText = "lemon > ";
     private const int MaximumSuggestions = 5;
+    private readonly StringBuilder _buffer = new();
 
     private readonly IReadOnlyList<string> _history = history;
-    private readonly StringBuilder _buffer = new();
     private int _cursor;
-    private int _selectedSuggestion;
-    private bool _suggestionsHidden;
     private bool _historyNavigationActive;
-    private int _top;
-    private int _reservedLines;
+    private int _inputColumn;
     private LyricsFrame? _lastLyricsFrame;
     private int _lastLyricsWidth;
-    private int _windowWidth;
+    private int _reservedLines;
+    private int _selectedSuggestion;
+    private bool _suggestionsHidden;
+    private int _top;
     private int _windowHeight;
-    private int _inputColumn;
+    private int _windowWidth;
 
     private int LyricsLines => lyricsSource is null ? 0 : Math.Min(3, _reservedLines - 1);
     private int ContentLines => _reservedLines - LyricsLines;
 
     public static bool IsSupported =>
-        SupportsInteractiveInput(global::System.Console.IsInputRedirected,
-            global::System.Console.IsOutputRedirected, Environment.GetEnvironmentVariable("TERM"));
+        SupportsInteractiveInput(Console.IsInputRedirected,
+            Console.IsOutputRedirected, Environment.GetEnvironmentVariable("TERM"));
 
-    internal static bool SupportsInteractiveInput(bool inputRedirected, bool outputRedirected, string? term) =>
-        !inputRedirected && !outputRedirected &&
-        !string.Equals(term, "dumb", StringComparison.OrdinalIgnoreCase);
+    private int PromptWidth => Math.Min(CellWidth(PromptText), Math.Max(0, _windowWidth - 3));
+
+    private static int ViewportTop => OperatingSystem.IsWindows() ? Console.WindowTop : 0;
+
+    internal static bool SupportsInteractiveInput(bool inputRedirected, bool outputRedirected, string? term)
+    {
+        return !inputRedirected && !outputRedirected &&
+               !string.Equals(term, "dumb", StringComparison.OrdinalIgnoreCase);
+    }
 
     public string? ReadLine(CancellationToken cancellationToken)
     {
@@ -45,11 +51,11 @@ internal sealed class InteractiveLineEditor(
 
         var historyIndex = _history.Count;
         var historyDraft = string.Empty;
-        var treatControlCAsInput = global::System.Console.TreatControlCAsInput;
+        var treatControlCAsInput = Console.TreatControlCAsInput;
 
         try
         {
-            global::System.Console.TreatControlCAsInput = true;
+            Console.TreatControlCAsInput = true;
             ReserveDrawingArea();
             while (true)
             {
@@ -57,21 +63,18 @@ internal sealed class InteractiveLineEditor(
                 var completion = GetCompletion();
                 Render(completion);
 
-                while (!global::System.Console.KeyAvailable)
+                while (!Console.KeyAvailable)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     Thread.Sleep(50);
-                    if (_windowWidth != global::System.Console.WindowWidth ||
-                        _windowHeight != global::System.Console.WindowHeight)
-                    {
+                    if (_windowWidth != Console.WindowWidth ||
+                        _windowHeight != Console.WindowHeight)
                         Render(completion);
-                    }
                     else
-                    {
                         RenderLyrics();
-                    }
                 }
-                var key = global::System.Console.ReadKey(intercept: true);
+
+                var key = Console.ReadKey(true);
                 var control = (key.Modifiers & ConsoleModifiers.Control) != 0;
 
                 if (control && key.Key == ConsoleKey.C)
@@ -96,10 +99,7 @@ internal sealed class InteractiveLineEditor(
 
                 if (key.Key == ConsoleKey.Tab)
                 {
-                    if (completion.Suggestions.Count > 0)
-                    {
-                        ApplySuggestion(completion);
-                    }
+                    if (completion.Suggestions.Count > 0) ApplySuggestion(completion);
 
                     continue;
                 }
@@ -116,10 +116,7 @@ internal sealed class InteractiveLineEditor(
                     }
                     else if (_history.Count > 0 && historyIndex > 0)
                     {
-                        if (historyIndex == _history.Count)
-                        {
-                            historyDraft = _buffer.ToString();
-                        }
+                        if (historyIndex == _history.Count) historyDraft = _buffer.ToString();
 
                         historyIndex--;
                         SetHistoryBuffer(_history[historyIndex]);
@@ -235,12 +232,12 @@ internal sealed class InteractiveLineEditor(
             exception is IOException or PlatformNotSupportedException or ArgumentOutOfRangeException)
         {
             TryClearDrawingArea();
-            global::System.Console.Write(PromptText);
-            return global::System.Console.ReadLine();
+            Console.Write(PromptText);
+            return Console.ReadLine();
         }
         finally
         {
-            global::System.Console.TreatControlCAsInput = treatControlCAsInput;
+            Console.TreatControlCAsInput = treatControlCAsInput;
         }
     }
 
@@ -248,23 +245,15 @@ internal sealed class InteractiveLineEditor(
     {
         var completion = completionSource(_buffer.ToString(), _cursor);
         if (_historyNavigationActive)
-        {
             return completion with
             {
                 Suggestions = [],
                 Hint = "Browsing history · edit the command to enable suggestions"
             };
-        }
 
-        if (_suggestionsHidden)
-        {
-            return completion with { Suggestions = [] };
-        }
+        if (_suggestionsHidden) return completion with { Suggestions = [] };
 
-        if (_selectedSuggestion >= completion.Suggestions.Count)
-        {
-            _selectedSuggestion = 0;
-        }
+        if (_selectedSuggestion >= completion.Suggestions.Count) _selectedSuggestion = 0;
 
         return completion;
     }
@@ -296,10 +285,7 @@ internal sealed class InteractiveLineEditor(
         _buffer.Insert(completion.ReplaceStart, insertText);
         _cursor = completion.ReplaceStart + insertText.Length;
 
-        if (_cursor == _buffer.Length || !char.IsWhiteSpace(_buffer[_cursor]))
-        {
-            _buffer.Insert(_cursor++, ' ');
-        }
+        if (_cursor == _buffer.Length || !char.IsWhiteSpace(_buffer[_cursor])) _buffer.Insert(_cursor++, ' ');
 
         Changed();
     }
@@ -311,20 +297,17 @@ internal sealed class InteractiveLineEditor(
         MoveCursor(0, _top);
         RenderPromptAndInput(
             CreateViewport(value, _cursor, GetInputWidth()),
-            includeGhostText: false,
-            completion: null);
-        global::System.Console.WriteLine();
+            false,
+            null);
+        Console.WriteLine();
 
         return value;
     }
 
     private void ReserveDrawingArea()
     {
-        var lines = GetReservedLines(global::System.Console.WindowHeight);
-        for (var index = 0; index < lines; index++)
-        {
-            global::System.Console.WriteLine();
-        }
+        var lines = GetReservedLines(Console.WindowHeight);
+        for (var index = 0; index < lines; index++) Console.WriteLine();
 
         _reservedLines = 0;
         _lastLyricsFrame = null;
@@ -332,8 +315,8 @@ internal sealed class InteractiveLineEditor(
 
     private void Render(CommandCompletion completion)
     {
-        var width = global::System.Console.WindowWidth;
-        var height = global::System.Console.WindowHeight;
+        var width = Console.WindowWidth;
+        var height = Console.WindowHeight;
         if (width < 2 || height < 2)
             throw new PlatformNotSupportedException("The terminal has no usable drawing area.");
 
@@ -348,19 +331,15 @@ internal sealed class InteractiveLineEditor(
         MoveCursor(0, _top);
         var viewport = CreateViewport(_buffer.ToString(), _cursor, GetInputWidth());
         _inputColumn = Math.Min(PromptWidth + viewport.CursorOffset, width - 2);
-        RenderPromptAndInput(viewport, includeGhostText: true, completion);
+        RenderPromptAndInput(viewport, true, completion);
 
         var row = 1;
         if (completion.Suggestions.Count > 0 && row < ContentLines)
-        {
             RenderSuggestionBox(completion, ref row);
-        }
         else if (!string.IsNullOrWhiteSpace(completion.Hint) && row < ContentLines)
-        {
             WriteRow(row++, $"  ↳ {completion.Hint}", ConsoleColor.DarkGray);
-        }
 
-        RenderLyrics(force: true);
+        RenderLyrics(true);
         MoveCursor(_inputColumn, _top);
     }
 
@@ -377,14 +356,16 @@ internal sealed class InteractiveLineEditor(
             for (var row = 0; row < LyricsLines; row++)
             {
                 MoveCursor(0, _top + ContentLines + row);
-                global::System.Console.Write(new string(' ', width));
+                Console.Write(new string(' ', width));
             }
+
             var rows = frame.GetVisibleRows(LyricsLines);
             for (var row = 0; row < rows.Count; row++)
             {
                 MoveCursor(0, _top + _reservedLines - rows.Count + row);
                 LyricsRowRenderer.Render(rows[row], width);
             }
+
             _lastLyricsFrame = frame;
             _lastLyricsWidth = width;
         }
@@ -401,26 +382,24 @@ internal sealed class InteractiveLineEditor(
     {
         if (PromptWidth < CellWidth(PromptText))
         {
-            global::System.Console.Write(Truncate(PromptText, PromptWidth));
+            Console.Write(Truncate(PromptText, PromptWidth));
         }
         else
         {
             SetColor(ConsoleColor.Yellow);
-            global::System.Console.Write("lemon");
+            Console.Write("lemon");
             SetColor(ConsoleColor.DarkGray);
-            global::System.Console.Write(" > ");
+            Console.Write(" > ");
         }
-        if (viewport.LeftHidden)
-        {
-            global::System.Console.Write('…');
-        }
+
+        if (viewport.LeftHidden) Console.Write('…');
 
         RenderHighlightedInput(_buffer.ToString(), viewport.Start, viewport.Length);
 
         if (viewport.RightHidden)
         {
             SetColor(ConsoleColor.DarkGray);
-            global::System.Console.Write('…');
+            Console.Write('…');
         }
 
         if (includeGhostText &&
@@ -440,7 +419,7 @@ internal sealed class InteractiveLineEditor(
             {
                 SetColor(ConsoleColor.DarkGray);
                 var availableWidth = Math.Max(0, GetInputWidth() - viewport.DisplayWidth);
-                global::System.Console.Write(Truncate(proposed[typed.Length..], availableWidth));
+                Console.Write(Truncate(proposed[typed.Length..], availableWidth));
             }
         }
 
@@ -470,14 +449,12 @@ internal sealed class InteractiveLineEditor(
         }
 
         if (row < ContentLines)
-        {
             WriteRow(
                 row++,
                 completion.PreferSelection
                     ? "  └─ ↑↓ choose  Tab/Enter insert  clear input for history"
                     : "  └─ ↑↓ choose  Tab complete  clear input for history",
                 ConsoleColor.DarkGray);
-        }
     }
 
     private void WriteSuggestionRow(int relativeRow, CommandSuggestion suggestion, bool selected)
@@ -493,21 +470,15 @@ internal sealed class InteractiveLineEditor(
     {
         MoveCursor(0, _top + relativeRow);
         SetColor(color);
-        global::System.Console.Write(Truncate(value, Math.Max(1, global::System.Console.WindowWidth - 2)));
+        Console.Write(Truncate(value, Math.Max(1, Console.WindowWidth - 2)));
         ResetColor();
     }
 
     private static string Truncate(string value, int maximumWidth)
     {
-        if (maximumWidth <= 0)
-        {
-            return string.Empty;
-        }
+        if (maximumWidth <= 0) return string.Empty;
 
-        if (CellWidth(value) <= maximumWidth)
-        {
-            return value;
-        }
+        if (CellWidth(value) <= maximumWidth) return value;
 
         const string ellipsis = "…";
         var builder = new StringBuilder();
@@ -515,10 +486,7 @@ internal sealed class InteractiveLineEditor(
         foreach (var rune in value.EnumerateRunes())
         {
             var runeWidth = IsWide(rune.Value) ? 2 : 1;
-            if (width + runeWidth + 1 > maximumWidth)
-            {
-                break;
-            }
+            if (width + runeWidth + 1 > maximumWidth) break;
 
             builder.Append(rune.ToString());
             width += runeWidth;
@@ -530,16 +498,10 @@ internal sealed class InteractiveLineEditor(
     private static void RenderHighlightedInput(string input, int start, int length)
     {
         var firstNonWhitespace = 0;
-        while (firstNonWhitespace < input.Length && char.IsWhiteSpace(input[firstNonWhitespace]))
-        {
-            firstNonWhitespace++;
-        }
+        while (firstNonWhitespace < input.Length && char.IsWhiteSpace(input[firstNonWhitespace])) firstNonWhitespace++;
 
         var commandEnd = firstNonWhitespace;
-        while (commandEnd < input.Length && !char.IsWhiteSpace(input[commandEnd]))
-        {
-            commandEnd++;
-        }
+        while (commandEnd < input.Length && !char.IsWhiteSpace(input[commandEnd])) commandEnd++;
 
         var command = input[firstNonWhitespace..commandEnd];
         var commandColor = CommandCatalog.IsCommand(command)
@@ -555,20 +517,13 @@ internal sealed class InteractiveLineEditor(
         for (var index = 0; index < start; index++)
         {
             var character = input[index];
-            if (character == '"')
-            {
-                quoted = !quoted;
-            }
+            if (character == '"') quoted = !quoted;
 
             if (!quoted && char.IsWhiteSpace(character))
-            {
                 option = false;
-            }
             else if (!quoted && character == '-' &&
                      (index == 0 || char.IsWhiteSpace(input[index - 1])))
-            {
                 option = true;
-            }
         }
 
         var end = start + length;
@@ -576,38 +531,23 @@ internal sealed class InteractiveLineEditor(
         {
             var character = input[index];
             if (index >= firstNonWhitespace && index < commandEnd)
-            {
                 SetColor(commandColor);
-            }
             else if (character == '"' || quoted)
-            {
                 SetColor(ConsoleColor.Yellow);
-            }
             else if (option)
-            {
                 SetColor(ConsoleColor.Magenta);
-            }
             else
-            {
                 SetColor(char.IsWhiteSpace(character) ? ConsoleColor.DarkGray : ConsoleColor.White);
-            }
 
-            global::System.Console.Write(character);
+            Console.Write(character);
 
-            if (character == '"')
-            {
-                quoted = !quoted;
-            }
+            if (character == '"') quoted = !quoted;
 
             if (!quoted && char.IsWhiteSpace(character))
-            {
                 option = false;
-            }
             else if (!quoted && character == '-' &&
                      (index == 0 || char.IsWhiteSpace(input[index - 1])))
-            {
                 option = true;
-            }
         }
 
         ResetColor();
@@ -615,14 +555,14 @@ internal sealed class InteractiveLineEditor(
 
     private void ClearDrawingArea()
     {
-        var width = Math.Max(0, global::System.Console.WindowWidth - 1);
+        var width = Math.Max(0, Console.WindowWidth - 1);
         var blank = new string(' ', width);
         var viewportTop = ViewportTop;
-        var bottom = Math.Min(_top + _reservedLines, viewportTop + global::System.Console.WindowHeight);
+        var bottom = Math.Min(_top + _reservedLines, viewportTop + Console.WindowHeight);
         for (var row = Math.Max(_top, viewportTop); row < bottom; row++)
         {
             MoveCursor(0, row);
-            global::System.Console.Write(blank);
+            Console.Write(blank);
         }
     }
 
@@ -643,31 +583,28 @@ internal sealed class InteractiveLineEditor(
     private static int CellWidth(string value)
     {
         var width = 0;
-        foreach (var rune in value.EnumerateRunes())
-        {
-            width += IsWide(rune.Value) ? 2 : 1;
-        }
+        foreach (var rune in value.EnumerateRunes()) width += IsWide(rune.Value) ? 2 : 1;
 
         return width;
     }
 
-    private static bool IsWide(int value) =>
-        value is >= 0x1100 and <= 0x115f or
-        >= 0x2e80 and <= 0xa4cf or
-        >= 0xac00 and <= 0xd7a3 or
-        >= 0xf900 and <= 0xfaff or
-        >= 0xfe10 and <= 0xfe6f or
-        >= 0xff00 and <= 0xff60 or
-        >= 0xffe0 and <= 0xffe6 or
-        >= 0x1f300 and <= 0x1faff;
+    private static bool IsWide(int value)
+    {
+        return value is >= 0x1100 and <= 0x115f or
+            >= 0x2e80 and <= 0xa4cf or
+            >= 0xac00 and <= 0xd7a3 or
+            >= 0xf900 and <= 0xfaff or
+            >= 0xfe10 and <= 0xfe6f or
+            >= 0xff00 and <= 0xff60 or
+            >= 0xffe0 and <= 0xffe6 or
+            >= 0x1f300 and <= 0x1faff;
+    }
 
     private static InputViewport CreateViewport(string value, int cursor, int maximumWidth)
     {
         maximumWidth = Math.Max(1, maximumWidth);
         if (CellWidth(value) <= maximumWidth)
-        {
             return new InputViewport(0, value.Length, false, false, CellWidth(value[..cursor]), CellWidth(value));
-        }
 
         var beforeBudget = cursor < value.Length
             ? Math.Max(1, maximumWidth * 2 / 3)
@@ -679,10 +616,7 @@ internal sealed class InteractiveLineEditor(
             var previous = PreviousRuneStart(value, start);
             var runeWidth = RuneWidth(Rune.GetRuneAt(value, previous));
             var markerWidth = previous > 0 ? 1 : 0;
-            if (beforeWidth + runeWidth + markerWidth > beforeBudget)
-            {
-                break;
-            }
+            if (beforeWidth + runeWidth + markerWidth > beforeBudget) break;
 
             start = previous;
             beforeWidth += runeWidth;
@@ -697,20 +631,14 @@ internal sealed class InteractiveLineEditor(
             var runeWidth = RuneWidth(rune);
             var next = end + rune.Utf16SequenceLength;
             var markerWidth = next < value.Length ? 1 : 0;
-            if (usedWidth + runeWidth + markerWidth > maximumWidth)
-            {
-                break;
-            }
+            if (usedWidth + runeWidth + markerWidth > maximumWidth) break;
 
             end = next;
             usedWidth += runeWidth;
         }
 
         var rightHidden = end < value.Length;
-        if (rightHidden)
-        {
-            usedWidth++;
-        }
+        if (rightHidden) usedWidth++;
 
         return new InputViewport(
             start,
@@ -724,24 +652,46 @@ internal sealed class InteractiveLineEditor(
     private static int PreviousRuneStart(string value, int index)
     {
         var previous = index - 1;
-        if (previous > 0 && char.IsLowSurrogate(value[previous]) && char.IsHighSurrogate(value[previous - 1]))
-        {
-            previous--;
-        }
+        if (previous > 0 && char.IsLowSurrogate(value[previous]) &&
+            char.IsHighSurrogate(value[previous - 1])) previous--;
 
         return previous;
     }
 
-    private static int RuneWidth(Rune rune) => IsWide(rune.Value) ? 2 : 1;
+    private static int RuneWidth(Rune rune)
+    {
+        return IsWide(rune.Value) ? 2 : 1;
+    }
 
-    private int PromptWidth => Math.Min(CellWidth(PromptText), Math.Max(0, _windowWidth - 3));
+    private int GetInputWidth()
+    {
+        return Math.Max(1, _windowWidth - PromptWidth - 2);
+    }
 
-    private int GetInputWidth() => Math.Max(1, _windowWidth - PromptWidth - 2);
+    private int GetReservedLines(int height)
+    {
+        return Math.Min(MaximumSuggestions + 3 + (lyricsSource is null ? 0 : 3), Math.Max(2, height - 1));
+    }
 
-    private int GetReservedLines(int height) =>
-        Math.Min(MaximumSuggestions + 3 + (lyricsSource is null ? 0 : 3), Math.Max(2, height - 1));
+    private static void MoveCursor(int left, int top)
+    {
+        Console.SetCursorPosition(left, top);
+    }
 
-    private static int ViewportTop => OperatingSystem.IsWindows() ? global::System.Console.WindowTop : 0;
+    private static void SetColor(ConsoleColor color)
+    {
+        SetColorIfEnabled(color);
+    }
+
+    private static void SetColorIfEnabled(ConsoleColor color)
+    {
+        if (HighlightingTextWriter.CanUseColor) Console.ForegroundColor = color;
+    }
+
+    private static void ResetColor()
+    {
+        if (HighlightingTextWriter.CanUseColor) Console.ResetColor();
+    }
 
     private sealed record InputViewport(
         int Start,
@@ -750,26 +700,4 @@ internal sealed class InteractiveLineEditor(
         bool RightHidden,
         int CursorOffset,
         int DisplayWidth);
-
-    private static void MoveCursor(int left, int top) =>
-        global::System.Console.SetCursorPosition(left, top);
-
-    private static void SetColor(ConsoleColor color) =>
-        SetColorIfEnabled(color);
-
-    private static void SetColorIfEnabled(ConsoleColor color)
-    {
-        if (HighlightingTextWriter.CanUseColor)
-        {
-            global::System.Console.ForegroundColor = color;
-        }
-    }
-
-    private static void ResetColor()
-    {
-        if (HighlightingTextWriter.CanUseColor)
-        {
-            global::System.Console.ResetColor();
-        }
-    }
 }

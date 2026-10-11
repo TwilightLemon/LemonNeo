@@ -15,26 +15,31 @@ public sealed class SearchService(IProviderRegistry registry, IPlaybackSourcePro
         var sources = playbackSources.Sources.ToArray();
         if (sources.Length == 0) return [];
         var namespaces = sources.SelectMany(source => source.AcceptedIdSchemes.Select(scheme => scheme.Namespace))
-                                                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        bool Supported(Track track) => sources.Any(source =>
-            string.Equals(source.ProviderId, track.Id.ProviderId, StringComparison.OrdinalIgnoreCase) ||
-            track.ExternalIds.Any(id => source.AcceptedIdSchemes.Any(scheme => scheme.Accepts(id))));
+        bool Supported(Track track)
+        {
+            return sources.Any(source =>
+                string.Equals(source.ProviderId, track.Id.ProviderId, StringComparison.OrdinalIgnoreCase) ||
+                track.ExternalIds.Any(id => source.AcceptedIdSchemes.Any(scheme => scheme.Accepts(id))));
+        }
 
         var results = new List<SearchResult>();
         foreach (var provider in registry.Providers.Where(provider => provider is ISearchProvider))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            string?[] scopes = provider is ISearchNamespaceProvider scoped
+            var scopes = provider is ISearchNamespaceProvider scoped
                 ? scoped.SearchNamespaces.Where(namespaces.Contains).Distinct(StringComparer.OrdinalIgnoreCase)
                     .Order(StringComparer.OrdinalIgnoreCase).Cast<string?>().ToArray()
                 : [null];
             if (scopes.Length == 0) continue;
-            var found = await Task.WhenAll(scopes.Select(scope => SearchAsync(keyword, provider.Id, scope, cancellationToken)));
+            var found = await Task.WhenAll(scopes.Select(scope =>
+                SearchAsync(keyword, provider.Id, scope, cancellationToken)));
             var tracks = found.SelectMany(batch => batch).SelectMany(result => result.Tracks)
                 .Where(Supported).DistinctBy(track => track.Id).ToArray();
-            results.Add(new(provider.Id, tracks));
+            results.Add(new SearchResult(provider.Id, tracks));
         }
+
         return results;
     }
 
@@ -55,14 +60,12 @@ public sealed class SearchService(IProviderRegistry registry, IPlaybackSourcePro
         var results = new List<SearchResult>();
 
         foreach (var searchProvider in providers.OfType<ISearchProvider>())
-        {
             try
             {
                 var result = await searchProvider.SearchAsync(
                     new SearchRequest(keyword, SourceNamespace: sourceNamespace),
                     cancellationToken);
                 if (!string.IsNullOrWhiteSpace(sourceNamespace))
-                {
                     result = result with
                     {
                         Tracks = result.Tracks
@@ -73,15 +76,14 @@ public sealed class SearchService(IProviderRegistry registry, IPlaybackSourcePro
                                     StringComparison.OrdinalIgnoreCase)))
                             .ToArray()
                     };
-                }
 
                 results.Add(result);
             }
             catch (Exception exception) when (exception is not OperationCanceledException and not ProviderException)
             {
-                throw new ProviderException($"Search failed for provider '{((IMusicProvider)searchProvider).Id}'.", exception);
+                throw new ProviderException($"Search failed for provider '{((IMusicProvider)searchProvider).Id}'.",
+                    exception);
             }
-        }
 
         return results;
     }

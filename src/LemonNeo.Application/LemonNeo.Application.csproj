@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <ProjectReference Include="../LemonNeo.Core/LemonNeo.Core.csproj" />
-    <ProjectReference Include="../LemonNeo.Abstractions/LemonNeo.Abstractions.csproj" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
-    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.12" />
-    <PackageReference Include="TagLibSharp" Version="2.3.0" />
-  </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="../LemonNeo.Core/LemonNeo.Core.csproj"/>
+        <ProjectReference Include="../LemonNeo.Abstractions/LemonNeo.Abstractions.csproj"/>
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12"/>
+        <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.12"/>
+        <PackageReference Include="TagLibSharp" Version="2.3.0"/>
+    </ItemGroup>
 </Project>

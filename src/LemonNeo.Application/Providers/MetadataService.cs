@@ -6,9 +6,12 @@ namespace LemonNeo.Application.Providers;
 public sealed class MetadataService(IProviderRegistry registry)
 {
     //Lemon Neo定义的行为，只使用tiele + artists 来检索元数据
-    public static string GetTrackSearchKeyword(Track track) =>
-        string.Join(" ", new[] { track.Title }.Concat(track.Artists.Select(artist => artist.Name))
+    public static string GetTrackSearchKeyword(Track track)
+    {
+        return string.Join(" ", new[] { track.Title }.Concat(track.Artists.Select(artist => artist.Name))
             .Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Trim()));
+    }
+
     public async Task<MetadataLookupResult> LookupAsync(
         Track track,
         IReadOnlyList<string>? targetNamespaces = null,
@@ -22,7 +25,9 @@ public sealed class MetadataService(IProviderRegistry registry)
         var request = new MetadataLookupRequest
         {
             Track = track,
-            SearchKeyword = string.IsNullOrWhiteSpace(searchKeyword) ? GetTrackSearchKeyword(track) : searchKeyword.Trim(),
+            SearchKeyword = string.IsNullOrWhiteSpace(searchKeyword)
+                ? GetTrackSearchKeyword(track)
+                : searchKeyword.Trim(),
             TargetNamespaces = targetNamespaces ?? [],
             LimitPerSource = limitPerSource,
             MinimumConfidence = minimumConfidence
@@ -32,17 +37,15 @@ public sealed class MetadataService(IProviderRegistry registry)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (request.TargetNamespaces.Count > 0 && !provider.MetadataNamespaces.Any(ns =>
-                request.TargetNamespaces.Contains(ns, StringComparer.OrdinalIgnoreCase))) continue;
+                    request.TargetNamespaces.Contains(ns, StringComparer.OrdinalIgnoreCase))) continue;
             var providerId = ((IMusicProvider)provider).Id;
             try
             {
                 var result = await provider.LookupMetadataAsync(request, cancellationToken);
                 matches.AddRange(result.Matches.Where(match => request.TargetNamespaces.Count == 0 ||
-                    request.TargetNamespaces.Contains(match.SourceNamespace, StringComparer.OrdinalIgnoreCase)));
-                foreach (var error in result.SourceErrors)
-                {
-                    errors[$"{providerId}/{error.Key}"] = error.Value;
-                }
+                                                               request.TargetNamespaces.Contains(match.SourceNamespace,
+                                                                   StringComparer.OrdinalIgnoreCase)));
+                foreach (var error in result.SourceErrors) errors[$"{providerId}/{error.Key}"] = error.Value;
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -66,13 +69,10 @@ public sealed class MetadataService(IProviderRegistry registry)
         var lookup = await LookupAsync(
             track,
             targetNamespaces,
-            limitPerSource: 1,
+            1,
             cancellationToken: cancellationToken);
         var reliable = lookup.Matches.ToArray();
-        if (reliable.Length == 0)
-        {
-            return (track, lookup);
-        }
+        if (reliable.Length == 0) return (track, lookup);
 
         var best = reliable[0].Track;
         // An external-ID scheme is unique by namespace and kind. Metadata matching may
@@ -84,6 +84,7 @@ public sealed class MetadataService(IProviderRegistry registry)
             if (externalIds.Any(existing => SameScheme(existing, candidate))) continue;
             externalIds.Add(candidate);
         }
+
         var enriched = track with
         {
             Title = string.IsNullOrWhiteSpace(best.Title) ? track.Title : best.Title,
@@ -100,7 +101,9 @@ public sealed class MetadataService(IProviderRegistry registry)
         return (enriched, lookup);
     }
 
-    private static bool SameScheme(ExternalMusicId left, ExternalMusicId right) =>
-        string.Equals(left.Namespace, right.Namespace, StringComparison.OrdinalIgnoreCase) &&
-        string.Equals(left.Kind, right.Kind, StringComparison.OrdinalIgnoreCase);
+    private static bool SameScheme(ExternalMusicId left, ExternalMusicId right)
+    {
+        return string.Equals(left.Namespace, right.Namespace, StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(left.Kind, right.Kind, StringComparison.OrdinalIgnoreCase);
+    }
 }

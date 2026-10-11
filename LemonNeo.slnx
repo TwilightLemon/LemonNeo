@@ -1,24 +1,24 @@
 <Solution>
-  <Folder Name="/external/">
-    <Project Path="external/Lyricify-Lyrics-Helper/Lyricify.Lyrics.Helper/Lyricify.Lyrics.Helper.csproj" />
-  </Folder>
-  <Folder Name="/src/">
-    <Project Path="src/LemonNeo.Abstractions/LemonNeo.Abstractions.csproj" />
-    <Project Path="src/LemonNeo.Infrastructure/LemonNeo.Infrastructure.csproj" />
-    <Project Path="src/LemonNeo.Application/LemonNeo.Application.csproj" />
-    <Project Path="src/LemonNeo.Console/LemonNeo.Console.csproj" />
-    <Project Path="src/LemonNeo.Core/LemonNeo.Core.csproj" />
-    <Project Path="src/LemonNeo.Desktop/LemonNeo.Desktop.csproj" />
-    <Project Path="src/LemonNeo.Hosting/LemonNeo.Hosting.csproj" />
-  </Folder>
-  <Folder Name="/plugins/">
-    <Project Path="plugins/LemonNeo.Plugin.WindowsSmtc/LemonNeo.Plugin.WindowsSmtc.csproj" />
-    <Project Path="plugins/LemonNeo.Plugin.MacNowPlaying/LemonNeo.Plugin.MacNowPlaying.csproj" />
-    <Project Path="plugins/LemonNeo.Plugin.Bass/LemonNeo.Plugin.Bass.csproj" />
-    <Project Path="plugins/LemonNeo.Plugin.GdStudioNetease/LemonNeo.Plugin.GdStudioNetease.csproj" />
-    <Project Path="plugins/LemonNeo.Plugin.Lyricify/LemonNeo.Plugin.Lyricify.csproj" />
-    <Project Path="plugins/LemonNeo.Plugin.MockMusic/LemonNeo.Plugin.MockMusic.csproj" />
-    <Project Path="plugins/LemonNeo.Plugin.Netease/LemonNeo.Plugin.Netease.csproj" />
-    <Project Path="plugins/LemonNeo.Plugin.QqMusic/LemonNeo.Plugin.QqMusic.csproj" />
-  </Folder>
+    <Folder Name="/external/">
+        <Project Path="external/Lyricify-Lyrics-Helper/Lyricify.Lyrics.Helper/Lyricify.Lyrics.Helper.csproj"/>
+    </Folder>
+    <Folder Name="/src/">
+        <Project Path="src/LemonNeo.Abstractions/LemonNeo.Abstractions.csproj"/>
+        <Project Path="src/LemonNeo.Infrastructure/LemonNeo.Infrastructure.csproj"/>
+        <Project Path="src/LemonNeo.Application/LemonNeo.Application.csproj"/>
+        <Project Path="src/LemonNeo.Console/LemonNeo.Console.csproj"/>
+        <Project Path="src/LemonNeo.Core/LemonNeo.Core.csproj"/>
+        <Project Path="src/LemonNeo.Desktop/LemonNeo.Desktop.csproj"/>
+        <Project Path="src/LemonNeo.Hosting/LemonNeo.Hosting.csproj"/>
+    </Folder>
+    <Folder Name="/plugins/">
+        <Project Path="plugins/LemonNeo.Plugin.WindowsSmtc/LemonNeo.Plugin.WindowsSmtc.csproj"/>
+        <Project Path="plugins/LemonNeo.Plugin.MacNowPlaying/LemonNeo.Plugin.MacNowPlaying.csproj"/>
+        <Project Path="plugins/LemonNeo.Plugin.Bass/LemonNeo.Plugin.Bass.csproj"/>
+        <Project Path="plugins/LemonNeo.Plugin.GdStudioNetease/LemonNeo.Plugin.GdStudioNetease.csproj"/>
+        <Project Path="plugins/LemonNeo.Plugin.Lyricify/LemonNeo.Plugin.Lyricify.csproj"/>
+        <Project Path="plugins/LemonNeo.Plugin.MockMusic/LemonNeo.Plugin.MockMusic.csproj"/>
+        <Project Path="plugins/LemonNeo.Plugin.Netease/LemonNeo.Plugin.Netease.csproj"/>
+        <Project Path="plugins/LemonNeo.Plugin.QqMusic/LemonNeo.Plugin.QqMusic.csproj"/>
+    </Folder>
 </Solution>

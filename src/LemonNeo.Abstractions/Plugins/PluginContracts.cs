@@ -23,13 +23,16 @@ public interface IPluginContext
     IHttpClientFactory HttpClientFactory { get; }
     ISettingsScope Settings { get; }
     ICredentialVault Credentials { get; }
+
     /// <summary>
-    /// Gets the plugin's current private cache directory. Plugins should read this
-    /// property when starting an operation instead of retaining the returned path.
+    ///     Gets the plugin's current private cache directory. Plugins should read this
+    ///     property when starting an operation instead of retaining the returned path.
     /// </summary>
     string CacheDirectory { get; }
+
     /// <summary>Access to the host session for Interactive plugins.</summary>
     IPlaybackInteraction Playback => throw new NotSupportedException("This host does not expose playback interaction.");
+
     void RegisterProvider(IMusicProvider provider);
     void RegisterPlayer(IPlayerProvider player);
 }

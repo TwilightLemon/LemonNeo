@@ -3,32 +3,31 @@ using LemonNeo.Abstractions.Settings;
 using LemonNeo.Abstractions.Storage;
 using LemonNeo.Application.Library;
 using LemonNeo.Application.Playback;
+using LemonNeo.Hosting.Registration;
 using LemonNeo.Infrastructure.Paths;
 using LemonNeo.Infrastructure.Plugins;
-using LemonNeo.Hosting.Registration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace LemonNeo.Hosting;
 
 /// <summary>The shared Desktop/Console owner of configuration, plugins, playback and shutdown.</summary>
 public class AppHost : IAsyncDisposable
 {
-    private readonly ServiceProvider _services;
-    private readonly HostOptions _options;
     private readonly SemaphoreSlim _initializeGate = new(1, 1);
+    private readonly HostOptions _options;
+    private readonly ServiceProvider _services;
     private readonly object _stateGate = new();
+    private Task? _disposeTask;
     private bool _initializationStarted;
     private bool _initialized;
-    private bool _pluginsLoaded;
     private bool _libraryLoaded;
-    private Task? _disposeTask;
+    private bool _pluginsLoaded;
 
     public AppHost(IAppPathProvider paths, HostOptions options, Action<IServiceCollection>? configure = null)
     {
         Paths = paths;
         _options = options;
-        StorageLocations = new(options.LibraryDirectory, options.CacheDirectory);
+        StorageLocations = new HostStorageLocations(options.LibraryDirectory, options.CacheDirectory);
         var services = new ServiceCollection();
         services.AddInfrastructure(paths, StorageLocations);
         services.AddApplication(StorageLocations);
@@ -36,13 +35,25 @@ public class AppHost : IAsyncDisposable
         _services = services.BuildServiceProvider();
     }
 
-    public static IAppPathProvider CreateDefaultPaths() => AppPathProvider.CreateDefault();
-
     public IPluginDiagnostics Plugins => Get<IPluginDiagnostics>();
     public IAppPathProvider Paths { get; }
     public HostStorageLocations StorageLocations { get; }
     public IAppSettingsService Settings => Get<IAppSettingsService>();
-    public T Get<T>() where T : notnull => _services.GetRequiredService<T>();
+
+    public ValueTask DisposeAsync()
+    {
+        return new ValueTask(_disposeTask ??= DisposeCoreAsync());
+    }
+
+    public static IAppPathProvider CreateDefaultPaths()
+    {
+        return AppPathProvider.CreateDefault();
+    }
+
+    public T Get<T>() where T : notnull
+    {
+        return _services.GetRequiredService<T>();
+    }
 
     /// <summary>Sets host storage after bootstrap configuration is loaded and before runtime initialization begins.</summary>
     public void ConfigureInitialStorage(string libraryDirectory, string cacheDirectory)
@@ -62,7 +73,10 @@ public class AppHost : IAsyncDisposable
         try
         {
             if (_initialized) return;
-            lock (_stateGate) _initializationStarted = true;
+            lock (_stateGate)
+            {
+                _initializationStarted = true;
+            }
 
             await Settings.LoadAsync(cancellationToken);
             var playbackTask = Get<PlaybackSessionService>().InitializeAsync(cancellationToken);
@@ -84,10 +98,14 @@ public class AppHost : IAsyncDisposable
                 await Get<PluginLoader>().LoadFromDirectoryAsync(_options.PluginDirectory, cancellationToken);
                 _pluginsLoaded = true;
             }
+
             Settings.Start();
             _initialized = true;
         }
-        finally { _initializeGate.Release(); }
+        finally
+        {
+            _initializeGate.Release();
+        }
     }
 
     private async Task InitializeLibraryAsync(CancellationToken cancellationToken)
@@ -127,28 +145,40 @@ public class AppHost : IAsyncDisposable
                 throw new AggregateException("Could not change the music library or restore the previous library.",
                     changeError, restoreError);
             }
+
             throw;
         }
     }
 
     /// <summary>Changes where subsequent cache operations persist their values.</summary>
-    public void ChangeCacheDirectory(string directory) => StorageLocations.SetCacheDirectory(directory);
+    public void ChangeCacheDirectory(string directory)
+    {
+        StorageLocations.SetCacheDirectory(directory);
+    }
 
-    private static bool PathEquals(string first, string second) =>
-        string.Equals(first, second, OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
+    private static bool PathEquals(string first, string second)
+    {
+        return string.Equals(first, second, OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
             ? StringComparison.OrdinalIgnoreCase
             : StringComparison.Ordinal);
-
-    public ValueTask DisposeAsync() => new(_disposeTask ??= DisposeCoreAsync());
+    }
 
     private async Task DisposeCoreAsync()
     {
         List<Exception> errors = [];
+
         async Task Finish(Func<Task> action)
         {
-            try { await action(); }
-            catch (Exception exception) { errors.Add(exception); }
+            try
+            {
+                await action();
+            }
+            catch (Exception exception)
+            {
+                errors.Add(exception);
+            }
         }
+
         await Finish(Settings.StopAsync);
         await Finish(Get<PlaybackSessionService>().PrepareForShutdownAsync);
         await Finish(Get<PluginLoader>().ShutdownAsync);

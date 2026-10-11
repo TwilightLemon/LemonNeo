@@ -3,5 +3,6 @@
   "name": "Netease User Library",
   "version": "1.0.0",
   "minimumHostVersion": "0.1.0",
-  "entryAssembly": "LemonNeo.Plugin.Netease.dll"
+  "entryAssembly": "LemonNeo.Plugin.Netease.dll",
+  "dependencies": []
 }

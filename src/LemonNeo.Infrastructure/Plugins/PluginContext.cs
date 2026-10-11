@@ -17,17 +17,19 @@ internal sealed class PluginContext(
     Func<string> getCacheDirectory,
     IPlaybackInteraction? playback) : IPluginContext
 {
-    private readonly List<IMusicProvider> _registeredProviders = [];
     private readonly List<IPlayerProvider> _registeredPlayers = [];
+    private readonly List<IMusicProvider> _registeredProviders = [];
+    public IReadOnlyList<IMusicProvider> RegisteredProviders => _registeredProviders;
+    public IReadOnlyList<IPlayerProvider> RegisteredPlayers => _registeredPlayers;
 
     public ILoggerFactory LoggerFactory { get; } = loggerFactory;
     public IHttpClientFactory HttpClientFactory { get; } = httpClientFactory;
     public ISettingsScope Settings { get; } = settings;
     public ICredentialVault Credentials { get; } = credentials;
     public string CacheDirectory => getCacheDirectory();
-    public IPlaybackInteraction Playback => playback ?? throw new NotSupportedException("This host does not expose playback interaction.");
-    public IReadOnlyList<IMusicProvider> RegisteredProviders => _registeredProviders;
-    public IReadOnlyList<IPlayerProvider> RegisteredPlayers => _registeredPlayers;
+
+    public IPlaybackInteraction Playback =>
+        playback ?? throw new NotSupportedException("This host does not expose playback interaction.");
 
     public void RegisterProvider(IMusicProvider provider)
     {

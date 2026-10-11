@@ -1,10 +1,16 @@
+using CommunityToolkit.Mvvm.ComponentModel;
 using LemonNeo.Core.Music;
 using LemonNeo.Desktop.Services;
-using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace LemonNeo.Desktop.ViewModels.Shared;
 
-public sealed class TrackRow(Track track, int number, LocalizationService text, Guid? QueueItemId = null, Guid? PlaylistId = null, Guid? PlaylistItemId = null) : ObservableObject
+public sealed class TrackRow(
+    Track track,
+    int number,
+    LocalizationService text,
+    Guid? QueueItemId = null,
+    Guid? PlaylistId = null,
+    Guid? PlaylistItemId = null) : ObservableObject
 {
     private bool _isCurrent;
     private bool _isMarked;
@@ -15,17 +21,41 @@ public sealed class TrackRow(Track track, int number, LocalizationService text, 
     public Guid? QueueItemId { get; } = QueueItemId;
     public Guid? PlaylistId { get; } = PlaylistId;
     public Guid? PlaylistItemId { get; } = PlaylistItemId;
-    public bool IsCurrent { get => _isCurrent; set => SetProperty(ref _isCurrent, value); }
-    public bool IsMarked { get => _isMarked; set => SetProperty(ref _isMarked, value); }
-    public bool IsSelectionMode { get => _isSelectionMode; set => SetProperty(ref _isSelectionMode, value); }
+
+    public bool IsCurrent
+    {
+        get => _isCurrent;
+        set => SetProperty(ref _isCurrent, value);
+    }
+
+    public bool IsMarked
+    {
+        get => _isMarked;
+        set => SetProperty(ref _isMarked, value);
+    }
+
+    public bool IsSelectionMode
+    {
+        get => _isSelectionMode;
+        set => SetProperty(ref _isSelectionMode, value);
+    }
+
     public Uri? ArtworkUri => Track.ArtworkUri;
     public ArtworkService? ArtworkLoader { get; set; }
     public string Title => Track.Title;
     public string Identity => Track.Id.ToString();
-    public string Artists => Track.Artists.Count > 0 ? string.Join(" / ", Track.Artists.Select(a => a.Name)) : Text["UnknownArtist"];
+
+    public string Artists => Track.Artists.Count > 0
+        ? string.Join(" / ", Track.Artists.Select(a => a.Name))
+        : Text["UnknownArtist"];
+
     public string Album => Track.Album?.Title ?? Text["UnknownAlbum"];
     public string Duration => Track.Duration is { } value ? FormatTime(value) : "—";
-    public static string FormatTime(TimeSpan time) => time.TotalHours >= 1
-        ? $"{(long)time.TotalHours}:{time.Minutes:00}:{time.Seconds:00}"
-        : time.ToString(@"m\:ss");
+
+    public static string FormatTime(TimeSpan time)
+    {
+        return time.TotalHours >= 1
+            ? $"{(long)time.TotalHours}:{time.Minutes:00}:{time.Seconds:00}"
+            : time.ToString(@"m\:ss");
+    }
 }

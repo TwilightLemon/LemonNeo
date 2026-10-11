@@ -1,9 +1,9 @@
+using System.Runtime.CompilerServices;
 using LemonNeo.Abstractions.Plugins;
 using LemonNeo.Abstractions.Providers;
 using LemonNeo.Core.Lyrics;
 using LemonNeo.Core.Music;
 using LemonNeo.Core.Playback;
-using System.Runtime.CompilerServices;
 
 namespace LemonNeo.Plugin.MockMusic;
 
@@ -18,42 +18,42 @@ public sealed class MockMusicPlugin :
 {
     private static readonly IReadOnlyList<Track> Tracks =
     [
-        new Track
+        new()
         {
             Id = new MusicItemId("mock", "track-001"),
             Title = "Blinding Lights",
             Artists = [new ArtistRef { Name = "The Weeknd" }],
             Album = new AlbumRef { Title = "After Hours" }
         },
-        new Track
+        new()
         {
             Id = new MusicItemId("mock", "track-002"),
             Title = "Save Your Tears",
             Artists = [new ArtistRef { Name = "The Weeknd" }],
             Album = new AlbumRef { Title = "After Hours" }
         },
-        new Track
+        new()
         {
             Id = new MusicItemId("mock", "track-003"),
             Title = "Starboy",
             Artists = [new ArtistRef { Name = "The Weeknd" }],
             Album = new AlbumRef { Title = "Starboy" }
         },
-        new Track
+        new()
         {
             Id = new MusicItemId("mock", "track-004"),
             Title = "The Hills",
             Artists = [new ArtistRef { Name = "The Weeknd" }],
             Album = new AlbumRef { Title = "Beauty Behind the Madness" }
         },
-        new Track
+        new()
         {
             Id = new MusicItemId("mock", "track-005"),
             Title = "Can't Feel My Face",
             Artists = [new ArtistRef { Name = "The Weeknd" }],
             Album = new AlbumRef { Title = "Beauty Behind the Madness" }
         },
-        new Track
+        new()
         {
             Id = new MusicItemId("mock", "track-006"),
             Title = "Die For You",
@@ -96,12 +96,6 @@ public sealed class MockMusicPlugin :
         "Mock Music",
         "1.0.0");
 
-    public string Id => "mock";
-
-    ProviderDescriptor IMusicProvider.Descriptor { get; } = new(
-        "Mock Music",
-        "Deterministic music data for the Lemon Neo prototype.");
-
     public ValueTask InitializeAsync(IPluginContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -113,6 +107,53 @@ public sealed class MockMusicPlugin :
     {
         cancellationToken.ThrowIfCancellationRequested();
         return ValueTask.CompletedTask;
+    }
+
+    public Task<Lyrics?> GetLyricsAsync(
+        Track track,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var exists = Tracks.Any(candidate => candidate.Id == track.Id);
+        return Task.FromResult(exists
+            ? new Lyrics($"Mock lyrics for {track.Title}.", "en")
+            : null);
+    }
+
+    public string Id => "mock";
+
+    ProviderDescriptor IMusicProvider.Descriptor { get; } = new(
+        "Mock Music",
+        "Deterministic music data for the Lemon Neo prototype.");
+
+    public IReadOnlyCollection<MusicIdScheme> AcceptedIdSchemes => [];
+
+    public Task<PlaybackSource?> ResolvePlaybackAsync(
+        MusicItemId trackId,
+        PlaybackRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult<PlaybackSource?>(null);
+    }
+
+    public Task<RemotePlaylist?> GetPlaylistAsync(
+        string playlistId,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(Playlists.GetValueOrDefault(playlistId));
+    }
+
+    public async IAsyncEnumerable<RemotePlaylistSummary> GetUserPlaylistsAsync(
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        foreach (var playlist in Playlists.Values.OrderBy(playlist => playlist.Name, StringComparer.Ordinal))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await Task.Yield();
+            yield return new RemotePlaylistSummary(playlist.Id, playlist.Name, playlist.Tracks.Count);
+        }
     }
 
     public Task<SearchResult> SearchAsync(
@@ -138,46 +179,5 @@ public sealed class MockMusicPlugin :
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(Tracks.FirstOrDefault(track =>
             string.Equals(track.Id.RemoteId, trackId, StringComparison.OrdinalIgnoreCase)));
-    }
-
-    public Task<RemotePlaylist?> GetPlaylistAsync(
-        string playlistId,
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(Playlists.GetValueOrDefault(playlistId));
-    }
-
-    public async IAsyncEnumerable<RemotePlaylistSummary> GetUserPlaylistsAsync(
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
-    {
-        foreach (var playlist in Playlists.Values.OrderBy(playlist => playlist.Name, StringComparer.Ordinal))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            await Task.Yield();
-            yield return new RemotePlaylistSummary(playlist.Id, playlist.Name, playlist.Tracks.Count);
-        }
-    }
-
-    public IReadOnlyCollection<MusicIdScheme> AcceptedIdSchemes => [];
-
-    public Task<PlaybackSource?> ResolvePlaybackAsync(
-        MusicItemId trackId,
-        PlaybackRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult<PlaybackSource?>(null);
-    }
-
-    public Task<Lyrics?> GetLyricsAsync(
-        Track track,
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var exists = Tracks.Any(candidate => candidate.Id == track.Id);
-        return Task.FromResult<Lyrics?>(exists
-            ? new Lyrics($"Mock lyrics for {track.Title}.", "en")
-            : null);
     }
 }

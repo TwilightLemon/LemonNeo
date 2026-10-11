@@ -1,73 +1,216 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:sharedControls="using:LemonNeo.Desktop.Controls.Shared" xmlns:accountsVm="using:LemonNeo.Desktop.ViewModels.Accounts" xmlns:sharedVm="using:LemonNeo.Desktop.ViewModels.Shared" xmlns:i18n="using:LemonNeo.Desktop.Services"
-             x:Class="LemonNeo.Desktop.Views.Accounts.AccountsView" x:DataType="accountsVm:AccountsViewModel">
-  <Grid RowDefinitions="Auto,Auto,Auto,*">
-    <sharedControls:PageHeader Title="{Binding PageTitle}">
-      <sharedControls:PageHeader.Actions>
-        <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsBusy}" ToolTip.Tip="{Binding Status}">
-          <ProgressBar IsIndeterminate="True" Width="60" Height="3" VerticalAlignment="Center" AutomationProperties.Name="{Binding Status}" />
-          <Button Classes="ghost" Command="{Binding CancelOperationCommand}" Content="{Translate {x:Static i18n:LanguageManager+Keys.CancelOperation}}" />
-        </StackPanel>
-      </sharedControls:PageHeader.Actions>
-    </sharedControls:PageHeader>
-    <Border Grid.Row="1" IsVisible="{Binding HasError}" Background="{DynamicResource Brush.DangerSoft}" Padding="14" Margin="0,0,0,12">
-      <Grid ColumnDefinitions="*,Auto">
-        <TextBlock Text="{Binding Error}" Foreground="{DynamicResource Brush.Danger}" TextWrapping="Wrap" MaxHeight="90" Margin="0,0,12,0" />
-        <Button Grid.Column="1" Classes="ghost compact" Command="{Binding DismissErrorCommand}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}">
-          <Path Classes="icon" Data="{StaticResource Icon.Close}" Width="14" Height="14" />
-        </Button>
-      </Grid>
-    </Border>
-    <Border Grid.Row="2" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="0,0,0,1" IsVisible="{Binding HasServices}">
-      <ListBox Name="AccountServiceTabs" Classes="serviceTabs" ItemsSource="{Binding Services}" SelectedItem="{Binding SelectedService}" ItemContainerTheme="{StaticResource ServiceTabTheme}"
-               Padding="0" IsEnabled="{Binding CanInteract}" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-               AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.AuthenticationProvider}}">
-        <ListBox.ItemsPanel><ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate></ListBox.ItemsPanel>
-        <ListBox.ItemTemplate>
-          <DataTemplate x:DataType="sharedVm:ProviderOption"><TextBlock Text="{Binding Name}" /></DataTemplate>
-        </ListBox.ItemTemplate>
-      </ListBox>
-    </Border>
-    <Grid Grid.Row="3" Margin="0,24,0,0">
-      <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasServices}">
-        <StackPanel Spacing="20" IsEnabled="{Binding CanInteract}">
-          <TextBlock Name="AuthenticationPluginAttribution" Text="{Binding PluginAttribution}" Classes="caption"
-                     TextWrapping="Wrap" IsVisible="{Binding HasPluginAttribution}" />
-          <Grid Name="SignedInAccount" ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding IsAuthenticated}">
-            <Border Name="AccountAvatar" Width="56" Height="56" CornerRadius="28" ClipToBounds="True" Background="{DynamicResource Brush.SurfaceRaised}"
-                    Margin="0,0,16,0" VerticalAlignment="Center">
-              <Grid>
-                <Path Name="AccountAvatarPlaceholder" Width="28" Height="28" Stretch="Uniform" Data="{StaticResource Icon.Account}"
-                      Fill="{DynamicResource Brush.TextSecondary}" IsVisible="{Binding !HasAccountAvatar}" />
-                <Image Name="AccountAvatarImage" Source="{Binding AccountAvatar}" Stretch="UniformToFill" />
-              </Grid>
-            </Border>
-            <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center" Margin="0,0,12,0">
-              <TextBlock Text="{Binding AccountName}" FontSize="20" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding AccountName}" />
-              <TextBlock Text="{Binding AccountId}" Classes="caption" TextTrimming="CharacterEllipsis" />
-            </StackPanel>
-            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-              <TextBlock Text="{Binding AuthenticationStatus}" Classes="caption" Foreground="{DynamicResource Brush.AccentText}" VerticalAlignment="Center" Margin="0,0,8,0" />
-              <Button Name="CookieLoginToggle" Classes="ghost" Command="{Binding ToggleCookieEditorCommand}" Content="{Translate {x:Static i18n:LanguageManager+Keys.UpdateSignIn}}" Padding="10,6" MinHeight="32" />
-              <Button Name="SignOutButton" Classes="ghost" Command="{Binding LogoutCommand}" IsEnabled="{Binding CanLogout}"
-                      Content="{Translate {x:Static i18n:LanguageManager+Keys.Logout}}" Padding="10,6" MinHeight="32" />
-            </StackPanel>
-          </Grid>
-          <StackPanel Name="CookieLoginForm" Spacing="12" MaxWidth="560" HorizontalAlignment="Left" IsVisible="{Binding IsCookieEditorOpen}">
-            <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.CookieLogin}}" FontSize="18" FontWeight="SemiBold" />
-            <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.CookieHint}}" Classes="caption" TextWrapping="Wrap" />
+<UserControl
+    x:Class="LemonNeo.Desktop.Views.Accounts.AccountsView"
+    x:DataType="accountsVm:AccountsViewModel"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:accountsVm="using:LemonNeo.Desktop.ViewModels.Accounts"
+    xmlns:i18n="using:LemonNeo.Desktop.Services"
+    xmlns:sharedControls="using:LemonNeo.Desktop.Controls.Shared"
+    xmlns:sharedVm="using:LemonNeo.Desktop.ViewModels.Shared"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid RowDefinitions="Auto,Auto,Auto,*">
+        <sharedControls:PageHeader Title="{Binding PageTitle}">
+            <sharedControls:PageHeader.Actions>
+                <StackPanel
+                    IsVisible="{Binding IsBusy}"
+                    Orientation="Horizontal"
+                    Spacing="10"
+                    ToolTip.Tip="{Binding Status}">
+                    <ProgressBar
+                        AutomationProperties.Name="{Binding Status}"
+                        Height="3"
+                        IsIndeterminate="True"
+                        VerticalAlignment="Center"
+                        Width="60" />
+                    <Button
+                        Classes="ghost"
+                        Command="{Binding CancelOperationCommand}"
+                        Content="{Translate {x:Static i18n:LanguageManager+Keys.CancelOperation}}" />
+                </StackPanel>
+            </sharedControls:PageHeader.Actions>
+        </sharedControls:PageHeader>
+        <Border
+            Background="{DynamicResource Brush.DangerSoft}"
+            Grid.Row="1"
+            IsVisible="{Binding HasError}"
+            Margin="0,0,0,12"
+            Padding="14">
             <Grid ColumnDefinitions="*,Auto">
-              <TextBox Name="CookieInput" Text="{Binding Cookie}" MinWidth="280" Margin="0,0,10,0"
-                       PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.Cookie}}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Cookie}}" />
-              <Button Name="SignInButton" Grid.Column="1" Classes="primary" Command="{Binding LoginCommand}" IsEnabled="{Binding CanLogin}" Content="{Translate {x:Static i18n:LanguageManager+Keys.Login}}" />
+                <TextBlock
+                    Foreground="{DynamicResource Brush.Danger}"
+                    Margin="0,0,12,0"
+                    MaxHeight="90"
+                    Text="{Binding Error}"
+                    TextWrapping="Wrap" />
+                <Button
+                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}"
+                    Classes="ghost compact"
+                    Command="{Binding DismissErrorCommand}"
+                    Grid.Column="1">
+                    <Path
+                        Classes="icon"
+                        Data="{StaticResource Icon.Close}"
+                        Height="14"
+                        Width="14" />
+                </Button>
             </Grid>
-          </StackPanel>
-        </StackPanel>
-      </ScrollViewer>
-      <StackPanel Spacing="8" MaxWidth="440" HorizontalAlignment="Left" VerticalAlignment="Center" IsVisible="{Binding !HasServices}">
-        <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.NoAccountServices}}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
-        <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.NoAccountServicesDescription}}" Classes="caption" TextWrapping="Wrap" />
-      </StackPanel>
+        </Border>
+        <Border
+            BorderBrush="{DynamicResource Brush.Border}"
+            BorderThickness="0,0,0,1"
+            Grid.Row="2"
+            IsVisible="{Binding HasServices}">
+            <ListBox
+                AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.AuthenticationProvider}}"
+                Classes="serviceTabs"
+                IsEnabled="{Binding CanInteract}"
+                ItemContainerTheme="{StaticResource ServiceTabTheme}"
+                ItemsSource="{Binding Services}"
+                Name="AccountServiceTabs"
+                Padding="0"
+                ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                SelectedItem="{Binding SelectedService}">
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="sharedVm:ProviderOption">
+                        <TextBlock Text="{Binding Name}" />
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Border>
+        <Grid Grid.Row="3" Margin="0,24,0,0">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasServices}">
+                <StackPanel IsEnabled="{Binding CanInteract}" Spacing="20">
+                    <TextBlock
+                        Classes="caption"
+                        IsVisible="{Binding HasPluginAttribution}"
+                        Name="AuthenticationPluginAttribution"
+                        Text="{Binding PluginAttribution}"
+                        TextWrapping="Wrap" />
+                    <Grid
+                        ColumnDefinitions="Auto,*,Auto"
+                        IsVisible="{Binding IsAuthenticated}"
+                        Name="SignedInAccount">
+                        <Border
+                            Background="{DynamicResource Brush.SurfaceRaised}"
+                            ClipToBounds="True"
+                            CornerRadius="28"
+                            Height="56"
+                            Margin="0,0,16,0"
+                            Name="AccountAvatar"
+                            VerticalAlignment="Center"
+                            Width="56">
+                            <Grid>
+                                <Path
+                                    Data="{StaticResource Icon.Account}"
+                                    Fill="{DynamicResource Brush.TextSecondary}"
+                                    Height="28"
+                                    IsVisible="{Binding !HasAccountAvatar}"
+                                    Name="AccountAvatarPlaceholder"
+                                    Stretch="Uniform"
+                                    Width="28" />
+                                <Image
+                                    Name="AccountAvatarImage"
+                                    Source="{Binding AccountAvatar}"
+                                    Stretch="UniformToFill" />
+                            </Grid>
+                        </Border>
+                        <StackPanel
+                            Grid.Column="1"
+                            Margin="0,0,12,0"
+                            Spacing="4"
+                            VerticalAlignment="Center">
+                            <TextBlock
+                                FontSize="20"
+                                FontWeight="SemiBold"
+                                Text="{Binding AccountName}"
+                                TextTrimming="CharacterEllipsis"
+                                ToolTip.Tip="{Binding AccountName}" />
+                            <TextBlock
+                                Classes="caption"
+                                Text="{Binding AccountId}"
+                                TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                        <StackPanel
+                            Grid.Column="2"
+                            Orientation="Horizontal"
+                            Spacing="8"
+                            VerticalAlignment="Center">
+                            <TextBlock
+                                Classes="caption"
+                                Foreground="{DynamicResource Brush.AccentText}"
+                                Margin="0,0,8,0"
+                                Text="{Binding AuthenticationStatus}"
+                                VerticalAlignment="Center" />
+                            <Button
+                                Classes="ghost"
+                                Command="{Binding ToggleCookieEditorCommand}"
+                                Content="{Translate {x:Static i18n:LanguageManager+Keys.UpdateSignIn}}"
+                                MinHeight="32"
+                                Name="CookieLoginToggle"
+                                Padding="10,6" />
+                            <Button
+                                Classes="ghost"
+                                Command="{Binding LogoutCommand}"
+                                Content="{Translate {x:Static i18n:LanguageManager+Keys.Logout}}"
+                                IsEnabled="{Binding CanLogout}"
+                                MinHeight="32"
+                                Name="SignOutButton"
+                                Padding="10,6" />
+                        </StackPanel>
+                    </Grid>
+                    <StackPanel
+                        HorizontalAlignment="Left"
+                        IsVisible="{Binding IsCookieEditorOpen}"
+                        MaxWidth="560"
+                        Name="CookieLoginForm"
+                        Spacing="12">
+                        <TextBlock
+                            FontSize="18"
+                            FontWeight="SemiBold"
+                            Text="{Translate {x:Static i18n:LanguageManager+Keys.CookieLogin}}" />
+                        <TextBlock
+                            Classes="caption"
+                            Text="{Translate {x:Static i18n:LanguageManager+Keys.CookieHint}}"
+                            TextWrapping="Wrap" />
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBox
+                                AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Cookie}}"
+                                Margin="0,0,10,0"
+                                MinWidth="280"
+                                Name="CookieInput"
+                                PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.Cookie}}"
+                                Text="{Binding Cookie}" />
+                            <Button
+                                Classes="primary"
+                                Command="{Binding LoginCommand}"
+                                Content="{Translate {x:Static i18n:LanguageManager+Keys.Login}}"
+                                Grid.Column="1"
+                                IsEnabled="{Binding CanLogin}"
+                                Name="SignInButton" />
+                        </Grid>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+            <StackPanel
+                HorizontalAlignment="Left"
+                IsVisible="{Binding !HasServices}"
+                MaxWidth="440"
+                Spacing="8"
+                VerticalAlignment="Center">
+                <TextBlock
+                    FontSize="18"
+                    FontWeight="SemiBold"
+                    Text="{Translate {x:Static i18n:LanguageManager+Keys.NoAccountServices}}"
+                    TextWrapping="Wrap" />
+                <TextBlock
+                    Classes="caption"
+                    Text="{Translate {x:Static i18n:LanguageManager+Keys.NoAccountServicesDescription}}"
+                    TextWrapping="Wrap" />
+            </StackPanel>
+        </Grid>
     </Grid>
-  </Grid>
 </UserControl>

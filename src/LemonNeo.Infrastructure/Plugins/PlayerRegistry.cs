@@ -6,16 +6,14 @@ namespace LemonNeo.Infrastructure.Plugins;
 
 internal sealed class PlayerRegistry : IPlayerRegistry
 {
+    private readonly object _gate = new();
+
     private readonly Dictionary<string, IPlayerProvider> _players =
         new(StringComparer.OrdinalIgnoreCase);
-    private readonly object _gate = new();
 
     public PlayerRegistry(IEnumerable<IPlayerProvider> hostPlayers)
     {
-        foreach (var player in hostPlayers)
-        {
-            Register(player);
-        }
+        foreach (var player in hostPlayers) Register(player);
     }
 
     public IReadOnlyCollection<IPlayerProvider> Players
@@ -58,9 +56,7 @@ internal sealed class PlayerRegistry : IPlayerRegistry
         lock (_gate)
         {
             if (!_players.TryAdd(player.Id, player))
-            {
                 throw new PluginLoadException($"Player '{player.Id}' is already registered.");
-            }
         }
     }
 
@@ -69,12 +65,8 @@ internal sealed class PlayerRegistry : IPlayerRegistry
         lock (_gate)
         {
             foreach (var player in players)
-            {
                 if (_players.TryGetValue(player.Id, out var current) && ReferenceEquals(current, player))
-                {
                     _players.Remove(player.Id);
-                }
-            }
         }
     }
 }

@@ -9,5 +9,25 @@
     "file-system",
     "network",
     "native-code"
+  ],
+  "dependencies": [
+    {
+      "name": "BASS",
+      "version": "2.4.18.3",
+      "license": "Un4seen BASS license",
+      "website": "https://www.un4seen.com/bass.html"
+    },
+    {
+      "name": "BASSFLAC",
+      "version": "2.4.5",
+      "license": "Un4seen BASS add-on license",
+      "website": "https://www.un4seen.com/bass.html"
+    },
+    {
+      "name": "BASS.NET",
+      "version": "2.4.14.1",
+      "license": "Un4seen BASS.NET license",
+      "website": "https://www.radio42.com/bass/bassnet.html"
+    }
   ]
 }

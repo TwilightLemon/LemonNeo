@@ -12,11 +12,9 @@ public sealed class TrackLookupService(IProviderRegistry registry)
         CancellationToken cancellationToken = default)
     {
         var provider = registry.Get(providerId)
-            ?? throw new ProviderException($"Provider '{providerId}' was not found.");
+                       ?? throw new ProviderException($"Provider '{providerId}' was not found.");
         if (provider is not ITrackLookupProvider lookupProvider)
-        {
             throw new ProviderException($"Provider '{providerId}' does not support track lookup by ID.");
-        }
 
         Track? track;
         try
@@ -33,10 +31,8 @@ public sealed class TrackLookupService(IProviderRegistry registry)
         if (track is not null &&
             (!string.Equals(track.Id.ProviderId, provider.Id, StringComparison.OrdinalIgnoreCase) ||
              !string.Equals(track.Id.RemoteId, trackId, StringComparison.OrdinalIgnoreCase)))
-        {
             throw new ProviderException(
                 $"Provider '{providerId}' returned '{track.Id}' for requested track '{trackId}'.");
-        }
 
         return track;
     }

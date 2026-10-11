@@ -40,8 +40,8 @@ internal sealed record LyricsFrame(LyricsRow Main, LyricsRow? Romanization = nul
 }
 
 /// <summary>
-/// Fetches without blocking input. Drawing stays on the editor thread so the
-/// playback monitor and network continuations never move the input cursor.
+///     Fetches without blocking input. Drawing stays on the editor thread so the
+///     playback monitor and network continuations never move the input cursor.
 /// </summary>
 internal sealed class ConsoleLyricsDisplay(
     Func<PlaybackSessionSnapshot> snapshotSource,
@@ -49,9 +49,16 @@ internal sealed class ConsoleLyricsDisplay(
     CancellationToken cancellationToken) : IAsyncDisposable
 {
     private readonly List<Task<LyricsLookupResult>> _loads = [];
-    private MusicItemId? _trackId;
-    private CancellationTokenSource? _loadCancellation;
     private Task<LyricsLookupResult>? _load;
+    private CancellationTokenSource? _loadCancellation;
+    private MusicItemId? _trackId;
+
+    public async ValueTask DisposeAsync()
+    {
+        _loadCancellation?.Cancel();
+        await Task.WhenAll(_loads);
+        _loadCancellation?.Dispose();
+    }
 
     public LyricsFrame GetFrame()
     {
@@ -75,11 +82,10 @@ internal sealed class ConsoleLyricsDisplay(
                 _loadCancellation = null;
             }
         }
+
         if (track is null) return LyricsFrame.Empty;
         if (_load is not { IsCompletedSuccessfully: true })
-        {
             return new LyricsFrame(new LyricsRow([new LyricsSegment("Loading lyrics…", false)]));
-        }
         return _load.Result.Lyrics is { } value
             ? CreateFrame(value, snapshot.Timeline.Position.TotalMilliseconds)
             : new LyricsFrame(new LyricsRow([new LyricsSegment("No lyrics available", false)]));
@@ -100,15 +106,13 @@ internal sealed class ConsoleLyricsDisplay(
     internal static LyricsFrame CreateFrame(Lyrics value, double positionMs)
     {
         var frame = LyricsTimeline.CreateFrame(value, positionMs);
-        static LyricsRow Row(LyricsDisplayRow row) => new(row.Segments.Select(s => new LyricsSegment(s.Text, s.Reached)).ToArray());
+
+        static LyricsRow Row(LyricsDisplayRow row)
+        {
+            return new LyricsRow(row.Segments.Select(s => new LyricsSegment(s.Text, s.Reached)).ToArray());
+        }
+
         return new LyricsFrame(Row(frame.Main), frame.Romanization is { } romanization ? Row(romanization) : null,
             frame.Translation is { } translation ? Row(translation) : null);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        _loadCancellation?.Cancel();
-        await Task.WhenAll(_loads);
-        _loadCancellation?.Dispose();
     }
 }

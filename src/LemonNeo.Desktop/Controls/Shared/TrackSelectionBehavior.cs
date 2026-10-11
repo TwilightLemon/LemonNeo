@@ -14,7 +14,8 @@ public static class TrackSelectionBehavior
         {
             if (list.DataContext is not TrackListViewModel { IsSelectionMode: true, CanInteract: true }) return;
             if (args.InitialPressMouseButton != MouseButton.Left) return;
-            if (args.Source is not Control control || control.GetSelfAndVisualAncestors().Any(v => v is CheckBox)) return;
+            if (args.Source is not Control control ||
+                control.GetSelfAndVisualAncestors().Any(v => v is CheckBox)) return;
             if (control.GetSelfAndVisualAncestors().OfType<ListBoxItem>().FirstOrDefault()?.DataContext is TrackRow row)
             {
                 row.IsMarked = !row.IsMarked;
@@ -24,7 +25,8 @@ public static class TrackSelectionBehavior
         list.AddHandler(InputElement.KeyDownEvent, (_, args) =>
         {
             if (list.DataContext is not TrackListViewModel { CanInteract: true } vm) return;
-            if (args.Key == Key.A && args.KeyModifiers.HasFlag(OperatingSystem.IsMacOS() ? KeyModifiers.Meta : KeyModifiers.Control))
+            if (args.Key == Key.A &&
+                args.KeyModifiers.HasFlag(OperatingSystem.IsMacOS() ? KeyModifiers.Meta : KeyModifiers.Control))
             {
                 vm.IsSelectionMode = true;
                 vm.SelectAllCommand.Execute(null);
@@ -35,7 +37,8 @@ public static class TrackSelectionBehavior
                 vm.IsSelectionMode = false;
                 args.Handled = true;
             }
-            else if (vm.IsSelectionMode && args.Key == Key.Space && vm.SelectedTrack is { } row && args.Source is not CheckBox)
+            else if (vm.IsSelectionMode && args.Key == Key.Space && vm.SelectedTrack is { } row &&
+                     args.Source is not CheckBox)
             {
                 row.IsMarked = !row.IsMarked;
                 args.Handled = true;

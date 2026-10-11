@@ -1,5 +1,5 @@
-using LemonNeo.Core.Playback;
 using System.Collections.Immutable;
+using LemonNeo.Core.Playback;
 
 namespace LemonNeo.Application.Playback;
 
@@ -15,7 +15,9 @@ public sealed record PlaybackQueueState
     public DateTimeOffset UpdatedAt { get; init; } = DateTimeOffset.UtcNow;
 }
 
-public sealed record PlaybackResumeState(Guid? ItemId = null, TimeSpan Position = default,
+public sealed record PlaybackResumeState(
+    Guid? ItemId = null,
+    TimeSpan Position = default,
     PlaybackStatus Status = PlaybackStatus.Stopped);
 
 public sealed record PlaybackPreferences(

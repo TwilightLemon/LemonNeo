@@ -7,15 +7,14 @@ using LemonNeo.Infrastructure.Credentials;
 using LemonNeo.Infrastructure.Library;
 using LemonNeo.Infrastructure.Plugins;
 using LemonNeo.Infrastructure.Settings;
-using LemonNeo.Hosting;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace LemonNeo.Hosting.Registration;
 
 internal static class InfrastructureRegistration
 {
-    public static void AddInfrastructure(this IServiceCollection services, IAppPathProvider paths, HostStorageLocations storage)
+    public static void AddInfrastructure(this IServiceCollection services, IAppPathProvider paths,
+        HostStorageLocations storage)
     {
         services.AddLogging();
         services.AddHttpClient();
@@ -23,10 +22,12 @@ internal static class InfrastructureRegistration
         services.AddSingleton<ISettingsEntityStore, JsonSettingsEntityStore>();
         services.AddSingleton<AppSettingsService>();
         services.AddSingleton<IAppSettingsService>(provider => provider.GetRequiredService<AppSettingsService>());
-        services.AddSingleton<IPluginDataStoreFactory>(_ => new PluginDataStoreFactory(paths, () => storage.CacheDirectory));
+        services.AddSingleton<IPluginDataStoreFactory>(_ =>
+            new PluginDataStoreFactory(paths, () => storage.CacheDirectory));
         services.AddSingleton<ProviderRegistry>();
         services.AddSingleton<IProviderRegistry>(provider => provider.GetRequiredService<ProviderRegistry>());
-        services.AddSingleton<IPlaybackSourceProviderRegistry>(provider => provider.GetRequiredService<ProviderRegistry>());
+        services.AddSingleton<IPlaybackSourceProviderRegistry>(provider =>
+            provider.GetRequiredService<ProviderRegistry>());
         services.AddSingleton<PlayerRegistry>();
         services.AddSingleton<IPlayerRegistry>(provider => provider.GetRequiredService<PlayerRegistry>());
         services.AddSingleton<ILibraryRepository>(new JsonLibraryRepository(() => storage.LibraryDirectory));

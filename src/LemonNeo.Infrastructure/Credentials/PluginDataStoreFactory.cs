@@ -1,15 +1,15 @@
-using LemonNeo.Abstractions.Storage;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
+using LemonNeo.Abstractions.Storage;
 using Microsoft.AspNetCore.DataProtection;
 
 namespace LemonNeo.Infrastructure.Credentials;
 
 internal sealed class PluginDataStoreFactory : IPluginDataStoreFactory
 {
-    private readonly IAppPathProvider _paths;
-    private readonly Func<string> _getCacheDirectory;
     private readonly IDataProtectionProvider _dataProtection;
+    private readonly Func<string> _getCacheDirectory;
+    private readonly IAppPathProvider _paths;
 
     public PluginDataStoreFactory(IAppPathProvider paths, Func<string> getCacheDirectory)
     {
@@ -50,11 +50,9 @@ internal sealed class PluginDataStoreFactory : IPluginDataStoreFactory
     {
         Directory.CreateDirectory(path);
         if (!OperatingSystem.IsWindows())
-        {
             File.SetUnixFileMode(
                 path,
                 UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-        }
     }
 }
 
@@ -67,6 +65,7 @@ internal sealed class ProtectedFileCredentialVault(
         WriteIndented = true,
         TypeInfoResolver = new DefaultJsonTypeInfoResolver()
     };
+
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly string _path = Path.GetFullPath(path);
 
@@ -114,10 +113,7 @@ internal sealed class ProtectedFileCredentialVault(
         try
         {
             var values = await ReadAsync(cancellationToken);
-            if (values.Remove(key))
-            {
-                await WriteAsync(values, cancellationToken);
-            }
+            if (values.Remove(key)) await WriteAsync(values, cancellationToken);
         }
         finally
         {
@@ -127,10 +123,7 @@ internal sealed class ProtectedFileCredentialVault(
 
     private async Task<Dictionary<string, string>> ReadAsync(CancellationToken cancellationToken)
     {
-        if (!File.Exists(_path))
-        {
-            return new Dictionary<string, string>(StringComparer.Ordinal);
-        }
+        if (!File.Exists(_path)) return new Dictionary<string, string>(StringComparer.Ordinal);
 
         await using var stream = File.OpenRead(_path);
         return await JsonSerializer.DeserializeAsync<Dictionary<string, string>>(
@@ -152,18 +145,18 @@ internal sealed class ProtectedFileCredentialVault(
                          FileAccess.Write,
                          FileShare.None,
                          4096,
-                         useAsync: true))
+                         true))
         {
             await JsonSerializer.SerializeAsync(stream, values, JsonOptions, cancellationToken);
             await stream.WriteAsync("\n"u8.ToArray(), cancellationToken);
         }
 
-        File.Move(temporaryPath, _path, overwrite: true);
-        if (!OperatingSystem.IsWindows())
-        {
-            File.SetUnixFileMode(_path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-        }
+        File.Move(temporaryPath, _path, true);
+        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(_path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
     }
 
-    private static void ValidateKey(string key) => ArgumentException.ThrowIfNullOrWhiteSpace(key);
+    private static void ValidateKey(string key)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+    }
 }

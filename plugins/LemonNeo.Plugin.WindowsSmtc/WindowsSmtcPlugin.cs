@@ -1,22 +1,21 @@
-using LemonNeo.Abstractions.Playback;
-using LemonNeo.Abstractions.Plugins;
-using LemonNeo.Core.Music;
-using LemonNeo.Core.Playback;
-using Microsoft.Extensions.Logging;
 using Windows.Media;
 using Windows.Media.Playback;
 using Windows.Storage;
 using Windows.Storage.Streams;
+using LemonNeo.Abstractions.Playback;
+using LemonNeo.Abstractions.Plugins;
+using Microsoft.Extensions.Logging;
 
 namespace LemonNeo.Plugin.WindowsSmtc;
 
 public sealed class WindowsSmtcPlugin : InteractivePluginBase
 {
-    private MediaPlayer? _owner;
     private SystemMediaTransportControls? _controls;
     private InteractivePlaybackSnapshot? _last;
+    private MediaPlayer? _owner;
 
-    public override PluginDescriptor Descriptor { get; } = new("LemonNeo.Plugin.WindowsSmtc", "Windows System Media Transport Controls", "0.1.0");
+    public override PluginDescriptor Descriptor { get; } = new("LemonNeo.Plugin.WindowsSmtc",
+        "Windows System Media Transport Controls", "0.1.0");
 
     protected override ValueTask InitializeCoreAsync(IPluginContext context, CancellationToken cancellationToken)
     {
@@ -31,7 +30,8 @@ public sealed class WindowsSmtcPlugin : InteractivePluginBase
         return ValueTask.CompletedTask;
     }
 
-    protected override async ValueTask UpdateAsync(InteractivePlaybackSnapshot snapshot, CancellationToken cancellationToken)
+    protected override async ValueTask UpdateAsync(InteractivePlaybackSnapshot snapshot,
+        CancellationToken cancellationToken)
     {
         var controls = _controls!;
         controls.IsEnabled = snapshot.Track is not null;
@@ -58,23 +58,32 @@ public sealed class WindowsSmtcPlugin : InteractivePluginBase
                 display.MusicProperties.Artist = string.Join(", ", track.Artists.Select(artist => artist.Name));
                 display.MusicProperties.AlbumTitle = track.Album?.Title ?? "";
                 if (track.ArtworkUri is { IsAbsoluteUri: true } artwork)
-                {
                     try
                     {
                         if (artwork.IsFile)
                         {
-                            var file = await StorageFile.GetFileFromPathAsync(artwork.LocalPath).AsTask(cancellationToken);
+                            var file = await StorageFile.GetFileFromPathAsync(artwork.LocalPath)
+                                .AsTask(cancellationToken);
                             display.Thumbnail = RandomAccessStreamReference.CreateFromFile(file);
                         }
                         else if (artwork.Scheme is "http" or "https")
+                        {
                             display.Thumbnail = RandomAccessStreamReference.CreateFromUri(artwork);
+                        }
                     }
-                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
-                    catch (Exception exception) { Logger.LogWarning(exception, "Could not publish media artwork."); }
-                }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception exception)
+                    {
+                        Logger.LogWarning(exception, "Could not publish media artwork.");
+                    }
             }
+
             display.Update();
         }
+
         var duration = snapshot.Duration ?? snapshot.Position;
         var seek = snapshot.Controls.HasFlag(PlaybackControls.Seek) && snapshot.Duration is not null;
         controls.UpdateTimelineProperties(new SystemMediaTransportControlsTimelineProperties
@@ -88,7 +97,8 @@ public sealed class WindowsSmtcPlugin : InteractivePluginBase
         _last = snapshot;
     }
 
-    private void OnButtonPressed(SystemMediaTransportControls sender, SystemMediaTransportControlsButtonPressedEventArgs args)
+    private void OnButtonPressed(SystemMediaTransportControls sender,
+        SystemMediaTransportControlsButtonPressedEventArgs args)
     {
         var command = args.Button switch
         {
@@ -128,6 +138,7 @@ public sealed class WindowsSmtcPlugin : InteractivePluginBase
             _owner?.Dispose();
             _owner = null;
         }
+
         return ValueTask.CompletedTask;
     }
 }

@@ -1,8 +1,8 @@
+using System.Globalization;
 using LemonNeo.Abstractions.Providers;
 using LemonNeo.Core.Exceptions;
 using LemonNeo.Core.Library;
 using LemonNeo.Core.Music;
-using System.Globalization;
 
 namespace LemonNeo.Application.Library;
 
@@ -22,11 +22,10 @@ public sealed class FractionalPlaylistOrderingService : IPlaylistOrderingService
     public string GetKeyBetween(PlaylistItem? before, PlaylistItem? after)
     {
         var lower = before is null ? 0m : Parse(before.SortKey);
-        var upper = after is null ? lower + (Step * 2) : Parse(after.SortKey);
+        var upper = after is null ? lower + Step * 2 : Parse(after.SortKey);
         if (upper - lower <= MinimumGap)
-        {
-            throw new InvalidOperationException("The playlist must be normalized before inserting between these items.");
-        }
+            throw new InvalidOperationException(
+                "The playlist must be normalized before inserting between these items.");
 
         return Format((lower + upper) / 2m);
     }
@@ -35,13 +34,18 @@ public sealed class FractionalPlaylistOrderingService : IPlaylistOrderingService
     {
         var index = 1;
         foreach (var item in playlist.Items.OrderBy(item => Parse(item.SortKey)).ThenBy(item => item.Id))
-        {
             item.SortKey = Format(Step * index++);
-        }
     }
 
-    public static decimal Parse(string value) => decimal.Parse(value, CultureInfo.InvariantCulture);
-    private static string Format(decimal value) => value.ToString("0.######", CultureInfo.InvariantCulture);
+    public static decimal Parse(string value)
+    {
+        return decimal.Parse(value, CultureInfo.InvariantCulture);
+    }
+
+    private static string Format(decimal value)
+    {
+        return value.ToString("0.######", CultureInfo.InvariantCulture);
+    }
 }
 
 public sealed class PlaylistService(
@@ -90,7 +94,8 @@ public sealed class PlaylistService(
         var values = tracks.ToArray();
         foreach (var track in values) ValidateTrack(track);
         var playlist = GetRequired(playlistId);
-        var existing = playlist.Items.OrderBy(item => FractionalPlaylistOrderingService.Parse(item.SortKey)).ThenBy(item => item.Id).ToArray();
+        var existing = playlist.Items.OrderBy(item => FractionalPlaylistOrderingService.Parse(item.SortKey))
+            .ThenBy(item => item.Id).ToArray();
         var added = values.Select(track => new PlaylistItem { Track = track, SortKey = "0" }).ToArray();
         if (added.Length == 0) return added;
         playlist.Items.AddRange(added);
@@ -101,7 +106,8 @@ public sealed class PlaylistService(
     public void Reorder(Guid playlistId, IReadOnlyCollection<Guid> itemIds, Guid targetId, bool after)
     {
         var playlist = GetRequired(playlistId);
-        var items = playlist.Items.OrderBy(item => FractionalPlaylistOrderingService.Parse(item.SortKey)).ThenBy(item => item.Id).ToList();
+        var items = playlist.Items.OrderBy(item => FractionalPlaylistOrderingService.Parse(item.SortKey))
+            .ThenBy(item => item.Id).ToList();
         var moving = items.Where(item => itemIds.Contains(item.Id)).ToArray();
         if (moving.Length != itemIds.Distinct().Count()) throw new ArgumentException("A playlist item was not found.");
         var target = GetItemRequired(playlistId, targetId);
@@ -131,19 +137,18 @@ public sealed class PlaylistService(
 
     public bool Delete(Guid playlistId)
     {
-        if (library.Current.Playlists.RemoveAll(playlist => playlist.Id == playlistId) == 0)
-        {
-            return false;
-        }
+        if (library.Current.Playlists.RemoveAll(playlist => playlist.Id == playlistId) == 0) return false;
 
         library.Current.Mirrors.RemoveAll(mirror => mirror.PlaylistId == playlistId);
         library.TouchDeleted(playlistId);
         return true;
     }
 
-    public PlaylistItem GetItemRequired(Guid playlistId, Guid itemId) =>
-        GetRequired(playlistId).Items.FirstOrDefault(item => item.Id == itemId)
-        ?? throw new ArgumentException($"Playlist item '{itemId}' was not found.");
+    public PlaylistItem GetItemRequired(Guid playlistId, Guid itemId)
+    {
+        return GetRequired(playlistId).Items.FirstOrDefault(item => item.Id == itemId)
+               ?? throw new ArgumentException($"Playlist item '{itemId}' was not found.");
+    }
 
     public PlaylistItem UpdateTrack(Guid playlistId, Guid itemId, Track track)
     {
@@ -160,10 +165,8 @@ public sealed class PlaylistService(
         var playlist = GetRequired(playlistId);
         var item = GetItemRequired(playlistId, itemId);
         if (position < 1 || position > playlist.Items.Count)
-        {
             throw new ArgumentOutOfRangeException(nameof(position),
                 $"Position must be between 1 and {playlist.Items.Count}.");
-        }
 
         var items = playlist.Items.OrderBy(value => FractionalPlaylistOrderingService.Parse(value.SortKey))
             .ThenBy(value => value.Id).ToList();
@@ -171,25 +174,24 @@ public sealed class PlaylistService(
         items.Insert(position - 1, item);
         // Assign temporary distinct keys in the requested order before normalizing.
         for (var index = 0; index < items.Count; index++)
-        {
             items[index].SortKey = (index + 1).ToString(CultureInfo.InvariantCulture);
-        }
 
         ordering.Normalize(playlist);
         Touch(playlist);
     }
 
-    public IReadOnlyList<ExternalMusicId> GetExternalIds(Guid playlistId, Guid itemId) =>
-        GetItemRequired(playlistId, itemId).Track.ExternalIds;
+    public IReadOnlyList<ExternalMusicId> GetExternalIds(Guid playlistId, Guid itemId)
+    {
+        return GetItemRequired(playlistId, itemId).Track.ExternalIds;
+    }
 
     public void AddExternalId(Guid playlistId, Guid itemId, ExternalMusicId id)
     {
         ValidateExternalId(id);
         var item = GetItemRequired(playlistId, itemId);
         if (item.Track.ExternalIds.Any(value => SameScheme(value, id)))
-        {
-            throw new ArgumentException($"External ID scheme '{id.Namespace}:{id.Kind ?? "-"}' already exists. Use update.");
-        }
+            throw new ArgumentException(
+                $"External ID scheme '{id.Namespace}:{id.Kind ?? "-"}' already exists. Use update.");
 
         UpdateTrack(playlistId, itemId, item.Track with { ExternalIds = [.. item.Track.ExternalIds, id] });
     }
@@ -199,9 +201,7 @@ public sealed class PlaylistService(
         ValidateExternalId(id);
         var item = GetItemRequired(playlistId, itemId);
         if (!item.Track.ExternalIds.Any(value => SameScheme(value, id)))
-        {
             throw new ArgumentException($"External ID scheme '{id.Namespace}:{id.Kind ?? "-"}' was not found.");
-        }
 
         UpdateTrack(playlistId, itemId, item.Track with
         {
@@ -215,27 +215,23 @@ public sealed class PlaylistService(
         var item = GetItemRequired(playlistId, itemId);
         var scheme = new MusicIdScheme(namespaceName, kind);
         var ids = item.Track.ExternalIds.Where(id => !scheme.Accepts(id)).ToArray();
-        if (ids.Length == item.Track.ExternalIds.Count)
-        {
-            return false;
-        }
+        if (ids.Length == item.Track.ExternalIds.Count) return false;
 
         UpdateTrack(playlistId, itemId, item.Track with { ExternalIds = ids });
         return true;
     }
 
-    private static bool SameScheme(ExternalMusicId left, ExternalMusicId right) =>
-        new MusicIdScheme(left.Namespace, left.Kind).Accepts(right);
+    private static bool SameScheme(ExternalMusicId left, ExternalMusicId right)
+    {
+        return new MusicIdScheme(left.Namespace, left.Kind).Accepts(right);
+    }
 
     private static void ValidateExternalId(ExternalMusicId id)
     {
         ArgumentNullException.ThrowIfNull(id);
         ArgumentException.ThrowIfNullOrWhiteSpace(id.Namespace);
         ArgumentException.ThrowIfNullOrWhiteSpace(id.Value);
-        if (id.Kind is not null)
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(id.Kind);
-        }
+        if (id.Kind is not null) ArgumentException.ThrowIfNullOrWhiteSpace(id.Kind);
     }
 
     private static void ValidateTrack(Track track)
@@ -244,10 +240,7 @@ public sealed class PlaylistService(
         ArgumentException.ThrowIfNullOrWhiteSpace(track.Title);
         ArgumentException.ThrowIfNullOrWhiteSpace(track.Id.ProviderId);
         ArgumentException.ThrowIfNullOrWhiteSpace(track.Id.RemoteId);
-        if (track.Duration < TimeSpan.Zero)
-        {
-            throw new ArgumentException("Track duration cannot be negative.");
-        }
+        if (track.Duration < TimeSpan.Zero) throw new ArgumentException("Track duration cannot be negative.");
     }
 
     private void Touch(Playlist playlist)
@@ -256,9 +249,11 @@ public sealed class PlaylistService(
         library.Touch(playlist.Id);
     }
 
-    public Playlist GetRequired(Guid playlistId) =>
-        library.Current.Playlists.FirstOrDefault(playlist => playlist.Id == playlistId)
-        ?? throw new ArgumentException($"Playlist '{playlistId}' was not found.");
+    public Playlist GetRequired(Guid playlistId)
+    {
+        return library.Current.Playlists.FirstOrDefault(playlist => playlist.Id == playlistId)
+               ?? throw new ArgumentException($"Playlist '{playlistId}' was not found.");
+    }
 }
 
 public sealed class ImportService(
@@ -282,18 +277,16 @@ public sealed class ImportService(
         CancellationToken cancellationToken = default)
     {
         var provider = registry.Get(providerId)
-            ?? throw new ProviderException($"Provider '{providerId}' was not found.");
+                       ?? throw new ProviderException($"Provider '{providerId}' was not found.");
         if (provider is not IPlaylistProvider playlistProvider)
-        {
             throw new ProviderException($"Provider '{providerId}' does not support playlists.");
-        }
 
         RemotePlaylist remote;
         try
         {
             remote = await playlistProvider.GetPlaylistAsync(remotePlaylistId, cancellationToken)
-                ?? throw new ProviderException(
-                    $"Remote playlist '{remotePlaylistId}' was not found on provider '{providerId}'.");
+                     ?? throw new ProviderException(
+                         $"Remote playlist '{remotePlaylistId}' was not found on provider '{providerId}'.");
         }
         catch (Exception exception) when (exception is not OperationCanceledException and not ProviderException)
         {
@@ -306,10 +299,7 @@ public sealed class ImportService(
     public Playlist ImportRemote(RemotePlaylist remote)
     {
         var local = playlists.Create(remote.Name, remote.Description);
-        foreach (var track in remote.Tracks)
-        {
-            playlists.Add(local.Id, track);
-        }
+        foreach (var track in remote.Tracks) playlists.Add(local.Id, track);
 
         return local;
     }

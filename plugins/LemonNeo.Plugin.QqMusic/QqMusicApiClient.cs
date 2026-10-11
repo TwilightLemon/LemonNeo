@@ -1,8 +1,8 @@
+using System.Globalization;
+using System.Text.Json;
 using LemonNeo.Abstractions.Providers;
 using LemonNeo.Core.Exceptions;
 using LemonNeo.Core.Music;
-using System.Globalization;
-using System.Text.Json;
 
 namespace LemonNeo.Plugin.QqMusic;
 
@@ -17,6 +17,7 @@ internal sealed record QqMusicProfile(
 internal sealed class QqMusicApiClient(HttpClient httpClient)
 {
     private const string ProviderId = "qqmusic";
+
     private const string UserAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36";
@@ -37,43 +38,30 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
         if (!TryGetObject(document.RootElement, out var data, "data") ||
             !TryGetObject(data, out var creator, "creator") ||
             string.IsNullOrWhiteSpace(ReadString(creator, "nick")))
-        {
             throw new ProviderException(
                 "The cookie is not associated with an authenticated QQ Music profile.");
-        }
 
         var created = new List<RemotePlaylistSummary>();
         if (TryGetArray(data, out var myMusic, "mymusic"))
-        {
             foreach (var item in myMusic.EnumerateArray())
-            {
                 if (ReadString(item, "type") == "1" &&
                     TryReadIdentifier(item, out var id, "id"))
-                {
                     created.Add(new RemotePlaylistSummary(
                         $"playlist:{id}",
                         ReadString(item, "title") ?? "我喜欢",
                         ReadTrackCount(item)));
-                }
-            }
-        }
 
         if (TryGetObject(data, out var myDiss, "mydiss") &&
             TryGetArray(myDiss, out var playlists, "list"))
-        {
             foreach (var item in playlists.EnumerateArray())
             {
-                if (!TryReadIdentifier(item, out var id, "dissid"))
-                {
-                    continue;
-                }
+                if (!TryReadIdentifier(item, out var id, "dissid")) continue;
 
                 created.Add(new RemotePlaylistSummary(
                     $"playlist:{id}",
                     ReadString(item, "title") ?? id,
                     ReadTrackCount(item)));
             }
-        }
 
         var deduplicated = created
             .GroupBy(item => item.Id, StringComparer.OrdinalIgnoreCase)
@@ -106,19 +94,14 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
             EnsureApiSuccess(document.RootElement, "followed playlists");
             if (!TryGetObject(document.RootElement, out var data, "data") ||
                 !TryGetArray(data, out var playlists, "cdlist"))
-            {
                 break;
-            }
 
             var pageCount = 0;
             var addedCount = 0;
             foreach (var item in playlists.EnumerateArray())
             {
                 pageCount++;
-                if (!TryReadIdentifier(item, out var id, "dissid") || !seen.Add(id))
-                {
-                    continue;
-                }
+                if (!TryReadIdentifier(item, out var id, "dissid") || !seen.Add(id)) continue;
 
                 addedCount++;
                 result.Add(new RemotePlaylistSummary(
@@ -127,10 +110,7 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
                     ReadTrackCount(item)));
             }
 
-            if (pageCount < pageSize || addedCount == 0)
-            {
-                break;
-            }
+            if (pageCount < pageSize || addedCount == 0) break;
         }
 
         return result;
@@ -155,19 +135,14 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
             EnsureApiSuccess(document.RootElement, "purchased albums");
             if (!TryGetObject(document.RootElement, out var data, "data") ||
                 !TryGetArray(data, out var albums, "albumlist"))
-            {
                 break;
-            }
 
             var pageCount = 0;
             var addedCount = 0;
             foreach (var item in albums.EnumerateArray())
             {
                 pageCount++;
-                if (!TryReadIdentifier(item, out var id, "albummid") || !seen.Add(id))
-                {
-                    continue;
-                }
+                if (!TryReadIdentifier(item, out var id, "albummid") || !seen.Add(id)) continue;
 
                 addedCount++;
                 result.Add(new RemotePlaylistSummary(
@@ -176,10 +151,7 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
                     ReadTrackCount(item)));
             }
 
-            if (pageCount < pageSize || addedCount == 0)
-            {
-                break;
-            }
+            if (pageCount < pageSize || addedCount == 0) break;
         }
 
         return result;
@@ -200,15 +172,11 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
         EnsureApiSuccess(document.RootElement, "playlist");
         if (!TryGetArray(document.RootElement, out var playlists, "cdlist") ||
             playlists.GetArrayLength() == 0)
-        {
             return null;
-        }
 
         var playlist = playlists[0];
         if (ReadInt64(playlist, "code") is { } playlistCode && playlistCode != 0)
-        {
             throw new ProviderException($"QQ Music playlist API returned code {playlistCode}.");
-        }
 
         var tracks = MapTrackArray(playlist, "songlist");
         return new RemotePlaylist
@@ -235,10 +203,7 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
             authentication.Cookie,
             cancellationToken);
         EnsureApiSuccess(document.RootElement, "album");
-        if (!TryGetObject(document.RootElement, out var album, "data"))
-        {
-            return null;
-        }
+        if (!TryGetObject(document.RootElement, out var album, "data")) return null;
 
         var tracks = MapTrackArray(album, "list");
         return new RemotePlaylist
@@ -259,9 +224,7 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
         if (string.IsNullOrWhiteSpace(trackId) ||
             trackId.Length > 128 ||
             !trackId.All(char.IsAsciiLetterOrDigit))
-        {
             return null;
-        }
 
         var userId = authentication?.UserId ?? "0";
         var gtk = authentication?.Gtk ?? 5381;
@@ -276,9 +239,7 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
         EnsureApiSuccess(document.RootElement, "track detail");
         if (!TryGetArray(document.RootElement, out var tracks, "data") ||
             tracks.GetArrayLength() == 0)
-        {
             return null;
-        }
 
         return TryMapTrack(tracks[0]) is { } track
             ? track with { Id = new MusicItemId(ProviderId, trackId) }
@@ -302,10 +263,8 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
             HttpCompletionOption.ResponseHeadersRead,
             cancellationToken);
         if (!response.IsSuccessStatusCode)
-        {
             throw new ProviderException(
                 $"QQ Music request failed with HTTP {(int)response.StatusCode} ({response.ReasonPhrase}).");
-        }
 
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         try
@@ -320,19 +279,12 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
 
     private static IReadOnlyList<Track> MapTrackArray(JsonElement parent, string property)
     {
-        if (!TryGetArray(parent, out var values, property))
-        {
-            return [];
-        }
+        if (!TryGetArray(parent, out var values, property)) return [];
 
         var result = new List<Track>();
         foreach (var value in values.EnumerateArray())
-        {
             if (TryMapTrack(value) is { } track)
-            {
                 result.Add(track);
-            }
-        }
 
         return result;
     }
@@ -343,20 +295,13 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
         var songId = ReadFirstString(value, "songid", "id");
         var remoteId = !string.IsNullOrWhiteSpace(songMid) ? songMid : songId;
         var title = ReadFirstString(value, "songname", "name", "title");
-        if (string.IsNullOrWhiteSpace(remoteId) || string.IsNullOrWhiteSpace(title))
-        {
-            return null;
-        }
+        if (string.IsNullOrWhiteSpace(remoteId) || string.IsNullOrWhiteSpace(title)) return null;
 
         var artists = new List<ArtistRef>();
         if (TryGetArray(value, out var singerValues, "singer"))
-        {
             foreach (var singer in singerValues.EnumerateArray())
             {
-                if (ReadString(singer, "name") is not { Length: > 0 } name)
-                {
-                    continue;
-                }
+                if (ReadString(singer, "name") is not { Length: > 0 } name) continue;
 
                 var singerMid = ReadString(singer, "mid");
                 artists.Add(new ArtistRef
@@ -367,7 +312,6 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
                         : new MusicItemId(ProviderId, singerMid)
                 });
             }
-        }
 
         var albumMid = ReadFirstString(value, "albummid");
         var albumName = ReadFirstString(value, "albumname");
@@ -379,20 +323,16 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
 
         var externalIds = new List<ExternalMusicId>();
         if (!string.IsNullOrWhiteSpace(songId))
-        {
             externalIds.Add(new ExternalMusicId(
                 MusicIdNamespaces.QQMusic,
                 songId,
                 "song-id"));
-        }
 
         if (!string.IsNullOrWhiteSpace(songMid))
-        {
             externalIds.Add(new ExternalMusicId(
                 MusicIdNamespaces.QQMusic,
                 songMid,
                 "song-mid"));
-        }
 
         var durationSeconds = ReadInt64(value, "interval");
         return new Track
@@ -420,16 +360,16 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
     private static void EnsureApiSuccess(JsonElement root, string operation)
     {
         if (ReadInt64(root, "code") is { } code && code != 0)
-        {
             throw new ProviderException($"QQ Music {operation} API returned code {code}.");
-        }
     }
 
-    private static int? ReadTrackCount(JsonElement value) =>
-        ReadInt32(value, "songnum") ??
-        ReadInt32(value, "song_count") ??
-        ReadInt32(value, "songcount") ??
-        ReadInt32(value, "total_song_num");
+    private static int? ReadTrackCount(JsonElement value)
+    {
+        return ReadInt32(value, "songnum") ??
+               ReadInt32(value, "song_count") ??
+               ReadInt32(value, "songcount") ??
+               ReadInt32(value, "total_song_num");
+    }
 
     private static bool TryReadIdentifier(JsonElement value, out string id, params string[] properties)
     {
@@ -440,42 +380,38 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
     private static string? ReadFirstString(JsonElement value, params string[] properties)
     {
         foreach (var property in properties)
-        {
             if (ReadString(value, property) is { Length: > 0 } result)
-            {
                 return result;
-            }
-        }
 
         return null;
     }
 
     private static string? ReadString(JsonElement value, string property)
     {
-        if (!value.TryGetProperty(property, out var child) || child.ValueKind == JsonValueKind.Null)
-        {
-            return null;
-        }
+        if (!value.TryGetProperty(property, out var child) || child.ValueKind == JsonValueKind.Null) return null;
 
         return child.ValueKind == JsonValueKind.String ? child.GetString() : child.ToString();
     }
 
-    private static int? ReadInt32(JsonElement value, string property) =>
-        int.TryParse(ReadString(value, property), NumberStyles.Integer, CultureInfo.InvariantCulture, out var result)
+    private static int? ReadInt32(JsonElement value, string property)
+    {
+        return int.TryParse(ReadString(value, property), NumberStyles.Integer, CultureInfo.InvariantCulture,
+            out var result)
             ? result
             : null;
+    }
 
-    private static long? ReadInt64(JsonElement value, string property) =>
-        long.TryParse(ReadString(value, property), NumberStyles.Integer, CultureInfo.InvariantCulture, out var result)
+    private static long? ReadInt64(JsonElement value, string property)
+    {
+        return long.TryParse(ReadString(value, property), NumberStyles.Integer, CultureInfo.InvariantCulture,
+            out var result)
             ? result
             : null;
+    }
 
     private static bool TryGetObject(JsonElement value, out JsonElement result, string property)
     {
-        if (value.TryGetProperty(property, out result) && result.ValueKind == JsonValueKind.Object)
-        {
-            return true;
-        }
+        if (value.TryGetProperty(property, out result) && result.ValueKind == JsonValueKind.Object) return true;
 
         result = default;
         return false;
@@ -483,10 +419,7 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
 
     private static bool TryGetArray(JsonElement value, out JsonElement result, string property)
     {
-        if (value.TryGetProperty(property, out result) && result.ValueKind == JsonValueKind.Array)
-        {
-            return true;
-        }
+        if (value.TryGetProperty(property, out result) && result.ValueKind == JsonValueKind.Array) return true;
 
         result = default;
         return false;
@@ -494,10 +427,7 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
 
     private static Uri? ParseHttpsUri(string? value)
     {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return null;
-        }
+        if (string.IsNullOrWhiteSpace(value)) return null;
 
         var normalized = value.StartsWith("//", StringComparison.Ordinal)
             ? $"https:{value}"

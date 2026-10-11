@@ -39,27 +39,27 @@ public interface IAudioInfoPlayer : IPlayer
 }
 
 /// <summary>
-/// Receives the original encoded audio bytes from the player's existing network
-/// request. The host owns this sink and its lifetime; players never persist audio.
+///     Receives the original encoded audio bytes from the player's existing network
+///     request. The host owns this sink and its lifetime; players never persist audio.
 /// </summary>
 public interface IPlaybackDownloadSink : IDisposable
 {
     /// <summary>
-    /// Reports the full response size. Null or non-positive lengths disable
-    /// caching of live/unbounded streams. May arrive after Write or Complete.
+    ///     Reports the full response size. Null or non-positive lengths disable
+    ///     caching of live/unbounded streams. May arrive after Write or Complete.
     /// </summary>
     void SetExpectedLength(long? length);
 
     /// <summary>
-    /// Consumes all bytes in the chunk synchronously without retaining its memory.
-    /// The player owns the underlying buffer and may reuse it after this returns.
-    /// Chunks must be ordered, contiguous bytes of the same playback download.
+    ///     Consumes all bytes in the chunk synchronously without retaining its memory.
+    ///     The player owns the underlying buffer and may reuse it after this returns.
+    ///     Chunks must be ordered, contiguous bytes of the same playback download.
     /// </summary>
     void Write(ReadOnlySpan<byte> chunk);
 
     /// <summary>
-    /// Signals the end of the download. The host publishes only when the received
-    /// byte count matches a positive expected length; disconnects are incomplete.
+    ///     Signals the end of the download. The host publishes only when the received
+    ///     byte count matches a positive expected length; disconnects are incomplete.
     /// </summary>
     void Complete();
 
@@ -68,9 +68,9 @@ public interface IPlaybackDownloadSink : IDisposable
 }
 
 /// <summary>
-/// Optional capability to forward chunks of the same HTTP download being played
-/// to a host-owned sink. Playback must start while that download is in progress;
-/// this must not issue a separate request or download the whole file first.
+///     Optional capability to forward chunks of the same HTTP download being played
+///     to a host-owned sink. Playback must start while that download is in progress;
+///     this must not issue a separate request or download the whole file first.
 /// </summary>
 public interface IStreamingPlayer : IPlayer
 {

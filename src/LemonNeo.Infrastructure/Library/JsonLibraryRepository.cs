@@ -1,8 +1,9 @@
+using System.Globalization;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using LemonNeo.Abstractions.Storage;
 using LemonNeo.Core.Exceptions;
 using LemonNeo.Core.Library;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace LemonNeo.Infrastructure.Library;
 
@@ -39,22 +40,19 @@ internal sealed class JsonLibraryRepository(Func<string> getLibraryDirectory) : 
     {
         var root = GetRoot();
         var indexPath = Path.Combine(root, IndexFileName);
-        if (!File.Exists(indexPath))
-        {
-            return new MusicLibrary();
-        }
+        if (!File.Exists(indexPath)) return new MusicLibrary();
 
         try
         {
             var index = await ReadAsync<LibraryIndex>(indexPath, cancellationToken)
-                ?? throw new LibraryException($"Library index is empty: {indexPath}");
+                        ?? throw new LibraryException($"Library index is empty: {indexPath}");
             var playlists = new List<Playlist>();
 
             foreach (var relativePath in index.PlaylistFiles.Order(StringComparer.Ordinal))
             {
                 var path = ResolveLibraryPath(root, relativePath);
                 var playlist = await ReadAsync<Playlist>(path, cancellationToken)
-                    ?? throw new LibraryException($"Playlist file is empty: {path}");
+                               ?? throw new LibraryException($"Playlist file is empty: {path}");
                 playlists.Add(playlist);
             }
 
@@ -121,33 +119,35 @@ internal sealed class JsonLibraryRepository(Func<string> getLibraryDirectory) : 
         }
     }
 
-    private static Playlist StablePlaylist(Playlist playlist) => new()
+    private static Playlist StablePlaylist(Playlist playlist)
     {
-        Id = playlist.Id,
-        Name = playlist.Name,
-        Description = playlist.Description,
-        CreatedAt = playlist.CreatedAt,
-        UpdatedAt = playlist.UpdatedAt,
-        Items = playlist.Items
-            .OrderBy(item => decimal.Parse(item.SortKey, System.Globalization.CultureInfo.InvariantCulture))
-            .ThenBy(item => item.Id)
-            .ToList()
-    };
+        return new Playlist
+        {
+            Id = playlist.Id,
+            Name = playlist.Name,
+            Description = playlist.Description,
+            CreatedAt = playlist.CreatedAt,
+            UpdatedAt = playlist.UpdatedAt,
+            Items = playlist.Items
+                .OrderBy(item => decimal.Parse(item.SortKey, CultureInfo.InvariantCulture))
+                .ThenBy(item => item.Id)
+                .ToList()
+        };
+    }
 
-    private string GetRoot() => Path.TrimEndingDirectorySeparator(Path.GetFullPath(getLibraryDirectory()));
+    private string GetRoot()
+    {
+        return Path.TrimEndingDirectorySeparator(Path.GetFullPath(getLibraryDirectory()));
+    }
 
     private static string ResolveLibraryPath(string root, string relativePath)
     {
         if (Path.IsPathRooted(relativePath))
-        {
             throw new LibraryException($"Library contains an absolute path: {relativePath}");
-        }
 
         var path = Path.GetFullPath(Path.Combine(root, relativePath));
         if (!path.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-        {
             throw new LibraryException($"Library path escapes its root: {relativePath}");
-        }
 
         return path;
     }
@@ -170,14 +170,14 @@ internal sealed class JsonLibraryRepository(Func<string> getLibraryDirectory) : 
                          FileMode.Create,
                          FileAccess.Write,
                          FileShare.None,
-                         bufferSize: 4096,
-                         useAsync: true))
+                         4096,
+                         true))
         {
             await JsonSerializer.SerializeAsync(stream, value, JsonOptions, cancellationToken);
             await stream.WriteAsync("\n"u8.ToArray(), cancellationToken);
         }
 
-        File.Move(temporaryPath, path, overwrite: true);
+        File.Move(temporaryPath, path, true);
     }
 
     private sealed record LibraryIndex

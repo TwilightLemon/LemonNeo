@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
@@ -7,17 +8,17 @@ namespace LemonNeo.Desktop.Services;
 /// <summary>Keeps window visibility separate from initialization and application shutdown.</summary>
 public sealed class DesktopLifetimeService : IDisposable
 {
-    private readonly IClassicDesktopStyleApplicationLifetime _desktop;
-    private readonly Window _window;
-    private readonly bool _keepRunningOnClose;
-    private readonly Func<Task> _initialize;
-    private readonly Func<Task> _shutdown;
-    private readonly Action _exitApplication;
     private readonly IActivatableLifetime? _activationLifetime;
+    private readonly IClassicDesktopStyleApplicationLifetime _desktop;
+    private readonly Action _exitApplication;
+    private readonly Func<Task> _initialize;
+    private readonly bool _keepRunningOnClose;
     private readonly Action? _prepareForBackground;
-    private Task? _shutdownTask;
-    private bool _shutdownStarted;
+    private readonly Func<Task> _shutdown;
+    private readonly Window _window;
     private bool _shutdownComplete;
+    private bool _shutdownStarted;
+    private Task? _shutdownTask;
 
     public DesktopLifetimeService(IClassicDesktopStyleApplicationLifetime desktop, Window window,
         bool keepRunningOnClose, Func<Task> initialize, Func<Task> shutdown,
@@ -39,6 +40,14 @@ public sealed class DesktopLifetimeService : IDisposable
         if (activationLifetime is not null) activationLifetime.Activated += OnActivated;
     }
 
+    public void Dispose()
+    {
+        _window.Opened -= OnOpened;
+        _window.Closing -= OnClosing;
+        _desktop.ShutdownRequested -= OnShutdownRequested;
+        if (_activationLifetime is not null) _activationLifetime.Activated -= OnActivated;
+    }
+
     private async void OnOpened(object? sender, EventArgs args)
     {
         // Show() raises Opened again after Hide(); startup must run only once.
@@ -57,6 +66,7 @@ public sealed class DesktopLifetimeService : IDisposable
             _window.Hide();
             return;
         }
+
         _ = ShutdownAsync();
     }
 
@@ -82,7 +92,10 @@ public sealed class DesktopLifetimeService : IDisposable
         _window.Activate();
     }
 
-    public Task ShutdownAsync() => _shutdownTask ??= ShutdownCoreAsync();
+    public Task ShutdownAsync()
+    {
+        return _shutdownTask ??= ShutdownCoreAsync();
+    }
 
     private async Task ShutdownCoreAsync()
     {
@@ -90,10 +103,13 @@ public sealed class DesktopLifetimeService : IDisposable
         _window.IsEnabled = false;
         // Leave the native close/shutdown callback before closing any windows.
         await Task.Yield();
-        try { await _shutdown(); }
+        try
+        {
+            await _shutdown();
+        }
         catch (Exception exception)
         {
-            System.Diagnostics.Trace.WriteLine($"Desktop shutdown failed: {exception}");
+            Trace.WriteLine($"Desktop shutdown failed: {exception}");
         }
         finally
         {
@@ -101,13 +117,5 @@ public sealed class DesktopLifetimeService : IDisposable
             Dispose();
             _exitApplication();
         }
-    }
-
-    public void Dispose()
-    {
-        _window.Opened -= OnOpened;
-        _window.Closing -= OnClosing;
-        _desktop.ShutdownRequested -= OnShutdownRequested;
-        if (_activationLifetime is not null) _activationLifetime.Activated -= OnActivated;
     }
 }

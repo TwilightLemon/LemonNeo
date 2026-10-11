@@ -10,8 +10,10 @@ public sealed record PlaybackSourceRow(PlaybackSourceCandidate Candidate, Locali
     public string Identity => $"{Candidate.SourceId.Namespace}:{Candidate.SourceId.Kind}:{Candidate.SourceId.Value}";
     public string Quality => Text["AudioQuality" + (Candidate.Source.Quality?.ToString() ?? "Unknown")];
     public string Method => Candidate.ResolutionMethod;
+
     public string Location => Candidate.Source switch
     {
-        FilePlaybackSource file => file.Path, HttpPlaybackSource http => http.Uri.AbsoluteUri, _ => Candidate.Source.GetType().Name
+        FilePlaybackSource file => file.Path, HttpPlaybackSource http => http.Uri.AbsoluteUri,
+        _ => Candidate.Source.GetType().Name
     };
 }

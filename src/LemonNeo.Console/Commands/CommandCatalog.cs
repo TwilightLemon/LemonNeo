@@ -6,9 +6,11 @@ internal sealed record CommandDescriptor(
     string Description,
     params string[] Aliases)
 {
-    public bool Matches(string value) =>
-        string.Equals(Name, value, StringComparison.OrdinalIgnoreCase) ||
-        Aliases.Contains(value, StringComparer.OrdinalIgnoreCase);
+    public bool Matches(string value)
+    {
+        return string.Equals(Name, value, StringComparison.OrdinalIgnoreCase) ||
+               Aliases.Contains(value, StringComparer.OrdinalIgnoreCase);
+    }
 }
 
 internal static class CommandCatalog
@@ -39,17 +41,22 @@ internal static class CommandCatalog
         new("playlist", "playlist [playlist]", "Choose and inspect a local playlist."),
         new("show-playlist", "show-playlist <playlist>", "Inspect a local playlist."),
         new("create-playlist", "create-playlist <name> [--description <text>]", "Create a local playlist."),
-        new("update-playlist", "update-playlist <playlist> [--name <name>] [--description <text>]", "Edit playlist fields; use \"\" to clear description."),
+        new("update-playlist", "update-playlist <playlist> [--name <name>] [--description <text>]",
+            "Edit playlist fields; use \"\" to clear description."),
         new("delete-playlist", "delete-playlist <playlist>", "Delete a local playlist and its items."),
         new("add", "add <playlist> <track-provider> <track-id>", "Add a track to a playlist."),
         new("remove", "remove <playlist> <item>", "Remove a track by number, item ID, or ID prefix."),
         new("show-track", "show-track <playlist> <item>", "Show a playlist track and its external IDs."),
-        new("create-track", "create-track <playlist> <title> [--<field> <value> ...]", "Create a track snapshot in a playlist."),
-        new("update-track", "update-track <playlist> <item> --<field> <value> [...]", "Edit title, artists (; separated), album, duration (seconds), artwork, provider, track-id."),
+        new("create-track", "create-track <playlist> <title> [--<field> <value> ...]",
+            "Create a track snapshot in a playlist."),
+        new("update-track", "update-track <playlist> <item> --<field> <value> [...]",
+            "Edit title, artists (; separated), album, duration (seconds), artwork, provider, track-id."),
         new("move-track", "move-track <playlist> <item> <position>", "Move a track to a one-based playlist position."),
-        new("external-ids", "external-ids <playlist> <item> [add|update|remove <namespace> <kind|-> [value]]", "List or edit qualified external IDs; - means no kind."),
+        new("external-ids", "external-ids <playlist> <item> [add|update|remove <namespace> <kind|-> [value]]",
+            "List or edit qualified external IDs; - means no kind."),
         new("play", "play <track-provider> <track-id> [--source <source-provider>]", "Play one track."),
-        new("play-playlist", "play-playlist <playlist> [start-number] [--source <source-provider>]", "Play a local playlist."),
+        new("play-playlist", "play-playlist <playlist> [start-number] [--source <source-provider>]",
+            "Play a local playlist."),
         new("play-current", "play-current", "Play the selected queue item."),
         new("previous", "previous", "Play the previous queue item.", "prev"),
         new("next", "next", "Play the next queue item."),
@@ -63,8 +70,13 @@ internal static class CommandCatalog
         new("exit", "exit", "Save and exit.", "quit")
     ];
 
-    public static CommandDescriptor? Find(string name) =>
-        Commands.FirstOrDefault(command => command.Matches(name));
+    public static CommandDescriptor? Find(string name)
+    {
+        return Commands.FirstOrDefault(command => command.Matches(name));
+    }
 
-    public static bool IsCommand(string name) => Find(name) is not null;
+    public static bool IsCommand(string name)
+    {
+        return Find(name) is not null;
+    }
 }

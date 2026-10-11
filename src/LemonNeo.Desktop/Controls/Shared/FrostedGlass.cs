@@ -21,9 +21,20 @@ public sealed class FrostedGlass : TemplatedControl
     private sealed class BackdropOperation(Rect bounds, CornerRadius corners) : ICustomDrawOperation
     {
         public Rect Bounds => bounds;
-        public bool HitTest(Point point) => false;
-        public bool Equals(ICustomDrawOperation? other) => false;
-        public void Dispose() { }
+
+        public bool HitTest(Point point)
+        {
+            return false;
+        }
+
+        public bool Equals(ICustomDrawOperation? other)
+        {
+            return false;
+        }
+
+        public void Dispose()
+        {
+        }
 
         public void Render(ImmediateDrawingContext context)
         {
@@ -58,19 +69,22 @@ public sealed class FrostedGlass : TemplatedControl
             using var clip = new SKRoundRect();
             clip.SetRectRadii(rect,
             [
-                new((float)corners.TopLeft, (float)corners.TopLeft),
-                new((float)corners.TopRight, (float)corners.TopRight),
-                new((float)corners.BottomRight, (float)corners.BottomRight),
-                new((float)corners.BottomLeft, (float)corners.BottomLeft)
+                new SKPoint((float)corners.TopLeft, (float)corners.TopLeft),
+                new SKPoint((float)corners.TopRight, (float)corners.TopRight),
+                new SKPoint((float)corners.BottomRight, (float)corners.BottomRight),
+                new SKPoint((float)corners.BottomLeft, (float)corners.BottomLeft)
             ]);
             canvas.Save();
             try
             {
-                canvas.ClipRoundRect(clip, SKClipOperation.Intersect, antialias: true);
+                canvas.ClipRoundRect(clip, SKClipOperation.Intersect, true);
                 canvas.ResetMatrix();
                 canvas.DrawImage(image, capture.Left, capture.Top, paint);
             }
-            finally { canvas.Restore(); }
+            finally
+            {
+                canvas.Restore();
+            }
         }
     }
 }

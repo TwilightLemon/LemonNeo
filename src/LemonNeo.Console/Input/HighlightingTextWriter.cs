@@ -17,7 +17,7 @@ internal sealed class HighlightingTextWriter(TextWriter inner) : TextWriter
     public override Encoding Encoding => inner.Encoding;
 
     public static bool CanUseColor =>
-        !global::System.Console.IsOutputRedirected &&
+        !Console.IsOutputRedirected &&
         !string.Equals(Environment.GetEnvironmentVariable("TERM"), "dumb", StringComparison.OrdinalIgnoreCase) &&
         string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NO_COLOR"));
 
@@ -55,7 +55,7 @@ internal sealed class HighlightingTextWriter(TextWriter inner) : TextWriter
                 return;
             }
 
-            var original = global::System.Console.ForegroundColor;
+            var original = Console.ForegroundColor;
             try
             {
                 WriteHighlighted(value);
@@ -63,13 +63,15 @@ internal sealed class HighlightingTextWriter(TextWriter inner) : TextWriter
             }
             finally
             {
-                global::System.Console.ForegroundColor = original;
+                Console.ForegroundColor = original;
             }
         }
     }
 
-    private static bool StartsWithAny(string value, params string[] prefixes) =>
-        prefixes.Any(prefix => value.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+    private static bool StartsWithAny(string value, params string[] prefixes)
+    {
+        return prefixes.Any(prefix => value.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+    }
 
     private void WriteHighlighted(string value)
     {
@@ -122,8 +124,8 @@ internal sealed class HighlightingTextWriter(TextWriter inner) : TextWriter
         var position = 0;
         if (labelEnd > 0 && labelEnd < 28 &&
             value[..labelEnd].All(character => char.IsLetterOrDigit(character) ||
-                                                char.IsWhiteSpace(character) ||
-                                                character is '-' or '_'))
+                                               char.IsWhiteSpace(character) ||
+                                               character is '-' or '_'))
         {
             WriteColored(value[..(labelEnd + 1)], ConsoleColor.Cyan);
             position = labelEnd + 1;
@@ -131,10 +133,7 @@ internal sealed class HighlightingTextWriter(TextWriter inner) : TextWriter
 
         foreach (Match match in HighlightedValues.Matches(value, position))
         {
-            if (match.Index > position)
-            {
-                inner.Write(value[position..match.Index]);
-            }
+            if (match.Index > position) inner.Write(value[position..match.Index]);
 
             var color = match.Value switch
             {
@@ -147,16 +146,13 @@ internal sealed class HighlightingTextWriter(TextWriter inner) : TextWriter
             position = match.Index + match.Length;
         }
 
-        if (position < value.Length)
-        {
-            inner.Write(value[position..]);
-        }
+        if (position < value.Length) inner.Write(value[position..]);
     }
 
     private void WriteColored(string value, ConsoleColor color)
     {
-        global::System.Console.ForegroundColor = color;
+        Console.ForegroundColor = color;
         inner.Write(value);
-        global::System.Console.ResetColor();
+        Console.ResetColor();
     }
 }

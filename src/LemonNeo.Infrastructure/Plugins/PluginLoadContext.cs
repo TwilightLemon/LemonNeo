@@ -4,17 +4,14 @@ using System.Runtime.Loader;
 
 namespace LemonNeo.Infrastructure.Plugins;
 
-internal sealed class PluginLoadContext(string entryAssemblyPath) : AssemblyLoadContext(isCollectible: true)
+internal sealed class PluginLoadContext(string entryAssemblyPath) : AssemblyLoadContext(true)
 {
-    private readonly AssemblyDependencyResolver _resolver = new(entryAssemblyPath);
     private readonly string _pluginDirectory = Path.GetDirectoryName(entryAssemblyPath)!;
+    private readonly AssemblyDependencyResolver _resolver = new(entryAssemblyPath);
 
     protected override Assembly? Load(AssemblyName assemblyName)
     {
-        if (IsSharedContract(assemblyName.Name))
-        {
-            return null;
-        }
+        if (IsSharedContract(assemblyName.Name)) return null;
 
         var path = _resolver.ResolveAssemblyToPath(assemblyName);
         if (path is null && assemblyName.Name is not null)
@@ -38,14 +35,12 @@ internal sealed class PluginLoadContext(string entryAssemblyPath) : AssemblyLoad
             };
             var runtimeIdentifier = GetCurrentRuntimeIdentifier();
             if (runtimeIdentifier is not null)
-            {
                 candidates.Add(Path.Combine(
                     _pluginDirectory,
                     "runtimes",
                     runtimeIdentifier,
                     "native",
                     fileName));
-            }
 
             path = candidates.FirstOrDefault(File.Exists);
         }
@@ -55,20 +50,11 @@ internal sealed class PluginLoadContext(string entryAssemblyPath) : AssemblyLoad
 
     private static string GetNativeLibraryFileName(string unmanagedDllName)
     {
-        if (Path.HasExtension(unmanagedDllName))
-        {
-            return unmanagedDllName;
-        }
+        if (Path.HasExtension(unmanagedDllName)) return unmanagedDllName;
 
-        if (OperatingSystem.IsWindows())
-        {
-            return unmanagedDllName + ".dll";
-        }
+        if (OperatingSystem.IsWindows()) return unmanagedDllName + ".dll";
 
-        if (OperatingSystem.IsLinux())
-        {
-            return "lib" + unmanagedDllName + ".so";
-        }
+        if (OperatingSystem.IsLinux()) return "lib" + unmanagedDllName + ".so";
 
         return OperatingSystem.IsMacOS()
             ? "lib" + unmanagedDllName + ".dylib"
@@ -97,7 +83,9 @@ internal sealed class PluginLoadContext(string entryAssemblyPath) : AssemblyLoad
             : $"{operatingSystem}-{architecture}";
     }
 
-    private static bool IsSharedContract(string? assemblyName) =>
-        assemblyName is "LemonNeo.Core" or "LemonNeo.Abstractions" ||
-        assemblyName?.StartsWith("Microsoft.Extensions.", StringComparison.Ordinal) == true;
+    private static bool IsSharedContract(string? assemblyName)
+    {
+        return assemblyName is "LemonNeo.Core" or "LemonNeo.Abstractions" ||
+               assemblyName?.StartsWith("Microsoft.Extensions.", StringComparison.Ordinal) == true;
+    }
 }

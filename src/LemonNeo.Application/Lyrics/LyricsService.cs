@@ -1,8 +1,6 @@
 using LemonNeo.Abstractions.Providers;
-using LemonNeo.Application;
-using LemonNeo.Core.Lyrics;
-using LyricsModel = LemonNeo.Core.Lyrics.Lyrics;
 using LemonNeo.Core.Music;
+using LyricsModel = LemonNeo.Core.Lyrics.Lyrics;
 
 namespace LemonNeo.Application.Lyrics;
 
@@ -20,7 +18,8 @@ public sealed class LyricsService(IProviderRegistry registry, LyricsCache? cache
         cancellationToken.ThrowIfCancellationRequested();
         if (cache is not null)
             foreach (var id in MusicCacheIdentity.KnownIds(track))
-                if (await cache.TryGetAsync(id, cancellationToken) is { } cached) return cached;
+                if (await cache.TryGetAsync(id, cancellationToken) is { } cached)
+                    return cached;
 
         var errors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var providers = registry.Providers
@@ -36,8 +35,10 @@ public sealed class LyricsService(IProviderRegistry registry, LyricsCache? cache
                 var lyrics = await ((ILyricsProvider)provider).GetLyricsAsync(track, cancellationToken);
                 if (lyrics is not null)
                 {
-                    var sourceId = lyrics.SourceId ?? (string.Equals(provider.Id, track.Id.ProviderId, StringComparison.OrdinalIgnoreCase)
-                        ? MusicCacheIdentity.FromTrackId(track.Id) : null);
+                    var sourceId = lyrics.SourceId ?? (string.Equals(provider.Id, track.Id.ProviderId,
+                        StringComparison.OrdinalIgnoreCase)
+                        ? MusicCacheIdentity.FromTrackId(track.Id)
+                        : null);
                     if (cache is not null && sourceId is not null)
                         await cache.StoreAsync(sourceId, lyrics, provider.Id, cancellationToken);
                     return new LyricsLookupResult(lyrics, provider.Id, errors);

@@ -1,13 +1,13 @@
-using LemonNeo.Abstractions.Playback;
 using System.Runtime.InteropServices;
+using LemonNeo.Abstractions.Playback;
 using Un4seen.Bass;
 using BassApi = Un4seen.Bass.Bass;
 
 namespace LemonNeo.Plugin.Bass;
 
 /// <summary>
-/// Native callback adapter only: it forwards the same bytes BASS is playing to
-/// the host. It has no cache paths, files, identities, or persistence policy.
+///     Native callback adapter only: it forwards the same bytes BASS is playing to
+///     the host. It has no cache paths, files, identities, or persistence policy.
 /// </summary>
 internal sealed class BassDownloadForwarder : IDisposable
 {
@@ -23,6 +23,16 @@ internal sealed class BassDownloadForwarder : IDisposable
     }
 
     public DOWNLOADPROC DownloadCallback { get; }
+
+    public void Dispose()
+    {
+        lock (_gate)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _sink.Abort();
+        }
+    }
 
     public void SetStream(int stream)
     {
@@ -44,7 +54,10 @@ internal sealed class BassDownloadForwarder : IDisposable
             lock (_gate)
             {
                 if (_disposed) return;
-                if (buffer == nint.Zero) _sink.Complete();
+                if (buffer == nint.Zero)
+                {
+                    _sink.Complete();
+                }
                 else if (length > 0)
                 {
                     if (_buffer.Length < length) _buffer = new byte[length];
@@ -56,18 +69,13 @@ internal sealed class BassDownloadForwarder : IDisposable
         }
         catch (Exception)
         {
-            try { _sink.Abort(); }
-            catch (Exception) { }
-        }
-    }
-
-    public void Dispose()
-    {
-        lock (_gate)
-        {
-            if (_disposed) return;
-            _disposed = true;
-            _sink.Abort();
+            try
+            {
+                _sink.Abort();
+            }
+            catch (Exception)
+            {
+            }
         }
     }
 }

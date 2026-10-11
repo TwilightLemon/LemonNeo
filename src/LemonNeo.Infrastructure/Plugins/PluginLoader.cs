@@ -1,10 +1,9 @@
+using System.Text.Json;
 using LemonNeo.Abstractions.Playback;
 using LemonNeo.Abstractions.Plugins;
 using LemonNeo.Abstractions.Providers;
 using LemonNeo.Abstractions.Settings;
 using LemonNeo.Abstractions.Storage;
-using System.Reflection;
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 
 namespace LemonNeo.Infrastructure.Plugins;
@@ -12,8 +11,8 @@ namespace LemonNeo.Infrastructure.Plugins;
 internal sealed class LoadedPlugin : IAsyncDisposable
 {
     private readonly PluginLoadContext _loadContext;
-    private readonly ProviderRegistry _registry;
     private readonly PlayerRegistry _playerRegistry;
+    private readonly ProviderRegistry _registry;
     private readonly IAppSettingsService _settings;
     private bool _disposed;
     private bool _shutdown;
@@ -44,22 +43,9 @@ internal sealed class LoadedPlugin : IAsyncDisposable
     public IReadOnlyList<IPlayerProvider> Players { get; }
     public bool IsInteractive => Instance is IInteractivePlugin;
 
-    public PluginInfo GetInfo() => new(Manifest, IsInteractive,
-        Providers.Select(provider => provider.Id).ToArray(), Players.Select(player => player.Id).ToArray());
-
-    public async Task ShutdownAsync()
-    {
-        if (_shutdown) return;
-        _shutdown = true;
-        await Instance.ShutdownAsync(CancellationToken.None);
-    }
-
     public async ValueTask DisposeAsync()
     {
-        if (_disposed)
-        {
-            return;
-        }
+        if (_disposed) return;
 
         _disposed = true;
         try
@@ -70,9 +56,28 @@ internal sealed class LoadedPlugin : IAsyncDisposable
         {
             _registry.Remove(Providers);
             _playerRegistry.Remove(Players);
-            try { await _settings.ReleasePackageAsync(Manifest.Id); }
-            finally { _loadContext.Unload(); }
+            try
+            {
+                await _settings.ReleasePackageAsync(Manifest.Id);
+            }
+            finally
+            {
+                _loadContext.Unload();
+            }
         }
+    }
+
+    public PluginInfo GetInfo()
+    {
+        return new PluginInfo(Manifest, IsInteractive,
+            Providers.Select(provider => provider.Id).ToArray(), Players.Select(player => player.Id).ToArray());
+    }
+
+    public async Task ShutdownAsync()
+    {
+        if (_shutdown) return;
+        _shutdown = true;
+        await Instance.ShutdownAsync(CancellationToken.None);
     }
 }
 
@@ -94,6 +99,23 @@ internal sealed class PluginLoader(
     private readonly List<LoadedPlugin> _loaded = [];
 
     public IReadOnlyList<LoadedPlugin> Loaded => _loaded;
+
+    public async ValueTask DisposeAsync()
+    {
+        for (var index = _loaded.Count - 1; index >= 0; index--)
+            try
+            {
+                await _loaded[index].DisposeAsync();
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(exception, "Plugin {PluginId} failed during shutdown.", _loaded[index].Manifest.Id);
+            }
+
+        _loaded.Clear();
+        LastReport = new PluginLoadReport([], LastReport.Failures);
+    }
+
     IReadOnlyList<PluginInfo> IPluginDiagnostics.Loaded =>
         _loaded.Select(plugin => plugin.GetInfo()).ToArray();
 
@@ -150,13 +172,13 @@ internal sealed class PluginLoader(
             logger.LogInformation("Skipping plugin {PluginId}: unsupported operating system.", manifest.Id);
             return null;
         }
+
         var directory = Path.GetDirectoryName(Path.GetFullPath(manifestPath))!;
         var assemblyPath = Path.GetFullPath(Path.Combine(directory, manifest.EntryAssembly));
         if (!assemblyPath.StartsWith(directory + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
             !File.Exists(assemblyPath))
-        {
-            throw new PluginLoadException($"Entry assembly is missing or outside its plugin directory: {manifest.EntryAssembly}");
-        }
+            throw new PluginLoadException(
+                $"Entry assembly is missing or outside its plugin directory: {manifest.EntryAssembly}");
 
         var loadContext = new PluginLoadContext(assemblyPath);
         try
@@ -168,18 +190,15 @@ internal sealed class PluginLoader(
                 .ToArray();
 
             if (pluginTypes.Length != 1)
-            {
                 throw new PluginLoadException(
                     $"Plugin '{manifest.Id}' must export exactly one ILemonPlugin implementation; found {pluginTypes.Length}.");
-            }
 
             var instance = Activator.CreateInstance(pluginTypes[0]) as ILemonPlugin
-                ?? throw new PluginLoadException($"Could not create plugin '{manifest.Id}'. A public parameterless constructor is required.");
+                           ?? throw new PluginLoadException(
+                               $"Could not create plugin '{manifest.Id}'. A public parameterless constructor is required.");
             if (!string.Equals(instance.Descriptor.Id, manifest.Id, StringComparison.Ordinal))
-            {
                 throw new PluginLoadException(
                     $"Manifest id '{manifest.Id}' does not match descriptor id '{instance.Descriptor.Id}'.");
-            }
 
             var context = new PluginContext(
                 loggerFactory,
@@ -225,12 +244,20 @@ internal sealed class PluginLoader(
         }
         catch
         {
-            try { await settings.ReleasePackageAsync(manifest.Id, CancellationToken.None); }
+            try
+            {
+                await settings.ReleasePackageAsync(manifest.Id, CancellationToken.None);
+            }
             catch (Exception releaseException)
             {
-                logger.LogWarning(releaseException, "Could not release configuration for failed plugin {PluginId}.", manifest.Id);
+                logger.LogWarning(releaseException, "Could not release configuration for failed plugin {PluginId}.",
+                    manifest.Id);
             }
-            finally { loadContext.Unload(); }
+            finally
+            {
+                loadContext.Unload();
+            }
+
             throw;
         }
     }
@@ -240,60 +267,63 @@ internal sealed class PluginLoader(
         if (string.IsNullOrWhiteSpace(manifest.Id) ||
             string.IsNullOrWhiteSpace(manifest.EntryAssembly) ||
             string.IsNullOrWhiteSpace(manifest.Version))
-        {
             throw new PluginLoadException($"Manifest has missing required fields: {manifestPath}");
-        }
 
         if (!Version.TryParse(manifest.Version, out _))
-        {
             throw new PluginLoadException($"Plugin version '{manifest.Version}' is invalid.");
-        }
 
         if (!PackageNames.IsValid(manifest.Id))
             throw new PluginLoadException($"Plugin ID '{manifest.Id}' must use a PascalCase package name.");
 
         if (manifest.Platforms.Any(platform => platform is not ("windows" or "macos" or "linux")))
-            throw new PluginLoadException($"Plugin '{manifest.Id}' has an invalid platform; use windows, macos, or linux.");
+            throw new PluginLoadException(
+                $"Plugin '{manifest.Id}' has an invalid platform; use windows, macos, or linux.");
+
+        foreach (var dependency in manifest.Dependencies)
+        {
+            if (string.IsNullOrWhiteSpace(dependency.Name) ||
+                string.IsNullOrWhiteSpace(dependency.Version) ||
+                string.IsNullOrWhiteSpace(dependency.License))
+                throw new PluginLoadException(
+                    $"Plugin '{manifest.Id}' has a dependency with a missing name, version, or license.");
+
+            if (!string.IsNullOrWhiteSpace(dependency.Website) &&
+                (!Uri.TryCreate(dependency.Website, UriKind.Absolute, out var website) ||
+                 website.Scheme is not ("http" or "https")))
+                throw new PluginLoadException(
+                    $"Plugin '{manifest.Id}' dependency '{dependency.Name}' has an invalid website URL.");
+        }
 
         if (!Version.TryParse(manifest.MinimumHostVersion, out var minimumHostVersion) ||
             minimumHostVersion > new Version(0, 1, 0))
-        {
             throw new PluginLoadException(
                 $"Plugin '{manifest.Id}' requires unsupported host version '{manifest.MinimumHostVersion}'.");
-        }
     }
 
-    private static bool IsCurrentPlatform(string platform) => platform switch
+    private static bool IsCurrentPlatform(string platform)
     {
-        "windows" => OperatingSystem.IsWindows(),
-        "macos" => OperatingSystem.IsMacOS(),
-        "linux" => OperatingSystem.IsLinux(),
-        _ => false
-    };
+        return platform switch
+        {
+            "windows" => OperatingSystem.IsWindows(),
+            "macos" => OperatingSystem.IsMacOS(),
+            "linux" => OperatingSystem.IsLinux(),
+            _ => false
+        };
+    }
 
     public async Task ShutdownAsync()
     {
         List<Exception> errors = [];
         for (var index = _loaded.Count - 1; index >= 0; index--)
-        {
-            try { await _loaded[index].ShutdownAsync(); }
-            catch (Exception exception) { errors.Add(exception); }
-        }
-        if (errors.Count > 0) throw new AggregateException("Plugin shutdown failed.", errors);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        for (var index = _loaded.Count - 1; index >= 0; index--)
-        {
-            try { await _loaded[index].DisposeAsync(); }
+            try
+            {
+                await _loaded[index].ShutdownAsync();
+            }
             catch (Exception exception)
             {
-                logger.LogWarning(exception, "Plugin {PluginId} failed during shutdown.", _loaded[index].Manifest.Id);
+                errors.Add(exception);
             }
-        }
 
-        _loaded.Clear();
-        LastReport = new([], LastReport.Failures);
+        if (errors.Count > 0) throw new AggregateException("Plugin shutdown failed.", errors);
     }
 }

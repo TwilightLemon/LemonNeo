@@ -31,8 +31,10 @@ public sealed record RemotePlaylist
 public sealed record MetadataLookupRequest
 {
     public required Track Track { get; init; }
+
     /// <summary>Optional search text; candidate confidence is still measured against Track.</summary>
     public string? SearchKeyword { get; init; }
+
     public IReadOnlyList<string> TargetNamespaces { get; init; } = [];
     public int LimitPerSource { get; init; } = 3;
     public double MinimumConfidence { get; init; } = 0.7;
@@ -78,8 +80,8 @@ public interface ISearchProvider
 }
 
 /// <summary>
-/// Advertises the source namespaces accepted by a search provider when it
-/// supports narrowing a search to one source.
+///     Advertises the source namespaces accepted by a search provider when it
+///     supports narrowing a search to one source.
 /// </summary>
 public interface ISearchNamespaceProvider
 {
@@ -87,8 +89,8 @@ public interface ISearchNamespaceProvider
 }
 
 /// <summary>
-/// Retrieves a track by the provider's native identifier without approximating
-/// the operation through text search.
+///     Retrieves a track by the provider's native identifier without approximating
+///     the operation through text search.
 /// </summary>
 public interface ITrackLookupProvider
 {
@@ -108,8 +110,8 @@ public interface IPlaylistProvider
 }
 
 /// <summary>
-/// Provides named groups of user playlists when a service distinguishes between
-/// owned, followed, purchased, or other playlist-like collections.
+///     Provides named groups of user playlists when a service distinguishes between
+///     owned, followed, purchased, or other playlist-like collections.
 /// </summary>
 public interface IPlaylistCollectionProvider
 {
@@ -131,10 +133,10 @@ public interface IPlaybackProvider
     IReadOnlyCollection<MusicIdScheme> AcceptedIdSchemes { get; }
 
     /// <summary>
-    /// Resolves only the requested quality using an ID scoped to this provider.
-    /// Automatic means the highest supported quality. Return null when unavailable;
-    /// do not retry at lower qualities. If the remote service silently downgrades,
-    /// return its actual quality in PlaybackSource.Quality for host arbitration.
+    ///     Resolves only the requested quality using an ID scoped to this provider.
+    ///     Automatic means the highest supported quality. Return null when unavailable;
+    ///     do not retry at lower qualities. If the remote service silently downgrades,
+    ///     return its actual quality in PlaybackSource.Quality for host arbitration.
     /// </summary>
     Task<PlaybackSource?> ResolvePlaybackAsync(
         MusicItemId trackId,
@@ -165,7 +167,7 @@ public sealed record PlaybackSourceProviderRegistration(
     IReadOnlyList<MusicIdScheme> AcceptedIdSchemes);
 
 /// <summary>
-/// Tracks the playback-source providers currently registered by loaded plugins.
+///     Tracks the playback-source providers currently registered by loaded plugins.
 /// </summary>
 public interface IPlaybackSourceProviderRegistry
 {

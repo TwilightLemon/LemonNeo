@@ -13,16 +13,16 @@ namespace LemonNeo.Desktop.Services;
 public sealed class ThemeColorService : IDisposable
 {
     private readonly Avalonia.Application _application;
-    private readonly ThemeResources _resources;
-    private readonly FluentTheme? _fluent;
-    private readonly DispatcherTimer _timer;
     private readonly Stopwatch _clock = new();
-    private IReadOnlyDictionary<string, Color> _from;
-    private IReadOnlyDictionary<string, Color> _target;
-    private AppearancePreferences _preferences = new();
-    private Color? _artworkColor;
+    private readonly FluentTheme? _fluent;
+    private readonly ThemeResources _resources;
+    private readonly DispatcherTimer _timer;
     private bool _applyingPreferences;
+    private Color? _artworkColor;
     private bool _disposed;
+    private IReadOnlyDictionary<string, Color> _from;
+    private AppearancePreferences _preferences = new();
+    private IReadOnlyDictionary<string, Color> _target;
 
     public ThemeColorService(Avalonia.Application application)
     {
@@ -37,6 +37,16 @@ public sealed class ThemeColorService : IDisposable
     }
 
     public bool IsUsingArtwork => _preferences.UseArtworkColors && _artworkColor.HasValue;
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        _application.ActualThemeVariantChanged -= OnThemeChanged;
+        _timer.Stop();
+        _timer.Tick -= OnTick;
+    }
+
     public event EventHandler? Changed;
 
     public void ApplyPreferences(AppearancePreferences preferences, bool animate)
@@ -53,7 +63,11 @@ public sealed class ThemeColorService : IDisposable
                 _ => ThemeVariant.Default
             };
         }
-        finally { _applyingPreferences = false; }
+        finally
+        {
+            _applyingPreferences = false;
+        }
+
         Refresh(animate);
     }
 
@@ -64,9 +78,12 @@ public sealed class ThemeColorService : IDisposable
         if (_preferences.UseArtworkColors) Refresh(true);
     }
 
-    private IReadOnlyDictionary<string, Color> CreatePalette() => ThemePalette.Create(
-        IsUsingArtwork ? ThemePalette.FromArtwork(_artworkColor!.Value) : ThemePalette.Get(_preferences.ThemeColor),
-        _application.ActualThemeVariant == ThemeVariant.Dark);
+    private IReadOnlyDictionary<string, Color> CreatePalette()
+    {
+        return ThemePalette.Create(
+            IsUsingArtwork ? ThemePalette.FromArtwork(_artworkColor!.Value) : ThemePalette.Get(_preferences.ThemeColor),
+            _application.ActualThemeVariant == ThemeVariant.Dark);
+    }
 
     private void Refresh(bool animate)
     {
@@ -83,8 +100,12 @@ public sealed class ThemeColorService : IDisposable
                 _clock.Restart();
                 _timer.Start();
             }
-            else ApplyFrame(_target);
+            else
+            {
+                ApplyFrame(_target);
+            }
         }
+
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
@@ -98,7 +119,11 @@ public sealed class ThemeColorService : IDisposable
         var progress = Math.Clamp(_clock.Elapsed.TotalMilliseconds / 420, 0, 1);
         var eased = progress * progress * (3 - 2 * progress);
         ApplyFrame(_target.ToDictionary(p => p.Key, p => ThemePalette.Mix(_from[p.Key], p.Value, eased)));
-        if (progress >= 1) { _timer.Stop(); _clock.Stop(); }
+        if (progress >= 1)
+        {
+            _timer.Stop();
+            _clock.Stop();
+        }
     }
 
     private void ApplyFrame(IReadOnlyDictionary<string, Color> colors)
@@ -107,14 +132,5 @@ public sealed class ThemeColorService : IDisposable
         // Fluent's Accent is its supported host palette input (checkboxes, switches, focus, etc.).
         if (_fluent is null) return;
         foreach (var palette in _fluent.Palettes.Values) palette.Accent = colors["AccentText"];
-    }
-
-    public void Dispose()
-    {
-        if (_disposed) return;
-        _disposed = true;
-        _application.ActualThemeVariantChanged -= OnThemeChanged;
-        _timer.Stop();
-        _timer.Tick -= OnTick;
     }
 }

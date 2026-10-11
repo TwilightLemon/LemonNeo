@@ -1,5 +1,4 @@
 using LemonNeo.Core.Music;
-using System.Collections.Immutable;
 
 namespace LemonNeo.Core.Library;
 

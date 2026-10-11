@@ -1,10 +1,10 @@
+using System.Net.Http.Headers;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using LemonNeo.Abstractions.Plugins;
 using LemonNeo.Abstractions.Providers;
 using LemonNeo.Core.Music;
 using LemonNeo.Core.Playback;
-using System.Net.Http.Headers;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 
 namespace LemonNeo.Plugin.GdStudioNetease;
@@ -16,10 +16,12 @@ public sealed class GdStudioNeteasePlugin :
 {
     private const string ProviderId = "gdstudio-netease";
     private const string PluginId = "LemonNeo.Plugin.GdStudioNetease";
+
     private const string UserAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
         "AppleWebKit/537.36 (KHTML, like Gecko) " +
         "Chrome/57.0.2987.110 Safari/537.36";
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private HttpClient? _httpClient;
@@ -29,17 +31,6 @@ public sealed class GdStudioNeteasePlugin :
         PluginId,
         "GDStudio Netease Playback Source",
         "1.0.0");
-
-    public string Id => ProviderId;
-
-    ProviderDescriptor IMusicProvider.Descriptor { get; } = new(
-        "GDStudio Netease Playback Source",
-        "Resolves Netease song IDs to direct HTTP audio sources through GDStudio.");
-
-    public IReadOnlyCollection<MusicIdScheme> AcceptedIdSchemes { get; } =
-    [
-        new(MusicIdNamespaces.NeteaseMusic, "song-id")
-    ];
 
     public ValueTask InitializeAsync(IPluginContext context, CancellationToken cancellationToken)
     {
@@ -60,6 +51,17 @@ public sealed class GdStudioNeteasePlugin :
         return ValueTask.CompletedTask;
     }
 
+    public string Id => ProviderId;
+
+    ProviderDescriptor IMusicProvider.Descriptor { get; } = new(
+        "GDStudio Netease Playback Source",
+        "Resolves Netease song IDs to direct HTTP audio sources through GDStudio.");
+
+    public IReadOnlyCollection<MusicIdScheme> AcceptedIdSchemes { get; } =
+    [
+        new(MusicIdNamespaces.NeteaseMusic, "song-id")
+    ];
+
     public async Task<PlaybackSource?> ResolvePlaybackAsync(
         MusicItemId trackId,
         PlaybackRequest request,
@@ -67,9 +69,7 @@ public sealed class GdStudioNeteasePlugin :
     {
         if (!string.Equals(trackId.ProviderId, ProviderId, StringComparison.OrdinalIgnoreCase) ||
             !IsValidSongId(trackId.RemoteId))
-        {
             return null;
-        }
 
         var client = _httpClient ?? throw new InvalidOperationException("The GDStudio provider is not initialized.");
         var endpoint = new Uri(
@@ -132,43 +132,48 @@ public sealed class GdStudioNeteasePlugin :
         }
     }
 
-    private static int RequestedBitrate(AudioQuality quality) => quality switch
+    private static int RequestedBitrate(AudioQuality quality)
     {
-        AudioQuality.Low => 128,
-        AudioQuality.Medium => 192,
-        AudioQuality.High => 320,
-        AudioQuality.Lossless => 740,
-        _ => 999
-    };
+        return quality switch
+        {
+            AudioQuality.Low => 128,
+            AudioQuality.Medium => 192,
+            AudioQuality.High => 320,
+            AudioQuality.Lossless => 740,
+            _ => 999
+        };
+    }
 
     // Response br is actual kbps, not the 740/999 request selector. Since it does not
     // include bit depth, use conservative bitrate tiers (16-bit CD PCM is 1411 kbps).
-    private static AudioQuality? ActualQuality(int? bitrate) => bitrate switch
+    private static AudioQuality? ActualQuality(int? bitrate)
     {
-        > 1411 => AudioQuality.HiRes,
-        > 320 => AudioQuality.Lossless,
-        > 192 => AudioQuality.High,
-        > 128 => AudioQuality.Medium,
-        > 0 => AudioQuality.Low,
-        _ => null
-    };
+        return bitrate switch
+        {
+            > 1411 => AudioQuality.HiRes,
+            > 320 => AudioQuality.Lossless,
+            > 192 => AudioQuality.High,
+            > 128 => AudioQuality.Medium,
+            > 0 => AudioQuality.Low,
+            _ => null
+        };
+    }
 
-    private static bool IsValidSongId(string value) =>
-        long.TryParse(value, out var parsed) && parsed > 0;
+    private static bool IsValidSongId(string value)
+    {
+        return long.TryParse(value, out var parsed) && parsed > 0;
+    }
 
     private sealed record GdStudioUrlResponse
     {
-        [JsonPropertyName("url")]
-        public string? Url { get; init; }
+        [JsonPropertyName("url")] public string? Url { get; init; }
 
         [JsonPropertyName("br")]
         [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
         public int? Bitrate { get; init; }
 
-        [JsonPropertyName("size")]
-        public long? Size { get; init; }
+        [JsonPropertyName("size")] public long? Size { get; init; }
 
-        [JsonPropertyName("from")]
-        public string? From { get; init; }
+        [JsonPropertyName("from")] public string? From { get; init; }
     }
 }

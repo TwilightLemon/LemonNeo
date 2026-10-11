@@ -1,100 +1,212 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:sharedControls="using:LemonNeo.Desktop.Controls.Shared" xmlns:metadataVm="using:LemonNeo.Desktop.ViewModels.Metadata"
-             xmlns:i18n="using:LemonNeo.Desktop.Services"
-             x:Class="LemonNeo.Desktop.Views.Metadata.MatchPlaylistView" x:DataType="metadataVm:MatchPlaylistPageViewModel">
-  <Grid RowDefinitions="Auto,Auto,*">
-    <sharedControls:PageHeader Title="{Binding PageTitle}" Description="{Binding PageDescription}" Summary="{Binding PageSummary}">
-      <sharedControls:PageHeader.Actions>
-        <StackPanel Spacing="10">
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Content="{Translate {x:Static i18n:LanguageManager+Keys.Back}}" Command="{Binding CloseCommand}" />
-            <Button Classes="primary" Content="{Translate {x:Static i18n:LanguageManager+Keys.MatchPlaylist}}" Command="{Binding MatchPlaylistCommand}" />
-          </StackPanel>
-          <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsBusy}">
-            <ProgressBar IsIndeterminate="True" Width="60" Height="3" VerticalAlignment="Center" AutomationProperties.Name="{Binding Status}" />
-            <Button Classes="ghost" Content="{Translate {x:Static i18n:LanguageManager+Keys.CancelOperation}}" Command="{Binding CancelOperationCommand}" />
-          </StackPanel>
-        </StackPanel>
-      </sharedControls:PageHeader.Actions>
-    </sharedControls:PageHeader>
-    <Border Grid.Row="1" IsVisible="{Binding HasError}" Background="{DynamicResource Brush.DangerSoft}" CornerRadius="10" Padding="14" Margin="0,0,0,12">
-      <Grid ColumnDefinitions="*,Auto">
-        <TextBlock Text="{Binding Error}" Foreground="{DynamicResource Brush.Danger}" TextWrapping="Wrap" MaxHeight="90" />
-        <Button Grid.Column="1" Classes="ghost icon" Command="{Binding DismissErrorCommand}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}">
-          <Path Classes="icon" Data="{StaticResource Icon.Close}" />
-        </Button>
-      </Grid>
-    </Border>
-    <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled">
-      <StackPanel Spacing="18" Margin="0,0,12,16">
-        <StackPanel Spacing="10" IsEnabled="{Binding CanInteract}">
-          <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.MetadataTargets}}" Classes="section" />
-          <ItemsControl Name="MetadataSourceSelector" ItemsSource="{Binding MetadataSources}" IsVisible="{Binding HasMetadataSources}">
-            <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="metadataVm:MetadataSourceOption">
-                <CheckBox Content="{Binding Namespace}" IsChecked="{Binding IsSelected, Mode=TwoWay}" Margin="0,0,20,8" />
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-          <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.NoMetadataSources}}" IsVisible="{Binding !HasMetadataSources}" Classes="muted" TextWrapping="Wrap" />
-          <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.SelectMetadataSources}}" Classes="caption" TextWrapping="Wrap" IsVisible="{Binding HasMetadataSources}" />
-        </StackPanel>
-        <TextBlock Text="{Binding Status}" IsVisible="{Binding HasStatus}" TextWrapping="Wrap" />
-        <SelectableTextBlock Text="{Binding InspectionMessages}" Classes="muted" TextWrapping="Wrap" />
-        <StackPanel Spacing="10" IsVisible="{Binding HasResults}">
-          <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.MatchResults}}" Classes="section" />
-          <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.MatchResultsHint}}" Classes="caption" TextWrapping="Wrap" />
-          <ItemsControl ItemsSource="{Binding Results}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="metadataVm:PlaylistMatchResultRow">
-                <Button Classes="ghost" Command="{Binding OpenTrackCommand}" CommandParameter="{Binding}"
-                        ToolTip.Tip="{Binding OpenTrackHint}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
-                        Padding="0" Margin="0,0,0,10">
-                  <Border Classes="card" Padding="18" HorizontalAlignment="Stretch">
-                    <StackPanel Spacing="10">
-                      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                        <TextBlock Text="{Binding Number}" Classes="caption" VerticalAlignment="Center" />
-                        <StackPanel Grid.Column="1" Spacing="4">
-                          <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                          <TextBlock Text="{Binding Artists}" Classes="muted" TextWrapping="Wrap" />
-                          <TextBlock Text="{Binding Identity}" Classes="caption" TextWrapping="Wrap" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="2" Spacing="4" HorizontalAlignment="Right">
-                          <TextBlock Text="{Binding Result}" Foreground="{DynamicResource Brush.Danger}"
-                                     FontWeight="SemiBold" HorizontalAlignment="Right" IsVisible="{Binding !IsSuccessful}" />
-                          <TextBlock Text="{Binding Result}" Foreground="{DynamicResource Brush.AccentText}"
-                                     FontWeight="SemiBold" HorizontalAlignment="Right" IsVisible="{Binding IsSuccessful}" />
-                          <TextBlock Text="{Binding Details}" Classes="caption" HorizontalAlignment="Right" TextWrapping="Wrap" />
-                          <TextBlock Text="{Binding MatchSource}" Classes="caption" HorizontalAlignment="Right" TextWrapping="Wrap" />
-                        </StackPanel>
-                      </Grid>
-                      <ItemsControl ItemsSource="{Binding Changes}" IsVisible="{Binding HasChanges}">
-                        <ItemsControl.ItemTemplate>
-                          <DataTemplate x:DataType="metadataVm:PlaylistTrackChangeRow">
-                            <Grid ColumnDefinitions="120,*,Auto,*" ColumnSpacing="12" Margin="0,6,0,0">
-                              <TextBlock Text="{Binding Field}" FontWeight="Medium" TextWrapping="Wrap" />
-                              <StackPanel Grid.Column="1" Spacing="3">
-                                <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.BeforeMatch}}" Classes="caption" />
-                                <TextBlock Text="{Binding Before}" TextWrapping="Wrap" />
-                              </StackPanel>
-                              <TextBlock Grid.Column="2" Text="→" Classes="muted" VerticalAlignment="Center" />
-                              <StackPanel Grid.Column="3" Spacing="3">
-                                <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.AfterMatch}}" Classes="caption" />
-                                <TextBlock Text="{Binding After}" TextWrapping="Wrap" />
-                              </StackPanel>
-                            </Grid>
-                          </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                      </ItemsControl>
+<UserControl
+    x:Class="LemonNeo.Desktop.Views.Metadata.MatchPlaylistView"
+    x:DataType="metadataVm:MatchPlaylistPageViewModel"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:i18n="using:LemonNeo.Desktop.Services"
+    xmlns:metadataVm="using:LemonNeo.Desktop.ViewModels.Metadata"
+    xmlns:sharedControls="using:LemonNeo.Desktop.Controls.Shared"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid RowDefinitions="Auto,Auto,*">
+        <sharedControls:PageHeader
+            Description="{Binding PageDescription}"
+            Summary="{Binding PageSummary}"
+            Title="{Binding PageTitle}">
+            <sharedControls:PageHeader.Actions>
+                <StackPanel Spacing="10">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Command="{Binding CloseCommand}" Content="{Translate {x:Static i18n:LanguageManager+Keys.Back}}" />
+                        <Button
+                            Classes="primary"
+                            Command="{Binding MatchPlaylistCommand}"
+                            Content="{Translate {x:Static i18n:LanguageManager+Keys.MatchPlaylist}}" />
                     </StackPanel>
-                  </Border>
+                    <StackPanel
+                        IsVisible="{Binding IsBusy}"
+                        Orientation="Horizontal"
+                        Spacing="10">
+                        <ProgressBar
+                            AutomationProperties.Name="{Binding Status}"
+                            Height="3"
+                            IsIndeterminate="True"
+                            VerticalAlignment="Center"
+                            Width="60" />
+                        <Button
+                            Classes="ghost"
+                            Command="{Binding CancelOperationCommand}"
+                            Content="{Translate {x:Static i18n:LanguageManager+Keys.CancelOperation}}" />
+                    </StackPanel>
+                </StackPanel>
+            </sharedControls:PageHeader.Actions>
+        </sharedControls:PageHeader>
+        <Border
+            Background="{DynamicResource Brush.DangerSoft}"
+            CornerRadius="10"
+            Grid.Row="1"
+            IsVisible="{Binding HasError}"
+            Margin="0,0,0,12"
+            Padding="14">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock
+                    Foreground="{DynamicResource Brush.Danger}"
+                    MaxHeight="90"
+                    Text="{Binding Error}"
+                    TextWrapping="Wrap" />
+                <Button
+                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}"
+                    Classes="ghost icon"
+                    Command="{Binding DismissErrorCommand}"
+                    Grid.Column="1">
+                    <Path Classes="icon" Data="{StaticResource Icon.Close}" />
                 </Button>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </StackPanel>
-      </StackPanel>
-    </ScrollViewer>
-  </Grid>
+            </Grid>
+        </Border>
+        <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="0,0,12,16" Spacing="18">
+                <StackPanel IsEnabled="{Binding CanInteract}" Spacing="10">
+                    <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.MetadataTargets}}" />
+                    <ItemsControl
+                        IsVisible="{Binding HasMetadataSources}"
+                        ItemsSource="{Binding MetadataSources}"
+                        Name="MetadataSourceSelector">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="metadataVm:MetadataSourceOption">
+                                <CheckBox
+                                    Content="{Binding Namespace}"
+                                    IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                    Margin="0,0,20,8" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock
+                        Classes="muted"
+                        IsVisible="{Binding !HasMetadataSources}"
+                        Text="{Translate {x:Static i18n:LanguageManager+Keys.NoMetadataSources}}"
+                        TextWrapping="Wrap" />
+                    <TextBlock
+                        Classes="caption"
+                        IsVisible="{Binding HasMetadataSources}"
+                        Text="{Translate {x:Static i18n:LanguageManager+Keys.SelectMetadataSources}}"
+                        TextWrapping="Wrap" />
+                </StackPanel>
+                <TextBlock
+                    IsVisible="{Binding HasStatus}"
+                    Text="{Binding Status}"
+                    TextWrapping="Wrap" />
+                <SelectableTextBlock
+                    Classes="muted"
+                    Text="{Binding InspectionMessages}"
+                    TextWrapping="Wrap" />
+                <StackPanel IsVisible="{Binding HasResults}" Spacing="10">
+                    <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.MatchResults}}" />
+                    <TextBlock
+                        Classes="caption"
+                        Text="{Translate {x:Static i18n:LanguageManager+Keys.MatchResultsHint}}"
+                        TextWrapping="Wrap" />
+                    <ItemsControl ItemsSource="{Binding Results}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="metadataVm:PlaylistMatchResultRow">
+                                <Button
+                                    Classes="ghost"
+                                    Command="{Binding OpenTrackCommand}"
+                                    CommandParameter="{Binding}"
+                                    HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Stretch"
+                                    Margin="0,0,0,10"
+                                    Padding="0"
+                                    ToolTip.Tip="{Binding OpenTrackHint}">
+                                    <Border
+                                        Classes="card"
+                                        HorizontalAlignment="Stretch"
+                                        Padding="18">
+                                        <StackPanel Spacing="10">
+                                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                                                <TextBlock
+                                                    Classes="caption"
+                                                    Text="{Binding Number}"
+                                                    VerticalAlignment="Center" />
+                                                <StackPanel Grid.Column="1" Spacing="4">
+                                                    <TextBlock
+                                                        FontWeight="SemiBold"
+                                                        Text="{Binding Title}"
+                                                        TextWrapping="Wrap" />
+                                                    <TextBlock
+                                                        Classes="muted"
+                                                        Text="{Binding Artists}"
+                                                        TextWrapping="Wrap" />
+                                                    <TextBlock
+                                                        Classes="caption"
+                                                        Text="{Binding Identity}"
+                                                        TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <StackPanel
+                                                    Grid.Column="2"
+                                                    HorizontalAlignment="Right"
+                                                    Spacing="4">
+                                                    <TextBlock
+                                                        FontWeight="SemiBold"
+                                                        Foreground="{DynamicResource Brush.Danger}"
+                                                        HorizontalAlignment="Right"
+                                                        IsVisible="{Binding !IsSuccessful}"
+                                                        Text="{Binding Result}" />
+                                                    <TextBlock
+                                                        FontWeight="SemiBold"
+                                                        Foreground="{DynamicResource Brush.AccentText}"
+                                                        HorizontalAlignment="Right"
+                                                        IsVisible="{Binding IsSuccessful}"
+                                                        Text="{Binding Result}" />
+                                                    <TextBlock
+                                                        Classes="caption"
+                                                        HorizontalAlignment="Right"
+                                                        Text="{Binding Details}"
+                                                        TextWrapping="Wrap" />
+                                                    <TextBlock
+                                                        Classes="caption"
+                                                        HorizontalAlignment="Right"
+                                                        Text="{Binding MatchSource}"
+                                                        TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </Grid>
+                                            <ItemsControl IsVisible="{Binding HasChanges}" ItemsSource="{Binding Changes}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="metadataVm:PlaylistTrackChangeRow">
+                                                        <Grid
+                                                            ColumnDefinitions="120,*,Auto,*"
+                                                            ColumnSpacing="12"
+                                                            Margin="0,6,0,0">
+                                                            <TextBlock
+                                                                FontWeight="Medium"
+                                                                Text="{Binding Field}"
+                                                                TextWrapping="Wrap" />
+                                                            <StackPanel Grid.Column="1" Spacing="3">
+                                                                <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.BeforeMatch}}" />
+                                                                <TextBlock Text="{Binding Before}" TextWrapping="Wrap" />
+                                                            </StackPanel>
+                                                            <TextBlock
+                                                                Classes="muted"
+                                                                Grid.Column="2"
+                                                                Text="→"
+                                                                VerticalAlignment="Center" />
+                                                            <StackPanel Grid.Column="3" Spacing="3">
+                                                                <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.AfterMatch}}" />
+                                                                <TextBlock Text="{Binding After}" TextWrapping="Wrap" />
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
 </UserControl>

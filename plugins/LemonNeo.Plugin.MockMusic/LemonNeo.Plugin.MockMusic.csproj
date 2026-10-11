@@ -1,12 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="../../src/LemonNeo.Core/LemonNeo.Core.csproj" />
-    <ProjectReference Include="../../src/LemonNeo.Abstractions/LemonNeo.Abstractions.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="plugin.json" CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
+    <PropertyGroup>
+        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="../../src/LemonNeo.Core/LemonNeo.Core.csproj"/>
+        <ProjectReference Include="../../src/LemonNeo.Abstractions/LemonNeo.Abstractions.csproj"/>
+    </ItemGroup>
+    <ItemGroup>
+        <None Include="plugin.json" CopyToOutputDirectory="PreserveNewest"/>
+    </ItemGroup>
 </Project>

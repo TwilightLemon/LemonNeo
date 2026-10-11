@@ -1,14 +1,14 @@
 namespace LemonNeo.Hosting;
 
 /// <summary>
-/// The host-owned locations of user-selectable storage. Services read the current
-/// value when starting an operation, so changing a location does not recreate the
-/// service provider or any plugin.
+///     The host-owned locations of user-selectable storage. Services read the current
+///     value when starting an operation, so changing a location does not recreate the
+///     service provider or any plugin.
 /// </summary>
 public sealed class HostStorageLocations
 {
-    private string _libraryDirectory;
     private string _cacheDirectory;
+    private string _libraryDirectory;
 
     internal HostStorageLocations(string libraryDirectory, string cacheDirectory)
     {
@@ -36,8 +36,10 @@ public sealed class HostStorageLocations
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    private static bool PathEquals(string first, string second) =>
-        string.Equals(first, second, OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
+    private static bool PathEquals(string first, string second)
+    {
+        return string.Equals(first, second, OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
             ? StringComparison.OrdinalIgnoreCase
             : StringComparison.Ordinal);
+    }
 }

@@ -39,6 +39,8 @@ public static class DesktopPreferences
         });
     }
 
-    private static string? NormalizeOptionalPath(string? path) =>
-        string.IsNullOrWhiteSpace(path) ? null : Path.GetFullPath(path);
+    private static string? NormalizeOptionalPath(string? path)
+    {
+        return string.IsNullOrWhiteSpace(path) ? null : Path.GetFullPath(path);
+    }
 }

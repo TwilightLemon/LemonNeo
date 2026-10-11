@@ -11,15 +11,16 @@ namespace LemonNeo.Desktop.Views.Lyrics;
 
 public partial class DesktopLyricsWindow : Window
 {
-    private readonly Cursor _horizontalResize = new(StandardCursorType.SizeWestEast);
-    private readonly Cursor _verticalResize = new(StandardCursorType.SizeNorthSouth);
     private readonly Cursor _diagonalResize = new(StandardCursorType.TopLeftCorner);
+    private readonly Cursor _horizontalResize = new(StandardCursorType.SizeWestEast);
     private readonly Cursor _reverseDiagonalResize = new(StandardCursorType.TopRightCorner);
-    private WindowEdge? _resizingEdge;
+    private readonly Cursor _verticalResize = new(StandardCursorType.SizeNorthSouth);
     private PixelPoint _resizePointer;
     private PixelPoint _resizePosition;
-    private Size _resizeSize;
     private double _resizeScaling;
+    private Size _resizeSize;
+    private WindowEdge? _resizingEdge;
+
     public DesktopLyricsWindow()
     {
         InitializeComponent();
@@ -35,7 +36,10 @@ public partial class DesktopLyricsWindow : Window
         {
             Screens.Changed -= OnScreensChanged;
             if (DataContext is LyricsViewModel vm) vm.SaveDesktopWindowSize(Bounds.Width, Bounds.Height);
-            _horizontalResize.Dispose(); _verticalResize.Dispose(); _diagonalResize.Dispose(); _reverseDiagonalResize.Dispose();
+            _horizontalResize.Dispose();
+            _verticalResize.Dispose();
+            _diagonalResize.Dispose();
+            _reverseDiagonalResize.Dispose();
         };
     }
 
@@ -56,7 +60,8 @@ public partial class DesktopLyricsWindow : Window
         Show();
         if (savedPosition is { } position) Position = position;
         else if (screen is not null)
-            Position = new PixelPoint(screen.WorkingArea.X + (screen.WorkingArea.Width - (int)(Bounds.Width * DesktopScaling)) / 2,
+            Position = new PixelPoint(
+                screen.WorkingArea.X + (screen.WorkingArea.Width - (int)(Bounds.Width * DesktopScaling)) / 2,
                 screen.WorkingArea.Bottom - (int)((Bounds.Height + 48) * DesktopScaling));
         KeepOnScreen();
         // The initial native layout may increase the height to fit the selected lyric rows.
@@ -64,13 +69,17 @@ public partial class DesktopLyricsWindow : Window
         {
             if (!IsVisible) return;
             if (savedPosition is null && screen is not null)
-                Position = new PixelPoint(screen.WorkingArea.X + (screen.WorkingArea.Width - (int)(Bounds.Width * DesktopScaling)) / 2,
+                Position = new PixelPoint(
+                    screen.WorkingArea.X + (screen.WorkingArea.Width - (int)(Bounds.Width * DesktopScaling)) / 2,
                     screen.WorkingArea.Bottom - (int)((Bounds.Height + 48) * DesktopScaling));
             KeepOnScreen();
         }, DispatcherPriority.Loaded);
     }
 
-    private void OnScreensChanged(object? sender, EventArgs args) => KeepOnScreen();
+    private void OnScreensChanged(object? sender, EventArgs args)
+    {
+        KeepOnScreen();
+    }
 
     private void KeepOnScreen()
     {
@@ -117,7 +126,8 @@ public partial class DesktopLyricsWindow : Window
 
     private void OnResizePressed(object? sender, PointerPressedEventArgs args)
     {
-        if (!CanResize || !args.GetCurrentPoint(this).Properties.IsLeftButtonPressed || ResizeEdge(args.GetPosition(this)) is not { } edge) return;
+        if (!CanResize || !args.GetCurrentPoint(this).Properties.IsLeftButtonPressed ||
+            ResizeEdge(args.GetPosition(this)) is not { } edge) return;
         args.Handled = true;
         // Captured pointer resizing also works on macOS, where Avalonia.Native's BeginResizeDrag is a no-op.
         _resizingEdge = edge;
@@ -141,11 +151,13 @@ public partial class DesktopLyricsWindow : Window
             var bottom = edge is WindowEdge.South or WindowEdge.SouthWest or WindowEdge.SouthEast;
             Width = Math.Clamp(_resizeSize.Width + (right ? deltaX : left ? -deltaX : 0), MinWidth, MaxWidth);
             Height = Math.Clamp(_resizeSize.Height + (bottom ? deltaY : top ? -deltaY : 0), MinHeight, MaxHeight);
-            Position = new PixelPoint(_resizePosition.X + (left ? (int)Math.Round((_resizeSize.Width - Width) * _resizeScaling) : 0),
+            Position = new PixelPoint(
+                _resizePosition.X + (left ? (int)Math.Round((_resizeSize.Width - Width) * _resizeScaling) : 0),
                 _resizePosition.Y + (top ? (int)Math.Round((_resizeSize.Height - Height) * _resizeScaling) : 0));
             args.Handled = true;
             return;
         }
+
         Cursor = ResizeEdge(args.GetPosition(this)) switch
         {
             WindowEdge.West or WindowEdge.East => _horizontalResize,
@@ -172,7 +184,18 @@ public partial class DesktopLyricsWindow : Window
         BeginMoveDrag(args);
     }
 
-    private void OnSettingsOpened(object? sender, EventArgs args) => HoverCard.Classes.Set("settingsOpen", true);
-    private void OnSettingsClosed(object? sender, EventArgs args) => HoverCard.Classes.Set("settingsOpen", false);
-    private void OnCloseWindow(object? sender, RoutedEventArgs args) => Close();
+    private void OnSettingsOpened(object? sender, EventArgs args)
+    {
+        HoverCard.Classes.Set("settingsOpen", true);
+    }
+
+    private void OnSettingsClosed(object? sender, EventArgs args)
+    {
+        HoverCard.Classes.Set("settingsOpen", false);
+    }
+
+    private void OnCloseWindow(object? sender, RoutedEventArgs args)
+    {
+        Close();
+    }
 }

@@ -1,8 +1,9 @@
+using System.Text.RegularExpressions;
 using LemonNeo.Core.Lyrics;
 using LemonNeo.Core.Music;
-using System.Text.RegularExpressions;
 using Lyricify.Lyrics.Helpers;
 using Lyricify.Lyrics.Models;
+using Lyricify.Lyrics.Parsers;
 using LemonLyrics = LemonNeo.Core.Lyrics.Lyrics;
 using LemonLyricsLine = LemonNeo.Core.Lyrics.LyricsLine;
 
@@ -10,8 +11,10 @@ namespace LemonNeo.Plugin.Lyricify;
 
 internal static partial class LyricsConverter
 {
-    [GeneratedRegex(@"(?m)^(?<timestamps>(?:[ \t]*\[[^\]\r\n]+\])*)[ \t]*//[ \t]*(?=\r?$)", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"(?m)^(?<timestamps>(?:[ \t]*\[[^\]\r\n]+\])*)[ \t]*//[ \t]*(?=\r?$)",
+        RegexOptions.CultureInvariant)]
     private static partial Regex EmptyQqTranslation();
+
     public static LemonLyrics Parse(
         string raw,
         LyricsRawTypes type,
@@ -28,7 +31,7 @@ internal static partial class LyricsConverter
         // Helper exposes this data separately from its parsed translation lines.
         try
         {
-            var pronunciation = global::Lyricify.Lyrics.Parsers.KrcTranslationParser
+            var pronunciation = KrcTranslationParser
                 .GetTranslationRawFromKrc(raw)?.Content?.FirstOrDefault(content => content.Type == 0)?.LyricContent;
             if (pronunciation is null || lyrics.Lines is null) return lyrics;
             var romanizedLines = new List<LyricsRomanizationLine>();
@@ -39,6 +42,7 @@ internal static partial class LyricsConverter
                     i < tokens.Count - 1 ? text + " " : text).ToArray(), lyrics.Lines[index]);
                 if (words is not null) romanizedLines.Add(new LyricsRomanizationLine(words));
             }
+
             return romanizedLines.Count == 0 ? lyrics : lyrics with { RomanizationLines = romanizedLines };
         }
         catch (Exception)
@@ -63,9 +67,11 @@ internal static partial class LyricsConverter
         var qqMusic = string.Equals(source, MusicIdNamespaces.QQMusic, StringComparison.OrdinalIgnoreCase);
         if (qqMusic) lines = lines.Select(NormalizeEmbeddedTranslations).ToArray();
         var translationLines = ParseAuxiliary(translation)?.Select(ConvertLine).ToArray()
-            ?? lines.Where(line => line.Translations is { Count: > 0 }).Select(line => new LemonLyricsLine(
-                line.Translations!.GetValueOrDefault("zh") ?? line.Translations!.Values.First(),
-                line.EffectiveStartTimeMs, line.EffectiveEndTimeMs, line.Translations)).ToArray();
+                               ?? lines.Where(line => line.Translations is { Count: > 0 }).Select(line =>
+                                   new LemonLyricsLine(
+                                       line.Translations!.GetValueOrDefault("zh") ?? line.Translations!.Values.First(),
+                                       line.EffectiveStartTimeMs, line.EffectiveEndTimeMs,
+                                       line.Translations)).ToArray();
         if (qqMusic)
         {
             // Keep the empty row and its timestamp so a missing translation cannot shift later rows.
@@ -80,9 +86,12 @@ internal static partial class LyricsConverter
         foreach (var line in lines.Where(line => !string.IsNullOrWhiteSpace(line.Romanization)))
         {
             var words = AlignPronunciation(SplitPronunciation(line.Romanization!), line);
-            romanizedLines.Add(words is not null ? new LyricsRomanizationLine(words)
-                : new LyricsRomanizationLine([], line.Romanization, line.EffectiveStartTimeMs, line.EffectiveEndTimeMs));
+            romanizedLines.Add(words is not null
+                ? new LyricsRomanizationLine(words)
+                : new LyricsRomanizationLine([], line.Romanization, line.EffectiveStartTimeMs,
+                    line.EffectiveEndTimeMs));
         }
+
         foreach (var helperLine in ParseAuxiliary(romanization) ?? [])
         {
             var line = ConvertLine(helperLine);
@@ -94,10 +103,9 @@ internal static partial class LyricsConverter
                 var original = lines.Where(candidate => candidate.IsWordSynchronized)
                     .MinBy(candidate => Math.Abs((long)(candidate.EffectiveStartTimeMs ?? int.MinValue) - start));
                 if (original?.EffectiveStartTimeMs is { } originalStart && Math.Abs((long)originalStart - start) <= 100)
-                {
                     words = AlignPronunciation(SplitPronunciation(line.Text), original);
-                }
             }
+
             if (words is { Count: > 0 }) romanizedLines.Add(new LyricsRomanizationLine(words));
             else romanizedLines.Add(new LyricsRomanizationLine([], line.Text, line.StartTimeMs, line.EndTimeMs));
         }
@@ -110,8 +118,10 @@ internal static partial class LyricsConverter
             SourceId: sourceId,
             Translation: translation,
             TranslationLines: translationLines.Length == 0 ? null : translationLines,
-            RomanizationLines: romanizedLines.Count == 0 ? null : romanizedLines
-                .DistinctBy(line => (line.StartTimeMs, line.Text)).OrderBy(line => line.StartTimeMs).ToArray(),
+            RomanizationLines: romanizedLines.Count == 0
+                ? null
+                : romanizedLines
+                    .DistinctBy(line => (line.StartTimeMs, line.Text)).OrderBy(line => line.StartTimeMs).ToArray(),
             Romanization: romanization);
     }
 
@@ -136,13 +146,20 @@ internal static partial class LyricsConverter
             line.SubLine is { } background ? ConvertLine(background) : null);
     }
 
-    private static bool IsEmptyQqTranslation(string text) => text.Trim() == "//";
-
-    private static LemonLyricsLine NormalizeEmbeddedTranslations(LemonLyricsLine line) => line with
+    private static bool IsEmptyQqTranslation(string text)
     {
-        Translations = line.Translations?.ToDictionary(entry => entry.Key, entry => IsEmptyQqTranslation(entry.Value) ? "" : entry.Value),
-        BackgroundLine = line.BackgroundLine is { } background ? NormalizeEmbeddedTranslations(background) : null
-    };
+        return text.Trim() == "//";
+    }
+
+    private static LemonLyricsLine NormalizeEmbeddedTranslations(LemonLyricsLine line)
+    {
+        return line with
+        {
+            Translations = line.Translations?.ToDictionary(entry => entry.Key,
+                entry => IsEmptyQqTranslation(entry.Value) ? "" : entry.Value),
+            BackgroundLine = line.BackgroundLine is { } background ? NormalizeEmbeddedTranslations(background) : null
+        };
+    }
 
     private static List<ILineInfo>? ParseAuxiliary(string? raw)
     {
@@ -158,8 +175,10 @@ internal static partial class LyricsConverter
         }
     }
 
-    private static string[] SplitPronunciation(string text) =>
-        Regex.Matches(text, @"\S+\s*").Select(match => match.Value).ToArray();
+    private static string[] SplitPronunciation(string text)
+    {
+        return Regex.Matches(text, @"\S+\s*").Select(match => match.Value).ToArray();
+    }
 
     private static IReadOnlyList<LyricsWord>? AlignPronunciation(IReadOnlyList<string> tokens, LemonLyricsLine line)
     {

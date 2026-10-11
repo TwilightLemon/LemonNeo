@@ -11,15 +11,15 @@ public sealed record CachedImage(ReadOnlyMemory<byte> Data, bool IsCached);
 public sealed class ImageCache : IAsyncDisposable
 {
     public const int MaximumImageBytes = 16 * 1024 * 1024;
-    private readonly HttpClient _httpClient;
-    private readonly ILogger<ImageCache> _logger;
-    private readonly Func<string> _getCacheDirectory;
-    private readonly long _maximumMemoryBytes;
+    private readonly SemaphoreSlim _concurrency = new(4);
     private readonly object _gate = new();
+    private readonly Func<string> _getCacheDirectory;
+    private readonly HttpClient _httpClient;
+    private readonly CancellationTokenSource _lifetime = new();
+    private readonly ILogger<ImageCache> _logger;
+    private readonly long _maximumMemoryBytes;
     private readonly MemoryCache _memory;
     private readonly Dictionary<string, Task<CachedImage?>> _requests = new(StringComparer.Ordinal);
-    private readonly SemaphoreSlim _concurrency = new(4);
-    private readonly CancellationTokenSource _lifetime = new();
     private bool _closing;
 
     public ImageCache(Func<string> getCacheDirectory, HttpClient httpClient, ILogger<ImageCache> logger,
@@ -35,6 +35,31 @@ public sealed class ImageCache : IAsyncDisposable
 
     public string DirectoryPath => Path.Combine(Path.GetFullPath(_getCacheDirectory()), "Images");
 
+    public async ValueTask DisposeAsync()
+    {
+        Task[] requests;
+        lock (_gate)
+        {
+            if (_closing) return;
+            _closing = true;
+            requests = _requests.Values.ToArray();
+            _memory.Clear();
+        }
+
+        await _lifetime.CancelAsync().ConfigureAwait(false);
+        try
+        {
+            await Task.WhenAll(requests).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+
+        _memory.Dispose();
+        _concurrency.Dispose();
+        _lifetime.Dispose();
+    }
+
     public async Task<CachedImage?> GetAsync(Uri uri, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -45,16 +70,18 @@ public sealed class ImageCache : IAsyncDisposable
         {
             ObjectDisposedException.ThrowIf(_closing, this);
             if (_memory.TryGetValue<byte[]>(key, out var data) && data is not null)
-                return new CachedImage(data, IsCached: true);
+                return new CachedImage(data, true);
             if (!_requests.TryGetValue(key, out request!))
             {
-                var completion = new TaskCompletionSource<CachedImage?>(TaskCreationOptions.RunContinuationsAsynchronously);
+                var completion =
+                    new TaskCompletionSource<CachedImage?>(TaskCreationOptions.RunContinuationsAsynchronously);
                 request = completion.Task;
                 _requests.Add(key, request);
                 // A caller cancelling its wait must not cancel another row's shared download.
                 _ = Task.Run(() => CompleteRequestAsync(uri, key, completion));
             }
         }
+
         return await request.WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
@@ -75,10 +102,17 @@ public sealed class ImageCache : IAsyncDisposable
                 data ??= await ReadSourceAsync(uri, timeout.Token).ConfigureAwait(false);
                 if (!isCached) await StoreDiskAsync(directory, key, data, timeout.Token).ConfigureAwait(false);
                 timeout.Token.ThrowIfCancellationRequested();
-                lock (_gate) Remember(key, data);
+                lock (_gate)
+                {
+                    Remember(key, data);
+                }
+
                 result = new CachedImage(data, isCached);
             }
-            finally { _concurrency.Release(); }
+            finally
+            {
+                _concurrency.Release();
+            }
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
         {
@@ -107,7 +141,10 @@ public sealed class ImageCache : IAsyncDisposable
                 FileShare.Read | FileShare.Delete, 81920, FileOptions.Asynchronous | FileOptions.SequentialScan);
             return await ReadBytesAsync(file, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException) { return null; }
+        catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return null;
+        }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             _logger.LogDebug(exception, "Could not read a cached image; fetching it from its source.");
@@ -123,9 +160,12 @@ public sealed class ImageCache : IAsyncDisposable
                 FileShare.Read | FileShare.Delete, 81920, FileOptions.Asynchronous | FileOptions.SequentialScan);
             return await ReadBytesAsync(file, cancellationToken).ConfigureAwait(false);
         }
-        using var response = await _httpClient.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+
+        using var response = await _httpClient
+            .GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
-        if (response.Content.Headers.ContentLength > MaximumImageBytes) throw new IOException("Image exceeds the size limit.");
+        if (response.Content.Headers.ContentLength > MaximumImageBytes)
+            throw new IOException("Image exceeds the size limit.");
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         return await ReadBytesAsync(stream, cancellationToken).ConfigureAwait(false);
     }
@@ -141,6 +181,7 @@ public sealed class ImageCache : IAsyncDisposable
             if (data.Length + read > MaximumImageBytes) throw new IOException("Image exceeds the size limit.");
             data.Write(buffer, 0, read);
         }
+
         if (data.Length == 0) throw new IOException("Image is empty.");
         cancellationToken.ThrowIfCancellationRequested();
         return data.ToArray();
@@ -154,13 +195,16 @@ public sealed class ImageCache : IAsyncDisposable
             Directory.CreateDirectory(directory);
             await File.WriteAllBytesAsync(temporaryPath, data, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
-            File.Move(temporaryPath, GetPath(directory, key), overwrite: true);
+            File.Move(temporaryPath, GetPath(directory, key), true);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             _logger.LogDebug(exception, "Could not store an image on disk; the loaded image remains available.");
         }
-        finally { RemoveFile(temporaryPath); }
+        finally
+        {
+            RemoveFile(temporaryPath);
+        }
     }
 
     private void Remember(string key, byte[] data)
@@ -178,36 +222,29 @@ public sealed class ImageCache : IAsyncDisposable
         {
             if (!_closing) _memory.Remove(key);
         }
+
         return Task.Run(() => RemoveFile(GetPath(directory, key)));
     }
 
     private void RemoveFile(string path)
     {
-        try { File.Delete(path); }
+        try
+        {
+            File.Delete(path);
+        }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             _logger.LogDebug(exception, "Could not remove an image cache file.");
         }
     }
 
-    private static string GetKey(Uri uri) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(uri.AbsoluteUri)));
-    private static string GetPath(string directory, string key) => Path.Combine(directory, key + ".image");
-
-    public async ValueTask DisposeAsync()
+    private static string GetKey(Uri uri)
     {
-        Task[] requests;
-        lock (_gate)
-        {
-            if (_closing) return;
-            _closing = true;
-            requests = _requests.Values.ToArray();
-            _memory.Clear();
-        }
-        await _lifetime.CancelAsync().ConfigureAwait(false);
-        try { await Task.WhenAll(requests).ConfigureAwait(false); }
-        catch (OperationCanceledException) { }
-        _memory.Dispose();
-        _concurrency.Dispose();
-        _lifetime.Dispose();
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(uri.AbsoluteUri)));
+    }
+
+    private static string GetPath(string directory, string key)
+    {
+        return Path.Combine(directory, key + ".image");
     }
 }

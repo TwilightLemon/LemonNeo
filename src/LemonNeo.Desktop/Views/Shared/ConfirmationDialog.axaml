@@ -1,11 +1,27 @@
-<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:i18n="using:LemonNeo.Desktop.Services" x:Class="LemonNeo.Desktop.Views.Shared.ConfirmationDialog"
-        Title="{Translate {x:Static i18n:LanguageManager+Keys.DeletePlaylist}}" Width="440" SizeToContent="Height" CanResize="False" WindowStartupLocation="CenterOwner">
-  <StackPanel Margin="28" Spacing="24">
-    <TextBlock Name="Message" TextWrapping="Wrap" />
-    <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
-      <Button Content="{Translate {x:Static i18n:LanguageManager+Keys.Cancel}}" Click="OnCancel" IsCancel="True" />
-      <Button Classes="danger" Content="{Translate {x:Static i18n:LanguageManager+Keys.DeletePlaylist}}" Click="OnConfirm" />
+<Window
+    CanResize="False"
+    SizeToContent="Height"
+    Title="{Translate {x:Static i18n:LanguageManager+Keys.DeletePlaylist}}"
+    Width="440"
+    WindowStartupLocation="CenterOwner"
+    x:Class="LemonNeo.Desktop.Views.Shared.ConfirmationDialog"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:i18n="using:LemonNeo.Desktop.Services"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel Margin="28" Spacing="24">
+        <TextBlock Name="Message" TextWrapping="Wrap" />
+        <StackPanel
+            HorizontalAlignment="Right"
+            Orientation="Horizontal"
+            Spacing="10">
+            <Button
+                Click="OnCancel"
+                Content="{Translate {x:Static i18n:LanguageManager+Keys.Cancel}}"
+                IsCancel="True" />
+            <Button
+                Classes="danger"
+                Click="OnConfirm"
+                Content="{Translate {x:Static i18n:LanguageManager+Keys.DeletePlaylist}}" />
+        </StackPanel>
     </StackPanel>
-  </StackPanel>
 </Window>

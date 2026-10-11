@@ -4,7 +4,12 @@ using System.Text;
 
 namespace LemonNeo.ConsoleApp;
 
-internal enum LyricsAnsiColor { None, TrueColor, Indexed }
+internal enum LyricsAnsiColor
+{
+    None,
+    TrueColor,
+    Indexed
+}
 
 internal static class LyricsRowRenderer
 {
@@ -22,22 +27,22 @@ internal static class LyricsRowRenderer
             : LyricsAnsiColor.None;
         if (!color || ansiColor != LyricsAnsiColor.None)
         {
-            Render(frame, maximumWidth, global::System.Console.Out, ansiColor);
+            Render(frame, maximumWidth, Console.Out, ansiColor);
             return;
         }
 
-        var original = global::System.Console.ForegroundColor;
+        var original = Console.ForegroundColor;
         try
         {
             foreach (var segment in CreateViewport(frame, maximumWidth))
             {
-                global::System.Console.ForegroundColor = segment.Reached ? ConsoleColor.DarkYellow : ConsoleColor.DarkGray;
-                global::System.Console.Write(segment.Text);
+                Console.ForegroundColor = segment.Reached ? ConsoleColor.DarkYellow : ConsoleColor.DarkGray;
+                Console.Write(segment.Text);
             }
         }
         finally
         {
-            global::System.Console.ForegroundColor = original;
+            Console.ForegroundColor = original;
         }
     }
 
@@ -48,7 +53,8 @@ internal static class LyricsRowRenderer
             string.Equals(colorTerm, "24bit", StringComparison.OrdinalIgnoreCase)) return LyricsAnsiColor.TrueColor;
         // Terminal.app and other 256-color terminals need an indexed orange instead of RGB.
         return term?.Contains("256color", StringComparison.OrdinalIgnoreCase) == true
-            ? LyricsAnsiColor.Indexed : LyricsAnsiColor.None;
+            ? LyricsAnsiColor.Indexed
+            : LyricsAnsiColor.None;
     }
 
     internal static void Render(LyricsRow frame, int maximumWidth, TextWriter output, LyricsAnsiColor color)
@@ -74,7 +80,8 @@ internal static class LyricsRowRenderer
     {
         if (maximumWidth <= 0 || frame.Segments.Count == 0) return [];
         var cells = frame.Segments.SelectMany(segment => segment.Text.EnumerateRunes()
-            .Select(rune => new Cell(Rune.IsControl(rune) ? " " : rune.ToString(), segment.Reached, CellWidth(rune))))
+                .Select(rune =>
+                    new Cell(Rune.IsControl(rune) ? " " : rune.ToString(), segment.Reached, CellWidth(rune))))
             .ToArray();
         if (cells.Length == 0) return [];
 
@@ -88,10 +95,7 @@ internal static class LyricsRowRenderer
                 start = focus;
                 var budget = Math.Max(0, maximumWidth * 2 / 3 - 1);
                 var used = cells[start].Width;
-                while (start > 0 && used + cells[start - 1].Width <= budget)
-                {
-                    used += cells[--start].Width;
-                }
+                while (start > 0 && used + cells[start - 1].Width <= budget) used += cells[--start].Width;
             }
         }
 
@@ -107,9 +111,11 @@ internal static class LyricsRowRenderer
                 if (width < maximumWidth) result.Add(new LyricsSegment("…", false));
                 break;
             }
+
             result.Add(new LyricsSegment(cell.Text, cell.Reached));
             width += cell.Width;
         }
+
         // Combine neighboring cells to avoid emitting a color change for every character.
         var grouped = new List<LyricsSegment>();
         var text = new StringBuilder();
@@ -121,9 +127,11 @@ internal static class LyricsRowRenderer
                 grouped.Add(new LyricsSegment(text.ToString(), previous));
                 text.Clear();
             }
+
             reached = segment.Reached;
             text.Append(segment.Text);
         }
+
         if (reached is { } last) grouped.Add(new LyricsSegment(text.ToString(), last));
         return grouped;
     }
@@ -134,7 +142,9 @@ internal static class LyricsRowRenderer
             UnicodeCategory.EnclosingMark or UnicodeCategory.Format) return 0;
         return rune.Value is >= 0x1100 and <= 0x115f or >= 0x2e80 and <= 0xa4cf or
             >= 0xac00 and <= 0xd7a3 or >= 0xf900 and <= 0xfaff or >= 0xfe10 and <= 0xfe6f or
-            >= 0xff00 and <= 0xff60 or >= 0xffe0 and <= 0xffe6 or >= 0x1f300 and <= 0x1faff ? 2 : 1;
+            >= 0xff00 and <= 0xff60 or >= 0xffe0 and <= 0xffe6 or >= 0x1f300 and <= 0x1faff
+            ? 2
+            : 1;
     }
 
     private static bool EnableAnsi()

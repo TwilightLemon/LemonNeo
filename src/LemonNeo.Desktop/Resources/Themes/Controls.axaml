@@ -1,151 +1,279 @@
-<ResourceDictionary xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:sharedControls="using:LemonNeo.Desktop.Controls.Shared"
-                    xmlns:converters="using:Avalonia.Data.Converters">
-  <ControlTheme x:Key="LemonButton" TargetType="Button">
-    <Setter Property="Background" Value="{DynamicResource Brush.SurfaceRaised}" />
-    <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />
-    <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="{DynamicResource Radius.Control}" />
-    <Setter Property="Padding" Value="{DynamicResource Space.Control}" />
-    <Setter Property="MinHeight" Value="40" />
-    <Setter Property="Cursor" Value="Hand" />
-    <Setter Property="HorizontalContentAlignment" Value="Center" />
-    <Setter Property="VerticalContentAlignment" Value="Center" />
-    <Setter Property="Transitions">
-      <Transitions>
-        <BrushTransition Property="Background" Duration="{DynamicResource Motion.Fast}" />
-        <DoubleTransition Property="Opacity" Duration="{DynamicResource Motion.Fast}" />
-      </Transitions>
-    </Setter>
-    <Setter Property="Template">
-      <ControlTemplate>
-        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}">
-          <ContentPresenter Name="PART_ContentPresenter" Content="{TemplateBinding Content}"
-                            ContentTemplate="{TemplateBinding ContentTemplate}" Padding="{TemplateBinding Padding}"
-                            HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
-                            VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
-                            RecognizesAccessKey="True" />
-        </Border>
-      </ControlTemplate>
-    </Setter>
-    <Style Selector="^:pointerover"><Setter Property="Background" Value="{DynamicResource Brush.Hover}" /></Style>
-    <Style Selector="^:pressed"><Setter Property="Opacity" Value="0.75" /></Style>
-    <Style Selector="^:disabled"><Setter Property="Opacity" Value="0.4" /></Style>
-    <Style Selector="^:focus-visible"><Setter Property="BorderBrush" Value="{DynamicResource Brush.Focus}" /></Style>
-  </ControlTheme>
-  <ControlTheme x:Key="ServiceTabTheme" TargetType="ListBoxItem">
-    <Setter Property="BorderThickness" Value="0,0,0,2" />
-    <Setter Property="BorderBrush" Value="Transparent" />
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="Cursor" Value="Hand" />
-    <Setter Property="Template">
-      <ControlTemplate>
-        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
-          <ContentPresenter Name="PART_ContentPresenter" Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
-                            Padding="{TemplateBinding Padding}" HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
-                            VerticalContentAlignment="Center" />
-        </Border>
-      </ControlTemplate>
-    </Setter>
-    <Style Selector="^:selected"><Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentText}" /></Style>
-    <Style Selector="^:focus-visible"><Setter Property="BorderBrush" Value="{DynamicResource Brush.Focus}" /></Style>
-  </ControlTheme>
-  <ControlTheme x:Key="PlaybackTrackButton" TargetType="RepeatButton">
-    <Setter Property="Template">
-      <ControlTemplate>
-        <Grid Background="Transparent">
-          <Border Background="{TemplateBinding Background}" Height="2" VerticalAlignment="Center" />
-        </Grid>
-      </ControlTemplate>
-    </Setter>
-  </ControlTheme>
-  <ControlTheme x:Key="PlaybackThumb" TargetType="Thumb">
-    <Setter Property="Template">
-      <ControlTemplate><Ellipse Fill="{TemplateBinding Background}" /></ControlTemplate>
-    </Setter>
-  </ControlTheme>
-  <ControlTheme x:Key="PlaybackTimeline" TargetType="Slider">
-    <Setter Property="Height" Value="20" />
-    <Setter Property="MinHeight" Value="20" />
-    <Setter Property="Padding" Value="0" />
-    <Setter Property="Background" Value="{DynamicResource Brush.Border}" />
-    <Setter Property="Foreground" Value="{DynamicResource Brush.AccentText}" />
-    <Setter Property="Template">
-      <ControlTemplate>
-        <Grid Background="Transparent">
-          <Border Background="{TemplateBinding Background}" Height="2" VerticalAlignment="Center" />
-          <Track Name="PART_Track" Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}"
-                 Value="{TemplateBinding Value, Mode=TwoWay}" IsDirectionReversed="{TemplateBinding IsDirectionReversed}" Orientation="Horizontal">
-            <Track.DecreaseButton>
-              <RepeatButton Name="PART_DecreaseButton" Theme="{StaticResource PlaybackTrackButton}" Background="{TemplateBinding Foreground}" Margin="0,0,-6,0" Focusable="False" />
-            </Track.DecreaseButton>
-            <Track.IncreaseButton>
-              <RepeatButton Name="PART_IncreaseButton" Theme="{StaticResource PlaybackTrackButton}" Background="{TemplateBinding Background}" Focusable="False" />
-            </Track.IncreaseButton>
-            <Thumb Name="PlaybackSliderThumb" Width="12" Height="12" VerticalAlignment="Center" Theme="{StaticResource PlaybackThumb}" Background="{TemplateBinding Foreground}" />
-          </Track>
-        </Grid>
-      </ControlTemplate>
-    </Setter>
-    <Style Selector="^ /template/ Thumb#PlaybackSliderThumb"><Setter Property="Opacity" Value="0" /></Style>
-    <Style Selector="^:pointerover /template/ Thumb#PlaybackSliderThumb, ^:focus-visible /template/ Thumb#PlaybackSliderThumb, ^:pressed /template/ Thumb#PlaybackSliderThumb">
-      <Setter Property="Opacity" Value="1" />
-    </Style>
-    <Style Selector="^:disabled /template/ Thumb#PlaybackSliderThumb"><Setter Property="Opacity" Value="0" /></Style>
-  </ControlTheme>
-  <ControlTheme x:Key="{x:Type sharedControls:PageHeader}" TargetType="sharedControls:PageHeader">
-    <Setter Property="Template">
-      <ControlTemplate>
-        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,28">
-          <StackPanel Spacing="8">
-            <TextBlock Text="{TemplateBinding Title}" FontSize="{DynamicResource Font.Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
-            <TextBlock Text="{TemplateBinding Description}" Foreground="{DynamicResource Brush.TextSecondary}" TextWrapping="NoWrap"
-                       MaxLines="1" TextTrimming="CharacterEllipsis"
-                       IsVisible="{Binding Description, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
-            <TextBlock Text="{TemplateBinding Summary}" Classes="caption" TextWrapping="NoWrap" MaxLines="1" TextTrimming="CharacterEllipsis"
-                       IsVisible="{Binding Summary, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
-          </StackPanel>
-          <ContentPresenter Grid.Column="1" Content="{TemplateBinding Actions}" VerticalAlignment="Center" Margin="16,0,0,0" />
-        </Grid>
-      </ControlTemplate>
-    </Setter>
-  </ControlTheme>
-  <ControlTheme x:Key="{x:Type sharedControls:EmptyState}" TargetType="sharedControls:EmptyState">
-    <Setter Property="Template">
-      <ControlTemplate>
-        <StackPanel Spacing="16" MaxWidth="400" HorizontalAlignment="Center" VerticalAlignment="Center">
-          <Border Background="{DynamicResource Brush.AccentSoft}" CornerRadius="24" Width="80" Height="80" HorizontalAlignment="Center">
-            <Path Data="{TemplateBinding Icon}" Width="28" Height="28" Stretch="Uniform" Fill="{DynamicResource Brush.AccentText}" />
-          </Border>
-          <TextBlock Text="{TemplateBinding Title}" FontSize="22" FontWeight="SemiBold" TextAlignment="Center" TextWrapping="Wrap" />
-          <TextBlock Text="{TemplateBinding Description}" TextAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource Brush.TextSecondary}" />
-          <ContentPresenter Content="{TemplateBinding Actions}" HorizontalAlignment="Center" Margin="0,8,0,0" />
-        </StackPanel>
-      </ControlTemplate>
-    </Setter>
-  </ControlTheme>
-  <ControlTheme x:Key="{x:Type sharedControls:Artwork}" TargetType="sharedControls:Artwork">
-    <Setter Property="Background" Value="{DynamicResource Brush.Artwork}" />
-    <Setter Property="CornerRadius" Value="{DynamicResource Radius.Card}" />
-    <Setter Property="Template">
-      <ControlTemplate>
-        <Border Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}" ClipToBounds="True">
-          <Grid>
-            <Viewbox Margin="8" IsVisible="{Binding Source, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static converters:ObjectConverters.IsNull}}">
-              <Grid Width="128" Height="128">
-                <Ellipse Width="128" Height="128" Fill="{DynamicResource Brush.Surface}" />
-                <Ellipse Width="98" Height="98" Stroke="{DynamicResource Brush.Border}" StrokeThickness="1" />
-                <Ellipse Width="74" Height="74" Stroke="{DynamicResource Brush.Border}" StrokeThickness="1" />
-                <Ellipse Width="44" Height="44" Fill="{DynamicResource Brush.Accent}" />
-                <Path Width="20" Height="20" Stretch="Uniform" Data="{StaticResource Icon.Music}" Fill="{DynamicResource Brush.OnAccent}" />
-              </Grid>
-            </Viewbox>
-            <Image Name="PART_Image" Source="{TemplateBinding Source}" Stretch="UniformToFill" />
-          </Grid>
-        </Border>
-      </ControlTemplate>
-    </Setter>
-  </ControlTheme>
+<ResourceDictionary
+    xmlns="https://github.com/avaloniaui"
+    xmlns:converters="using:Avalonia.Data.Converters"
+    xmlns:sharedControls="using:LemonNeo.Desktop.Controls.Shared"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ControlTheme TargetType="Button" x:Key="LemonButton">
+        <Setter Property="Background" Value="{DynamicResource Brush.SurfaceRaised}" />
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{DynamicResource Radius.Control}" />
+        <Setter Property="Padding" Value="{DynamicResource Space.Control}" />
+        <Setter Property="MinHeight" Value="40" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Duration="{DynamicResource Motion.Fast}" Property="Background" />
+                <DoubleTransition Duration="{DynamicResource Motion.Fast}" Property="Opacity" />
+            </Transitions>
+        </Setter>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="{TemplateBinding CornerRadius}">
+                    <ContentPresenter
+                        Content="{TemplateBinding Content}"
+                        ContentTemplate="{TemplateBinding ContentTemplate}"
+                        HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                        Name="PART_ContentPresenter"
+                        Padding="{TemplateBinding Padding}"
+                        RecognizesAccessKey="True"
+                        VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                </Border>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover">
+            <Setter Property="Background" Value="{DynamicResource Brush.Hover}" />
+        </Style>
+        <Style Selector="^:pressed">
+            <Setter Property="Opacity" Value="0.75" />
+        </Style>
+        <Style Selector="^:disabled">
+            <Setter Property="Opacity" Value="0.4" />
+        </Style>
+        <Style Selector="^:focus-visible">
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Focus}" />
+        </Style>
+    </ControlTheme>
+    <ControlTheme TargetType="ListBoxItem" x:Key="ServiceTabTheme">
+        <Setter Property="BorderThickness" Value="0,0,0,2" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}">
+                    <ContentPresenter
+                        Content="{TemplateBinding Content}"
+                        ContentTemplate="{TemplateBinding ContentTemplate}"
+                        HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                        Name="PART_ContentPresenter"
+                        Padding="{TemplateBinding Padding}"
+                        VerticalContentAlignment="Center" />
+                </Border>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:selected">
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentText}" />
+        </Style>
+        <Style Selector="^:focus-visible">
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Focus}" />
+        </Style>
+    </ControlTheme>
+    <ControlTheme TargetType="RepeatButton" x:Key="PlaybackTrackButton">
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Grid Background="Transparent">
+                    <Border
+                        Background="{TemplateBinding Background}"
+                        Height="2"
+                        VerticalAlignment="Center" />
+                </Grid>
+            </ControlTemplate>
+        </Setter>
+    </ControlTheme>
+    <ControlTheme TargetType="Thumb" x:Key="PlaybackThumb">
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Ellipse Fill="{TemplateBinding Background}" />
+            </ControlTemplate>
+        </Setter>
+    </ControlTheme>
+    <ControlTheme TargetType="Slider" x:Key="PlaybackTimeline">
+        <Setter Property="Height" Value="20" />
+        <Setter Property="MinHeight" Value="20" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Background" Value="{DynamicResource Brush.Border}" />
+        <Setter Property="Foreground" Value="{DynamicResource Brush.AccentText}" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Grid Background="Transparent">
+                    <Border
+                        Background="{TemplateBinding Background}"
+                        Height="2"
+                        VerticalAlignment="Center" />
+                    <Track
+                        IsDirectionReversed="{TemplateBinding IsDirectionReversed}"
+                        Maximum="{TemplateBinding Maximum}"
+                        Minimum="{TemplateBinding Minimum}"
+                        Name="PART_Track"
+                        Orientation="Horizontal"
+                        Value="{TemplateBinding Value,
+                                                Mode=TwoWay}">
+                        <Track.DecreaseButton>
+                            <RepeatButton
+                                Background="{TemplateBinding Foreground}"
+                                Focusable="False"
+                                Margin="0,0,-6,0"
+                                Name="PART_DecreaseButton"
+                                Theme="{StaticResource PlaybackTrackButton}" />
+                        </Track.DecreaseButton>
+                        <Track.IncreaseButton>
+                            <RepeatButton
+                                Background="{TemplateBinding Background}"
+                                Focusable="False"
+                                Name="PART_IncreaseButton"
+                                Theme="{StaticResource PlaybackTrackButton}" />
+                        </Track.IncreaseButton>
+                        <Thumb
+                            Background="{TemplateBinding Foreground}"
+                            Height="12"
+                            Name="PlaybackSliderThumb"
+                            Theme="{StaticResource PlaybackThumb}"
+                            VerticalAlignment="Center"
+                            Width="12" />
+                    </Track>
+                </Grid>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^ /template/ Thumb#PlaybackSliderThumb">
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+        <Style Selector="^:pointerover /template/ Thumb#PlaybackSliderThumb, ^:focus-visible /template/ Thumb#PlaybackSliderThumb, ^:pressed /template/ Thumb#PlaybackSliderThumb">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="^:disabled /template/ Thumb#PlaybackSliderThumb">
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+    </ControlTheme>
+    <ControlTheme TargetType="sharedControls:PageHeader" x:Key="{x:Type sharedControls:PageHeader}">
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,28">
+                    <StackPanel Spacing="8">
+                        <TextBlock
+                            FontSize="{DynamicResource Font.Title}"
+                            FontWeight="SemiBold"
+                            Text="{TemplateBinding Title}"
+                            TextWrapping="Wrap" />
+                        <TextBlock
+                            Foreground="{DynamicResource Brush.TextSecondary}"
+                            IsVisible="{Binding Description, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}"
+                            MaxLines="1"
+                            Text="{TemplateBinding Description}"
+                            TextTrimming="CharacterEllipsis"
+                            TextWrapping="NoWrap" />
+                        <TextBlock
+                            Classes="caption"
+                            IsVisible="{Binding Summary, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}"
+                            MaxLines="1"
+                            Text="{TemplateBinding Summary}"
+                            TextTrimming="CharacterEllipsis"
+                            TextWrapping="NoWrap" />
+                    </StackPanel>
+                    <ContentPresenter
+                        Content="{TemplateBinding Actions}"
+                        Grid.Column="1"
+                        Margin="16,0,0,0"
+                        VerticalAlignment="Center" />
+                </Grid>
+            </ControlTemplate>
+        </Setter>
+    </ControlTheme>
+    <ControlTheme TargetType="sharedControls:EmptyState" x:Key="{x:Type sharedControls:EmptyState}">
+        <Setter Property="Template">
+            <ControlTemplate>
+                <StackPanel
+                    HorizontalAlignment="Center"
+                    MaxWidth="400"
+                    Spacing="16"
+                    VerticalAlignment="Center">
+                    <Border
+                        Background="{DynamicResource Brush.AccentSoft}"
+                        CornerRadius="24"
+                        Height="80"
+                        HorizontalAlignment="Center"
+                        Width="80">
+                        <Path
+                            Data="{TemplateBinding Icon}"
+                            Fill="{DynamicResource Brush.AccentText}"
+                            Height="28"
+                            Stretch="Uniform"
+                            Width="28" />
+                    </Border>
+                    <TextBlock
+                        FontSize="22"
+                        FontWeight="SemiBold"
+                        Text="{TemplateBinding Title}"
+                        TextAlignment="Center"
+                        TextWrapping="Wrap" />
+                    <TextBlock
+                        Foreground="{DynamicResource Brush.TextSecondary}"
+                        Text="{TemplateBinding Description}"
+                        TextAlignment="Center"
+                        TextWrapping="Wrap" />
+                    <ContentPresenter
+                        Content="{TemplateBinding Actions}"
+                        HorizontalAlignment="Center"
+                        Margin="0,8,0,0" />
+                </StackPanel>
+            </ControlTemplate>
+        </Setter>
+    </ControlTheme>
+    <ControlTheme TargetType="sharedControls:Artwork" x:Key="{x:Type sharedControls:Artwork}">
+        <Setter Property="Background" Value="{DynamicResource Brush.Artwork}" />
+        <Setter Property="CornerRadius" Value="{DynamicResource Radius.Card}" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border
+                    Background="{TemplateBinding Background}"
+                    ClipToBounds="True"
+                    CornerRadius="{TemplateBinding CornerRadius}">
+                    <Grid>
+                        <Viewbox IsVisible="{Binding Source, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static converters:ObjectConverters.IsNull}}" Margin="8">
+                            <Grid Height="128" Width="128">
+                                <Ellipse
+                                    Fill="{DynamicResource Brush.Surface}"
+                                    Height="128"
+                                    Width="128" />
+                                <Ellipse
+                                    Height="98"
+                                    Stroke="{DynamicResource Brush.Border}"
+                                    StrokeThickness="1"
+                                    Width="98" />
+                                <Ellipse
+                                    Height="74"
+                                    Stroke="{DynamicResource Brush.Border}"
+                                    StrokeThickness="1"
+                                    Width="74" />
+                                <Ellipse
+                                    Fill="{DynamicResource Brush.Accent}"
+                                    Height="44"
+                                    Width="44" />
+                                <Path
+                                    Data="{StaticResource Icon.Music}"
+                                    Fill="{DynamicResource Brush.OnAccent}"
+                                    Height="20"
+                                    Stretch="Uniform"
+                                    Width="20" />
+                            </Grid>
+                        </Viewbox>
+                        <Image
+                            Name="PART_Image"
+                            Source="{TemplateBinding Source}"
+                            Stretch="UniformToFill" />
+                    </Grid>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </ControlTheme>
 </ResourceDictionary>

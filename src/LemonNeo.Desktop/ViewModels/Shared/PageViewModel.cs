@@ -8,46 +8,76 @@ namespace LemonNeo.Desktop.ViewModels.Shared;
 public abstract class PageViewModel : ObservableObject, IAsyncDisposable
 {
     protected readonly DesktopContext Context;
-    protected DesktopHost _host => Context.Host;
-    protected LocalizationService _text => Context.Text;
-    protected CancellationToken LifetimeToken => _lifetime.Token;
     private readonly CancellationTokenSource _lifetime = new();
-    private CancellationTokenSource? _operationCancellation;
-    private Task _operation = Task.CompletedTask;
-    private bool _isBusy;
     private bool _closing;
-    private string? _errorKey;
     private object?[] _errorArguments = [];
     private string? _errorDetails;
-    private string _statusKey = "Ready";
+    private string? _errorKey;
+    private bool _isBusy;
+    private Task _operation = Task.CompletedTask;
+    private CancellationTokenSource? _operationCancellation;
     private object?[] _statusArguments = [];
+    private string _statusKey = "Ready";
 
     protected PageViewModel(DesktopContext context, string route)
     {
         Context = context;
         Route = route;
-        CancelOperationCommand = new(() => _operationCancellation?.Cancel(), () => _operationCancellation is not null);
-        DismissErrorCommand = new(() => SetError(null));
+        CancelOperationCommand =
+            new RelayCommand(() => _operationCancellation?.Cancel(), () => _operationCancellation is not null);
+        DismissErrorCommand = new RelayCommand(() => SetError(null));
         Context.PropertyChanged += OnContextChanged;
         _text.Changed += OnLanguageChanged;
     }
+
+    protected DesktopHost _host => Context.Host;
+    protected LocalizationService _text => Context.Text;
+    protected CancellationToken LifetimeToken => _lifetime.Token;
 
     public string Route { get; }
     public virtual string PageTitle => _text[Route];
     public virtual string PageDescription => _text[$"{Route}Description"];
     public virtual string? PageSummary => null;
-    public bool IsBusy { get => _isBusy; protected set => SetProperty(ref _isBusy, value); }
+
+    public bool IsBusy
+    {
+        get => _isBusy;
+        protected set => SetProperty(ref _isBusy, value);
+    }
+
     public virtual bool CanInteract => _operationCancellation is null && Context.IsInitialized && !_closing;
     public bool HasStatus => _statusKey != "Ready";
     public string Status => HasStatus ? _text.Format(_statusKey, _statusArguments) : "";
-    public string? Error => _errorKey is null ? null : _text.Format(_errorKey, _errorArguments) +
-        (_errorDetails is null ? "" : Environment.NewLine + _errorDetails);
+
+    public string? Error => _errorKey is null
+        ? null
+        : _text.Format(_errorKey, _errorArguments) +
+          (_errorDetails is null ? "" : Environment.NewLine + _errorDetails);
+
     public bool HasError => _errorKey is not null;
     public RelayCommand CancelOperationCommand { get; }
     public RelayCommand DismissErrorCommand { get; }
-    public virtual Task ActivateAsync() => Task.CompletedTask;
 
-    protected Task ExecuteAsync(Func<CancellationToken, Task> action) => RunOperationAsync(action);
+    public virtual async ValueTask DisposeAsync()
+    {
+        _closing = true;
+        Context.PropertyChanged -= OnContextChanged;
+        _text.Changed -= OnLanguageChanged;
+        await _lifetime.CancelAsync();
+        await _operation;
+        _lifetime.Dispose();
+    }
+
+    public virtual Task ActivateAsync()
+    {
+        return Task.CompletedTask;
+    }
+
+    protected Task ExecuteAsync(Func<CancellationToken, Task> action)
+    {
+        return RunOperationAsync(action);
+    }
+
     protected Task RunOperationAsync(Func<CancellationToken, Task> action, string status = "Working",
         bool showBusy = true, TimeSpan? busyDelay = null)
     {
@@ -59,7 +89,8 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
         return _operation;
     }
 
-    private async Task RunCoreAsync(Func<CancellationToken, Task> action, string status, CancellationTokenSource cancellation,
+    private async Task RunCoreAsync(Func<CancellationToken, Task> action, string status,
+        CancellationTokenSource cancellation,
         bool showBusy, TimeSpan busyDelay)
     {
         using var progressCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
@@ -100,39 +131,50 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
             cancellationToken.ThrowIfCancellationRequested();
             IsBusy = true;
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
     }
 
     protected void SetStatus(string key, params object?[] arguments)
     {
-        _statusKey = key; _statusArguments = arguments;
-        OnPropertyChanged(nameof(Status)); OnPropertyChanged(nameof(HasStatus));
+        _statusKey = key;
+        _statusArguments = arguments;
+        OnPropertyChanged(nameof(Status));
+        OnPropertyChanged(nameof(HasStatus));
     }
+
     protected void SetError(string? key, object?[]? arguments = null, string? details = null)
     {
-        _errorKey = key; _errorArguments = arguments ?? []; _errorDetails = details;
-        OnPropertyChanged(nameof(Error)); OnPropertyChanged(nameof(HasError));
+        _errorKey = key;
+        _errorArguments = arguments ?? [];
+        _errorDetails = details;
+        OnPropertyChanged(nameof(Error));
+        OnPropertyChanged(nameof(HasError));
     }
+
     protected virtual void RaiseInteractionProperties()
     {
         OnPropertyChanged(nameof(CanInteract));
         CancelOperationCommand.NotifyCanExecuteChanged();
     }
+
     protected virtual void RefreshLocalizedProperties()
     {
-        OnPropertyChanged(nameof(PageTitle)); OnPropertyChanged(nameof(PageDescription)); OnPropertyChanged(nameof(PageSummary));
-        OnPropertyChanged(nameof(Status)); OnPropertyChanged(nameof(Error));
+        OnPropertyChanged(nameof(PageTitle));
+        OnPropertyChanged(nameof(PageDescription));
+        OnPropertyChanged(nameof(PageSummary));
+        OnPropertyChanged(nameof(Status));
+        OnPropertyChanged(nameof(Error));
     }
-    private void OnLanguageChanged(object? sender, EventArgs args) => RefreshLocalizedProperties();
-    private void OnContextChanged(object? sender, PropertyChangedEventArgs args) => RaiseInteractionProperties();
 
-    public virtual async ValueTask DisposeAsync()
+    private void OnLanguageChanged(object? sender, EventArgs args)
     {
-        _closing = true;
-        Context.PropertyChanged -= OnContextChanged;
-        _text.Changed -= OnLanguageChanged;
-        await _lifetime.CancelAsync();
-        await _operation;
-        _lifetime.Dispose();
+        RefreshLocalizedProperties();
+    }
+
+    private void OnContextChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        RaiseInteractionProperties();
     }
 }

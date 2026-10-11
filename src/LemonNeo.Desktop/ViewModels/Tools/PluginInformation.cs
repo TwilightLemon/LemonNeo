@@ -34,3 +34,16 @@ public sealed record PluginProviderGroup(string Name, IReadOnlyList<PluginInform
 {
     public int Count => Items.Count;
 }
+
+public sealed record DependencyInformation(string Name, string Version, string License, string? Website)
+{
+    public bool HasWebsite => !string.IsNullOrWhiteSpace(Website);
+}
+
+public sealed record PluginDependencyGroup(
+    string Name,
+    string Version,
+    IReadOnlyList<DependencyInformation> Dependencies)
+{
+    public bool HasDependencies => Dependencies.Count > 0;
+}

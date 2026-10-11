@@ -1,4 +1,15 @@
 <Project>
-  <Import Project="$(MSBuildThisFileDirectory)build/LemonNeo.Plugins.props" Condition="'$(IsLemonNeoHost)' == 'true'" />
-  <Import Project="$(MSBuildThisFileDirectory)build/LemonNeo.Plugins.targets" />
+    <ItemGroup Condition="'$(IsLemonNeoHost)' == 'true'">
+        <None Include="$(MSBuildThisFileDirectory)LICENSE"
+              Link="LICENSE"
+              CopyToOutputDirectory="PreserveNewest"
+              CopyToPublishDirectory="PreserveNewest"/>
+    </ItemGroup>
+    <ItemGroup Condition="Exists('$(MSBuildProjectDirectory)/plugin.json') and Exists('$(MSBuildProjectDirectory)/THIRD-PARTY.md')">
+        <None Update="THIRD-PARTY.md"
+              CopyToOutputDirectory="PreserveNewest"
+              CopyToPublishDirectory="PreserveNewest"/>
+    </ItemGroup>
+    <Import Project="$(MSBuildThisFileDirectory)build/LemonNeo.Plugins.props" Condition="'$(IsLemonNeoHost)' == 'true'"/>
+    <Import Project="$(MSBuildThisFileDirectory)build/LemonNeo.Plugins.targets"/>
 </Project>

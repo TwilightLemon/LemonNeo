@@ -6,5 +6,31 @@
   "minimumHostVersion": "0.1.0",
   "permissions": [
     "network"
+  ],
+  "dependencies": [
+    {
+      "name": "Lyricify Lyrics Helper",
+      "version": "0.2.0",
+      "license": "Apache-2.0",
+      "website": "https://github.com/WXRIW/Lyricify-Lyrics-Helper"
+    },
+    {
+      "name": "CHTCHSConv",
+      "version": "1.0.0",
+      "license": "License not declared by package",
+      "website": "https://www.nuget.org/packages/CHTCHSConv/1.0.0"
+    },
+    {
+      "name": "Newtonsoft.Json",
+      "version": "13.0.3",
+      "license": "MIT",
+      "website": "https://github.com/JamesNK/Newtonsoft.Json"
+    },
+    {
+      "name": "SharpZipLib",
+      "version": "1.4.2",
+      "license": "MIT",
+      "website": "https://github.com/icsharpcode/SharpZipLib"
+    }
   ]
 }

@@ -1,7 +1,7 @@
+using CommunityToolkit.Mvvm.Input;
 using LemonNeo.Abstractions.Settings;
 using LemonNeo.Application.Playback;
 using LemonNeo.Core.Playback;
-using CommunityToolkit.Mvvm.Input;
 using LemonNeo.Desktop.Config;
 using LemonNeo.Desktop.Services;
 using LemonNeo.Desktop.Utils;
@@ -12,7 +12,6 @@ namespace LemonNeo.Desktop.ViewModels.Settings;
 
 public sealed class SettingsViewModel : PageViewModel
 {
-    private AppearanceService _appearance => Context.Appearance;
     private readonly IDisposable _appearanceSubscription;
     private readonly IDisposable _languageSubscription;
     private readonly ISettingsScope _playbackSettings;
@@ -27,12 +26,15 @@ public sealed class SettingsViewModel : PageViewModel
         _storageService = _host.Get<IDesktopStorageService>();
         _storage.Changed += OnStorageChanged;
         _playbackSettings = _host.Settings.ForPackage(PackageNames.Application);
-        _playbackSubscription = _playbackSettings.Subscribe<PlaybackPreferences>(_ => OnPropertyChanged(nameof(SelectedAudioQuality)));
-        ThemeCommand = new(value => ApplyAppearance(current => current with { Theme = Enum.Parse<ThemePreference>(value!) }));
-        LanguageCommand = new(value =>
+        _playbackSubscription =
+            _playbackSettings.Subscribe<PlaybackPreferences>(_ => OnPropertyChanged(nameof(SelectedAudioQuality)));
+        ThemeCommand = new RelayCommand<string>(value =>
+            ApplyAppearance(current => current with { Theme = Enum.Parse<ThemePreference>(value!) }));
+        LanguageCommand = new RelayCommand<string>(value =>
         {
-            if (!_closing) Context.Settings.Apply<LanguagePreferences>(current =>
-                current with { Language = Enum.Parse<LanguagePreference>(value!) });
+            if (!_closing)
+                Context.Settings.Apply<LanguagePreferences>(current =>
+                    current with { Language = Enum.Parse<LanguagePreference>(value!) });
         });
         ThemeColors = ThemePalette.BuiltIn.Select(value => new ThemeColorOption(value, _appearance, _text,
             id => ApplyAppearance(current => current with { ThemeColor = id }))).ToArray();
@@ -41,8 +43,11 @@ public sealed class SettingsViewModel : PageViewModel
         _appearance.Colors.Changed += OnColorChanged;
     }
 
+    private AppearanceService _appearance => Context.Appearance;
+
     public IReadOnlyList<string> AudioQualityOptions => Enum.GetValues<AudioQuality>()
         .Select(quality => _text["AudioQuality" + quality]).ToArray();
+
     public int SelectedAudioQuality
     {
         get => (int)_playbackSettings.Get<PlaybackPreferences>().Quality;
@@ -56,20 +61,27 @@ public sealed class SettingsViewModel : PageViewModel
     public RelayCommand<string> ThemeCommand { get; }
     public RelayCommand<string> LanguageCommand { get; }
     public IReadOnlyList<ThemeColorOption> ThemeColors { get; }
+
     public bool UseArtworkColors
     {
         get => _appearance.Current.UseArtworkColors;
         set => ApplyAppearance(current => current with { UseArtworkColors = value });
     }
+
     public bool ReduceMotion
     {
         get => _appearance.Current.ReduceMotion;
         set => ApplyAppearance(current => current with { ReduceMotion = value });
     }
+
     public string ThemeColorStatus => _appearance.Colors.IsUsingArtwork
         ? _text["ThemeColorUsingArtwork"]
-        : _text.Format(UseArtworkColors ? "ThemeColorFallbackStatus" : "ThemeColorBuiltInStatus", _text[ThemePalette.Get(_appearance.Current.ThemeColor).NameKey]);
-    public IEnumerable<string> PluginDescriptions => _host.Plugins.Loaded.Select(value => $"{value.Manifest.Name}  ·  {value.Manifest.Version}");
+        : _text.Format(UseArtworkColors ? "ThemeColorFallbackStatus" : "ThemeColorBuiltInStatus",
+            _text[ThemePalette.Get(_appearance.Current.ThemeColor).NameKey]);
+
+    public IEnumerable<string> PluginDescriptions =>
+        _host.Plugins.Loaded.Select(value => $"{value.Manifest.Name}  ·  {value.Manifest.Version}");
+
     public bool IsThemeSystem => _appearance.Current.Theme == ThemePreference.System;
     public bool IsThemeLight => _appearance.Current.Theme == ThemePreference.Light;
     public bool IsThemeDark => _appearance.Current.Theme == ThemePreference.Dark;
@@ -81,11 +93,15 @@ public sealed class SettingsViewModel : PageViewModel
     public string ConfigurationPath => _host.Paths.ConfigurationDirectory;
     public string CachePath => _storage.CacheDirectory;
 
-    public Task ChangeLibraryAsync(string directory) =>
-        ExecuteAsync(ct => _storageService.ChangeLibraryAsync(directory, ct));
+    public Task ChangeLibraryAsync(string directory)
+    {
+        return ExecuteAsync(ct => _storageService.ChangeLibraryAsync(directory, ct));
+    }
 
-    public Task ChangeCacheAsync(string directory) =>
-        ExecuteAsync(ct => _storageService.ChangeCacheAsync(directory, ct));
+    public Task ChangeCacheAsync(string directory)
+    {
+        return ExecuteAsync(ct => _storageService.ChangeCacheAsync(directory, ct));
+    }
 
     private void OnStorageChanged(object? sender, EventArgs args)
     {
@@ -97,18 +113,28 @@ public sealed class SettingsViewModel : PageViewModel
     {
         if (!_closing) Context.Settings.Apply(update);
     }
-    private void OnColorChanged(object? sender, EventArgs args) => OnPropertyChanged(nameof(ThemeColorStatus));
+
+    private void OnColorChanged(object? sender, EventArgs args)
+    {
+        OnPropertyChanged(nameof(ThemeColorStatus));
+    }
+
     private void RefreshLanguageProperties()
     {
         foreach (var name in new[] { nameof(IsLanguageSystem), nameof(IsLanguageChinese), nameof(IsLanguageEnglish) })
             OnPropertyChanged(name);
     }
+
     private void RefreshAppearanceProperties()
     {
-        foreach (var name in new[] { nameof(IsThemeSystem), nameof(IsThemeLight), nameof(IsThemeDark), nameof(ReduceMotion),
-                     nameof(UseArtworkColors), nameof(ThemeColorStatus) }) OnPropertyChanged(name);
+        foreach (var name in new[]
+                 {
+                     nameof(IsThemeSystem), nameof(IsThemeLight), nameof(IsThemeDark), nameof(ReduceMotion),
+                     nameof(UseArtworkColors), nameof(ThemeColorStatus)
+                 }) OnPropertyChanged(name);
         foreach (var option in ThemeColors) option.Refresh();
     }
+
     protected override void RefreshLocalizedProperties()
     {
         base.RefreshLocalizedProperties();
@@ -119,6 +145,7 @@ public sealed class SettingsViewModel : PageViewModel
         OnPropertyChanged(nameof(PluginSummary));
         OnPropertyChanged(nameof(PluginDescriptions));
     }
+
     public override async ValueTask DisposeAsync()
     {
         _closing = true;

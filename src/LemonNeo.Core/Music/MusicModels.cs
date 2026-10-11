@@ -1,10 +1,11 @@
-using System.Collections.Immutable;
-
 namespace LemonNeo.Core.Music;
 
 public readonly record struct MusicItemId(string ProviderId, string RemoteId)
 {
-    public override string ToString() => $"{ProviderId}:{RemoteId}";
+    public override string ToString()
+    {
+        return $"{ProviderId}:{RemoteId}";
+    }
 }
 
 public sealed record ExternalMusicId(
@@ -16,9 +17,11 @@ public sealed record MusicIdScheme(
     string Namespace,
     string? Kind)
 {
-    public bool Accepts(ExternalMusicId id) =>
-        string.Equals(Namespace, id.Namespace, StringComparison.OrdinalIgnoreCase) &&
-        string.Equals(Kind, id.Kind, StringComparison.OrdinalIgnoreCase);
+    public bool Accepts(ExternalMusicId id)
+    {
+        return string.Equals(Namespace, id.Namespace, StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(Kind, id.Kind, StringComparison.OrdinalIgnoreCase);
+    }
 }
 
 public static class MusicIdNamespaces
@@ -62,9 +65,9 @@ public sealed record Album
 }
 
 /// <summary>
-/// A self-contained metadata snapshot used by search results, metadata matches,
-/// playlist items, and playback queues. Playback availability is determined at
-/// resolution time by playback-source providers.
+///     A self-contained metadata snapshot used by search results, metadata matches,
+///     playlist items, and playback queues. Playback availability is determined at
+///     resolution time by playback-source providers.
 /// </summary>
 public sealed record Track
 {

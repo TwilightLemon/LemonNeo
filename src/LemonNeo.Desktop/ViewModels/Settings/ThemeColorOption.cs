@@ -7,8 +7,11 @@ using LemonNeo.Desktop.Utils;
 
 namespace LemonNeo.Desktop.ViewModels.Settings;
 
-public sealed class ThemeColorOption(ThemeColorDefinition definition, AppearanceService appearance,
-    LocalizationService text, Action<ThemeColorPreset> select) : ObservableObject
+public sealed class ThemeColorOption(
+    ThemeColorDefinition definition,
+    AppearanceService appearance,
+    LocalizationService text,
+    Action<ThemeColorPreset> select) : ObservableObject
 {
     public string Name => text[definition.NameKey];
     public bool IsSelected => appearance.Current.ThemeColor == definition.Id;

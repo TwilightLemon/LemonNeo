@@ -38,15 +38,32 @@ public sealed class SlideFadeTransition : IPageTransition
         }
     }
 
-    private Animation CreateAnimation(double startY, double opacity) => new()
+    private Animation CreateAnimation(double startY, double opacity)
     {
-        Duration = Duration,
-        Easing = EntranceEasing,
-        FillMode = FillMode.None,
-        Children =
+        return new Animation
         {
-            new KeyFrame { Cue = new Cue(0), Setters = { new Setter(TranslateTransform.YProperty, startY), new Setter(Visual.OpacityProperty, 0d) } },
-            new KeyFrame { Cue = new Cue(1), Setters = { new Setter(TranslateTransform.YProperty, 0d), new Setter(Visual.OpacityProperty, opacity) } }
-        }
-    };
+            Duration = Duration,
+            Easing = EntranceEasing,
+            FillMode = FillMode.None,
+            Children =
+            {
+                new KeyFrame
+                {
+                    Cue = new Cue(0),
+                    Setters =
+                    {
+                        new Setter(TranslateTransform.YProperty, startY), new Setter(Visual.OpacityProperty, 0d)
+                    }
+                },
+                new KeyFrame
+                {
+                    Cue = new Cue(1),
+                    Setters =
+                    {
+                        new Setter(TranslateTransform.YProperty, 0d), new Setter(Visual.OpacityProperty, opacity)
+                    }
+                }
+            }
+        };
+    }
 }

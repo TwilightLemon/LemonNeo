@@ -8,8 +8,10 @@ public interface IPlayerProvider
 {
     string Id { get; }
     PlayerDescriptor Descriptor { get; }
+
     /// <summary>Audio filename extensions understood by this decoder, including the leading dot.</summary>
     IReadOnlyCollection<string> SupportedExtensions { get; }
+
     IPlayer Player { get; }
     bool CanPlay(PlaybackSource source);
 }

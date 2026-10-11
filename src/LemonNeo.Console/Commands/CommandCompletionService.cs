@@ -1,9 +1,8 @@
+using System.Text;
 using LemonNeo.Abstractions.Providers;
 using LemonNeo.Application.Library;
 using LemonNeo.Core.Library;
 using LemonNeo.Core.Music;
-using LemonNeo.Core.Playback;
-using System.Text;
 
 namespace LemonNeo.ConsoleApp;
 
@@ -21,8 +20,10 @@ internal sealed record CommandCompletion(
     bool PreferSelection = false,
     bool CurrentValueIsExact = false)
 {
-    public static CommandCompletion Empty(int cursor, string? hint = null) =>
-        new(cursor, 0, [], Hint: hint);
+    public static CommandCompletion Empty(int cursor, string? hint = null)
+    {
+        return new CommandCompletion(cursor, 0, [], Hint: hint);
+    }
 }
 
 internal sealed class CommandCompletionService(
@@ -43,6 +44,7 @@ internal sealed class CommandCompletionService(
         MusicIdNamespaces.Isrc,
         MusicIdNamespaces.File
     ];
+
     public CommandCompletion Complete(string input, int cursor)
     {
         var target = CompletionTarget.Parse(input, cursor);
@@ -56,43 +58,31 @@ internal sealed class CommandCompletionService(
                 $"{playlistDescriptor.Usage}  ·  {playlistDescriptor.Description}");
         }
 
-        if (target.TokenIndex == 0)
-        {
-            return CompleteCommand(target);
-        }
+        if (target.TokenIndex == 0) return CompleteCommand(target);
 
         var commandName = target.Tokens[0];
         var descriptor = CommandCatalog.Find(commandName);
         if (descriptor is null)
-        {
             return CommandCompletion.Empty(target.Start, "Unknown command — edit it or press Tab to complete.");
-        }
 
         var hint = $"{descriptor.Usage}  ·  {descriptor.Description}";
         var argumentIndex = target.TokenIndex;
 
-        if (IsPlaylistArgument(commandName, argumentIndex))
-        {
-            return CompletePlaylists(target, hint);
-        }
+        if (IsPlaylistArgument(commandName, argumentIndex)) return CompletePlaylists(target, hint);
 
         if (argumentIndex == 2 && commandName.ToLowerInvariant() is
-            "remove" or "show-track" or "update-track" or "move-track" or "external-ids")
-        {
+                "remove" or "show-track" or "update-track" or "move-track" or "external-ids")
             return CompletePlaylistItems(target, hint);
-        }
 
         if (commandName.Equals("external-ids", StringComparison.OrdinalIgnoreCase) && argumentIndex == 3)
-        {
             return CompleteValues(target, hint, "External ID actions",
-                ("add", "Add a new ID scheme"), ("update", "Change an existing ID value"), ("remove", "Delete an ID scheme"));
-        }
+                ("add", "Add a new ID scheme"), ("update", "Change an existing ID value"),
+                ("remove", "Delete an ID scheme"));
 
         if (commandName.Equals("startup", StringComparison.OrdinalIgnoreCase) && argumentIndex == 1)
-        {
             return CompleteValues(target, hint, "Startup commands",
-                ("show", "Show the startup script"), ("set", "Copy a script from a file"), ("reset", "Restore the default script"));
-        }
+                ("show", "Show the startup script"), ("set", "Copy a script from a file"),
+                ("reset", "Restore the default script"));
 
         var fieldStart = commandName.ToLowerInvariant() switch
         {
@@ -102,9 +92,7 @@ internal sealed class CommandCompletionService(
         };
         if (commandName.Equals("create-playlist", StringComparison.OrdinalIgnoreCase) && argumentIndex >= 2 &&
             !target.Tokens.Contains("--description", StringComparer.OrdinalIgnoreCase))
-        {
             return CompleteValues(target, hint, "Fields", ("--description", "Set the playlist description"));
-        }
         if (fieldStart >= 0 && argumentIndex >= fieldStart && (argumentIndex - fieldStart) % 2 == 0)
         {
             var fields = fieldStart == 2
@@ -132,36 +120,26 @@ internal sealed class CommandCompletionService(
         }
 
         if (TryGetProviderRole(commandName, target, out var providerRole))
-        {
             return CompleteProviders(target, hint, providerRole);
-        }
 
         if (string.Equals(commandName, "mode", StringComparison.OrdinalIgnoreCase) && argumentIndex == 1)
-        {
             return CompleteValues(target, hint, "Playback modes",
                 ("sequential", "Play in queue order"),
                 ("repeat", "Repeat the queue"),
                 ("shuffle", "Randomized queue order"));
-        }
 
         if (string.Equals(commandName, "queue", StringComparison.OrdinalIgnoreCase) && argumentIndex == 1)
-        {
             return CompleteValues(target, hint, "Queue actions", ("clear", "Remove every queued track"));
-        }
 
         if (IsNamespaceArgument(commandName, argumentIndex))
-        {
             return CompleteValues(
                 target,
                 hint,
                 "Metadata namespaces",
                 MetadataNamespaces.Select(value => (value, "Metadata source namespace")).ToArray());
-        }
 
         if (IsSourceOptionPosition(commandName, target))
-        {
             return CompleteValues(target, hint, "Options", ("--source", "Require a playback source provider"));
-        }
 
         return new CommandCompletion(target.Start, target.Length, [], Hint: hint);
     }
@@ -169,11 +147,9 @@ internal sealed class CommandCompletionService(
     private static CommandCompletion CompleteCommand(CompletionTarget target)
     {
         if (string.IsNullOrEmpty(target.Value))
-        {
             return CommandCompletion.Empty(
                 target.Start,
                 "↑↓ history · start typing for suggestions · Tab completes");
-        }
 
         var matches = Rank(
                 CommandCatalog.Commands.SelectMany(command =>
@@ -222,8 +198,8 @@ internal sealed class CommandCompletionService(
             matches,
             "Local playlists",
             library.Current.Playlists.Count == 0 ? "No local playlists yet." : hint,
-            PreferSelection: true,
-            CurrentValueIsExact: exact);
+            true,
+            exact);
     }
 
     private CommandCompletion CompletePlaylistItems(CompletionTarget target, string hint)
@@ -232,13 +208,11 @@ internal sealed class CommandCompletionService(
             ? TryResolvePlaylist(target.Tokens[1])
             : null;
         if (playlist is null)
-        {
             return new CommandCompletion(
                 target.Start,
                 target.Length,
                 [],
                 Hint: "Select a playlist before choosing an item.");
-        }
 
         var suggestions = playlist.Items.Select(item => new CommandSuggestion(
             item.Id.ToString(),
@@ -253,8 +227,8 @@ internal sealed class CommandCompletionService(
             matches,
             $"Items in {playlist.Name}",
             hint,
-            PreferSelection: true,
-            CurrentValueIsExact: target.Value.Length > 0 && playlist.Items.Count(item =>
+            true,
+            target.Value.Length > 0 && playlist.Items.Count(item =>
                 item.Id.ToString().StartsWith(target.Value, StringComparison.OrdinalIgnoreCase)) == 1);
     }
 
@@ -304,64 +278,59 @@ internal sealed class CommandCompletionService(
     private static IEnumerable<CommandSuggestion> Rank(
         IEnumerable<CommandSuggestion> suggestions,
         string query,
-        Func<CommandSuggestion, string> searchText) =>
-        suggestions
+        Func<CommandSuggestion, string> searchText)
+    {
+        return suggestions
             .Select(suggestion => (Suggestion: suggestion, Rank: MatchRank(searchText(suggestion), query)))
             .Where(item => item.Rank >= 0)
             .OrderBy(item => item.Rank)
             .ThenBy(item => item.Suggestion.DisplayText, StringComparer.OrdinalIgnoreCase)
             .Select(item => item.Suggestion);
+    }
 
     private static int MatchRank(string value, string query)
     {
-        if (query.Length == 0)
-        {
-            return 0;
-        }
+        if (query.Length == 0) return 0;
 
-        if (value.StartsWith(query, StringComparison.OrdinalIgnoreCase))
-        {
-            return 0;
-        }
+        if (value.StartsWith(query, StringComparison.OrdinalIgnoreCase)) return 0;
 
         return value.Contains(query, StringComparison.OrdinalIgnoreCase) ? 1 : -1;
     }
 
-    private static bool IsPlaylistArgument(string command, int argumentIndex) =>
-        argumentIndex == 1 && command.ToLowerInvariant() is
+    private static bool IsPlaylistArgument(string command, int argumentIndex)
+    {
+        return argumentIndex == 1 && command.ToLowerInvariant() is
             "playlist" or "show-playlist" or "match-playlist" or "add" or "remove" or "play-playlist" or
-            "update-playlist" or "delete-playlist" or "show-track" or "create-track" or "update-track" or "move-track" or "external-ids";
+            "update-playlist" or "delete-playlist" or "show-track" or "create-track" or "update-track" or "move-track"
+            or "external-ids";
+    }
 
-    private static bool IsNamespaceArgument(string command, int argumentIndex) =>
-        (string.Equals(command, "metadata", StringComparison.OrdinalIgnoreCase) && argumentIndex >= 3) ||
-        (string.Equals(command, "match-playlist", StringComparison.OrdinalIgnoreCase) && argumentIndex >= 2);
+    private static bool IsNamespaceArgument(string command, int argumentIndex)
+    {
+        return (string.Equals(command, "metadata", StringComparison.OrdinalIgnoreCase) && argumentIndex >= 3) ||
+               (string.Equals(command, "match-playlist", StringComparison.OrdinalIgnoreCase) && argumentIndex >= 2);
+    }
 
-    private static bool IsSearchSourceArgument(string command, CompletionTarget target) =>
-        string.Equals(command, "search", StringComparison.OrdinalIgnoreCase) &&
-        target.TokenIndex > 1 &&
-        string.Equals(
-            target.Tokens[target.TokenIndex - 1],
-            "--source",
-            StringComparison.OrdinalIgnoreCase);
+    private static bool IsSearchSourceArgument(string command, CompletionTarget target)
+    {
+        return string.Equals(command, "search", StringComparison.OrdinalIgnoreCase) &&
+               target.TokenIndex > 1 &&
+               string.Equals(
+                   target.Tokens[target.TokenIndex - 1],
+                   "--source",
+                   StringComparison.OrdinalIgnoreCase);
+    }
 
     private static bool IsSourceOptionPosition(string command, CompletionTarget target)
     {
         if (string.Equals(command, "search", StringComparison.OrdinalIgnoreCase))
-        {
             return target.TokenIndex >= 2 &&
                    !target.Tokens.Contains("--source", StringComparer.OrdinalIgnoreCase) &&
                    (target.Value.Length == 0 || target.Value.StartsWith("-", StringComparison.Ordinal));
-        }
 
-        if (string.Equals(command, "play", StringComparison.OrdinalIgnoreCase))
-        {
-            return target.TokenIndex == 3;
-        }
+        if (string.Equals(command, "play", StringComparison.OrdinalIgnoreCase)) return target.TokenIndex == 3;
 
-        if (!string.Equals(command, "play-playlist", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
+        if (!string.Equals(command, "play-playlist", StringComparison.OrdinalIgnoreCase)) return false;
 
         return target.TokenIndex is 2 or 3 &&
                (target.Value.Length == 0 || target.Value.StartsWith("-", StringComparison.Ordinal));
@@ -377,7 +346,8 @@ internal sealed class CommandCompletionService(
 
         if (command.ToLowerInvariant() is "play" or "play-playlist" &&
             target.Tokens.Count > 1 &&
-            string.Equals(target.Tokens[Math.Max(0, argumentIndex - 1)], "--source", StringComparison.OrdinalIgnoreCase))
+            string.Equals(target.Tokens[Math.Max(0, argumentIndex - 1)], "--source",
+                StringComparison.OrdinalIgnoreCase))
         {
             role = ProviderParameterRole.PlaybackSource;
             return true;
@@ -396,7 +366,7 @@ internal sealed class CommandCompletionService(
         }
 
         if (argumentIndex == 1 && command.ToLowerInvariant() is
-            "metadata" or "enrich" or "lyrics" or "sources" or "play")
+                "metadata" or "enrich" or "lyrics" or "sources" or "play")
         {
             role = ProviderParameterRole.TrackLookup;
             return true;
@@ -421,8 +391,10 @@ internal sealed class CommandCompletionService(
         return matches.Length == 1 ? matches[0] : null;
     }
 
-    private static string Quote(string value) =>
-        value.Any(char.IsWhiteSpace) ? $"\"{value}\"" : value;
+    private static string Quote(string value)
+    {
+        return value.Any(char.IsWhiteSpace) ? $"\"{value}\"" : value;
+    }
 
     private sealed record CompletionTarget(
         int Start,
@@ -440,15 +412,9 @@ internal sealed class CommandCompletionService(
 
             while (index < cursor)
             {
-                while (index < cursor && char.IsWhiteSpace(input[index]))
-                {
-                    index++;
-                }
+                while (index < cursor && char.IsWhiteSpace(input[index])) index++;
 
-                if (index >= cursor)
-                {
-                    break;
-                }
+                if (index >= cursor) break;
 
                 starts.Add(index);
                 var value = new StringBuilder();
@@ -507,13 +473,8 @@ internal sealed class CommandCompletionService(
             {
                 var character = input[index];
                 if (character == '"')
-                {
                     quoted = !quoted;
-                }
-                else if (char.IsWhiteSpace(character) && !quoted)
-                {
-                    break;
-                }
+                else if (char.IsWhiteSpace(character) && !quoted) break;
 
                 index++;
             }

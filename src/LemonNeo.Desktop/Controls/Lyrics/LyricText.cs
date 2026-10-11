@@ -1,9 +1,9 @@
-using LemonNeo.Application.Lyrics;
-using LemonNeo.Core.Lyrics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.TextFormatting;
+using LemonNeo.Application.Lyrics;
+using LemonNeo.Core.Lyrics;
 
 namespace LemonNeo.Desktop.Controls.Lyrics;
 
@@ -12,38 +12,87 @@ public sealed class LyricText : TextBlock
 {
     public static readonly StyledProperty<IReadOnlyList<LyricsDisplaySegment>?> SegmentsProperty =
         AvaloniaProperty.Register<LyricText, IReadOnlyList<LyricsDisplaySegment>?>(nameof(Segments));
+
     public static readonly StyledProperty<IReadOnlyList<LyricsWord>?> WordsProperty =
         AvaloniaProperty.Register<LyricText, IReadOnlyList<LyricsWord>?>(nameof(Words));
+
     public static readonly StyledProperty<IBrush?> ReachedBrushProperty =
         AvaloniaProperty.Register<LyricText, IBrush?>(nameof(ReachedBrush));
+
     public static readonly StyledProperty<double> PositionMillisecondsProperty =
         AvaloniaProperty.Register<LyricText, double>(nameof(PositionMilliseconds));
+
     public static readonly StyledProperty<bool> IsHighlightedProperty =
         AvaloniaProperty.Register<LyricText, bool>(nameof(IsHighlighted));
+
     public static readonly StyledProperty<bool> ReduceMotionProperty =
         AvaloniaProperty.Register<LyricText, bool>(nameof(ReduceMotion));
+
     public static readonly StyledProperty<int?> LineStartTimeMsProperty =
         AvaloniaProperty.Register<LyricText, int?>(nameof(LineStartTimeMs));
 
-    private TextLayout? _highlightLayout;
-    private TextLayout? _sourceLayout;
-    private Rect[][] _wordBounds = [];
     private readonly LinearGradientBrush _mask = new()
     {
         StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
         EndPoint = new RelativePoint(1, 0, RelativeUnit.Relative),
-        GradientStops = [new(Colors.White, 0), new(Colors.White, 0), new(Colors.Transparent, 1), new(Colors.Transparent, 1)]
+        GradientStops =
+        [
+            new GradientStop(Colors.White, 0), new GradientStop(Colors.White, 0),
+            new GradientStop(Colors.Transparent, 1), new GradientStop(Colors.Transparent, 1)
+        ]
     };
 
-    public IReadOnlyList<LyricsDisplaySegment>? Segments { get => GetValue(SegmentsProperty); set => SetValue(SegmentsProperty, value); }
-    public IReadOnlyList<LyricsWord>? Words { get => GetValue(WordsProperty); set => SetValue(WordsProperty, value); }
-    public IBrush? ReachedBrush { get => GetValue(ReachedBrushProperty); set => SetValue(ReachedBrushProperty, value); }
-    public double PositionMilliseconds { get => GetValue(PositionMillisecondsProperty); set => SetValue(PositionMillisecondsProperty, value); }
-    public bool IsHighlighted { get => GetValue(IsHighlightedProperty); set => SetValue(IsHighlightedProperty, value); }
-    public bool ReduceMotion { get => GetValue(ReduceMotionProperty); set => SetValue(ReduceMotionProperty, value); }
-    public int? LineStartTimeMs { get => GetValue(LineStartTimeMsProperty); set => SetValue(LineStartTimeMsProperty, value); }
+    private TextLayout? _highlightLayout;
+    private TextLayout? _sourceLayout;
+    private Rect[][] _wordBounds = [];
 
-    static LyricText() => AffectsRender<LyricText>(PositionMillisecondsProperty, IsHighlightedProperty, ReduceMotionProperty, LineStartTimeMsProperty);
+    static LyricText()
+    {
+        AffectsRender<LyricText>(PositionMillisecondsProperty, IsHighlightedProperty, ReduceMotionProperty,
+            LineStartTimeMsProperty);
+    }
+
+    public IReadOnlyList<LyricsDisplaySegment>? Segments
+    {
+        get => GetValue(SegmentsProperty);
+        set => SetValue(SegmentsProperty, value);
+    }
+
+    public IReadOnlyList<LyricsWord>? Words
+    {
+        get => GetValue(WordsProperty);
+        set => SetValue(WordsProperty, value);
+    }
+
+    public IBrush? ReachedBrush
+    {
+        get => GetValue(ReachedBrushProperty);
+        set => SetValue(ReachedBrushProperty, value);
+    }
+
+    public double PositionMilliseconds
+    {
+        get => GetValue(PositionMillisecondsProperty);
+        set => SetValue(PositionMillisecondsProperty, value);
+    }
+
+    public bool IsHighlighted
+    {
+        get => GetValue(IsHighlightedProperty);
+        set => SetValue(IsHighlightedProperty, value);
+    }
+
+    public bool ReduceMotion
+    {
+        get => GetValue(ReduceMotionProperty);
+        set => SetValue(ReduceMotionProperty, value);
+    }
+
+    public int? LineStartTimeMs
+    {
+        get => GetValue(LineStartTimeMsProperty);
+        set => SetValue(LineStartTimeMsProperty, value);
+    }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
@@ -51,12 +100,19 @@ public sealed class LyricText : TextBlock
         if (change.Property == WordsProperty || change.Property == SegmentsProperty)
         {
             SetCurrentValue(TextProperty, Words is { Count: > 0 } words
-                ? string.Concat(words.Select(w => w.Text)) : Segments is { } segments
-                    ? string.Concat(segments.Select(s => s.Text)) : Text);
+                ? string.Concat(words.Select(w => w.Text))
+                : Segments is { } segments
+                    ? string.Concat(segments.Select(s => s.Text))
+                    : Text);
             ClearHighlightLayout();
             InvalidateVisual();
         }
-        if (change.Property == ReachedBrushProperty) { ClearHighlightLayout(); InvalidateVisual(); }
+
+        if (change.Property == ReachedBrushProperty)
+        {
+            ClearHighlightLayout();
+            InvalidateVisual();
+        }
     }
 
     protected override void RenderTextLayout(DrawingContext context, Point origin)
@@ -69,22 +125,31 @@ public sealed class LyricText : TextBlock
             for (var i = 0; i < words.Count; i++)
             {
                 var word = words[i];
-                var progress = PositionMilliseconds < word.StartTimeMs ? 0 : ReduceMotion || word.EndTimeMs <= word.StartTimeMs
-                    ? 1 : Math.Clamp((PositionMilliseconds - word.StartTimeMs) / (word.EndTimeMs - word.StartTimeMs), 0, 1);
+                var progress = PositionMilliseconds < word.StartTimeMs
+                    ? 0
+                    : ReduceMotion || word.EndTimeMs <= word.StartTimeMs
+                        ? 1
+                        : Math.Clamp((PositionMilliseconds - word.StartTimeMs) / (word.EndTimeMs - word.StartTimeMs), 0,
+                            1);
                 DrawHighlight(context, origin, _wordBounds[i], progress);
             }
         }
         else if (Segments is { } segments)
         {
             for (var i = 0; i < segments.Count; i++)
-                if (segments[i].Reached) DrawHighlight(context, origin, _wordBounds[i], 1);
+                if (segments[i].Reached)
+                    DrawHighlight(context, origin, _wordBounds[i], 1);
         }
         else
         {
             // Line-synchronized lyrics fade as a line; they do not invent word timestamps.
-            var opacity = ReduceMotion || LineStartTimeMs is null ? 1
+            var opacity = ReduceMotion || LineStartTimeMs is null
+                ? 1
                 : Math.Clamp((PositionMilliseconds - LineStartTimeMs.Value) / 240, 0, 1);
-            using (context.PushOpacity(opacity)) _highlightLayout!.Draw(context, origin);
+            using (context.PushOpacity(opacity))
+            {
+                _highlightLayout!.Draw(context, origin);
+            }
         }
     }
 
@@ -122,13 +187,19 @@ public sealed class LyricText : TextBlock
             var rectangle = bound.Translate(new Vector(origin.X, origin.Y));
             using (context.PushClip(rectangle))
             {
-                if (local >= 1) _highlightLayout!.Draw(context, origin);
+                if (local >= 1)
+                {
+                    _highlightLayout!.Draw(context, origin);
+                }
                 else
                 {
                     var edge = local * 1.3 - .15;
                     _mask.GradientStops[1].Offset = Math.Clamp(edge - .15, 0, 1);
                     _mask.GradientStops[2].Offset = Math.Clamp(edge + .15, 0, 1);
-                    using (context.PushOpacityMask(_mask, rectangle)) _highlightLayout!.Draw(context, origin);
+                    using (context.PushOpacityMask(_mask, rectangle))
+                    {
+                        _highlightLayout!.Draw(context, origin);
+                    }
                 }
             }
         }
@@ -141,6 +212,7 @@ public sealed class LyricText : TextBlock
         _sourceLayout = null;
         _wordBounds = [];
     }
+
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         ClearHighlightLayout();

@@ -1,9 +1,20 @@
-<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        x:Class="LemonNeo.Desktop.Views.Shared.MessageDialog"
-        Width="460" SizeToContent="Height" CanResize="False" WindowStartupLocation="CenterOwner">
-  <StackPanel Margin="28" Spacing="24">
-    <TextBlock Name="Message" TextWrapping="Wrap" />
-    <Button Name="AcceptButton" Classes="primary" HorizontalAlignment="Right" MinWidth="88"
-            Click="OnAccept" IsDefault="True" IsCancel="True" />
-  </StackPanel>
+<Window
+    CanResize="False"
+    SizeToContent="Height"
+    Width="460"
+    WindowStartupLocation="CenterOwner"
+    x:Class="LemonNeo.Desktop.Views.Shared.MessageDialog"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel Margin="28" Spacing="24">
+        <TextBlock Name="Message" TextWrapping="Wrap" />
+        <Button
+            Classes="primary"
+            Click="OnAccept"
+            HorizontalAlignment="Right"
+            IsCancel="True"
+            IsDefault="True"
+            MinWidth="88"
+            Name="AcceptButton" />
+    </StackPanel>
 </Window>

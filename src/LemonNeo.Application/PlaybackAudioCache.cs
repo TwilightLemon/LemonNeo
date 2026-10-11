@@ -1,9 +1,9 @@
-using LemonNeo.Abstractions.Playback;
-using LemonNeo.Core.Music;
-using LemonNeo.Core.Playback;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using LemonNeo.Abstractions.Playback;
+using LemonNeo.Core.Music;
+using LemonNeo.Core.Playback;
 using Microsoft.Extensions.Logging;
 
 namespace LemonNeo.Application;
@@ -18,12 +18,15 @@ public sealed class PlaybackAudioCache(Func<string> getCacheDirectory, ILogger<P
         ExternalMusicId identifier, AudioQuality quality, CancellationToken cancellationToken = default)
     {
         var directory = DirectoryPath;
-        var entry = await TryGetEntryAsync(directory, MusicCacheIdentity.Normalize(identifier), quality, cancellationToken);
-        return entry is null ? null : new FilePlaybackSource(Path.Combine(directory, entry.FileName))
-        {
-            Quality = entry.Quality,
-            BitrateKbps = entry.BitrateKbps
-        };
+        var entry = await TryGetEntryAsync(directory, MusicCacheIdentity.Normalize(identifier), quality,
+            cancellationToken);
+        return entry is null
+            ? null
+            : new FilePlaybackSource(Path.Combine(directory, entry.FileName))
+            {
+                Quality = entry.Quality,
+                BitrateKbps = entry.BitrateKbps
+            };
     }
 
     private async Task<CacheEntry?> TryGetEntryAsync(
@@ -54,6 +57,7 @@ public sealed class PlaybackAudioCache(Func<string> getCacheDirectory, ILogger<P
                 RemoveIndex(indexPath);
                 return null;
             }
+
             logger.LogInformation("Found host-cached audio at {Path}.", path);
             return entry;
         }
@@ -65,11 +69,13 @@ public sealed class PlaybackAudioCache(Func<string> getCacheDirectory, ILogger<P
         }
     }
 
-    public IPlaybackDownloadSink? Start(ExternalMusicId identifier, HttpPlaybackSource source, bool awaitDecoderInfo = false)
+    public IPlaybackDownloadSink? Start(ExternalMusicId identifier, HttpPlaybackSource source,
+        bool awaitDecoderInfo = false)
     {
         // Unknown quality must never be cached under the requested quality.
         var quality = source.Quality is { } supplied && supplied != AudioQuality.Automatic && Enum.IsDefined(supplied)
-            ? source.Quality : null;
+            ? source.Quality
+            : null;
         if (quality is null && !awaitDecoderInfo) return null;
         identifier = MusicCacheIdentity.Normalize(identifier);
         var directory = DirectoryPath;
@@ -77,7 +83,8 @@ public sealed class PlaybackAudioCache(Func<string> getCacheDirectory, ILogger<P
         {
             Directory.CreateDirectory(directory);
             return new DownloadWriter(directory, identifier, quality, source.BitrateKbps,
-                actual => GetIndexPath(directory, identifier, actual), AudioExtension(Path.GetExtension(source.Uri.AbsolutePath)), logger, awaitDecoderInfo);
+                actual => GetIndexPath(directory, identifier, actual),
+                AudioExtension(Path.GetExtension(source.Uri.AbsolutePath)), logger, awaitDecoderInfo);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
@@ -93,7 +100,8 @@ public sealed class PlaybackAudioCache(Func<string> getCacheDirectory, ILogger<P
     }
 
     /// <summary>Corrects a previously verified cached resource's metadata without copying audio or creating aliases.</summary>
-    public async Task RefreshAudioInfoAsync(ExternalMusicId identifier, FilePlaybackSource source, AudioStreamInfo? info,
+    public async Task RefreshAudioInfoAsync(ExternalMusicId identifier, FilePlaybackSource source,
+        AudioStreamInfo? info,
         CancellationToken cancellationToken = default)
     {
         if (info is null || source.Quality is not { } previous) return;
@@ -107,15 +115,19 @@ public sealed class PlaybackAudioCache(Func<string> getCacheDirectory, ILogger<P
         try
         {
             // Discovery already checked the audio digest; only read the small index again.
-            var entry = JsonSerializer.Deserialize<CacheEntry>(await File.ReadAllTextAsync(previousPath, cancellationToken));
+            var entry = JsonSerializer.Deserialize<CacheEntry>(
+                await File.ReadAllTextAsync(previousPath, cancellationToken));
             if (entry is null || entry.FormatVersion != FormatVersion || entry.Identifier != identifier ||
                 entry.Quality != previous || Path.Combine(directory, entry.FileName) != source.Path) return;
             if (quality is { } actual)
             {
                 temporaryPath = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".json.part");
-                await File.WriteAllTextAsync(temporaryPath, JsonSerializer.Serialize(entry with { Quality = actual, BitrateKbps = bitrate }), cancellationToken);
-                File.Move(temporaryPath, GetIndexPath(directory, identifier, actual), overwrite: true);
+                await File.WriteAllTextAsync(temporaryPath,
+                    JsonSerializer.Serialize(entry with { Quality = actual, BitrateKbps = bitrate }),
+                    cancellationToken);
+                File.Move(temporaryPath, GetIndexPath(directory, identifier, actual), true);
             }
+
             if (quality != previous) RemoveIndex(previousPath);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
@@ -136,52 +148,67 @@ public sealed class PlaybackAudioCache(Func<string> getCacheDirectory, ILogger<P
 
     private static string GetIndexPath(string directory, ExternalMusicId identifier, AudioQuality quality)
     {
-        var identity = JsonSerializer.Serialize(new { MusicId = MusicCacheIdentity.GetKey(identifier), Quality = quality });
+        var identity = JsonSerializer.Serialize(new
+            { MusicId = MusicCacheIdentity.GetKey(identifier), Quality = quality });
         return Path.Combine(directory,
             Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(identity))) + ".json");
     }
 
     private void RemoveIndex(string path)
     {
-        try { File.Delete(path); }
+        try
+        {
+            File.Delete(path);
+        }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             logger.LogWarning(exception, "Could not remove an invalid audio cache index {Path}.", path);
         }
     }
 
-    private static bool IsDigest(string? value) =>
-        value is { Length: 64 } && value.All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
-
-    private static string AudioExtension(string extension) => extension.ToLowerInvariant() switch
+    private static bool IsDigest(string? value)
     {
-        ".mp3" or ".mp2" or ".mp1" or ".flac" or ".wav" or ".ogg" or ".aiff" or
-        ".aif" or ".m4a" or ".mp4" or ".aac" or ".wma" or ".opus" => extension.ToLowerInvariant(),
-        _ => ".audio"
-    };
+        return value is { Length: 64 } && value.All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
+    }
 
-    private sealed record CacheEntry(int FormatVersion, ExternalMusicId Identifier, AudioQuality Quality, int? BitrateKbps,
-        string FileName, long Length, string Sha256);
+    private static string AudioExtension(string extension)
+    {
+        return extension.ToLowerInvariant() switch
+        {
+            ".mp3" or ".mp2" or ".mp1" or ".flac" or ".wav" or ".ogg" or ".aiff" or
+                ".aif" or ".m4a" or ".mp4" or ".aac" or ".wma" or ".opus" => extension.ToLowerInvariant(),
+            _ => ".audio"
+        };
+    }
+
+    private sealed record CacheEntry(
+        int FormatVersion,
+        ExternalMusicId Identifier,
+        AudioQuality Quality,
+        int? BitrateKbps,
+        string FileName,
+        long Length,
+        string Sha256);
 
     private sealed class DownloadWriter : IPlaybackDownloadSink
     {
-        private readonly object _gate = new();
         private readonly string _directory;
-        private readonly ExternalMusicId _identifier;
-        private AudioQuality? _quality;
-        private int? _bitrateKbps;
-        private readonly Func<AudioQuality, string> _getIndexPath;
         private readonly string _extension;
-        private readonly string _temporaryPath;
-        private readonly string _temporaryIndexPath;
-        private readonly ILogger _logger;
+        private readonly object _gate = new();
+        private readonly Func<AudioQuality, string> _getIndexPath;
         private readonly IncrementalHash _hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        private FileStream? _file;
-        private long _written;
-        private long? _expectedLength;
-        private bool _ended;
+        private readonly ExternalMusicId _identifier;
+        private readonly ILogger _logger;
+        private readonly string _temporaryIndexPath;
+        private readonly string _temporaryPath;
+        private int? _bitrateKbps;
         private bool _closed;
+        private bool _ended;
+        private long? _expectedLength;
+        private FileStream? _file;
         private bool _metadataReady;
+        private AudioQuality? _quality;
+        private long _written;
 
         public DownloadWriter(string directory, ExternalMusicId identifier, AudioQuality? quality, int? bitrateKbps,
             Func<AudioQuality, string> getIndexPath, string extension, ILogger logger, bool awaitDecoderInfo)
@@ -209,19 +236,6 @@ public sealed class PlaybackAudioCache(Func<string> getCacheDirectory, ILogger<P
             }
         }
 
-        public void SetAudioInfo(AudioStreamInfo? info)
-        {
-            lock (_gate)
-            {
-                if (_closed || _metadataReady) return;
-                _quality = AudioQualities.Resolve(info, _quality);
-                if (info?.BitrateKbps is > 0) _bitrateKbps = info.BitrateKbps;
-                if (_quality is null) { Close(); return; }
-                _metadataReady = true;
-                if (_ended && _expectedLength is not null) Publish();
-            }
-        }
-
         public void SetExpectedLength(long? length)
         {
             lock (_gate)
@@ -232,6 +246,7 @@ public sealed class PlaybackAudioCache(Func<string> getCacheDirectory, ILogger<P
                     Close();
                     return;
                 }
+
                 _expectedLength = length;
                 if (_written > length) Close();
                 else if (_ended) Publish();
@@ -243,7 +258,12 @@ public sealed class PlaybackAudioCache(Func<string> getCacheDirectory, ILogger<P
             lock (_gate)
             {
                 if (_closed) return;
-                if (_ended) { Close(); return; }
+                if (_ended)
+                {
+                    Close();
+                    return;
+                }
+
                 try
                 {
                     if (_expectedLength is { } expected && chunk.Length > expected - _written)
@@ -251,11 +271,13 @@ public sealed class PlaybackAudioCache(Func<string> getCacheDirectory, ILogger<P
                         Close();
                         return;
                     }
+
                     _file!.Write(chunk);
                     _hash.AppendData(chunk);
                     _written += chunk.Length;
                 }
-                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ObjectDisposedException)
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
+                                                      or ObjectDisposedException)
                 {
                     Close();
                     _logger.LogWarning(exception, "Could not save downloaded audio. Streaming playback continues.");
@@ -273,44 +295,83 @@ public sealed class PlaybackAudioCache(Func<string> getCacheDirectory, ILogger<P
             }
         }
 
+        public void Abort()
+        {
+            Dispose();
+        }
+
+        public void Dispose()
+        {
+            lock (_gate)
+            {
+                Close();
+            }
+        }
+
+        public void SetAudioInfo(AudioStreamInfo? info)
+        {
+            lock (_gate)
+            {
+                if (_closed || _metadataReady) return;
+                _quality = AudioQualities.Resolve(info, _quality);
+                if (info?.BitrateKbps is > 0) _bitrateKbps = info.BitrateKbps;
+                if (_quality is null)
+                {
+                    Close();
+                    return;
+                }
+
+                _metadataReady = true;
+                if (_ended && _expectedLength is not null) Publish();
+            }
+        }
+
         private void Publish()
         {
             // Fast downloads can finish while the decoder is still opening the stream.
             if (!_metadataReady || _quality is not { } quality) return;
-            if (_written != _expectedLength) { Close(); return; }
+            if (_written != _expectedLength)
+            {
+                Close();
+                return;
+            }
+
             try
             {
                 var digest = Convert.ToHexStringLower(_hash.GetHashAndReset());
                 var fileName = digest + _extension;
-                _file!.Flush(flushToDisk: true);
+                _file!.Flush(true);
                 _file.Dispose();
                 _file = null;
-                File.Move(_temporaryPath, Path.Combine(_directory, fileName), overwrite: true);
-                var entry = JsonSerializer.Serialize(new CacheEntry(FormatVersion, _identifier, quality, _bitrateKbps, fileName, _written, digest));
+                File.Move(_temporaryPath, Path.Combine(_directory, fileName), true);
+                var entry = JsonSerializer.Serialize(new CacheEntry(FormatVersion, _identifier, quality, _bitrateKbps,
+                    fileName, _written, digest));
                 File.WriteAllText(_temporaryIndexPath, entry);
-                File.Move(_temporaryIndexPath, _getIndexPath(quality), overwrite: true);
+                File.Move(_temporaryIndexPath, _getIndexPath(quality), true);
                 _logger.LogInformation("Cached downloaded audio at {Path}.", Path.Combine(_directory, fileName));
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
                 _logger.LogWarning(exception, "Could not finalize the audio cache. Streaming playback continues.");
             }
-            finally { Close(); }
-        }
-
-        public void Abort() => Dispose();
-
-        public void Dispose()
-        {
-            lock (_gate) { Close(); }
+            finally
+            {
+                Close();
+            }
         }
 
         private void Close()
         {
             if (_closed) return;
             _closed = true;
-            try { _file?.Dispose(); }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException) { }
+            try
+            {
+                _file?.Dispose();
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+            }
+
             _file = null;
             _hash.Dispose();
             DeleteTemporary(_temporaryPath);
@@ -319,8 +380,13 @@ public sealed class PlaybackAudioCache(Func<string> getCacheDirectory, ILogger<P
 
         private static void DeleteTemporary(string path)
         {
-            try { File.Delete(path); }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException) { }
+            try
+            {
+                File.Delete(path);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+            }
         }
     }
 }

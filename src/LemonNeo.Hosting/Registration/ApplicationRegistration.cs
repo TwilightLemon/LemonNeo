@@ -26,11 +26,14 @@ internal static class ApplicationRegistration
         services.AddSingleton<TrackLookupService>();
         services.AddSingleton<MetadataService>();
         services.AddSingleton(provider => new ImageCache(() => storage.CacheDirectory,
-            provider.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(ImageCache)), provider.GetRequiredService<ILogger<ImageCache>>()));
-        services.AddSingleton(provider => new LyricsCache(() => storage.CacheDirectory, provider.GetRequiredService<ILogger<LyricsCache>>()));
+            provider.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(ImageCache)),
+            provider.GetRequiredService<ILogger<ImageCache>>()));
+        services.AddSingleton(provider =>
+            new LyricsCache(() => storage.CacheDirectory, provider.GetRequiredService<ILogger<LyricsCache>>()));
         services.AddSingleton<LyricsService>();
         services.AddSingleton<IPlaybackQueue, PlaybackQueue>();
-        services.AddSingleton(provider => new PlaybackAudioCache(() => storage.CacheDirectory, provider.GetRequiredService<ILogger<PlaybackAudioCache>>()));
+        services.AddSingleton(provider => new PlaybackAudioCache(() => storage.CacheDirectory,
+            provider.GetRequiredService<ILogger<PlaybackAudioCache>>()));
         services.AddSingleton<PlaybackSourceDiscoveryService>();
         services.AddSingleton<PlaybackResolver>();
         services.AddSingleton<PlaybackSessionService>();
