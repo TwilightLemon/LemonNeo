@@ -6,7 +6,7 @@ namespace LemonNeo.Desktop.Controls.Backgrounds;
 
 /// <summary>
 /// Skia port of the modern Lyricify Apple Music Inspired · iOS render passes.
-/// The mesh data is compiled directly from the referenced Apache-2.0 submodule.
+/// The mesh data is compiled from the vendored Apache-2.0 reference source.
 /// </summary>
 internal sealed class AppleMusicMeshRenderer : IDisposable
 {
@@ -45,6 +45,7 @@ internal sealed class AppleMusicMeshRenderer : IDisposable
     private string _currentArtworkId = string.Empty;
     private bool _disposed;
     private DecodedArtwork? _previousArtwork;
+    private volatile bool _artworkTransitionActive;
     private double _transitionStart;
 
     public bool HasArtwork
@@ -54,6 +55,8 @@ internal sealed class AppleMusicMeshRenderer : IDisposable
             lock (_gate) return !_disposed && _currentArtwork is not null;
         }
     }
+
+    public bool IsArtworkTransitionActive => _artworkTransitionActive;
 
     internal static DecodedArtwork DecodeArtwork(BackgroundArtworkFrame artwork)
     {
@@ -97,6 +100,7 @@ internal sealed class AppleMusicMeshRenderer : IDisposable
             _currentArtwork = artwork;
             _currentArtworkId = id ?? string.Empty;
             _transitionStart = _clock.Elapsed.TotalSeconds;
+            _artworkTransitionActive = _previousArtwork is not null;
         }
     }
 
@@ -109,6 +113,7 @@ internal sealed class AppleMusicMeshRenderer : IDisposable
             _currentArtwork = null;
             _previousArtwork = null;
             _currentArtworkId = string.Empty;
+            _artworkTransitionActive = false;
         }
     }
 
@@ -135,7 +140,9 @@ internal sealed class AppleMusicMeshRenderer : IDisposable
 
             var clockTime = (float)_clock.Elapsed.TotalSeconds;
             var time = frame.AnimationTime;
-            var transitionMix = frame.IsAnimationEnabled ? GetTransitionMix(clockTime) : CompleteTransition();
+            var transitionMix = frame.IsArtworkTransitionEnabled
+                ? GetTransitionMix(clockTime)
+                : CompleteTransition();
             var processedPulse = SmootherStep(Math.Clamp(frame.LowFrequencyPulse, 0f, 1f));
             var imageScale = 1f + ImagePulseIntensity * processedPulse * processedPulse *
                 (float)Math.Clamp(frame.BassPulseScale, 0d, 10d);
@@ -328,11 +335,17 @@ internal sealed class AppleMusicMeshRenderer : IDisposable
 
     private float GetTransitionMix(float time)
     {
-        if (_previousArtwork is null) return 1f;
+        if (_previousArtwork is null)
+        {
+            _artworkTransitionActive = false;
+            return 1f;
+        }
+
         var progress = (float)((time - _transitionStart) / ArtworkTransitionSeconds);
         if (progress < 1f) return Math.Clamp(progress, 0f, 1f);
         _previousArtwork.Dispose();
         _previousArtwork = null;
+        _artworkTransitionActive = false;
         return 1f;
     }
 
@@ -340,6 +353,7 @@ internal sealed class AppleMusicMeshRenderer : IDisposable
     {
         _previousArtwork?.Dispose();
         _previousArtwork = null;
+        _artworkTransitionActive = false;
         return 1f;
     }
 
@@ -479,6 +493,7 @@ internal sealed class AppleMusicMeshRenderer : IDisposable
             _previousArtwork?.Dispose();
             _currentArtwork = null;
             _previousArtwork = null;
+            _artworkTransitionActive = false;
         }
     }
 
@@ -496,7 +511,7 @@ internal sealed class AppleMusicMeshRenderer : IDisposable
         float LowFrequencyPulse,
         int PresetSlot,
         bool IsMeshEnabled,
-        bool IsAnimationEnabled,
+        bool IsArtworkTransitionEnabled,
         bool IsDarkTheme);
 
     internal readonly record struct LuminanceStatistics(float Average, float Shadow, float Highlight);

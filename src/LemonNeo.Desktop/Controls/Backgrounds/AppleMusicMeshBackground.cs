@@ -179,7 +179,7 @@ public sealed class AppleMusicMeshBackground : Control
             _pulse,
             PresetSlot,
             IsMeshEnabled,
-            IsAnimationEnabled && IsPlaying,
+            IsAnimationEnabled,
             ActualThemeVariant == ThemeVariant.Dark);
         context.Custom(new MeshDrawOperation(new Rect(Bounds.Size), _renderer, frame));
     }
@@ -322,8 +322,10 @@ public sealed class AppleMusicMeshBackground : Control
             return;
         }
 
-        // After pausing, keep rendering only until the last bass pulse has eased out.
-        if (!IsPlaying && _pulse <= 0f && _pulseTarget <= 0f) return;
+        // Playback pause freezes mesh motion, but artwork transitions and the
+        // last bass pulse still need frames until their independent animations finish.
+        if (!IsPlaying && _pulse <= 0f && _pulseTarget <= 0f &&
+            !_renderer.IsArtworkTransitionActive) return;
 
         var generation = ++_animationFrameGeneration;
         _animationFrameCallback = _ => OnAnimationFrame(generation);
@@ -372,7 +374,7 @@ public sealed class AppleMusicMeshBackground : Control
             _animationTime += (now - _lastFrameTimestamp) / (double)Stopwatch.Frequency;
         _lastFrameTimestamp = now;
         InvalidateVisual();
-        if (!IsPlaying && _pulse <= 0f)
+        if (!IsPlaying && _pulse <= 0f && !_renderer.IsArtworkTransitionActive)
         {
             StopAnimation();
             return;
