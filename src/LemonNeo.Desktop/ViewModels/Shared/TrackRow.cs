@@ -47,9 +47,9 @@ public sealed class TrackRow(
 
     public string Artists => Track.Artists.Count > 0
         ? string.Join(" / ", Track.Artists.Select(a => a.Name))
-        : Text["UnknownArtist"];
+        : Text[LanguageManager.Keys.UnknownArtist];
 
-    public string Album => Track.Album?.Title ?? Text["UnknownAlbum"];
+    public string Album => Track.Album?.Title ?? Text[LanguageManager.Keys.UnknownAlbum];
     public string Duration => Track.Duration is { } value ? FormatTime(value) : "—";
 
     public static string FormatTime(TimeSpan time)

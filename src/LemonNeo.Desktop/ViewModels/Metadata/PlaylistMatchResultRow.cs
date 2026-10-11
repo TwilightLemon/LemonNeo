@@ -43,21 +43,23 @@ public sealed class PlaylistMatchResultRow
     public string Title => Original.Title;
 
     public string Artists => Original.Artists.Count == 0
-        ? _text["UnknownArtist"]
+        ? _text[LanguageManager.Keys.UnknownArtist]
         : string.Join(" / ", Original.Artists.Select(artist => artist.Name));
 
     public string Identity => Original.Id.ToString();
-    public string Result => _text[IsSuccessful ? "MatchSucceeded" : "MatchFailed"];
+    public string Result => _text[IsSuccessful
+        ? LanguageManager.Keys.MatchSucceeded
+        : LanguageManager.Keys.MatchFailed];
 
     public string Details => IsSuccessful
-        ? HasChanges ? _text.Format("MatchChangedFields", Changes.Count) : _text["NoMetadataChanges"]
-        : _text["NoReliableMatch"];
+        ? HasChanges ? _text.Format(LanguageManager.Keys.MatchChangedFields, Changes.Count) : _text[LanguageManager.Keys.NoMetadataChanges]
+        : _text[LanguageManager.Keys.NoReliableMatch];
 
     public string MatchSource => Lookup.Matches.FirstOrDefault() is { } match
-        ? _text.Format("MatchSourceSummary", match.SourceNamespace, match.Confidence)
+        ? _text.Format(LanguageManager.Keys.MatchSourceSummary, match.SourceNamespace, match.Confidence)
         : "";
 
-    public string OpenTrackHint => _text["OpenTrackDetails"];
+    public string OpenTrackHint => _text[LanguageManager.Keys.OpenTrackDetails];
 
     public PlaylistMatchResultRow Relocalize(LocalizationService text)
     {

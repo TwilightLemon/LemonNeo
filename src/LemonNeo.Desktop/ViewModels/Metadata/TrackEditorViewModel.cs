@@ -111,25 +111,25 @@ public sealed partial class TrackEditorViewModel : ObservableObject
     {
         if (string.IsNullOrWhiteSpace(Title) || string.IsNullOrWhiteSpace(ProviderId) ||
             string.IsNullOrWhiteSpace(TrackId))
-            throw new ArgumentException(_text["TrackFieldsRequired"]);
+            throw new ArgumentException(_text[LanguageManager.Keys.TrackFieldsRequired]);
         TimeSpan? duration = null;
         if (!string.IsNullOrWhiteSpace(DurationSeconds))
         {
             if (!(double.TryParse(DurationSeconds, NumberStyles.Float, _text.Culture, out var seconds) ||
                   double.TryParse(DurationSeconds, NumberStyles.Float, CultureInfo.InvariantCulture, out seconds)) ||
                 !double.IsFinite(seconds) || seconds < 0 || seconds >= TimeSpan.MaxValue.TotalSeconds)
-                throw new ArgumentException(_text["DurationInvalid"]);
+                throw new ArgumentException(_text[LanguageManager.Keys.DurationInvalid]);
             duration = TimeSpan.FromSeconds(seconds);
         }
 
         Uri? artwork = null;
         if (!string.IsNullOrWhiteSpace(ArtworkUri) && !Uri.TryCreate(ArtworkUri.Trim(), UriKind.Absolute, out artwork))
-            throw new ArgumentException(_text["ArtworkInvalid"]);
+            throw new ArgumentException(_text[LanguageManager.Keys.ArtworkInvalid]);
         var ids = new List<ExternalMusicId>();
         foreach (var row in ExternalIds)
         {
             if (string.IsNullOrWhiteSpace(row.Namespace) || string.IsNullOrWhiteSpace(row.Value))
-                throw new ArgumentException(_text["ExternalIdInvalid"]);
+                throw new ArgumentException(_text[LanguageManager.Keys.ExternalIdInvalid]);
             var kind = NormalizeKind(row.Kind);
             ids.Add(new ExternalMusicId(row.Namespace.Trim(), row.Value.Trim(), kind));
         }
@@ -147,7 +147,7 @@ public sealed partial class TrackEditorViewModel : ObservableObject
                 var retained = _snapshot.ExternalIds.Where(id => Scheme(id) == group.Key)
                     .GroupBy(id => id.Value).ToDictionary(g => g.Key, g => g.Count());
                 if (group.GroupBy(id => id.Value).Any(g => g.Count() > retained.GetValueOrDefault(g.Key)))
-                    throw new ArgumentException(_text["DuplicateExternalId"]);
+                    throw new ArgumentException(_text[LanguageManager.Keys.DuplicateExternalId]);
             }
 
         return _snapshot with

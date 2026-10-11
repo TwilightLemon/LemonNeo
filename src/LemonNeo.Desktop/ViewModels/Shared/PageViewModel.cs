@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Irihi.Lingua;
 using LemonNeo.Desktop.Services;
 
 namespace LemonNeo.Desktop.ViewModels.Shared;
@@ -12,12 +13,12 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
     private bool _closing;
     private object?[] _errorArguments = [];
     private string? _errorDetails;
-    private string? _errorKey;
+    private LinguaKey? _errorKey;
     private bool _isBusy;
     private Task _operation = Task.CompletedTask;
     private CancellationTokenSource? _operationCancellation;
     private object?[] _statusArguments = [];
-    private string _statusKey = "Ready";
+    private LinguaKey? _statusKey;
 
     protected PageViewModel(DesktopContext context, string route)
     {
@@ -46,8 +47,8 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
     }
 
     public virtual bool CanInteract => _operationCancellation is null && Context.IsInitialized && !_closing;
-    public bool HasStatus => _statusKey != "Ready";
-    public string Status => HasStatus ? _text.Format(_statusKey, _statusArguments) : "";
+    public bool HasStatus => _statusKey is not null;
+    public string Status => _statusKey is { } key ? _text.Format(key, _statusArguments) : "";
 
     public string? Error => _errorKey is null
         ? null
@@ -78,18 +79,19 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
         return RunOperationAsync(action);
     }
 
-    protected Task RunOperationAsync(Func<CancellationToken, Task> action, string status = "Working",
+    protected Task RunOperationAsync(Func<CancellationToken, Task> action, LinguaKey? status = null,
         bool showBusy = true, TimeSpan? busyDelay = null)
     {
         // Operation ownership controls reentrancy; IsBusy only controls visible progress.
         if (_operationCancellation is not null || _closing || !Context.IsInitialized) return Task.CompletedTask;
         var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
         _operationCancellation = cancellation;
-        _operation = RunCoreAsync(action, status, cancellation, showBusy, busyDelay ?? TimeSpan.Zero);
+        _operation = RunCoreAsync(action, status ?? LanguageManager.Keys.Working, cancellation, showBusy,
+            busyDelay ?? TimeSpan.Zero);
         return _operation;
     }
 
-    private async Task RunCoreAsync(Func<CancellationToken, Task> action, string status,
+    private async Task RunCoreAsync(Func<CancellationToken, Task> action, LinguaKey status,
         CancellationTokenSource cancellation,
         bool showBusy, TimeSpan busyDelay)
     {
@@ -101,16 +103,16 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
         try
         {
             await action(cancellation.Token);
-            if (showBusy && _statusKey == status) SetStatus("Ready");
+            if (showBusy && _statusKey == status) SetStatus(null);
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {
-            if (showBusy) SetStatus("Cancelled");
+            if (showBusy) SetStatus(LanguageManager.Keys.Cancelled);
         }
         catch (Exception exception)
         {
-            SetError("OperationFailed", [exception.Message]);
-            if (showBusy) SetStatus("Ready");
+            SetError(LanguageManager.Keys.OperationFailed, [exception.Message]);
+            if (showBusy) SetStatus(null);
         }
         finally
         {
@@ -136,7 +138,7 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
-    protected void SetStatus(string key, params object?[] arguments)
+    protected void SetStatus(LinguaKey? key, params object?[] arguments)
     {
         _statusKey = key;
         _statusArguments = arguments;
@@ -144,7 +146,7 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
         OnPropertyChanged(nameof(HasStatus));
     }
 
-    protected void SetError(string? key, object?[]? arguments = null, string? details = null)
+    protected void SetError(LinguaKey? key, object?[]? arguments = null, string? details = null)
     {
         _errorKey = key;
         _errorArguments = arguments ?? [];

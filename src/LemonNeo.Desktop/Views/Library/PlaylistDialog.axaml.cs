@@ -1,7 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
-using Irihi.Lingua;
 using LemonNeo.Core.Library;
 using LemonNeo.Desktop.Services;
 using LemonNeo.Desktop.ViewModels.Library;
@@ -43,7 +42,7 @@ public partial class PlaylistDialog : Window
         if (DataContext is not PlaylistDialogViewModel { IsNew: true } model || !StorageProvider.CanPickFolder) return;
         var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
-            Title = ((LinguaObservableString)LanguageManager.Instance.ChooseFolder).CurrentValue,
+            Title = LanguageManager.GetCurrentValue(LanguageManager.Keys.ChooseFolder),
             AllowMultiple = false
         });
         foreach (var folder in folders)

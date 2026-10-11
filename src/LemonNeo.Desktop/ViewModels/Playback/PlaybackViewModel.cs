@@ -79,19 +79,19 @@ public sealed class PlaybackViewModel : PageViewModel
     // Playback execution is exclusive, but its progress must not disable the whole control bar.
     public override bool CanInteract => Context.IsInitialized && !_closing;
     private bool CanControlPlayback => CanInteract;
-    public string NowTitle => Snapshot.CurrentTrack?.Title ?? _text["NoTrack"];
+    public string NowTitle => Snapshot.CurrentTrack?.Title ?? _text[LanguageManager.Keys.NoTrack];
 
     public string NowArtist => Snapshot.CurrentTrack is { } track
-        ? track.Artists.Count > 0 ? string.Join(" / ", track.Artists.Select(a => a.Name)) : _text["UnknownArtist"]
-        : _text["NoTrackDescription"];
+        ? track.Artists.Count > 0 ? string.Join(" / ", track.Artists.Select(a => a.Name)) : _text[LanguageManager.Keys.UnknownArtist]
+        : _text[LanguageManager.Keys.NoTrackDescription];
 
     public bool HasCurrentTrack => Snapshot.CurrentTrack is not null;
     public Bitmap? NowArtwork => _nowArtwork;
     public bool IsPlaying => Snapshot.State == PlayerState.Playing;
-    public string PlayLabel => _text[IsPlaying ? "Pause" : "Play"];
+    public string PlayLabel => _text[IsPlaying ? LanguageManager.Keys.Pause : LanguageManager.Keys.Play];
 
     public string PlaybackLabel =>
-        Snapshot.RestoredStatus is not null ? _text["Restored"] : _text[Snapshot.State.ToString()];
+        Snapshot.RestoredStatus is not null ? _text[LanguageManager.Keys.Restored] : _text[Snapshot.State.ToString()];
 
     public string ModeLabel => _text[Snapshot.Mode.ToString()];
     public bool IsSequential => Snapshot.Mode == PlaybackMode.Sequential;
@@ -144,24 +144,24 @@ public sealed class PlaybackViewModel : PageViewModel
     }
 
     public string SourceType => Snapshot.SourceDetails is { } details
-        ? _text[details.IsCached
-            ? "PlaybackSourceCached"
+        ? details.IsCached
+            ? _text[LanguageManager.Keys.PlaybackSourceCached]
             : details.Source is HttpPlaybackSource
-                ? "PlaybackSourceOnline"
-                : "PlaybackSourceLocal"]
-        : _text["PlaybackSourceUnknown"];
+                ? _text[LanguageManager.Keys.PlaybackSourceOnline]
+                : _text[LanguageManager.Keys.PlaybackSourceLocal]
+        : _text[LanguageManager.Keys.PlaybackSourceUnknown];
 
     public string SourceLocation => Snapshot.SourceDetails?.Source switch
     {
         HttpPlaybackSource http => http.Uri.AbsoluteUri,
         FilePlaybackSource file => file.Path,
-        _ => _text["PlaybackSourceUnknown"]
+        _ => _text[LanguageManager.Keys.PlaybackSourceUnknown]
     };
 
-    public string SourceProvider => Snapshot.SourceDetails?.ProviderId ?? _text["PlaybackSourceUnknown"];
-    public string SourceNamespace => Snapshot.SourceDetails?.SourceId.Namespace ?? _text["PlaybackSourceUnknown"];
+    public string SourceProvider => Snapshot.SourceDetails?.ProviderId ?? _text[LanguageManager.Keys.PlaybackSourceUnknown];
+    public string SourceNamespace => Snapshot.SourceDetails?.SourceId.Namespace ?? _text[LanguageManager.Keys.PlaybackSourceUnknown];
     public string SourceKind => Snapshot.SourceDetails?.SourceId.Kind ?? "—";
-    public string SourceId => Snapshot.SourceDetails?.SourceId.Value ?? _text["PlaybackSourceUnknown"];
+    public string SourceId => Snapshot.SourceDetails?.SourceId.Value ?? _text[LanguageManager.Keys.PlaybackSourceUnknown];
 
     private int? CurrentBitrate => Snapshot.AudioInfo?.BitrateKbps is > 0 and var measured
         ? measured
@@ -169,24 +169,25 @@ public sealed class PlaybackViewModel : PageViewModel
 
     public string SourceBitrate => CurrentBitrate is > 0 and var bitrate
         ? $"{bitrate} kbps"
-        : _text["PlaybackSourceUnknown"];
+        : _text[LanguageManager.Keys.PlaybackSourceUnknown];
 
-    public string BitrateOrigin =>
-        _text[Snapshot.AudioInfo?.BitrateKbps is > 0 ? "PlaybackBitrateDecoder" : "PlaybackBitrateSource"];
+    public string BitrateOrigin => _text[Snapshot.AudioInfo?.BitrateKbps is > 0
+        ? LanguageManager.Keys.PlaybackBitrateDecoder
+        : LanguageManager.Keys.PlaybackBitrateSource];
 
-    public string SourceCodec => Snapshot.AudioInfo?.Codec ?? _text["PlaybackSourceUnknown"];
+    public string SourceCodec => Snapshot.AudioInfo?.Codec ?? _text[LanguageManager.Keys.PlaybackSourceUnknown];
 
     public string SourceSampleRate => Snapshot.AudioInfo?.SampleRateHz is > 0 and var rate
         ? $"{rate / 1000d:0.###} kHz"
-        : _text["PlaybackSourceUnknown"];
+        : _text[LanguageManager.Keys.PlaybackSourceUnknown];
 
     public string SourceBitDepth => Snapshot.AudioInfo?.BitsPerSample is > 0 and var bits
         ? $"{bits} bit"
-        : _text["PlaybackSourceUnknown"];
+        : _text[LanguageManager.Keys.PlaybackSourceUnknown];
 
     public string SourceChannels => Snapshot.AudioInfo?.Channels is > 0 and var channels
         ? channels.ToString()
-        : _text["PlaybackSourceUnknown"];
+        : _text[LanguageManager.Keys.PlaybackSourceUnknown];
 
     public string AudioFormatLabel => HasSourceDetails
         ? string.Join(" · ", new[]
@@ -198,12 +199,12 @@ public sealed class PlaybackViewModel : PageViewModel
         }.Where(value => !string.IsNullOrEmpty(value)))
         : "";
 
-    public string SourcePlayer => Snapshot.PlayerId ?? _text["PlaybackSourceUnknown"];
+    public string SourcePlayer => Snapshot.PlayerId ?? _text[LanguageManager.Keys.PlaybackSourceUnknown];
     public string TimeLabel => $"{PositionText} / {DurationText}";
 
-    public string PlaybackDetails => _text.Format("PlaybackDetailsFormat", Snapshot.CurrentTrack?.Id.ToString() ?? "—",
+    public string PlaybackDetails => _text.Format(LanguageManager.Keys.PlaybackDetailsFormat, Snapshot.CurrentTrack?.Id.ToString() ?? "—",
         Snapshot.CurrentIndex + 1, Snapshot.QueueCount, Snapshot.PlayerId ?? "—",
-        Snapshot.RequiredSourceProviderId ?? _text["Automatic"]);
+        Snapshot.RequiredSourceProviderId ?? _text[LanguageManager.Keys.Automatic]);
 
     public event EventHandler? Changed;
 
@@ -274,7 +275,7 @@ public sealed class PlaybackViewModel : PageViewModel
         }
         catch (Exception exception)
         {
-            SetError("OperationFailed", [exception.Message]);
+            SetError(LanguageManager.Keys.OperationFailed, [exception.Message]);
         }
     }
 
@@ -296,7 +297,7 @@ public sealed class PlaybackViewModel : PageViewModel
                 }
                 catch (Exception exception)
                 {
-                    SetError("OperationFailed", [exception.Message]);
+                    SetError(LanguageManager.Keys.OperationFailed, [exception.Message]);
                 }
             }
         }

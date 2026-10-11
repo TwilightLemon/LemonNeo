@@ -21,6 +21,9 @@ public sealed class LocalizationService : IDisposable
     public CultureInfo Culture { get; private set; } = CultureInfo.InvariantCulture;
     public LanguagePreference Preference { get; private set; }
 
+    public string this[LinguaKey key] => LanguageManager.GetCurrentValue(key);
+
+    /// <summary>Resolves a key selected at runtime. Use the LinguaKey overload for known resource keys.</summary>
     public string this[string key] =>
         (LanguageManager.Instance.GetObservable(key) as LinguaObservableString)?.CurrentValue ?? key;
 
@@ -31,6 +34,12 @@ public sealed class LocalizationService : IDisposable
 
     public event EventHandler? Changed;
 
+    public string Format(LinguaKey key, params object?[] arguments)
+    {
+        return string.Format(Culture, this[key], arguments);
+    }
+
+    /// <summary>Formats a key selected at runtime. Use the LinguaKey overload for known resource keys.</summary>
     public string Format(string key, params object?[] arguments)
     {
         return string.Format(Culture, this[key], arguments);

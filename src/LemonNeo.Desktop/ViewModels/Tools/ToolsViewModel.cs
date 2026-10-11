@@ -46,8 +46,6 @@ public sealed partial class ToolsViewModel : PageViewModel
                                         ?? ApplicationAssembly.GetName().Version?.ToString()
                                         ?? "—";
 
-    public string CopyrightNotice => _text["CopyrightNotice"];
-
     public IReadOnlyList<DependencyInformation> ApplicationDependencies { get; } =
     [
         new("Avalonia.Desktop", "12.1.3", "MIT", "https://github.com/AvaloniaUI/Avalonia"),
@@ -89,7 +87,7 @@ public sealed partial class ToolsViewModel : PageViewModel
         }
     }
 
-    public string PluginSummary => _text.Format("LoadedPluginSummary", _host.Plugins.Loaded.Count,
+    public string PluginSummary => _text.Format(LanguageManager.Keys.LoadedPluginSummary, _host.Plugins.Loaded.Count,
         _host.Get<IProviderRegistry>().Providers.Count, _host.Get<IPlayerRegistry>().Players.Count);
 
     private void RefreshPluginInformation()
@@ -125,13 +123,13 @@ public sealed partial class ToolsViewModel : PageViewModel
             Capability(provider is IPlaylistExportProvider, "CapabilityPlaylistExport");
             var details = new List<PluginDetail>();
             if (provider is ISearchNamespaceProvider search)
-                details.Add(new PluginDetail(_text["SearchSources"],
+                details.Add(new PluginDetail(_text[LanguageManager.Keys.SearchSources],
                     string.Join(", ", NormalizeNamespaces(search.SearchNamespaces))));
             if (provider is IMetadataProvider metadata)
-                details.Add(new PluginDetail(_text["MetadataSources"],
+                details.Add(new PluginDetail(_text[LanguageManager.Keys.MetadataSources],
                     string.Join(", ", NormalizeNamespaces(metadata.MetadataNamespaces))));
             if (provider is IPlaybackProvider playbackProvider && playbackProvider.AcceptedIdSchemes.Count > 0)
-                details.Add(new PluginDetail(_text["AcceptedIds"],
+                details.Add(new PluginDetail(_text[LanguageManager.Keys.AcceptedIds],
                     string.Join(", ",
                         playbackProvider.AcceptedIdSchemes.Select(s => $"{s.Namespace}:{s.Kind ?? "*"}")
                             .Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase))));
@@ -156,9 +154,9 @@ public sealed partial class ToolsViewModel : PageViewModel
             var plugin = plugins.FirstOrDefault(p => p.PlayerIds.Contains(player.Id, StringComparer.OrdinalIgnoreCase));
             groups["PlayerProviders"].Add(new PluginInformation(player.Descriptor.Name, player.Id,
                 player.Descriptor.Description,
-                GetPluginSummary(plugin), [_text["PlayerEngine"]], [], [],
+                GetPluginSummary(plugin), [_text[LanguageManager.Keys.PlayerEngine]], [], [],
                 [
-                    new PluginDetail(_text["SupportedFormats"], FormatExtensions(player.SupportedExtensions)),
+                    new PluginDetail(_text[LanguageManager.Keys.SupportedFormats], FormatExtensions(player.SupportedExtensions)),
                     .. GetPluginDetails(plugin)
                 ]));
         }
@@ -170,7 +168,7 @@ public sealed partial class ToolsViewModel : PageViewModel
             if (!plugin.IsInteractive && (hasProviders || hasPlayers)) continue;
             groups[plugin.IsInteractive ? "InteractivePlugins" : "OtherPlugins"].Add(new PluginInformation(
                 plugin.Manifest.Name, plugin.Manifest.Id, "", GetPluginSummary(plugin),
-                plugin.IsInteractive ? [_text["InteractivePlugin"]] : [], [], [], GetPluginDetails(plugin)));
+                plugin.IsInteractive ? [_text[LanguageManager.Keys.InteractivePlugin]] : [], [], [], GetPluginDetails(plugin)));
         }
 
         ProviderGroups = groups.Where(g => g.Value.Count > 0).Select(g => new PluginProviderGroup(_text[g.Key],
@@ -196,9 +194,9 @@ public sealed partial class ToolsViewModel : PageViewModel
             .ToArray();
         ApplicationDetails =
         [
-            new PluginDetail(_text["Runtime"], RuntimeInformation.FrameworkDescription),
-            new PluginDetail(_text["Architecture"], RuntimeInformation.ProcessArchitecture.ToString()),
-            new PluginDetail(_text["License"], "GPL-3.0-only")
+            new PluginDetail(_text[LanguageManager.Keys.Runtime], RuntimeInformation.FrameworkDescription),
+            new PluginDetail(_text[LanguageManager.Keys.Architecture], RuntimeInformation.ProcessArchitecture.ToString()),
+            new PluginDetail(_text[LanguageManager.Keys.License], "GPL-3.0-only")
         ];
         foreach (var name in new[]
                  {
@@ -224,7 +222,7 @@ public sealed partial class ToolsViewModel : PageViewModel
             .ToArray();
         var preferred = _playbackSettings.Get<PlaybackPreferences>().PreferredPlayerId;
         _decoderIds = [null, .. players.Select(player => player.Id)];
-        DecoderOptions = [_text["AutomaticDecoder"], .. players.Select(player => player.Descriptor.Name)];
+        DecoderOptions = [_text[LanguageManager.Keys.AutomaticDecoder], .. players.Select(player => player.Descriptor.Name)];
         Decoders = players.Select(player => new DecoderInformation(
             player.Descriptor.Name,
             player.Id,
@@ -238,12 +236,12 @@ public sealed partial class ToolsViewModel : PageViewModel
     private string FormatExtensions(IEnumerable<string> extensions)
     {
         var values = extensions.Order(StringComparer.OrdinalIgnoreCase).ToArray();
-        return values.Length == 0 ? _text["NoSupportedFormats"] : string.Join(", ", values);
+        return values.Length == 0 ? _text[LanguageManager.Keys.NoSupportedFormats] : string.Join(", ", values);
     }
 
     private string GetPluginSummary(PluginInfo? plugin)
     {
-        return plugin is null ? "" : _text.Format("PluginProvidedBy", plugin.Manifest.Name, plugin.Manifest.Version);
+        return plugin is null ? "" : _text.Format(LanguageManager.Keys.PluginProvidedBy, plugin.Manifest.Name, plugin.Manifest.Version);
     }
 
     private IReadOnlyList<PluginDetail> GetPluginDetails(PluginInfo? plugin)
@@ -252,13 +250,13 @@ public sealed partial class ToolsViewModel : PageViewModel
         var manifest = plugin.Manifest;
         return
         [
-            new PluginDetail(_text["PluginId"], manifest.Id),
-            new PluginDetail(_text["EntryAssembly"], manifest.EntryAssembly),
-            new PluginDetail(_text["Platforms"],
-                manifest.Platforms.Count == 0 ? _text["AllPlatforms"] : string.Join(", ", manifest.Platforms)),
-            new PluginDetail(_text["HostVersion"], manifest.MinimumHostVersion),
-            new PluginDetail(_text["Permissions"],
-                manifest.Permissions.Count == 0 ? _text["NoPermissions"] : string.Join(", ", manifest.Permissions))
+            new PluginDetail(_text[LanguageManager.Keys.PluginId], manifest.Id),
+            new PluginDetail(_text[LanguageManager.Keys.EntryAssembly], manifest.EntryAssembly),
+            new PluginDetail(_text[LanguageManager.Keys.Platforms],
+                manifest.Platforms.Count == 0 ? _text[LanguageManager.Keys.AllPlatforms] : string.Join(", ", manifest.Platforms)),
+            new PluginDetail(_text[LanguageManager.Keys.HostVersion], manifest.MinimumHostVersion),
+            new PluginDetail(_text[LanguageManager.Keys.Permissions],
+                manifest.Permissions.Count == 0 ? _text[LanguageManager.Keys.NoPermissions] : string.Join(", ", manifest.Permissions))
         ];
     }
 

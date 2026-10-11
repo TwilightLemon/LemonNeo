@@ -227,7 +227,7 @@ public sealed class MainViewModel : PageViewModel
     internal void BeginStartup()
     {
         SetError(null);
-        SetStatus("Loading");
+        SetStatus(LanguageManager.Keys.Loading);
         IsBusy = true;
         RaiseInteractionProperties();
     }
@@ -238,19 +238,19 @@ public sealed class MainViewModel : PageViewModel
         Context.RefreshLibrary();
         var report = _host.Plugins.LastReport;
         if (report.Failures.Count > 0)
-            SetError("PluginFailures", [report.Failures.Count],
+            SetError(LanguageManager.Keys.PluginFailures, [report.Failures.Count],
                 string.Join(Environment.NewLine, report.Failures.Select(f => f.Error)));
         Playback.UpdateSnapshot();
         await Navigation.Current.ActivateAsync();
-        SetStatus("Ready");
+        SetStatus(null);
         IsBusy = false;
         RaiseInteractionProperties();
     }
 
     internal void ReportStartupFailure(string message)
     {
-        SetError("StartupFailed", [message]);
-        SetStatus("Ready");
+        SetError(LanguageManager.Keys.StartupFailed, [message]);
+        SetStatus(null);
         IsBusy = false;
         RaiseInteractionProperties();
     }

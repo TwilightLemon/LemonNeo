@@ -53,7 +53,7 @@ public sealed partial class OnlineViewModel : PageViewModel
                 {
                     ResetRemotePlaylists();
                     SetError(null);
-                    SetStatus("Ready");
+                    SetStatus(null);
                 }
 
                 RaiseServiceProperties();
@@ -93,23 +93,25 @@ public sealed partial class OnlineViewModel : PageViewModel
     public bool HasSelectedRemotePlaylist => SelectedRemotePlaylist is { CanImport: true };
 
     public string SelectedPlaylistSummary => SelectedRemotePlaylist is { TrackCount: not "—" } row
-        ? _text.Format("RemoteTrackCount", row.TrackCount)
-        : _text["RemoteTrackCountUnknown"];
+        ? _text.Format(LanguageManager.Keys.RemoteTrackCount, row.TrackCount)
+        : _text[LanguageManager.Keys.RemoteTrackCountUnknown];
 
     public string RemoteEmptyTitle => !SupportsPlaylists
-        ? _text["NoPlaylistServices"]
+        ? _text[LanguageManager.Keys.NoPlaylistServices]
         : HasLoadedRemotePlaylists
-            ? _text[HasCategoryMenu && SelectedCategory is not null ? "EmptyCollection" : "NoRemotePlaylistsFound"]
-            : _text["EmptyRemote"];
+            ? _text[HasCategoryMenu && SelectedCategory is not null
+                ? LanguageManager.Keys.EmptyCollection
+                : LanguageManager.Keys.NoRemotePlaylistsFound]
+            : _text[LanguageManager.Keys.EmptyRemote];
 
     public string RemoteEmptyDescription => !SupportsPlaylists
-        ? _text["NoPlaylistServicesDescription"]
+        ? _text[LanguageManager.Keys.NoPlaylistServicesDescription]
         : HasLoadedRemotePlaylists
             ? _text[
                 HasCategoryMenu && SelectedCategory is not null
-                    ? "EmptyCollectionDescription"
-                    : "NoRemotePlaylistsFoundDescription"]
-            : _text["EmptyRemoteDescription"];
+                    ? LanguageManager.Keys.EmptyCollectionDescription
+                    : LanguageManager.Keys.NoRemotePlaylistsFoundDescription]
+            : _text[LanguageManager.Keys.EmptyRemoteDescription];
 
     public bool CanBrowseRemote => CanInteract && SupportsPlaylists;
 
@@ -149,7 +151,7 @@ public sealed partial class OnlineViewModel : PageViewModel
         return ExecuteAsync(async ct =>
         {
             if (SelectedService?.Id is not { } id || Service is not IPlaylistProvider provider)
-                throw new ArgumentException(_text["ProviderUnavailable"]);
+                throw new ArgumentException(_text[LanguageManager.Keys.ProviderUnavailable]);
             var categories = new List<RemotePlaylistCategory>();
             var selectedCategoryId = SelectedCategory?.Id;
             await Task.Run(async () =>
@@ -168,9 +170,9 @@ public sealed partial class OnlineViewModel : PageViewModel
                 {
                     var rows = new List<RemotePlaylistRow>();
                     await foreach (var playlist in provider.GetUserPlaylistsAsync(ct))
-                        rows.Add(new RemotePlaylistRow(id, playlist.Id, playlist.Name, _text["RemotePlaylists"],
+                        rows.Add(new RemotePlaylistRow(id, playlist.Id, playlist.Name, _text[LanguageManager.Keys.RemotePlaylists],
                             playlist.TrackCount?.ToString(_text.Culture) ?? "—"));
-                    categories.Add(new RemotePlaylistCategory("", _text["RemotePlaylists"], rows));
+                    categories.Add(new RemotePlaylistCategory("", _text[LanguageManager.Keys.RemotePlaylists], rows));
                 }
             }, ct);
             ct.ThrowIfCancellationRequested();
@@ -190,14 +192,14 @@ public sealed partial class OnlineViewModel : PageViewModel
     {
         return ExecuteAsync(async ct =>
         {
-            if (string.IsNullOrWhiteSpace(id)) throw new ArgumentException(_text["RemotePlaylistUnavailable"]);
+            if (string.IsNullOrWhiteSpace(id)) throw new ArgumentException(_text[LanguageManager.Keys.RemotePlaylistUnavailable]);
             var importer = _host.Get<ImportService>();
             var remote = await Task.Run(() => importer.GetRemotePlaylistAsync(providerId, id.Trim(), ct), ct);
             ct.ThrowIfCancellationRequested();
             var playlist = importer.ImportRemote(remote);
             await _host.Get<LibraryService>().SaveAsync(ct);
             Context.RefreshLibrary();
-            SetStatus("RemoteImported", playlist.Name, playlist.Items.Count);
+            SetStatus(LanguageManager.Keys.RemoteImported, playlist.Name, playlist.Items.Count);
         });
     }
 
@@ -255,7 +257,7 @@ public sealed partial class OnlineViewModel : PageViewModel
             for (var i = 0; i < PlaylistCategories.Count; i++)
             {
                 var category = PlaylistCategories[i];
-                var name = _text["RemotePlaylists"];
+                var name = _text[LanguageManager.Keys.RemotePlaylists];
                 if (category.Name == name && category.Playlists.All(row => row.Collection == name)) continue;
                 var selected = ReferenceEquals(category, SelectedCategory);
                 var updated = category with
@@ -276,7 +278,7 @@ public sealed partial class OnlineViewModel : PageViewModel
         if (CancelOperationCommand.CanExecute(null)) CancelOperationCommand.Execute(null);
         ResetRemotePlaylists();
         SetError(null);
-        SetStatus("Ready");
+        SetStatus(null);
     }
 
     public override async ValueTask DisposeAsync()

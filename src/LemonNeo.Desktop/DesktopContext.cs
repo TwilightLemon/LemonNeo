@@ -25,7 +25,7 @@ public sealed class DesktopContext(DesktopHost host, LocalizationService text, A
         internal set => SetProperty(ref _initialized, value);
     }
 
-    public string LibrarySummary => Text.Format("LibraryStatistics", Playlists.Count,
+    public string LibrarySummary => Text.Format(LanguageManager.Keys.LibraryStatistics, Playlists.Count,
         Host.Get<LibraryService>().Current.Playlists.SelectMany(p => p.Items).DistinctBy(i => i.Track.Id).Count(),
         Host.Get<LibraryService>().Current.Playlists.Sum(p => p.Items.Count));
 

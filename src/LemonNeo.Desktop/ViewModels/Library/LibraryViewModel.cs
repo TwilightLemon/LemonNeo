@@ -138,8 +138,8 @@ public sealed class LibraryViewModel : TrackListViewModel
             Context.RefreshLibrary();
             if (ReferenceEquals(Navigation.Current, this))
                 await Navigation.NavigateAsync(DesktopRoutes.Library, playlist.Id);
-            if (import is null) SetStatus("PlaylistCreated", playlist.Name);
-            else SetStatus("Imported", import.ImportedTracks, import.SkippedFiles.Count);
+            if (import is null) SetStatus(LanguageManager.Keys.PlaylistCreated, playlist.Name);
+            else SetStatus(LanguageManager.Keys.Imported, import.ImportedTracks, import.SkippedFiles.Count);
         });
     }
 
@@ -150,7 +150,7 @@ public sealed class LibraryViewModel : TrackListViewModel
             _host.Get<PlaylistService>().Update(id, name, description);
             await _host.Get<LibraryService>().SaveAsync(ct);
             Context.RefreshLibrary();
-            SetStatus("LibrarySaved");
+            SetStatus(LanguageManager.Keys.LibrarySaved);
         });
     }
 
@@ -163,13 +163,13 @@ public sealed class LibraryViewModel : TrackListViewModel
             if (ReferenceEquals(Navigation.Current, this) && SelectedPlaylist?.Id == id)
                 await Navigation.NavigateAsync(DesktopRoutes.Library);
             Context.RefreshLibrary();
-            SetStatus("LibrarySaved");
+            SetStatus(LanguageManager.Keys.LibrarySaved);
         });
     }
 
     public string GetDeletePlaylistPrompt(string name)
     {
-        return _text.Format("DeletePlaylistPrompt", name);
+        return _text.Format(LanguageManager.Keys.DeletePlaylistPrompt, name);
     }
 
     public Task RemoveSelectedTrackAsync()
@@ -181,7 +181,7 @@ public sealed class LibraryViewModel : TrackListViewModel
             foreach (var id in ids) _host.Get<PlaylistService>().Remove(playlist.Id, id);
             await _host.Get<LibraryService>().SaveAsync(ct);
             Context.RefreshLibrary();
-            SetStatus("LibrarySaved");
+            SetStatus(LanguageManager.Keys.LibrarySaved);
         });
     }
 
@@ -198,7 +198,7 @@ public sealed class LibraryViewModel : TrackListViewModel
             _host.Get<PlaylistService>().Reorder(playlist.Id, ids, targetId, after);
             await _host.Get<LibraryService>().SaveAsync(ct);
             Context.RefreshLibrary();
-            SetStatus("LibrarySaved");
+            SetStatus(LanguageManager.Keys.LibrarySaved);
         });
     }
 
@@ -217,7 +217,7 @@ public sealed class LibraryViewModel : TrackListViewModel
             _host.Get<PlaylistService>().Move(playlistId, itemId, position);
             await _host.Get<LibraryService>().SaveAsync(ct);
             Context.RefreshLibrary();
-            SetStatus("LibrarySaved");
+            SetStatus(LanguageManager.Keys.LibrarySaved);
         });
     }
 

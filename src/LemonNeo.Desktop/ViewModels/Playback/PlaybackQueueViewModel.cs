@@ -45,12 +45,16 @@ public sealed class PlaybackQueueViewModel : PageViewModel
         }
     }
 
-    public string TrackCount => _text.Format("TrackCount", _rows.Length);
+    public int TrackCount => _rows.Length;
     public bool HasTracks => Tracks.Count > 0;
     public bool HasPlayingTrack => _rows.Any(row => row.IsCurrent);
     public bool CanPlay => CanInteract && Playback.CanInteract;
-    public string EmptyTitle => _text[_rows.Length == 0 ? "EmptyQueue" : "NoResults"];
-    public string EmptyDescription => _text[_rows.Length == 0 ? "EmptyQueueDescription" : "NoResultsDescription"];
+    public string EmptyTitle => _text[_rows.Length == 0
+        ? LanguageManager.Keys.EmptyQueue
+        : LanguageManager.Keys.NoResults];
+    public string EmptyDescription => _text[_rows.Length == 0
+        ? LanguageManager.Keys.EmptyQueueDescription
+        : LanguageManager.Keys.NoResultsDescription];
     public AsyncRelayCommand<QueueTrackViewModel> PlayTrackCommand { get; }
 
     public QueueTrackViewModel? RevealPlayingTrack()
@@ -126,7 +130,6 @@ public sealed class PlaybackQueueViewModel : PageViewModel
     {
         base.RefreshLocalizedProperties();
         foreach (var row in _rows) row.RefreshLocalizedProperties();
-        OnPropertyChanged(nameof(TrackCount));
         RefreshTracks();
     }
 

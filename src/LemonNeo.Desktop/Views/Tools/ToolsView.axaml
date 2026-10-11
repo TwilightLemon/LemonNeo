@@ -411,10 +411,6 @@
                                         HorizontalAlignment="Center"
                                         Margin="0,4,0,0"
                                         Spacing="12">
-                                        <TextBlock
-                                            Classes="caption"
-                                            HorizontalAlignment="Center"
-                                            Text="{Binding CopyrightNotice}" />
                                         <Button
                                             Classes="primary"
                                             Command="{Binding OpenRepositoryCommand}"

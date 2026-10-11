@@ -339,7 +339,6 @@
   "ApplicationDependencies": "主程序软件包与许可证",
   "PluginDependencies": "插件软件包与许可证",
   "SourceCode": "开源地址",
-  "CopyrightNotice": "© 2026 TwilightLemon. 保留所有权利。",
   "NoThirdPartyDependencies": "未声明第三方软件包。",
   "FolderPlaylistName": "导入歌单名称（留空使用文件夹名称）",
   "CancelOperation": "取消操作",

@@ -37,7 +37,7 @@ public sealed partial class MatchPlaylistPageViewModel : PageViewModel
     public Playlist? Playlist => Context.Playlists.FirstOrDefault(playlist => playlist.Id == _playlistId);
 
     public override string? PageSummary => Playlist is { } playlist
-        ? $"{playlist.Name} · {_text.Format("TrackSummary", playlist.Items.Count, TrackRow.FormatTime(TimeSpan.FromSeconds(playlist.Items.Sum(item => item.Track.Duration?.TotalSeconds ?? 0))))}"
+        ? $"{playlist.Name} · {_text.Format(LanguageManager.Keys.TrackSummary, playlist.Items.Count, TrackRow.FormatTime(TimeSpan.FromSeconds(playlist.Items.Sum(item => item.Track.Duration?.TotalSeconds ?? 0))))}"
         : null;
 
     public IReadOnlyList<MetadataSourceOption> MetadataSources { get; }
@@ -107,7 +107,7 @@ public sealed partial class MatchPlaylistPageViewModel : PageViewModel
             foreach (var result in results.OrderBy(result => result.IsSuccessful).ThenBy(result => result.Number))
                 Results.Add(result);
             OnPropertyChanged(nameof(HasResults));
-            SetStatus("PlaylistMatchSummary", matched, tracks.Length, changed, tracks.Length - matched);
+            SetStatus(LanguageManager.Keys.PlaylistMatchSummary, matched, tracks.Length, changed, tracks.Length - matched);
         });
     }
 

@@ -1,7 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
-using Irihi.Lingua;
 using LemonNeo.Desktop.Services;
 using LemonNeo.Desktop.ViewModels.Settings;
 
@@ -17,15 +16,14 @@ public partial class SettingsView : UserControl
     private async void OnChangeLibraryPath(object? sender, RoutedEventArgs args)
     {
         var path = await PickFolderAsync(
-            ((LinguaObservableString)LanguageManager.Instance.ChooseLibraryPath).CurrentValue ??
-            "Choose a music library folder");
+            LanguageManager.GetCurrentValue(LanguageManager.Keys.ChooseLibraryPath));
         if (path is not null && DataContext is SettingsViewModel model) await model.ChangeLibraryAsync(path);
     }
 
     private async void OnChangeCachePath(object? sender, RoutedEventArgs args)
     {
         var path = await PickFolderAsync(
-            ((LinguaObservableString)LanguageManager.Instance.ChooseCachePath).CurrentValue ?? "Choose a cache folder");
+            LanguageManager.GetCurrentValue(LanguageManager.Keys.ChooseCachePath));
         if (path is not null && DataContext is SettingsViewModel model) await model.ChangeCacheAsync(path);
     }
 

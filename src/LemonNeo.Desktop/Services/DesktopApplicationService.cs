@@ -40,7 +40,7 @@ public sealed class DesktopApplicationService : IDesktopStorageService, IAsyncDi
         _appearance = appearance;
         _viewModel = viewModel;
         window.DataContext = viewModel;
-        window.Title = text["AppName"];
+        window.Title = text[LanguageManager.Keys.AppName];
     }
 
     public MainViewModel ViewModel =>
@@ -67,7 +67,7 @@ public sealed class DesktopApplicationService : IDesktopStorageService, IAsyncDi
 
             await host.ChangeLibraryDirectoryAsync(next, cancellationToken);
             viewModel.SharedContext.RefreshLibrary();
-            _window.Title = $"{Text["AppName"]} — {new DirectoryInfo(next).Name}";
+            _window.Title = $"{Text[LanguageManager.Keys.AppName]} — {new DirectoryInfo(next).Name}";
             await SaveStoragePreferencesAsync(host, cancellationToken);
         }
         finally
@@ -146,7 +146,7 @@ public sealed class DesktopApplicationService : IDesktopStorageService, IAsyncDi
                 }
 
                 await viewModel.CompleteStartupAsync();
-                _window.Title = $"{Text["AppName"]} — {new DirectoryInfo(host.StorageLocations.LibraryDirectory).Name}";
+                _window.Title = $"{Text[LanguageManager.Keys.AppName]} — {new DirectoryInfo(host.StorageLocations.LibraryDirectory).Name}";
                 _window.RestoreDesktopLyrics();
                 _initialized = true;
                 return true;
@@ -159,7 +159,7 @@ public sealed class DesktopApplicationService : IDesktopStorageService, IAsyncDi
             {
                 Trace.WriteLine($"Desktop initialization failed: {exception}");
                 viewModel.ReportStartupFailure(exception.Message);
-                await ShowErrorAsync(Text["DesktopStartupFailedTitle"], exception.Message);
+                await ShowErrorAsync(Text[LanguageManager.Keys.DesktopStartupFailedTitle], exception.Message);
                 return false;
             }
         }
@@ -177,7 +177,7 @@ public sealed class DesktopApplicationService : IDesktopStorageService, IAsyncDi
     private async Task ReportLibraryFallbackAsync(Exception exception)
     {
         Trace.WriteLine($"Could not open the configured music library: {exception}");
-        await ShowErrorAsync(Text["LibraryOpenFailedTitle"], exception.Message);
+        await ShowErrorAsync(Text[LanguageManager.Keys.LibraryOpenFailedTitle], exception.Message);
     }
 
     private ValidatedStoragePaths ValidateInitialStorage(string libraryDirectory, string cacheDirectory)
@@ -206,7 +206,7 @@ public sealed class DesktopApplicationService : IDesktopStorageService, IAsyncDi
 
         Directory.CreateDirectory(library);
         if (!File.Exists(Path.Combine(library, "library.json")) && Directory.EnumerateFileSystemEntries(library).Any())
-            throw new InvalidOperationException(Text["LibraryFolderInvalid"]);
+            throw new InvalidOperationException(Text[LanguageManager.Keys.LibraryFolderInvalid]);
 
         VerifyWritable(library);
         return library;
@@ -272,18 +272,18 @@ public sealed class DesktopApplicationService : IDesktopStorageService, IAsyncDi
 
     private Task ShowErrorAsync(string title, string message)
     {
-        return new MessageDialog(title, message, Text["OK"]).ShowDialog(_window);
+        return new MessageDialog(title, message, Text[LanguageManager.Keys.OK]).ShowDialog(_window);
     }
 
     private string StorageSeparation(string firstKey, string secondKey)
     {
-        return Text.Format("StoragePathsMustBeSeparate", Text[firstKey], Text[secondKey]);
+        return Text.Format(LanguageManager.Keys.StoragePathsMustBeSeparate, Text[firstKey], Text[secondKey]);
     }
 
     private string NormalizeDirectory(string directory)
     {
         if (string.IsNullOrWhiteSpace(directory))
-            throw new InvalidOperationException(Text["StoragePathRequired"]);
+            throw new InvalidOperationException(Text[LanguageManager.Keys.StoragePathRequired]);
         try
         {
             return Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory));
@@ -291,7 +291,7 @@ public sealed class DesktopApplicationService : IDesktopStorageService, IAsyncDi
         catch (Exception exception) when (exception is ArgumentException or NotSupportedException
                                               or PathTooLongException)
         {
-            throw new InvalidOperationException(Text["StoragePathInvalid"], exception);
+            throw new InvalidOperationException(Text[LanguageManager.Keys.StoragePathInvalid], exception);
         }
     }
 

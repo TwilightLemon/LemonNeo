@@ -46,14 +46,14 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
             if (!CanUseMetadataMatch(row) || string.IsNullOrWhiteSpace(row!.Match.Track.Title)) return;
             Editor!.ApplyMetadata(row!.Match.Track);
             row.MarkMetadataReplaced();
-            SetStatus("MetadataApplied");
+            SetStatus(LanguageManager.Keys.MetadataApplied);
         }, row => CanUseMetadataMatch(row) && !string.IsNullOrWhiteSpace(row!.Match.Track.Title));
         AddMatchExternalIdsCommand = new RelayCommand<MetadataMatchRow>(row =>
         {
             if (!CanUseMetadataMatch(row)) return;
             var added = Editor!.AddExternalIds(row!.Match.Track.ExternalIds);
             row.MarkExternalIdsAdded();
-            SetStatus("MetadataIdsAdded", added);
+            SetStatus(LanguageManager.Keys.MetadataIdsAdded, added);
         }, row => CanUseMetadataMatch(row) && row!.Match.Track.ExternalIds.Count > 0);
         MetadataSources = MetadataSourceOption.Create(_host.Get<IProviderRegistry>(),
             _host.Get<IPlaybackSourceProviderRegistry>());
@@ -118,14 +118,14 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
             // Stay in the editor on validation or persistence failure.
             Context.RefreshLibrary();
             if (ReferenceEquals(Navigation.Current, this)) await Navigation.GoBackAsync();
-            SetStatus("LibrarySaved");
+            SetStatus(LanguageManager.Keys.LibrarySaved);
         });
     }
 
     private Track GetInspectionTrack()
     {
         return Editor?.Build(false) ??
-               throw new ArgumentException(_text["SelectTrackFirst"]);
+               throw new ArgumentException(_text[LanguageManager.Keys.SelectTrackFirst]);
     }
 
     private static string FormatErrors(IEnumerable<KeyValuePair<string, string>> errors)
@@ -173,10 +173,10 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
         {
             var track = GetInspectionTrack();
             if (string.IsNullOrWhiteSpace(MetadataSearchQuery))
-                throw new ArgumentException(_text["SearchQueryRequired"]);
+                throw new ArgumentException(_text[LanguageManager.Keys.SearchQueryRequired]);
             var targets = MetadataSources.Where(source => source.IsSelected).Select(source => source.Namespace)
                 .ToArray();
-            if (targets.Length == 0) throw new ArgumentException(_text["SelectMetadataSources"]);
+            if (targets.Length == 0) throw new ArgumentException(_text[LanguageManager.Keys.SelectMetadataSources]);
             var query = MetadataSearchQuery.Trim();
             var result = await Task.Run(() => _host.Get<MetadataService>().LookupAsync(track, targets,
                 20,
@@ -189,7 +189,7 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
                         { ArtworkLoader = _host.Get<ArtworkService>() });
             RefreshMetadataCommands();
             InspectionMessages = FormatErrors(result.SourceErrors);
-            SetStatus("MetadataCompleted", result.Matches.Count);
+            SetStatus(LanguageManager.Keys.MetadataCompleted, result.Matches.Count);
         });
     }
 
@@ -202,7 +202,7 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
             _inspectedLyrics = result;
             LyricsDetails = result.Lyrics is { } lyrics
                 ? FormatLyricsDetails(lyrics, result.ProviderId)
-                : _text["NoLyrics"];
+                : _text[LanguageManager.Keys.NoLyrics];
             InspectionMessages = FormatErrors(result.ProviderErrors);
         });
     }
@@ -220,14 +220,15 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
             _sourceTrack = track;
             SelectedSource = DiscoveredSources.FirstOrDefault();
             InspectionMessages = FormatErrors(result.ProviderErrors);
-            SetStatus("SourcesCompleted", result.Candidates.Count);
+            SetStatus(LanguageManager.Keys.SourcesCompleted, result.Candidates.Count);
         });
     }
 
     private string FormatLyricsDetails(CoreLyrics lyrics, string? providerId)
     {
-        var text = new StringBuilder(_text.Format("LyricsDetailsSummary", providerId ?? "—", lyrics.Source ?? "—",
-            _text[lyrics.IsSynchronized ? "Yes" : "No"], _text[lyrics.IsWordSynchronized ? "Yes" : "No"])).AppendLine();
+        var text = new StringBuilder(_text.Format(LanguageManager.Keys.LyricsDetailsSummary, providerId ?? "—", lyrics.Source ?? "—",
+            _text[lyrics.IsSynchronized ? LanguageManager.Keys.Yes : LanguageManager.Keys.No],
+            _text[lyrics.IsWordSynchronized ? LanguageManager.Keys.Yes : LanguageManager.Keys.No])).AppendLine();
         if (lyrics.SourceId is { } source) text.AppendLine($"{source.Namespace}:{source.Kind ?? "-"} = {source.Value}");
         if (lyrics.Lines is { Count: > 0 })
             foreach (var line in lyrics.Lines)
@@ -240,12 +241,12 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
             }
         else text.AppendLine(lyrics.Text);
 
-        text.AppendLine().AppendLine(_text["TranslationLabel"]);
+        text.AppendLine().AppendLine(_text[LanguageManager.Keys.TranslationLabel]);
         if (lyrics.TranslationLines is { Count: > 0 })
             foreach (var line in lyrics.TranslationLines)
                 text.AppendLine($"{LyricTime(line.EffectiveStartTimeMs)}{line.Text}");
         else if (!string.IsNullOrWhiteSpace(lyrics.Translation)) text.AppendLine(lyrics.Translation);
-        text.AppendLine().AppendLine(_text["RomanizationLabel"]);
+        text.AppendLine().AppendLine(_text[LanguageManager.Keys.RomanizationLabel]);
         if (lyrics.RomanizationLines is { Count: > 0 })
             foreach (var line in lyrics.RomanizationLines)
                 text.AppendLine($"{LyricTime(line.StartTimeMs)}{line.Text}");
@@ -276,7 +277,7 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
         if (_inspectedLyrics is { } result)
             LyricsDetails = result.Lyrics is { } lyrics
                 ? FormatLyricsDetails(lyrics, result.ProviderId)
-                : _text["NoLyrics"];
+                : _text[LanguageManager.Keys.NoLyrics];
         foreach (var row in MetadataMatches) row.RefreshLocalizedProperties();
         for (var i = 0; i < DiscoveredSources.Count; i++)
             DiscoveredSources[i] = new PlaybackSourceRow(DiscoveredSources[i].Candidate, _text);

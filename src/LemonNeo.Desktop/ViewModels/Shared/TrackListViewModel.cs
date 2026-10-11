@@ -98,8 +98,10 @@ public abstract class TrackListViewModel : PageViewModel
         }
     }
 
-    public string SelectionSummary => _text.Format("SelectedTrackCount", ActionTracks.Count);
-    public string SelectionModeLabel => _text[IsSelectionMode ? "FinishSelection" : "ManageTracks"];
+    public string SelectionSummary => _text.Format(LanguageManager.Keys.SelectedTrackCount, ActionTracks.Count);
+    public string SelectionModeLabel => _text[IsSelectionMode
+        ? LanguageManager.Keys.FinishSelection
+        : LanguageManager.Keys.ManageTracks];
 
     public bool InsertAtStart
     {
@@ -109,7 +111,7 @@ public abstract class TrackListViewModel : PageViewModel
 
     public bool HasPlayingTrack => _hasPlayingTrack;
 
-    public string TrackSummary => _text.Format("TrackSummary", Tracks.Count,
+    public string TrackSummary => _text.Format(LanguageManager.Keys.TrackSummary, Tracks.Count,
         TrackRow.FormatTime(TimeSpan.FromSeconds(Tracks.Sum(t => t.Track.Duration?.TotalSeconds ?? 0))));
 
     public override string? PageSummary => TrackSummary;
@@ -225,7 +227,7 @@ public abstract class TrackListViewModel : PageViewModel
             }
 
             Context.RefreshLibrary();
-            SetStatus("TracksAdded", tracks.Length, target.Name);
+            SetStatus(LanguageManager.Keys.TracksAdded, tracks.Length, target.Name);
             succeeded = true;
         });
         return succeeded;
@@ -238,7 +240,7 @@ public abstract class TrackListViewModel : PageViewModel
             _host.Get<PlaylistService>().AddRange(playlistId, [track], InsertAtStart);
             await _host.Get<LibraryService>().SaveAsync(ct);
             Context.RefreshLibrary();
-            SetStatus("TrackAdded");
+            SetStatus(LanguageManager.Keys.TrackAdded);
         });
     }
 

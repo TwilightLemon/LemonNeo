@@ -12,7 +12,13 @@
                 FontSize="24"
                 FontWeight="SemiBold"
                 Text="{Binding PageTitle}" />
-            <TextBlock Classes="caption" Text="{Binding TrackCount}" />
+            <TextBlock Classes="caption">
+                <TextBlock.Text>
+                    <FormatTranslate FormatKey="{x:Static i18n:LanguageManager+Keys.TrackCount}">
+                        <TranslateEntry Binding="{Binding TrackCount}" />
+                    </FormatTranslate>
+                </TextBlock.Text>
+            </TextBlock>
         </StackPanel>
         <TextBox
             AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.SearchPlaceholder}}"

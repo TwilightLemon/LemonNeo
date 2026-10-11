@@ -75,8 +75,10 @@ public sealed class SettingsViewModel : PageViewModel
     }
 
     public string ThemeColorStatus => _appearance.Colors.IsUsingArtwork
-        ? _text["ThemeColorUsingArtwork"]
-        : _text.Format(UseArtworkColors ? "ThemeColorFallbackStatus" : "ThemeColorBuiltInStatus",
+        ? _text[LanguageManager.Keys.ThemeColorUsingArtwork]
+        : _text.Format(UseArtworkColors
+                ? LanguageManager.Keys.ThemeColorFallbackStatus
+                : LanguageManager.Keys.ThemeColorBuiltInStatus,
             _text[ThemePalette.Get(_appearance.Current.ThemeColor).NameKey]);
 
     public IEnumerable<string> PluginDescriptions =>
@@ -88,7 +90,7 @@ public sealed class SettingsViewModel : PageViewModel
     public bool IsLanguageSystem => Context.Settings.Get<LanguagePreferences>().Language == LanguagePreference.System;
     public bool IsLanguageChinese => Context.Settings.Get<LanguagePreferences>().Language == LanguagePreference.Chinese;
     public bool IsLanguageEnglish => Context.Settings.Get<LanguagePreferences>().Language == LanguagePreference.English;
-    public string PluginSummary => _text.Format("PluginCount", _host.Plugins.Loaded.Count);
+    public string PluginSummary => _text.Format(LanguageManager.Keys.PluginCount, _host.Plugins.Loaded.Count);
     public string LibraryPath => _storage.LibraryDirectory;
     public string ConfigurationPath => _host.Paths.ConfigurationDirectory;
     public string CachePath => _storage.CacheDirectory;

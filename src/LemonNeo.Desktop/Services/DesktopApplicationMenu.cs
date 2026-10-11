@@ -77,14 +77,14 @@ public sealed class DesktopApplicationMenu : IDisposable
 
     private void Refresh()
     {
-        _showWindow.Header = _text["ShowMainWindow"];
-        _previous.Header = _text["Previous"];
+        _showWindow.Header = _text[LanguageManager.Keys.ShowMainWindow];
+        _previous.Header = _text[LanguageManager.Keys.Previous];
         _togglePlayback.Header = _playback.PlayLabel;
-        _next.Header = _text["Next"];
-        _exit.Header = _text["ExitApplication"];
+        _next.Header = _text[LanguageManager.Keys.Next];
+        _exit.Header = _text[LanguageManager.Keys.ExitApplication];
         _previous.IsEnabled = _playback.CanPrevious;
         _togglePlayback.IsEnabled = _playback.CanTogglePlayback;
         _next.IsEnabled = _playback.CanNext;
-        if (_trayIcon is not null) _trayIcon.ToolTipText = _text["AppName"];
+        if (_trayIcon is not null) _trayIcon.ToolTipText = _text[LanguageManager.Keys.AppName];
     }
 }

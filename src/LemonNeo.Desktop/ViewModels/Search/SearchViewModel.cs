@@ -42,14 +42,14 @@ public sealed partial class SearchViewModel : TrackListViewModel
     {
         return ExecuteAsync(async ct =>
         {
-            if (string.IsNullOrWhiteSpace(SearchQuery)) throw new ArgumentException(_text["SearchQueryRequired"]);
+            if (string.IsNullOrWhiteSpace(SearchQuery)) throw new ArgumentException(_text[LanguageManager.Keys.SearchQueryRequired]);
             var results =
                 await Task.Run(() => _host.Get<SearchService>().SearchForPlaybackAsync(SearchQuery.Trim(), ct), ct);
             ct.ThrowIfCancellationRequested();
             _searchTracks = results.SelectMany(r => r.Tracks).DistinctBy(t => t.Id).ToArray();
             Filter = "";
             RefreshTracks();
-            SetStatus("SearchCompleted", Tracks.Count);
+            SetStatus(LanguageManager.Keys.SearchCompleted, Tracks.Count);
         });
     }
 

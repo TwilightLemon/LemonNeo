@@ -45,7 +45,7 @@ public sealed partial class AccountsViewModel : PageViewModel
                 Cookie = "";
                 IsCookieEditorOpen = !IsAuthenticated;
                 SetError(null);
-                SetStatus("Ready");
+                SetStatus(null);
             }
 
             RaiseAccountProperties();
@@ -67,11 +67,13 @@ public sealed partial class AccountsViewModel : PageViewModel
     public bool HasPluginAttribution => ProviderPlugin is not null;
 
     public string PluginAttribution => ProviderPlugin is { } plugin
-        ? _text.Format("AuthenticationProvidedByPlugin", plugin.Manifest.Name, plugin.Manifest.Version)
+        ? _text.Format(LanguageManager.Keys.AuthenticationProvidedByPlugin, plugin.Manifest.Name, plugin.Manifest.Version)
         : "";
 
     public bool IsAuthenticated => Provider?.State.IsAuthenticated == true;
-    public string AuthenticationStatus => _text[IsAuthenticated ? "Authenticated" : "NotAuthenticated"];
+    public string AuthenticationStatus => _text[IsAuthenticated
+        ? LanguageManager.Keys.Authenticated
+        : LanguageManager.Keys.NotAuthenticated];
 
     public string AccountName => Provider?.State is { IsAuthenticated: true } state
         ? state.AccountName ?? state.UserId ?? SelectedService?.Name ?? ""
@@ -101,17 +103,17 @@ public sealed partial class AccountsViewModel : PageViewModel
             var completed = false;
             try
             {
-                if (provider is null) throw new ArgumentException(_text["ProviderUnavailable"]);
-                if (string.IsNullOrWhiteSpace(Cookie)) throw new ArgumentException(_text["CookieRequired"]);
+                if (provider is null) throw new ArgumentException(_text[LanguageManager.Keys.ProviderUnavailable]);
+                if (string.IsNullOrWhiteSpace(Cookie)) throw new ArgumentException(_text[LanguageManager.Keys.CookieRequired]);
                 var cookie = Cookie.Trim();
                 if (!(await Task.Run(() => provider.GetAvailableMethodsAsync(ct), ct)).Contains(AuthMethod.Cookie))
-                    throw new ArgumentException(_text["CookieUnsupported"]);
+                    throw new ArgumentException(_text[LanguageManager.Keys.CookieUnsupported]);
                 await Task.Run(
                     () => provider.AuthenticateAsync(
                         new AuthenticationRequest(AuthMethod.Cookie,
                             new Dictionary<string, string> { ["cookie"] = cookie }), ct), ct);
                 completed = true;
-                SetStatus("LoginCompleted");
+                SetStatus(LanguageManager.Keys.LoginCompleted);
             }
             finally
             {
@@ -129,14 +131,14 @@ public sealed partial class AccountsViewModel : PageViewModel
         return ExecuteAsync(async ct =>
         {
             var providerId = SelectedService?.Id;
-            var provider = Provider ?? throw new ArgumentException(_text["ProviderUnavailable"]);
+            var provider = Provider ?? throw new ArgumentException(_text[LanguageManager.Keys.ProviderUnavailable]);
             var previousState = provider.State;
             var completed = false;
             try
             {
                 await Task.Run(() => provider.SignOutAsync(ct), ct);
                 completed = true;
-                SetStatus("LogoutCompleted");
+                SetStatus(LanguageManager.Keys.LogoutCompleted);
             }
             finally
             {

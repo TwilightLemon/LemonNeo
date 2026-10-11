@@ -339,7 +339,6 @@
   "ApplicationDependencies": "Application packages & licenses",
   "PluginDependencies": "Plugin packages & licenses",
   "SourceCode": "Source code",
-  "CopyrightNotice": "© 2026 TwilightLemon. All rights reserved.",
   "NoThirdPartyDependencies": "No third-party packages declared.",
   "FolderPlaylistName": "Imported playlist name (empty = folder name)",
   "CancelOperation": "Cancel action",
