@@ -1,3 +1,5 @@
+using System.Buffers;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Caching.Memory;
@@ -69,7 +71,7 @@ public sealed class ImageCache : IAsyncDisposable
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_closing, this);
-            if (_memory.TryGetValue<byte[]>(key, out var data) && data is not null)
+            if (_memory.TryGetValue<ReadOnlyMemory<byte>>(key, out var data))
                 return new CachedImage(data, true);
             if (!_requests.TryGetValue(key, out request!))
             {
@@ -89,25 +91,28 @@ public sealed class ImageCache : IAsyncDisposable
     {
         CachedImage? result = null;
         var cancelled = false;
-        var directory = DirectoryPath;
         try
         {
+            var directory = DirectoryPath;
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
             await _concurrency.WaitAsync(timeout.Token).ConfigureAwait(false);
             try
             {
                 timeout.CancelAfter(TimeSpan.FromSeconds(15));
-                var data = await ReadDiskAsync(directory, key, timeout.Token).ConfigureAwait(false);
+                // Local artwork already has durable storage (including imported Artwork/ files).
+                // Only remote images need a second, host-owned disk copy.
+                var data = uri.IsFile ? null : await ReadDiskAsync(directory, key, timeout.Token).ConfigureAwait(false);
                 var isCached = data is not null;
                 data ??= await ReadSourceAsync(uri, timeout.Token).ConfigureAwait(false);
-                if (!isCached) await StoreDiskAsync(directory, key, data, timeout.Token).ConfigureAwait(false);
+                if (!uri.IsFile && !isCached)
+                    await StoreDiskAsync(directory, key, data.Value, timeout.Token).ConfigureAwait(false);
                 timeout.Token.ThrowIfCancellationRequested();
                 lock (_gate)
                 {
-                    Remember(key, data);
+                    Remember(key, data.Value);
                 }
 
-                result = new CachedImage(data, isCached);
+                result = new CachedImage(data.Value, isCached);
             }
             finally
             {
@@ -133,7 +138,7 @@ public sealed class ImageCache : IAsyncDisposable
         }
     }
 
-    private async Task<byte[]?> ReadDiskAsync(string directory, string key, CancellationToken cancellationToken)
+    private async Task<ReadOnlyMemory<byte>?> ReadDiskAsync(string directory, string key, CancellationToken cancellationToken)
     {
         try
         {
@@ -152,7 +157,7 @@ public sealed class ImageCache : IAsyncDisposable
         }
     }
 
-    private async Task<byte[]> ReadSourceAsync(Uri uri, CancellationToken cancellationToken)
+    private async Task<ReadOnlyMemory<byte>> ReadSourceAsync(Uri uri, CancellationToken cancellationToken)
     {
         if (uri.IsFile)
         {
@@ -167,33 +172,55 @@ public sealed class ImageCache : IAsyncDisposable
         if (response.Content.Headers.ContentLength > MaximumImageBytes)
             throw new IOException("Image exceeds the size limit.");
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        return await ReadBytesAsync(stream, cancellationToken).ConfigureAwait(false);
+        return await ReadBytesAsync(stream, cancellationToken, response.Content.Headers.ContentLength).ConfigureAwait(false);
     }
 
-    private static async Task<byte[]> ReadBytesAsync(Stream stream, CancellationToken cancellationToken)
+    private static async Task<ReadOnlyMemory<byte>> ReadBytesAsync(Stream stream, CancellationToken cancellationToken,
+        long? contentLength = null)
     {
-        if (stream.CanSeek && stream.Length > MaximumImageBytes) throw new IOException("Image exceeds the size limit.");
-        using var data = new MemoryStream();
-        var buffer = new byte[81920];
-        int read;
-        while ((read = await stream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+        var length = stream.CanSeek ? stream.Length - stream.Position : contentLength;
+        if (length > MaximumImageBytes) throw new IOException("Image exceeds the size limit.");
+        if (length is >= 0)
         {
-            if (data.Length + read > MaximumImageBytes) throw new IOException("Image exceeds the size limit.");
-            data.Write(buffer, 0, read);
+            if (length == 0) throw new IOException("Image is empty.");
+            var bytes = GC.AllocateUninitializedArray<byte>((int)length.Value);
+            await stream.ReadExactlyAsync(bytes, cancellationToken).ConfigureAwait(false);
+            if (await stream.ReadAsync(new byte[1], cancellationToken).ConfigureAwait(false) != 0)
+                throw new IOException("Image length differs from its declared size.");
+            cancellationToken.ThrowIfCancellationRequested();
+            return bytes;
         }
 
-        if (data.Length == 0) throw new IOException("Image is empty.");
-        cancellationToken.ThrowIfCancellationRequested();
-        return data.ToArray();
+        using var data = new MemoryStream();
+        var buffer = ArrayPool<byte>.Shared.Rent(81920);
+        try
+        {
+            int read;
+            while ((read = await stream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+            {
+                if (data.Length + read > MaximumImageBytes) throw new IOException("Image exceeds the size limit.");
+                data.Write(buffer, 0, read);
+            }
+
+            if (data.Length == 0) throw new IOException("Image is empty.");
+            cancellationToken.ThrowIfCancellationRequested();
+            return data.GetBuffer().AsMemory(0, (int)data.Length);
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
     }
 
-    private async Task StoreDiskAsync(string directory, string key, byte[] data, CancellationToken cancellationToken)
+    private async Task StoreDiskAsync(string directory, string key, ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
     {
         var temporaryPath = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".part");
         try
         {
             Directory.CreateDirectory(directory);
-            await File.WriteAllBytesAsync(temporaryPath, data, cancellationToken).ConfigureAwait(false);
+            await using (var file = new FileStream(temporaryPath, FileMode.CreateNew, FileAccess.Write,
+                             FileShare.None, 81920, FileOptions.Asynchronous))
+                await file.WriteAsync(data, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             File.Move(temporaryPath, GetPath(directory, key), true);
         }
@@ -207,10 +234,11 @@ public sealed class ImageCache : IAsyncDisposable
         }
     }
 
-    private void Remember(string key, byte[] data)
+    private void Remember(string key, ReadOnlyMemory<byte> data)
     {
-        if (_closing || data.Length > _maximumMemoryBytes) return;
-        _memory.Set(key, data, new MemoryCacheEntryOptions().SetSize(data.LongLength));
+        var size = MemoryMarshal.TryGetArray(data, out var buffer) ? buffer.Array!.LongLength : data.Length;
+        if (_closing || size > _maximumMemoryBytes) return;
+        _memory.Set(key, data, new MemoryCacheEntryOptions().SetSize(size));
     }
 
     /// <summary>Evicts bytes that the image decoder rejected, allowing a fresh source request.</summary>
@@ -223,7 +251,7 @@ public sealed class ImageCache : IAsyncDisposable
             if (!_closing) _memory.Remove(key);
         }
 
-        return Task.Run(() => RemoveFile(GetPath(directory, key)));
+        return uri.IsFile ? Task.CompletedTask : Task.Run(() => RemoveFile(GetPath(directory, key)));
     }
 
     private void RemoveFile(string path)

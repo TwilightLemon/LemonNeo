@@ -23,9 +23,15 @@ public sealed class QueueTrackViewModel(
 
     public string Description => $"{Row.Artists} · {Row.Album}";
 
+    internal void Update(PlaybackQueueItem item, int number)
+    {
+        Row.Update(item.Track, number);
+        OnPropertyChanged(nameof(Description));
+    }
+
     internal void RefreshLocalizedProperties()
     {
-        OnPropertyChanged(nameof(Row));
+        Row.RefreshLocalizedProperties();
         OnPropertyChanged(nameof(Description));
     }
 }

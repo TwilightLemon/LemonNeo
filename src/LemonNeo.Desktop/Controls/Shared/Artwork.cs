@@ -1,7 +1,6 @@
 using Avalonia;
 using Avalonia.Controls.Primitives;
 using Avalonia.Media;
-using Avalonia.Media.Imaging;
 using LemonNeo.Desktop.Services;
 
 namespace LemonNeo.Desktop.Controls.Shared;
@@ -18,7 +17,7 @@ public sealed class Artwork : TemplatedControl
         AvaloniaProperty.Register<Artwork, ArtworkService?>(nameof(Loader));
 
     private bool _attached;
-    private Bitmap? _loadedBitmap;
+    private LoadedArtwork? _loadedArtwork;
     private CancellationTokenSource? _request;
 
     public IImage? Source
@@ -63,10 +62,10 @@ public sealed class Artwork : TemplatedControl
     {
         _request?.Cancel();
         _request = null;
-        if (_loadedBitmap is { } previous)
+        if (_loadedArtwork is { } previous)
         {
-            _loadedBitmap = null;
-            if (ReferenceEquals(Source, previous)) Source = null;
+            _loadedArtwork = null;
+            if (ReferenceEquals(Source, previous.Bitmap)) Source = null;
             previous.Dispose();
         }
 
@@ -77,15 +76,15 @@ public sealed class Artwork : TemplatedControl
 
     private async Task LoadArtworkAsync(ArtworkService loader, Uri uri, CancellationTokenSource request)
     {
-        Bitmap? bitmap = null;
+        LoadedArtwork? artwork = null;
         try
         {
-            bitmap = await loader.LoadAsync(uri, request.Token, 128);
+            artwork = await loader.LoadAsync(uri, request.Token, 128);
             // Virtualized rows can be detached or rebound while their shared request is running.
             if (!_attached || request.IsCancellationRequested || !ReferenceEquals(_request, request)) return;
-            _loadedBitmap = bitmap;
-            Source = bitmap;
-            bitmap = null;
+            _loadedArtwork = artwork;
+            Source = artwork?.Bitmap;
+            artwork = null;
         }
         catch (OperationCanceledException)
         {
@@ -95,7 +94,7 @@ public sealed class Artwork : TemplatedControl
         }
         finally
         {
-            bitmap?.Dispose();
+            artwork?.Dispose();
             if (ReferenceEquals(_request, request)) _request = null;
             request.Dispose();
         }

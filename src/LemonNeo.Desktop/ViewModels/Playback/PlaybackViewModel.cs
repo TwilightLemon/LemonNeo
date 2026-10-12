@@ -32,7 +32,7 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
     private bool _closing;
     private bool _isSourceDetailsOpen;
     private bool _isUpdatingVolume;
-    private Bitmap? _nowArtwork;
+    private LoadedArtwork? _nowArtwork;
     private float[] _pulseSpectrum = [];
     private double _volumePercent;
     private Task _volumeReadTask = Task.CompletedTask;
@@ -102,7 +102,7 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
         : _text[LanguageManager.Keys.NoTrackDescription];
 
     public bool HasCurrentTrack => Snapshot.CurrentTrack is not null;
-    public Bitmap? NowArtwork => _nowArtwork;
+    public Bitmap? NowArtwork => _nowArtwork?.Bitmap;
     public BackgroundArtworkFrame? CurrentArtwork => _backgroundArtwork;
     public bool IsPlaying => Snapshot.State == PlayerState.Playing;
     public string PlayLabel => _text[IsPlaying ? LanguageManager.Keys.Pause : LanguageManager.Keys.Play];
@@ -395,11 +395,11 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
 
     private async Task LoadArtworkAsync(Uri uri, CancellationToken cancellationToken)
     {
-        Bitmap? bitmap = null;
+        LoadedArtwork? loaded = null;
         try
         {
-            var loaded = await _artwork.LoadWithDataAsync(uri, cancellationToken);
-            bitmap = loaded?.Bitmap;
+            loaded = await _artwork.LoadWithDataAsync(uri, cancellationToken);
+            var bitmap = loaded?.Bitmap;
             Color? color = null;
             if (bitmap is not null)
                 try
@@ -417,21 +417,21 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
                 }
 
             if (_closing || cancellationToken.IsCancellationRequested || !Equals(uri, _artworkUri)) return;
-            SetArtwork(bitmap, color, loaded is null
+            SetArtwork(loaded, color, loaded is null
                 ? null
                 : new BackgroundArtworkFrame(uri.AbsoluteUri, loaded.EncodedData));
-            bitmap = null;
+            loaded = null;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
         }
         finally
         {
-            bitmap?.Dispose();
+            loaded?.Dispose();
         }
     }
 
-    private void SetArtwork(Bitmap? bitmap, Color? color = null, BackgroundArtworkFrame? backgroundArtwork = null)
+    private void SetArtwork(LoadedArtwork? bitmap, Color? color = null, BackgroundArtworkFrame? backgroundArtwork = null)
     {
         var previous = _nowArtwork;
         if (SetProperty(ref _nowArtwork, bitmap, nameof(NowArtwork))) previous?.Dispose();

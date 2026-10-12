@@ -14,7 +14,7 @@ public sealed partial class AccountsViewModel : PageViewModel
     private readonly ArtworkService _artwork;
     private readonly CancellationTokenSource _avatarLifetime = new();
     private readonly List<Task> _avatarTasks = [];
-    private Bitmap? _accountAvatar;
+    private LoadedArtwork? _accountAvatar;
     private CancellationTokenSource? _avatarCancellation;
     private (string? ProviderId, string? UserId, Uri? Uri) _avatarIdentity;
     private bool _closing;
@@ -80,7 +80,7 @@ public sealed partial class AccountsViewModel : PageViewModel
         : "";
 
     public string AccountId => Provider?.State is { IsAuthenticated: true, UserId: { } id } ? id : "";
-    public Bitmap? AccountAvatar => _accountAvatar;
+    public Bitmap? AccountAvatar => _accountAvatar?.Bitmap;
     public bool HasAccountAvatar => AccountAvatar is not null;
     public bool CanLogin => CanInteract && Provider is not null && !string.IsNullOrWhiteSpace(Cookie);
     public bool CanLogout => CanInteract && IsAuthenticated;
@@ -202,7 +202,7 @@ public sealed partial class AccountsViewModel : PageViewModel
 
     private async Task LoadAvatarAsync(Uri uri, CancellationToken cancellationToken)
     {
-        Bitmap? bitmap = null;
+        LoadedArtwork? bitmap = null;
         try
         {
             bitmap = await _artwork.LoadAsync(uri, cancellationToken);
@@ -219,7 +219,7 @@ public sealed partial class AccountsViewModel : PageViewModel
         }
     }
 
-    private void SetAvatar(Bitmap? bitmap)
+    private void SetAvatar(LoadedArtwork? bitmap)
     {
         var previous = _accountAvatar;
         if (!SetProperty(ref _accountAvatar, bitmap, nameof(AccountAvatar))) return;

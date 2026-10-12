@@ -15,8 +15,8 @@ public sealed class TrackRow(
     private bool _isCurrent;
     private bool _isMarked;
     private bool _isSelectionMode;
-    public Track Track { get; } = track;
-    public int Number { get; } = number;
+    public Track Track { get; private set; } = track;
+    public int Number { get; private set; } = number;
     public LocalizationService Text { get; } = text;
     public Guid? QueueItemId { get; } = QueueItemId;
     public Guid? PlaylistId { get; } = PlaylistId;
@@ -51,6 +51,30 @@ public sealed class TrackRow(
 
     public string Album => Track.Album?.Title ?? Text[LanguageManager.Keys.UnknownAlbum];
     public string Duration => Track.Duration is { } value ? FormatTime(value) : "—";
+
+    internal void Update(Track track, int number)
+    {
+        if (Number != number)
+        {
+            Number = number;
+            OnPropertyChanged(nameof(Number));
+        }
+        if (Equals(Track, track)) return;
+        var artworkUri = ArtworkUri;
+        Track = track;
+        OnPropertyChanged(nameof(Track));
+        OnPropertyChanged(nameof(Title));
+        OnPropertyChanged(nameof(Identity));
+        RefreshLocalizedProperties();
+        if (!Equals(artworkUri, ArtworkUri)) OnPropertyChanged(nameof(ArtworkUri));
+    }
+
+    internal void RefreshLocalizedProperties()
+    {
+        OnPropertyChanged(nameof(Artists));
+        OnPropertyChanged(nameof(Album));
+        OnPropertyChanged(nameof(Duration));
+    }
 
     public static string FormatTime(TimeSpan time)
     {

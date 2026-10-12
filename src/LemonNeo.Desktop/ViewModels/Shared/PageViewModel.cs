@@ -15,6 +15,8 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
     private string? _errorDetails;
     private LinguaKey? _errorKey;
     private bool _isBusy;
+    private bool _isNavigationActive = true;
+    private bool _localizationDirty;
     private Task _operation = Task.CompletedTask;
     private CancellationTokenSource? _operationCancellation;
     private object?[] _statusArguments = [];
@@ -56,6 +58,18 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
           (_errorDetails is null ? "" : Environment.NewLine + _errorDetails);
 
     public bool HasError => _errorKey is not null;
+    protected bool IsNavigationActive => _isNavigationActive;
+    internal void SetNavigationActive(bool active)
+    {
+        _isNavigationActive = active;
+        if (!active || !_localizationDirty) return;
+        _localizationDirty = false;
+        RefreshLocalizedProperties();
+    }
+    internal bool HasActiveOperation => _operationCancellation is not null;
+    internal event EventHandler? OperationCompleted;
+    internal virtual object? CaptureNavigationState() => null;
+    internal virtual void RestoreNavigationState(object? state) { }
     public RelayCommand CancelOperationCommand { get; }
     public RelayCommand DismissErrorCommand { get; }
 
@@ -122,6 +136,7 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
             _operationCancellation = null;
             cancellation.Dispose();
             RaiseInteractionProperties();
+            OperationCompleted?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -172,11 +187,12 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
 
     private void OnLanguageChanged(object? sender, EventArgs args)
     {
-        RefreshLocalizedProperties();
+        if (_isNavigationActive) RefreshLocalizedProperties();
+        else _localizationDirty = true;
     }
 
     private void OnContextChanged(object? sender, PropertyChangedEventArgs args)
     {
-        RaiseInteractionProperties();
+        if (_isNavigationActive) RaiseInteractionProperties();
     }
 }

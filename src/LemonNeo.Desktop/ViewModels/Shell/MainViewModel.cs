@@ -72,7 +72,6 @@ public sealed class MainViewModel : PageViewModel
     public SearchViewModel Search => Navigation.GetPage<SearchViewModel>(DesktopRoutes.Search);
     public OnlineViewModel Online => Navigation.GetPage<OnlineViewModel>(DesktopRoutes.Online);
     public AccountsViewModel Accounts => Navigation.GetPage<AccountsViewModel>(DesktopRoutes.Accounts);
-    public TrackEditorPageViewModel EditorPage => Navigation.GetPage<TrackEditorPageViewModel>(DesktopRoutes.Editor);
     public ToolsViewModel Tools => Navigation.GetPage<ToolsViewModel>(DesktopRoutes.Tools);
     public SettingsViewModel Settings => Navigation.GetPage<SettingsViewModel>(DesktopRoutes.Settings);
     public LyricsViewModel Lyrics => Navigation.GetPage<LyricsViewModel>(DesktopRoutes.Lyrics);

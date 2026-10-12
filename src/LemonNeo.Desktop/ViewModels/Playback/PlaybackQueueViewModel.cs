@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using LemonNeo.Application.Playback;
 using LemonNeo.Desktop.Services;
@@ -11,6 +12,7 @@ namespace LemonNeo.Desktop.ViewModels.Playback;
 public sealed class PlaybackQueueViewModel : PageViewModel
 {
     private readonly PlaybackSessionService _session;
+    private readonly DispatcherTimer _filterTimer;
     private string _filter = "";
     private QueueTrackViewModel[] _rows = [];
     private QueueTrackViewModel? _selectedTrack;
@@ -20,6 +22,8 @@ public sealed class PlaybackQueueViewModel : PageViewModel
     {
         Playback = playback;
         _session = _host.Get<PlaybackSessionService>();
+        _filterTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
+        _filterTimer.Tick += OnFilterTick;
         PlayTrackCommand = new AsyncRelayCommand<QueueTrackViewModel>(PlayTrackAsync, row => CanPlay && row is not null,
             AsyncRelayCommandOptions.AllowConcurrentExecutions);
         Playback.Changed += OnPlaybackChanged;
@@ -41,7 +45,10 @@ public sealed class PlaybackQueueViewModel : PageViewModel
         get => _filter;
         set
         {
-            if (SetProperty(ref _filter, value)) RefreshTracks();
+            if (!SetProperty(ref _filter, value)) return;
+            _filterTimer.Stop();
+            if (string.IsNullOrWhiteSpace(value)) RefreshTracks();
+            else _filterTimer.Start();
         }
     }
 
@@ -87,8 +94,16 @@ public sealed class PlaybackQueueViewModel : PageViewModel
         var items = _session.Queue.Items;
         if (!_rows.Select(r => (r.Id, r.Row.Track)).SequenceEqual(items.Select(i => (i.Id, i.Track))))
         {
+            var existing = _rows.ToDictionary(row => row.Id);
             _rows = items.Select((item, index) =>
-                new QueueTrackViewModel(item, index + 1, _text, _host.Get<ArtworkService>())).ToArray();
+            {
+                if (existing.TryGetValue(item.Id, out var row))
+                {
+                    row.Update(item, index + 1);
+                    return row;
+                }
+                return new QueueTrackViewModel(item, index + 1, _text, _host.Get<ArtworkService>());
+            }).ToArray();
             RefreshTracks();
             OnPropertyChanged(nameof(TrackCount));
         }
@@ -101,17 +116,19 @@ public sealed class PlaybackQueueViewModel : PageViewModel
 
     private void RefreshTracks()
     {
+        _filterTimer.Stop();
         var selectedId = SelectedTrack?.Id;
-        Tracks.Clear();
-        foreach (var row in _rows.Where(r => string.IsNullOrWhiteSpace(Filter) ||
-                                             $"{r.Row.Title} {r.Row.Artists} {r.Row.Album}".Contains(Filter.Trim(),
-                                                 StringComparison.CurrentCultureIgnoreCase)))
-            Tracks.Add(row);
+        var filter = Filter.Trim();
+        var rows = filter.Length == 0 ? _rows : _rows.Where(r =>
+            $"{r.Row.Title} {r.Row.Artists} {r.Row.Album}".Contains(filter, StringComparison.CurrentCultureIgnoreCase)).ToArray();
+        CollectionSynchronizer.Update(Tracks, rows);
         SelectedTrack = Tracks.FirstOrDefault(r => r.Id == selectedId);
         OnPropertyChanged(nameof(HasTracks));
         OnPropertyChanged(nameof(EmptyTitle));
         OnPropertyChanged(nameof(EmptyDescription));
     }
+
+    private void OnFilterTick(object? sender, EventArgs args) => RefreshTracks();
 
     public override Task ActivateAsync()
     {
@@ -137,6 +154,8 @@ public sealed class PlaybackQueueViewModel : PageViewModel
     {
         Playback.Changed -= OnPlaybackChanged;
         Playback.PropertyChanged -= OnPlaybackPropertyChanged;
+        _filterTimer.Stop();
+        _filterTimer.Tick -= OnFilterTick;
         await base.DisposeAsync();
     }
 }

@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using LemonNeo.Application.Library;
 using LemonNeo.Core.Library;
@@ -15,10 +16,13 @@ public abstract class TrackListViewModel : PageViewModel
     protected readonly DesktopNavigation Navigation;
     protected readonly PlaybackViewModel Playback;
     private readonly IDisposable _preferencesSubscription;
+    private readonly DispatcherTimer _filterTimer;
+    private TrackRow[] _rows = [];
     private string _filter = "";
     private bool _hasPlayingTrack;
     private bool _isSelectionMode;
     private ExternalMusicId? _lastPlayingId;
+    private bool _needsRefresh;
     private TrackRow? _selectedTrack;
     private Playlist? _targetPlaylist;
     private bool _updatingSelection;
@@ -28,6 +32,8 @@ public abstract class TrackListViewModel : PageViewModel
     {
         Navigation = navigation;
         Playback = playback;
+        _filterTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
+        _filterTimer.Tick += OnFilterTick;
         PlayAllCommand = new AsyncRelayCommand(() => PlayAsync(), AsyncRelayCommandOptions.AllowConcurrentExecutions);
         PlaySelectedCommand = new AsyncRelayCommand(() => PlayAsync(SelectedTrack),
             AsyncRelayCommandOptions.AllowConcurrentExecutions);
@@ -73,7 +79,12 @@ public abstract class TrackListViewModel : PageViewModel
         get => _filter;
         set
         {
-            if (SetProperty(ref _filter, value)) RefreshTracks();
+            if (!SetProperty(ref _filter, value)) return;
+            _filterTimer.Stop();
+            // Clearing must be immediate for RevealPlayingTrack and a new search result.
+            if (string.IsNullOrWhiteSpace(value)) ApplyFilter();
+            else _filterTimer.Start();
+            RaiseInteractionProperties();
         }
     }
 
@@ -93,8 +104,20 @@ public abstract class TrackListViewModel : PageViewModel
         set
         {
             if (!SetProperty(ref _isSelectionMode, value)) return;
-            foreach (var row in Tracks) row.IsSelectionMode = value;
-            SetSelection(false);
+            _updatingSelection = true;
+            try
+            {
+                foreach (var row in _rows)
+                {
+                    row.IsSelectionMode = value;
+                    row.IsMarked = false;
+                }
+            }
+            finally
+            {
+                _updatingSelection = false;
+            }
+            RaiseInteractionProperties();
         }
     }
 
@@ -133,30 +156,64 @@ public abstract class TrackListViewModel : PageViewModel
     public abstract Task PlayAsync(TrackRow? selected = null);
     protected abstract IEnumerable<TrackRow> GetTracks();
 
+    internal override object CaptureNavigationState() => new TrackListNavigationState(Filter,
+        SelectedTrack is { } selected ? RowKey(selected) : null, IsSelectionMode,
+        IsSelectionMode ? _rows.Where(row => row.IsMarked).Select(RowKey).ToArray() : []);
+
+    internal override void RestoreNavigationState(object? state)
+    {
+        if (state is not TrackListNavigationState saved) return;
+        IsSelectionMode = saved.IsSelectionMode;
+        Filter = saved.Filter;
+        // Restoring a history entry must not wait for the typing debounce timer.
+        ApplyFilter();
+        if (saved.IsSelectionMode)
+        {
+            var marked = saved.MarkedKeys.ToHashSet();
+            foreach (var row in _rows) row.IsMarked = marked.Contains(RowKey(row));
+        }
+        SelectedTrack = saved.SelectedKey is { } key ? Tracks.FirstOrDefault(row => RowKey(row) == key) : null;
+    }
+
+
     protected virtual void RefreshTracks()
     {
-        var selected = SelectedTrack;
-        var marked = Tracks.Where(t => t.IsMarked).Select(RowKey).ToHashSet();
-        var values = GetTracks();
-        if (!string.IsNullOrWhiteSpace(Filter))
-            values = values.Where(t =>
-                $"{t.Track.Title} {string.Join(' ', t.Track.Artists.Select(a => a.Name))} {t.Track.Album?.Title}"
-                    .Contains(Filter.Trim(), StringComparison.CurrentCultureIgnoreCase));
-        var rows = values.ToArray();
-        foreach (var row in Tracks) row.PropertyChanged -= OnRowChanged;
-        Tracks.Clear();
+        _needsRefresh = false;
+        _filterTimer.Stop();
+        var existing = _rows.ToDictionary(RowKey);
         var artwork = _host.Get<ArtworkService>();
-        foreach (var row in rows)
+        _rows = GetTracks().Select(row =>
         {
+            if (existing.Remove(RowKey(row), out var previous))
+            {
+                previous.Update(row.Track, row.Number);
+                return previous;
+            }
             row.ArtworkLoader = artwork;
             row.IsSelectionMode = IsSelectionMode;
-            row.IsMarked = marked.Contains(RowKey(row));
             row.PropertyChanged += OnRowChanged;
-            Tracks.Add(row);
-        }
+            return row;
+        }).ToArray();
+        foreach (var removed in existing.Values) removed.PropertyChanged -= OnRowChanged;
+        ApplyFilter();
+    }
 
-        SelectedTrack = Tracks.FirstOrDefault(t => selected?.PlaylistItemId is { } itemId ? t.PlaylistItemId == itemId
-            : selected?.QueueItemId is { } queueId ? t.QueueItemId == queueId : t.Track.Id == selected?.Track.Id);
+    private void OnFilterTick(object? sender, EventArgs args)
+    {
+        _filterTimer.Stop();
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        _filterTimer.Stop();
+        var selected = SelectedTrack;
+        var filter = Filter.Trim();
+        var rows = filter.Length == 0 ? _rows : _rows.Where(t =>
+            $"{t.Track.Title} {string.Join(' ', t.Track.Artists.Select(a => a.Name))} {t.Track.Album?.Title}"
+                .Contains(filter, StringComparison.CurrentCultureIgnoreCase)).ToArray();
+        CollectionSynchronizer.Update(Tracks, rows);
+        SelectedTrack = selected is not null && Tracks.Contains(selected) ? selected : null;
         OnPropertyChanged(nameof(HasTracks));
         OnPropertyChanged(nameof(TrackSummary));
         OnPropertyChanged(nameof(PageSummary));
@@ -191,6 +248,7 @@ public abstract class TrackListViewModel : PageViewModel
 
     private void OnPlaybackChanged(object? sender, EventArgs args)
     {
+        if (!IsNavigationActive) return;
         if (!Equals(_lastPlayingId, Playback.Snapshot.SourceDetails?.SourceId)) RefreshPlayingTracks();
     }
 
@@ -198,9 +256,9 @@ public abstract class TrackListViewModel : PageViewModel
     {
         var source = Playback.Snapshot.SourceDetails?.SourceId;
         _lastPlayingId = source;
-        foreach (var row in Tracks) row.IsCurrent = PlayingTrackMatcher.Matches(row.Track, source);
+        foreach (var row in _rows) row.IsCurrent = PlayingTrackMatcher.Matches(row.Track, source);
         SetProperty(ref _hasPlayingTrack,
-            source is not null && GetTracks().Any(row => PlayingTrackMatcher.Matches(row.Track, source)),
+            source is not null && _rows.Any(row => row.IsCurrent),
             nameof(HasPlayingTrack));
     }
 
@@ -246,20 +304,34 @@ public abstract class TrackListViewModel : PageViewModel
 
     private void OnLibraryChanged(object? sender, EventArgs args)
     {
+        if (!IsNavigationActive)
+        {
+            MarkTracksDirty();
+            return;
+        }
         TargetPlaylist = Playlists.FirstOrDefault(p => p.Id == TargetPlaylist?.Id) ?? Playlists.FirstOrDefault();
-        RefreshLocalizedProperties();
+        RefreshTracks();
+        base.RefreshLocalizedProperties();
     }
 
     private void OnPlaybackPropertyChanged(object? sender, PropertyChangedEventArgs args)
     {
+        if (!IsNavigationActive) return;
         if (args.PropertyName == nameof(Playback.CanInteract)) OnPropertyChanged(nameof(CanPlay));
     }
 
     public override Task ActivateAsync()
     {
-        RefreshTracks();
+        TargetPlaylist = Playlists.FirstOrDefault(p => p.Id == TargetPlaylist?.Id) ?? Playlists.FirstOrDefault();
+        if (_needsRefresh) RefreshTracks();
+        else RefreshPlayingTracks();
         return Task.CompletedTask;
     }
+
+    protected void MarkTracksDirty() => _needsRefresh = true;
+
+    private sealed record TrackListNavigationState(string Filter, string? SelectedKey, bool IsSelectionMode,
+        string[] MarkedKeys);
 
     protected override void RaiseInteractionProperties()
     {
@@ -274,7 +346,8 @@ public abstract class TrackListViewModel : PageViewModel
     protected override void RefreshLocalizedProperties()
     {
         base.RefreshLocalizedProperties();
-        RefreshTracks();
+        foreach (var row in _rows) row.RefreshLocalizedProperties();
+        ApplyFilter();
     }
 
     public override async ValueTask DisposeAsync()
@@ -283,7 +356,9 @@ public abstract class TrackListViewModel : PageViewModel
         Playback.PropertyChanged -= OnPlaybackPropertyChanged;
         Playback.Changed -= OnPlaybackChanged;
         _preferencesSubscription.Dispose();
-        foreach (var row in Tracks) row.PropertyChanged -= OnRowChanged;
+        _filterTimer.Stop();
+        _filterTimer.Tick -= OnFilterTick;
+        foreach (var row in _rows) row.PropertyChanged -= OnRowChanged;
         await base.DisposeAsync();
     }
 }

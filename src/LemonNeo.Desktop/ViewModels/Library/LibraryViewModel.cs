@@ -223,6 +223,16 @@ public sealed class LibraryViewModel : TrackListViewModel
 
     private void OnPlaybackChanged(object? sender, EventArgs args)
     {
+        if (!IsNavigationActive)
+        {
+            if (!ReferenceEquals(_lastPlaybackTrack, Playback.Snapshot.CurrentTrack))
+            {
+                _lastPlaybackTrack = Playback.Snapshot.CurrentTrack;
+                MarkTracksDirty();
+            }
+            if (IsQueue) MarkTracksDirty();
+            return;
+        }
         // Resolution can enrich the stored snapshots with the chosen source ID.
         // Refresh only when metadata changes, not on every playback timeline tick.
         if (!ReferenceEquals(_lastPlaybackTrack, Playback.Snapshot.CurrentTrack))
