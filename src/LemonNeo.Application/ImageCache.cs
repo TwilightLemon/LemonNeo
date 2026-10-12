@@ -13,6 +13,7 @@ public sealed record CachedImage(ReadOnlyMemory<byte> Data, bool IsCached);
 public sealed class ImageCache : IAsyncDisposable
 {
     public const int MaximumImageBytes = 16 * 1024 * 1024;
+    private const int StreamBufferSize = 80 * 1024;
     private readonly SemaphoreSlim _concurrency = new(4);
     private readonly object _gate = new();
     private readonly Func<string> _getCacheDirectory;
@@ -143,7 +144,7 @@ public sealed class ImageCache : IAsyncDisposable
         try
         {
             await using var file = new FileStream(GetPath(directory, key), FileMode.Open, FileAccess.Read,
-                FileShare.Read | FileShare.Delete, 81920, FileOptions.Asynchronous | FileOptions.SequentialScan);
+                FileShare.Read | FileShare.Delete, StreamBufferSize, FileOptions.Asynchronous | FileOptions.SequentialScan);
             return await ReadBytesAsync(file, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
@@ -162,7 +163,7 @@ public sealed class ImageCache : IAsyncDisposable
         if (uri.IsFile)
         {
             await using var file = new FileStream(uri.LocalPath, FileMode.Open, FileAccess.Read,
-                FileShare.Read | FileShare.Delete, 81920, FileOptions.Asynchronous | FileOptions.SequentialScan);
+                FileShare.Read | FileShare.Delete, StreamBufferSize, FileOptions.Asynchronous | FileOptions.SequentialScan);
             return await ReadBytesAsync(file, cancellationToken).ConfigureAwait(false);
         }
 
@@ -192,7 +193,7 @@ public sealed class ImageCache : IAsyncDisposable
         }
 
         using var data = new MemoryStream();
-        var buffer = ArrayPool<byte>.Shared.Rent(81920);
+        var buffer = ArrayPool<byte>.Shared.Rent(StreamBufferSize);
         try
         {
             int read;
@@ -219,7 +220,7 @@ public sealed class ImageCache : IAsyncDisposable
         {
             Directory.CreateDirectory(directory);
             await using (var file = new FileStream(temporaryPath, FileMode.CreateNew, FileAccess.Write,
-                             FileShare.None, 81920, FileOptions.Asynchronous))
+                             FileShare.None, StreamBufferSize, FileOptions.Asynchronous))
                 await file.WriteAsync(data, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             File.Move(temporaryPath, GetPath(directory, key), true);

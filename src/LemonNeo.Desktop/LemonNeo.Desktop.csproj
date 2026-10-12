@@ -7,18 +7,21 @@
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     </PropertyGroup>
     <ItemGroup>
-        <InternalsVisibleTo Include="LemonNeo.Tests"/>
-        <AvaloniaResource Include="Resources/Icons/App.ico"/>
-        <PackageReference Include="Avalonia.Desktop" Version="12.1.3"/>
-        <PackageReference Include="Avalonia.Skia" Version="12.1.3"/>
-        <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.3"/>
-        <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2"/>
-        <PackageReference Include="Irihi.Lingua" Version="1.0.0"/>
-        <AdditionalFiles Include="Resources/Languages/*.json"/>
-        <ProjectReference Include="../LemonNeo.Hosting/LemonNeo.Hosting.csproj"/>
-        <ProjectReference Include="../LemonNeo.Application/LemonNeo.Application.csproj"/>
-        <ProjectReference Include="../LemonNeo.Abstractions/LemonNeo.Abstractions.csproj"/>
-        <ProjectReference Include="../LemonNeo.Core/LemonNeo.Core.csproj"/>
-        <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.12"/>
+        <InternalsVisibleTo Include="LemonNeo.Tests" />
+        <AvaloniaResource Include="Resources/Icons/App.ico" />
+        <PackageReference Include="Avalonia.Desktop" Version="12.1.3" />
+        <PackageReference Include="Avalonia.Skia" Version="12.1.3" />
+        <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.3" />
+        <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+        <PackageReference Include="Irihi.Lingua" Version="1.0.0" />
+        <AdditionalFiles Include="Resources/Languages/*.json" />
+        <ProjectReference Include="../LemonNeo.Hosting/LemonNeo.Hosting.csproj" />
+        <ProjectReference Include="../LemonNeo.Application/LemonNeo.Application.csproj" />
+        <ProjectReference Include="../LemonNeo.Abstractions/LemonNeo.Abstractions.csproj" />
+        <ProjectReference Include="../LemonNeo.Core/LemonNeo.Core.csproj" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.12" />
+    </ItemGroup>
+    <ItemGroup>
+      <Folder Include="Properties\" />
     </ItemGroup>
 </Project>
