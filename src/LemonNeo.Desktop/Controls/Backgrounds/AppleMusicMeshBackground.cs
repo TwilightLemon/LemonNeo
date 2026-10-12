@@ -120,7 +120,8 @@ public sealed class AppleMusicMeshBackground : Control
         set => SetValue(IsMeshEnabledProperty, value);
     }
 
-    /// <summary>-1 follows the display refresh rate, 0 disables continuous rendering.</summary>
+    /// <summary>-1 follows the compositor's animation tick, which is driven by the display
+    /// refresh rate; 0 disables continuous rendering.</summary>
     public int FrameRateLimit
     {
         get => GetValue(FrameRateLimitProperty);
@@ -361,8 +362,9 @@ public sealed class AppleMusicMeshBackground : Control
         if (generation != _animationFrameGeneration) return;
         _animationFramePending = false;
         var now = Stopwatch.GetTimestamp();
-        var frameRate = FrameRateLimit < 0 ? 60 : FrameRateLimit;
-        var minimumTicks = frameRate > 0 ? Math.Max(1, Stopwatch.Frequency / frameRate) : 0;
+        // A negative limit means "follow the display refresh rate": the compositor already
+        // ticks RequestAnimationFrame at that cadence, so no extra throttle is applied.
+        var minimumTicks = FrameRateLimit > 0 ? Math.Max(1, Stopwatch.Frequency / FrameRateLimit) : 0;
         if (_lastFrameTimestamp != 0 && now - _lastFrameTimestamp < minimumTicks)
         {
             RequestAnimationFrame();
