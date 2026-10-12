@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Template for LemonNeo.Desktop.app. @@VERSION@@ and @@BUILD@@ are filled in by Create-AppBundle.sh. -->
+<plist version="1.0">
+    <dict>
+        <key>CFBundleDevelopmentRegion</key>
+        <string>en</string>
+        <key>CFBundleDisplayName</key>
+        <string>Lemon Neo</string>
+        <key>CFBundleExecutable</key>
+        <string>LemonNeo.Desktop</string>
+        <key>CFBundleIconFile</key>
+        <string>App.icns</string>
+        <key>CFBundleIdentifier</key>
+        <string>com.lemonneo.desktop</string>
+        <key>CFBundleInfoDictionaryVersion</key>
+        <string>6.0</string>
+        <key>CFBundleName</key>
+        <string>Lemon Neo</string>
+        <key>CFBundlePackageType</key>
+        <string>APPL</string>
+        <key>CFBundleShortVersionString</key>
+        <string>@@VERSION@@</string>
+        <key>CFBundleSupportedPlatforms</key>
+        <array>
+            <string>MacOSX</string>
+        </array>
+        <key>CFBundleVersion</key>
+        <string>@@BUILD@@</string>
+        <key>LSApplicationCategoryType</key>
+        <string>public.app-category.music</string>
+        <key>LSMinimumSystemVersion</key>
+        <string>13.0</string>
+        <key>NSHighResolutionCapable</key>
+        <true/>
+        <key>NSPrincipalClass</key>
+        <string>NSApplication</string>
+    </dict>
+</plist>

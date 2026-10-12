@@ -1,0 +1,210 @@
+name: Build desktop packages
+
+# Tagging `v*` builds every package and attaches them to a GitHub release; a manual run only
+# uploads them as workflow artifacts.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to stamp into the packages. Defaults to <Version> in LemonNeo.Desktop.csproj.
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-desktop-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  build:
+    name: ${{ matrix.rid }} (${{ matrix.variant }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Each platform builds on its own runner: the plugin set depends on the host OS, and
+        # the macOS bundle is assembled with ditto, plutil, and codesign.
+        include:
+          - runner: windows-latest
+            rid: win-x64
+            variant: self-contained
+            self_contained: true
+          - runner: windows-latest
+            rid: win-x64
+            variant: framework-dependent
+            self_contained: false
+          - runner: macos-latest # Apple silicon
+            rid: osx-arm64
+            variant: self-contained
+            self_contained: true
+          - runner: macos-latest # Apple silicon
+            rid: osx-arm64
+            variant: framework-dependent
+            self_contained: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="$INPUT_VERSION"
+          fi
+          if [ -z "$version" ]; then
+            version=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' src/LemonNeo.Desktop/LemonNeo.Desktop.csproj | head -n 1)
+          fi
+          if [ -z "$version" ]; then
+            echo "::error::No version to package; set <Version> in LemonNeo.Desktop.csproj or pass one to the workflow."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Packaging Lemon Neo $version"
+
+      # The host build deploys plugins/ next to the executable, and the publish target carries
+      # that folder into the publish output — so plugins ship inside every package by default.
+      - name: Publish
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          RID: ${{ matrix.rid }}
+          SELF_CONTAINED: ${{ matrix.self_contained }}
+        run: |
+          set -euo pipefail
+          dotnet publish src/LemonNeo.Desktop/LemonNeo.Desktop.csproj \
+            --configuration Release \
+            --runtime "$RID" \
+            --self-contained "$SELF_CONTAINED" \
+            --output publish \
+            -p:Version="$VERSION"
+
+      - name: Verify plugin deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -d publish/plugins ]; then
+            echo "::error::The publish output has no plugins; check the plugin deployment targets before shipping this package."
+            exit 1
+          fi
+          count=$(find publish/plugins -mindepth 1 -maxdepth 1 -type d | wc -l)
+          if [ "$count" -eq 0 ]; then
+            echo "::error::The plugins folder in the publish output is empty; check the plugin deployment targets before shipping this package."
+            exit 1
+          fi
+          echo "$count plugins deployed:"
+          ls -1 publish/plugins
+
+      - name: Assemble app bundle (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          bash build/macos/Create-AppBundle.sh publish LemonNeo.Desktop.app "$VERSION" "$GITHUB_RUN_NUMBER"
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $dist = Join-Path $env:GITHUB_WORKSPACE 'dist'
+          $publish = Join-Path $env:GITHUB_WORKSPACE 'publish'
+          New-Item -ItemType Directory -Force -Path $dist | Out-Null
+          $archive = Join-Path $dist "LemonNeo.Desktop-$env:VERSION-${{ matrix.rid }}-${{ matrix.variant }}.zip"
+          if (Get-Command 7z -ErrorAction SilentlyContinue) {
+            Push-Location $publish
+            try {
+              & 7z a -tzip -mx=5 $archive '*'
+              if ($LASTEXITCODE -ne 0) { throw "7z exited with $LASTEXITCODE" }
+            } finally { Pop-Location }
+          } else {
+            Compress-Archive -Path (Join-Path $publish '*') -DestinationPath $archive
+          }
+          Get-Item $archive | Select-Object Name, Length
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          archive="dist/LemonNeo.Desktop-${VERSION}-${{ matrix.rid }}-${{ matrix.variant }}.zip"
+          # ditto preserves the bundle's permissions, symlinks, and metadata.
+          ditto -c -k --sequesterRsrc --keepParent LemonNeo.Desktop.app "$archive"
+          ls -lh "$archive"
+
+      - name: Upload package
+        uses: actions/upload-artifact@v7
+        with:
+          name: LemonNeo.Desktop-${{ steps.version.outputs.version }}-${{ matrix.rid }}-${{ matrix.variant }}
+          path: dist/*.zip
+          if-no-files-found: error
+
+  release:
+    name: Attach packages to the release
+    if: github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create the release
+        shell: bash
+        run: |
+          set -euo pipefail
+          ls -lh dist
+          cat > release-notes.md <<'NOTES'
+          Desktop packages for Windows (x64) and macOS (Apple silicon).
+
+          Both platforms ship two archives:
+
+          - `-self-contained` bundles the .NET runtime, so there is nothing to install first.
+          - `-framework-dependent` requires the [.NET 10 desktop runtime](https://dotnet.microsoft.com/download/dotnet/10.0).
+
+          Plugins live in the `plugins/` folder next to the app; deleting one of those folders
+          uninstalls that plugin. The macOS builds are unsigned and not notarized, so clear the
+          quarantine attribute before the first launch:
+          `xattr -dr com.apple.quarantine "/Applications/Lemon Neo.app"`.
+          NOTES
+          args=(--title "Lemon Neo ${GITHUB_REF_NAME#v}" --verify-tag --notes-file release-notes.md)
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            args+=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME" dist/*.zip "${args[@]}"
