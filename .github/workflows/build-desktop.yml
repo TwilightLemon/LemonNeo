@@ -201,9 +201,12 @@ jobs:
           then drag `Lemon Neo.app` onto the `Applications` shortcut.
 
           Plugins live in the `plugins/` folder next to the app; deleting one of those folders
-          uninstalls that plugin. The macOS builds are ad-hoc signed but not Developer ID signed
-          or notarized, so Gatekeeper may require clearing the quarantine attribute before the first launch:
-          `xattr -dr com.apple.quarantine "/Applications/Lemon Neo.app"`.
+          uninstalls that plugin. The macOS builds are not signed with a valid Apple Developer ID,
+          so Gatekeeper may refuse the first launch. If the app will not open:
+
+          1. Clear the quarantine attribute:
+             `xattr -dr com.apple.quarantine "/Applications/Lemon Neo.app"`
+          2. Or open **System Settings → Privacy & Security** and choose **Open Anyway**.
           NOTES
           args=(--title "Lemon Neo ${GITHUB_REF_NAME#v}" --verify-tag --notes-file release-notes.md)
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then

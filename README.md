@@ -10,6 +10,7 @@ A cross-platform music player bringing your favorite music together.
 ![Avalonia UI](https://img.shields.io/badge/UI-Avalonia%20UI-b33bb3)
 ![GitHub Repo stars](https://img.shields.io/github/stars/TwilightLemon/LemonNeo)  
 
+English | [简体中文](README.zh-CN.md)
 
 </div>
 
