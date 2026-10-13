@@ -1,5 +1,6 @@
-# Regenerate the desktop icons — the Windows .ico and the macOS .icns — from the same music
-# geometry and placement as the sidebar logo.
+# Regenerate the Windows .ico from the same music geometry and placement as the sidebar logo.
+# The macOS .icns is a different canvas with its own grid rules, so build/macos/Generate-AppIcon.swift
+# writes that one instead.
 [CmdletBinding()]
 param()
 
@@ -7,13 +8,6 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $iconDirectory = Join-Path $repositoryRoot 'src/LemonNeo.Desktop/Resources/Icons'
-
-function Write-BigEndianUInt32 {
-    param([System.IO.BinaryWriter]$writer, [uint32]$value)
-    $bytes = [BitConverter]::GetBytes($value)
-    [Array]::Reverse($bytes)
-    $writer.Write($bytes)
-}
 
 function New-IconFrame {
     param([int]$size, $accent, $foreground, $tile, $music)
@@ -87,24 +81,11 @@ $tile.AddArc(4, 20, 40, 40, 90, 90)
 $tile.CloseFigure()
 $accent = [System.Drawing.SolidBrush]::new([System.Drawing.ColorTranslator]::FromHtml('#DCEC7E'))
 $foreground = [System.Drawing.SolidBrush]::new([System.Drawing.ColorTranslator]::FromHtml('#172027'))
-# The .ico stops at 256 px, the largest size its directory entry can address; the .icns
-# carries the same artwork up to 1024 px for Retina displays.
+# 256 px is the largest size an .ico directory entry can address.
 $iconSizes = @(16, 20, 24, 32, 48, 64, 128, 256)
-$icnsEntries = @(
-    @{ Type = 'icp4'; Size = 16 }
-    @{ Type = 'ic11'; Size = 32 }
-    @{ Type = 'icp5'; Size = 32 }
-    @{ Type = 'ic12'; Size = 64 }
-    @{ Type = 'ic07'; Size = 128 }
-    @{ Type = 'ic13'; Size = 256 }
-    @{ Type = 'ic08'; Size = 256 }
-    @{ Type = 'ic14'; Size = 512 }
-    @{ Type = 'ic09'; Size = 512 }
-    @{ Type = 'ic10'; Size = 1024 }
-)
 try {
     $frames = @{}
-    foreach ($size in $iconSizes + @(512, 1024)) {
+    foreach ($size in $iconSizes) {
         $frames[$size] = New-IconFrame -size $size -accent $accent -foreground $foreground -tile $tile -music $music
     }
     New-Item -ItemType Directory -Path $iconDirectory -Force | Out-Null
@@ -123,23 +104,6 @@ try {
         foreach ($size in $iconSizes) { $writer.Write([byte[]]$frames[$size]) }
     }
     finally { $writer.Dispose() }
-
-    # A PNG-based .icns is a header followed by typed chunks, each carrying one PNG frame.
-    $total = 8
-    foreach ($entry in $icnsEntries) { $total += 8 + $frames[$entry.Size].Length }
-    $encoding = [System.Text.Encoding]::ASCII
-    $writer = [System.IO.BinaryWriter]::new([System.IO.File]::Create((Join-Path $iconDirectory 'App.icns')))
-    try {
-        $writer.Write($encoding.GetBytes('icns'))
-        Write-BigEndianUInt32 -writer $writer -value ([uint32]$total)
-        foreach ($entry in $icnsEntries) {
-            $data = $frames[$entry.Size]
-            $writer.Write($encoding.GetBytes($entry.Type))
-            Write-BigEndianUInt32 -writer $writer -value ([uint32]($data.Length + 8))
-            $writer.Write([byte[]]$data)
-        }
-    }
-    finally { $writer.Dispose() }
 }
 finally { $accent.Dispose(); $foreground.Dispose(); $tile.Dispose(); $placementMatrix.Dispose(); $music.Dispose() }
-Write-Output "Generated App.ico with $($iconSizes.Count) sizes and App.icns with $($icnsEntries.Count) entries."
+Write-Output "Generated App.ico with $($iconSizes.Count) sizes."
