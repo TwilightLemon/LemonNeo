@@ -4,7 +4,7 @@
         <ProjectReference Include="../LemonNeo.Abstractions/LemonNeo.Abstractions.csproj"/>
     </ItemGroup>
     <ItemGroup>
-        <PackageReference Include="Microsoft.AspNetCore.DataProtection.Extensions" Version="10.0.12"/>
+        <PackageReference Include="Microsoft.AspNetCore.DataProtection.Extensions" Version="10.0.13"/>
         <InternalsVisibleTo Include="LemonNeo.Hosting"/>
     </ItemGroup>
 </Project>
