@@ -484,11 +484,12 @@
                             Padding="8,0"
                             ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Lyrics}}">
                             <Grid ColumnDefinitions="48,*">
-                                <sharedControls:Artwork
+                                <sharedControls:TransitionArtwork
                                     AutomationProperties.Name="{Binding Playback.NowTitle}"
                                     CornerRadius="10"
                                     Height="48"
-                                    Source="{Binding Playback.NowArtwork}"
+                                    ReduceMotion="{Binding Lyrics.ReduceMotion}"
+                                    Source="{Binding Playback.NowArtworkReference}"
                                     VerticalAlignment="Center"
                                     Width="48" />
                                 <StackPanel

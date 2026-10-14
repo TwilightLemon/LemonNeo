@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Media;
 using LemonNeo.Desktop.Services;
 using LemonNeo.Desktop.Views.Shell;
 using LemonNeo.Hosting;
@@ -13,6 +14,8 @@ public class App : Avalonia.Application
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
+        if (OperatingSystem.IsWindows())
+            Resources["Font.UI"] = new FontFamily("Microsoft YaHei UI");
     }
 
     public override void OnFrameworkInitializationCompleted()

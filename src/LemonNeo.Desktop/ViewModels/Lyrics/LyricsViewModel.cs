@@ -23,7 +23,7 @@ public sealed class LyricsViewModel : PageViewModel
     private IReadOnlyList<LyricsLine> _lyricLines = [];
     private CancellationTokenSource? _lyricsCancellation;
     private string _lyricsStatusKey = "NoLyrics";
-    private Track? _lyricsTrack;
+    private MusicItemId? _lyricsTrackId;
     private PlaybackSessionSnapshot _snapshot;
 
     public LyricsViewModel(DesktopContext context, PlaybackViewModel playback) : base(context, DesktopRoutes.Lyrics)
@@ -257,8 +257,10 @@ public sealed class LyricsViewModel : PageViewModel
         _snapshot = Playback.Snapshot;
         SeekLyricCommand.NotifyCanExecuteChanged();
         UpdateLyricsPosition();
-        if (Equals(_lyricsTrack, _snapshot.CurrentTrack)) return;
-        _lyricsTrack = _snapshot.CurrentTrack;
+        // Source discovery can enrich ExternalIds without changing the song. Keep its lyrics
+        // and any in-flight lookup instead of clearing and reloading the same document.
+        if (_lyricsTrackId == _snapshot.CurrentTrack?.Id) return;
+        _lyricsTrackId = _snapshot.CurrentTrack?.Id;
         _lyricsCancellation?.Cancel();
         _lyricsCancellation?.Dispose();
         _lyricsCancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
@@ -279,7 +281,7 @@ public sealed class LyricsViewModel : PageViewModel
             var result = await Task.Run(() => _host.Get<LyricsService>().GetLyricsAsync(track, cancellationToken),
                 cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
-            if (!Equals(_snapshot.CurrentTrack, track)) return;
+            if (_snapshot.CurrentTrack?.Id != track.Id) return;
             Document = result.Lyrics;
             _lyricsStatusKey = "NoLyrics";
             _lyricLines = Document?.Lines?.OrderBy(l => l.EffectiveStartTimeMs ?? int.MaxValue).ToArray() ?? [];

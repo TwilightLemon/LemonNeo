@@ -157,11 +157,12 @@
                     Margin="0,0,28,0"
                     Name="CoverArea"
                     VerticalAlignment="Center">
-                    <sharedControls:Artwork
+                    <sharedControls:TransitionArtwork
                         AutomationProperties.Name="{Binding Playback.NowTitle}"
                         CornerRadius="24"
                         Name="NowPlayingCover"
-                        Source="{Binding Playback.NowArtwork}" />
+                        ReduceMotion="{Binding ReduceMotion}"
+                        Source="{Binding Playback.NowArtworkReference}" />
                 </Border>
                 <lyricsControls:LyricsPresenter
                     BoldLyrics="{Binding BoldLyrics}"

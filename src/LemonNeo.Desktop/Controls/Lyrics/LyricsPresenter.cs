@@ -13,6 +13,7 @@ using Avalonia.VisualTree;
 using CommunityToolkit.Mvvm.Input;
 using LemonNeo.Application.Lyrics;
 using LemonNeo.Core.Lyrics;
+using LemonNeo.Desktop.Controls.Shared;
 using CoreLyrics = LemonNeo.Core.Lyrics.Lyrics;
 
 namespace LemonNeo.Desktop.Controls.Lyrics;
@@ -115,6 +116,9 @@ public sealed class LyricsPresenter : UserControl
     private readonly Stopwatch _positionClock = new();
     private readonly List<RowControls> _rows = [];
     private readonly ScrollViewer _scroll;
+    private readonly BlurTransitionHost _transition;
+    private bool _rebuildingRows;
+    private CoreLyrics? _displayedDocument;
     private readonly Stopwatch _scrollClock = new();
     private readonly Cursor _seekCursor = new(StandardCursorType.Hand);
     private readonly Border _topSpace = new();
@@ -149,7 +153,8 @@ public sealed class LyricsPresenter : UserControl
                 new GradientStop(Colors.White, .88), new GradientStop(Colors.Transparent, 1)
             ]
         };
-        Content = new Grid { Children = { _scroll, _empty, _follow } };
+        _transition = new BlurTransitionHost(new Grid { Children = { _scroll, _empty } });
+        Content = new Grid { Children = { _transition, _follow } };
         _follow.Click += (_, _) => FollowCurrentLine();
         _scroll.AddHandler(PointerWheelChangedEvent, (_, _) => SuspendFollowing(), RoutingStrategies.Tunnel);
         _scroll.AddHandler(PointerPressedEvent, (_, _) => SuspendFollowing(), RoutingStrategies.Tunnel);
@@ -307,9 +312,13 @@ public sealed class LyricsPresenter : UserControl
         base.OnPropertyChanged(change);
         // UserControl initialization also changes properties before our child controls exist.
         if (_scroll is null) return;
-        if (change.Property == DocumentProperty) RebuildRows();
+        if (change.Property == DocumentProperty)
+        {
+            _transition.Change(ApplyContent);
+        }
         if (change.Property == VisibleLineCountProperty || change.Property == IsVerticalProperty)
         {
+            _transition.Complete();
             _scroll.OpacityMask = IsCompact
                 ? null
                 : new LinearGradientBrush
@@ -362,6 +371,7 @@ public sealed class LyricsPresenter : UserControl
             change.Property == ShowTranslationProperty ||
             change.Property == BoldLyricsProperty || change.Property == ReduceMotionProperty)
         {
+            _transition.ReduceMotion = ReduceMotion;
             UpdateAppearance();
             RequestCenter();
             if (ReduceMotion)
@@ -379,14 +389,30 @@ public sealed class LyricsPresenter : UserControl
             AutomationProperties.SetName(_follow, FollowLabel);
         }
 
-        if (change.Property == EmptyTextProperty) _empty.Text = EmptyText;
+        if (change.Property == EmptyTextProperty)
+        {
+            if (_empty.IsVisible) _transition.Change(ApplyContent);
+            else _empty.Text = EmptyText;
+        }
         if (change.Property == SeekCommandProperty) ObserveSeekCommand();
         if (change.Property == CanSeekProperty || change.Property == SeekCommandProperty) UpdateSeekTargets();
         if (change.Property == IsVisibleProperty) RequestAnimationFrame();
     }
 
+    private double LivePosition => PositionMilliseconds +
+        (IsPlaying && !IsStopped ? _positionClock.Elapsed.TotalMilliseconds : 0);
+
+    private void ApplyContent()
+    {
+        _empty.Text = EmptyText;
+        if (!ReferenceEquals(_displayedDocument, Document)) RebuildRows();
+        else UpdatePosition(LivePosition, false, true);
+    }
+
     private void RebuildRows()
     {
+        _rebuildingRows = true;
+        _displayedDocument = Document;
         _scrollClock.Reset();
         _rows.Clear();
         _lines.Children.Clear();
@@ -452,9 +478,10 @@ public sealed class LyricsPresenter : UserControl
         UpdateAppearance();
         UpdateSeekTargets();
         UpdateSpacers();
-        UpdatePosition(PositionMilliseconds, false);
+        UpdatePosition(LivePosition, false, true);
         RequestCenter();
         RequestAnimationFrame();
+        _rebuildingRows = false;
     }
 
     private void UpdateAppearance()
@@ -503,8 +530,11 @@ public sealed class LyricsPresenter : UserControl
         }
     }
 
-    private void UpdatePosition(double position, bool animate)
+    private void UpdatePosition(double position, bool animate, bool applyImmediately = false)
     {
+        // The outgoing document stays intact until blur-out completes. The replacement then uses
+        // the current playback clock, not the position at which the transition was requested.
+        if (!ReferenceEquals(_displayedDocument, Document)) return;
         var low = 0;
         var high = _timedRows.Length - 1;
         var selected = -1;
@@ -527,6 +557,11 @@ public sealed class LyricsPresenter : UserControl
             : IsCompact && _rows.Count > 0 ? 0 : -1;
         if (index != CurrentIndex)
         {
+            if (IsCompact && !_rebuildingRows && !applyImmediately)
+            {
+                _transition.Change(ApplyContent);
+                return;
+            }
             if (CurrentIndex >= 0)
             {
                 var previous = _rows[CurrentIndex];
