@@ -38,14 +38,17 @@ public static class DesktopPreferences
         settings.Register(nameof(LyricsPreferences), new LyricsPreferences(), value => value with
         {
             FontSize = double.IsFinite(value.FontSize) ? Math.Clamp(value.FontSize, 16, 100) : 24,
-            Alignment = Enum.IsDefined(value.Alignment) ? value.Alignment : LyricAlignment.Center
+            Alignment = Enum.IsDefined(value.Alignment) ? value.Alignment : LyricAlignment.Center,
+            LyricFontFamilies = value.LyricFontFamilies ?? ""
         });
         settings.Register(nameof(DesktopLyricsPreferences), new DesktopLyricsPreferences(), value => value with
         {
             LineCount = Math.Clamp(value.LineCount, 1, 2),
             FontSize = double.IsFinite(value.FontSize) ? Math.Clamp(value.FontSize, 16, 100) : 28,
-            WindowWidth = double.IsFinite(value.WindowWidth) ? Math.Clamp(value.WindowWidth, 320, 3000) : 760,
-            WindowHeight = double.IsFinite(value.WindowHeight) ? Math.Clamp(value.WindowHeight, 110, 1200) : 300
+            WindowWidth = double.IsFinite(value.WindowWidth) ? Math.Clamp(value.WindowWidth, 110, 3000) : 760,
+            WindowHeight = double.IsFinite(value.WindowHeight) ? Math.Clamp(value.WindowHeight, 110, 3000) : 300,
+            DisplayMode = Enum.IsDefined(value.DisplayMode) ? value.DisplayMode : LyricDisplayMode.Horizontal,
+            LyricFontFamilies = value.LyricFontFamilies ?? ""
         });
     }
 

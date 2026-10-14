@@ -19,6 +19,8 @@ public sealed class LoadedArtwork : IDisposable
     public Bitmap Bitmap => GetArtwork().Bitmap;
     public ReadOnlyMemory<byte> EncodedData => GetArtwork().EncodedData;
 
+    internal LoadedArtwork Retain() => new(GetArtwork());
+
     private SharedArtwork GetArtwork() => _artwork ?? throw new ObjectDisposedException(nameof(LoadedArtwork));
 
     public void Dispose() => Interlocked.Exchange(ref _artwork, null)?.Release();

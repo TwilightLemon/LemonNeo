@@ -23,7 +23,7 @@ public sealed class LyricsViewModel : PageViewModel
     private IReadOnlyList<LyricsLine> _lyricLines = [];
     private CancellationTokenSource? _lyricsCancellation;
     private string _lyricsStatusKey = "NoLyrics";
-    private Track? _lyricsTrack;
+    private MusicItemId? _lyricsTrackId;
     private PlaybackSessionSnapshot _snapshot;
 
     public LyricsViewModel(DesktopContext context, PlaybackViewModel playback) : base(context, DesktopRoutes.Lyrics)
@@ -34,6 +34,8 @@ public sealed class LyricsViewModel : PageViewModel
         AlignCenterCommand = new RelayCommand(() => SetAlignment(LyricAlignment.Center));
         SingleDesktopLineCommand = new RelayCommand(() => DesktopLyricLineCount = 1);
         TwoDesktopLinesCommand = new RelayCommand(() => DesktopLyricLineCount = 2);
+        HorizontalDesktopLyricsCommand = new RelayCommand(() => SetDesktopDisplayMode(LyricDisplayMode.Horizontal));
+        VerticalDesktopLyricsCommand = new RelayCommand(() => SetDesktopDisplayMode(LyricDisplayMode.Vertical));
         SeekLyricCommand = new AsyncRelayCommand<double>(position => Playback.SeekAsync(position / 1000),
             position => position >= 0 && Playback.CanSeek);
         _lyricsSubscription = Context.Settings.Subscribe<LyricsPreferences>(_ => RefreshLyricsPreferenceProperties());
@@ -58,6 +60,28 @@ public sealed class LyricsViewModel : PageViewModel
     public RelayCommand AlignCenterCommand { get; }
     public RelayCommand SingleDesktopLineCommand { get; }
     public RelayCommand TwoDesktopLinesCommand { get; }
+    public RelayCommand HorizontalDesktopLyricsCommand { get; }
+    public RelayCommand VerticalDesktopLyricsCommand { get; }
+    public bool IsVerticalDesktopLyrics => _desktopPreferences.DisplayMode == LyricDisplayMode.Vertical;
+    public bool IsHorizontalDesktopLyrics => !IsVerticalDesktopLyrics;
+
+    public string LyricFontFamilies
+    {
+        get => _lyricsPreferences.LyricFontFamilies;
+        set
+        {
+            if (value != LyricFontFamilies) ApplyLyricsPreferences(p => p with { LyricFontFamilies = value ?? "" });
+        }
+    }
+
+    public string DesktopLyricFontFamilies
+    {
+        get => _desktopPreferences.LyricFontFamilies;
+        set
+        {
+            if (value != DesktopLyricFontFamilies) ApplyDesktopPreferences(p => p with { LyricFontFamilies = value ?? "" });
+        }
+    }
     public bool IsSingleDesktopLine => DesktopLyricLineCount == 1;
     public bool IsTwoDesktopLines => DesktopLyricLineCount == 2;
 
@@ -75,6 +99,8 @@ public sealed class LyricsViewModel : PageViewModel
     public AsyncRelayCommand<double> SeekLyricCommand { get; }
     public double DesktopLyricWindowWidth => _desktopPreferences.WindowWidth;
     public double DesktopLyricWindowHeight => _desktopPreferences.WindowHeight;
+    public int? DesktopLyricWindowX => _desktopPreferences.WindowX;
+    public int? DesktopLyricWindowY => _desktopPreferences.WindowY;
 
     public double DesktopLyricFontSize
     {
@@ -172,10 +198,22 @@ public sealed class LyricsViewModel : PageViewModel
         ApplyDesktopPreferences(p => p with { WindowWidth = width, WindowHeight = height });
     }
 
+    /// <summary>Persist the placement when the window closes; dragging only moves the window.</summary>
+    public void SaveDesktopWindowPosition(int x, int y)
+    {
+        if (x == DesktopLyricWindowX && y == DesktopLyricWindowY) return;
+        ApplyDesktopPreferences(p => p with { WindowX = x, WindowY = y });
+    }
+
     private void SetAlignment(LyricAlignment alignment)
     {
         if (_lyricsPreferences.Alignment == alignment) return;
         ApplyLyricsPreferences(p => p with { Alignment = alignment });
+    }
+
+    private void SetDesktopDisplayMode(LyricDisplayMode mode)
+    {
+        if (_desktopPreferences.DisplayMode != mode) ApplyDesktopPreferences(p => p with { DisplayMode = mode });
     }
 
     private void ApplyLyricsPreferences(Func<LyricsPreferences, LyricsPreferences> update)
@@ -193,7 +231,7 @@ public sealed class LyricsViewModel : PageViewModel
         foreach (var name in new[]
                  {
                      nameof(LyricFontSize), nameof(ShowRomanization), nameof(ShowTranslation), nameof(BoldLyrics),
-                     nameof(IsLeftAligned), nameof(IsCenterAligned), nameof(LyricTextAlignment)
+                     nameof(IsLeftAligned), nameof(IsCenterAligned), nameof(LyricTextAlignment), nameof(LyricFontFamilies)
                  }) OnPropertyChanged(name);
     }
 
@@ -203,7 +241,9 @@ public sealed class LyricsViewModel : PageViewModel
                  {
                      nameof(DesktopLyricLineCount), nameof(IsSingleDesktopLine), nameof(IsTwoDesktopLines),
                      nameof(DesktopLyricFontSize), nameof(DesktopShowRomanization), nameof(DesktopShowTranslation),
-                     nameof(DesktopLyricWindowWidth), nameof(DesktopLyricWindowHeight)
+                     nameof(DesktopLyricWindowWidth), nameof(DesktopLyricWindowHeight),
+                     nameof(DesktopLyricWindowX), nameof(DesktopLyricWindowY), nameof(DesktopLyricFontFamilies),
+                     nameof(IsVerticalDesktopLyrics), nameof(IsHorizontalDesktopLyrics)
                  }) OnPropertyChanged(name);
     }
 
@@ -217,8 +257,10 @@ public sealed class LyricsViewModel : PageViewModel
         _snapshot = Playback.Snapshot;
         SeekLyricCommand.NotifyCanExecuteChanged();
         UpdateLyricsPosition();
-        if (Equals(_lyricsTrack, _snapshot.CurrentTrack)) return;
-        _lyricsTrack = _snapshot.CurrentTrack;
+        // Source discovery can enrich ExternalIds without changing the song. Keep its lyrics
+        // and any in-flight lookup instead of clearing and reloading the same document.
+        if (_lyricsTrackId == _snapshot.CurrentTrack?.Id) return;
+        _lyricsTrackId = _snapshot.CurrentTrack?.Id;
         _lyricsCancellation?.Cancel();
         _lyricsCancellation?.Dispose();
         _lyricsCancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
@@ -239,7 +281,7 @@ public sealed class LyricsViewModel : PageViewModel
             var result = await Task.Run(() => _host.Get<LyricsService>().GetLyricsAsync(track, cancellationToken),
                 cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
-            if (!Equals(_snapshot.CurrentTrack, track)) return;
+            if (_snapshot.CurrentTrack?.Id != track.Id) return;
             Document = result.Lyrics;
             _lyricsStatusKey = "NoLyrics";
             _lyricLines = Document?.Lines?.OrderBy(l => l.EffectiveStartTimeMs ?? int.MaxValue).ToArray() ?? [];

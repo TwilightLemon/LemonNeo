@@ -22,6 +22,9 @@ public sealed class NeteaseUserPlugin :
 {
     private const string ProviderId = "netease";
     private const string CookieKey = "music-163-cookie";
+    // Request sizes, not total import limits. Keep song-detail URLs below common proxy limits.
+    private const int PlaylistPageSize = 100;
+    private const int TrackBatchSize = 100;
 
     private const string UserAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
@@ -120,23 +123,35 @@ public sealed class NeteaseUserPlugin :
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var (cookie, userId) = RequiredAuthentication();
-        using var document = await GetJsonAsync(
-            $"api/user/playlist/?offset=0&limit=1000&uid={Uri.EscapeDataString(userId)}",
-            cookie,
-            cancellationToken);
-        EnsureApiSuccess(document.RootElement);
-        if (!document.RootElement.TryGetProperty("playlist", out var playlists) ||
-            playlists.ValueKind != JsonValueKind.Array)
-            throw new ProviderException("Netease returned no playlist collection.");
-
-        foreach (var playlist in playlists.EnumerateArray())
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var offset = 0;
+        while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!TryReadId(playlist, "id", out var id)) continue;
+            using var document = await GetJsonAsync(
+                $"api/user/playlist/?offset={offset}&limit={PlaylistPageSize}&uid={Uri.EscapeDataString(userId)}",
+                cookie, cancellationToken);
+            EnsureApiSuccess(document.RootElement);
+            if (!document.RootElement.TryGetProperty("playlist", out var playlists) ||
+                playlists.ValueKind != JsonValueKind.Array)
+                throw new ProviderException("Netease returned no playlist collection.");
 
-            var name = ReadString(playlist, "name") ?? id;
-            var count = ReadInt32(playlist, "trackCount");
-            yield return new RemotePlaylistSummary(id, name, count);
+            var previousCount = seen.Count;
+            foreach (var playlist in playlists.EnumerateArray())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!TryReadId(playlist, "id", out var id) || !seen.Add(id)) continue;
+                yield return new RemotePlaylistSummary(id, ReadString(playlist, "name") ?? id,
+                    ReadInt32(playlist, "trackCount"));
+            }
+
+            var count = playlists.GetArrayLength();
+            var hasMore = document.RootElement.TryGetProperty("more", out var more)
+                && more.ValueKind is JsonValueKind.True or JsonValueKind.False ? more.GetBoolean() : (bool?)null;
+            if (hasMore == false || (hasMore is null && count < PlaylistPageSize)) yield break;
+            if (count == 0 || seen.Count == previousCount)
+                throw new ProviderException("Netease playlist pagination made no progress. Please retry the import.");
+            offset = checked(offset + count);
         }
     }
 
@@ -149,7 +164,7 @@ public sealed class NeteaseUserPlugin :
 
         var (cookie, _) = RequiredAuthentication();
         using var document = await GetJsonAsync(
-            $"api/v6/playlist/detail?id={playlistId}&offset=0&total=true&limit=100000&n=10000",
+            $"api/v6/playlist/detail?id={playlistId}&n={TrackBatchSize}",
             cookie,
             cancellationToken);
         EnsureApiSuccess(document.RootElement);
@@ -162,6 +177,35 @@ public sealed class NeteaseUserPlugin :
             foreach (var value in values.EnumerateArray())
                 if (TryMapTrack(value) is { } track)
                     tracks.Add(track);
+
+        // The detail endpoint can truncate tracks even for authenticated users. trackIds is the
+        // authoritative ordered collection; resolve missing details in batches and preserve its order.
+        if (playlist.TryGetProperty("trackIds", out var trackIds) && trackIds.ValueKind == JsonValueKind.Array)
+        {
+            var ids = trackIds.EnumerateArray()
+                .Select(value => TryReadId(value, "id", out var id) ? id : null)
+                .OfType<string>().ToArray();
+            var byId = tracks.DistinctBy(track => track.Id.RemoteId)
+                .ToDictionary(track => track.Id.RemoteId, StringComparer.Ordinal);
+            foreach (var batch in ids.Where(id => !byId.ContainsKey(id)).Distinct().Chunk(TrackBatchSize))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var requestValue = Uri.EscapeDataString("[" + string.Join(",", batch.Select(id => $"{{\"id\":{id}}}")) + "]");
+                using var details = await GetJsonAsync($"api/v3/song/detail?c={requestValue}", cookie, cancellationToken);
+                EnsureApiSuccess(details.RootElement);
+                if (!details.RootElement.TryGetProperty("songs", out var songs) || songs.ValueKind != JsonValueKind.Array)
+                    throw new ProviderException("Netease returned no song collection.");
+                foreach (var song in songs.EnumerateArray())
+                    if (TryMapTrack(song) is { } track) byId[track.Id.RemoteId] = track;
+            }
+
+            // Removed or unavailable songs may legitimately be absent from song/detail.
+            tracks = ids.Where(byId.ContainsKey).Select(id => byId[id]).ToList();
+        }
+        else if (ReadInt32(playlist, "trackCount") is { } total && total > tracks.Count)
+        {
+            throw new ProviderException("Netease returned an incomplete playlist without track ids. Please retry the import.");
+        }
 
         return new RemotePlaylist
         {

@@ -103,6 +103,7 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
 
     public bool HasCurrentTrack => Snapshot.CurrentTrack is not null;
     public Bitmap? NowArtwork => _nowArtwork?.Bitmap;
+    public LoadedArtwork? NowArtworkReference => _nowArtwork;
     public BackgroundArtworkFrame? CurrentArtwork => _backgroundArtwork;
     public bool IsPlaying => Snapshot.State == PlayerState.Playing;
     public string PlayLabel => _text[IsPlaying ? LanguageManager.Keys.Pause : LanguageManager.Keys.Play];
@@ -384,10 +385,8 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
             SetArtwork(null);
             return;
         }
-        // Keep the old background frame until the new encoded image is ready,
-        // allowing the renderer to cross-fade artwork without affecting the
-        // foreground cover placeholder.
-        SetArtwork(null, backgroundArtwork: _backgroundArtwork);
+        // Keep the current cover and palette while loading so the incoming image can
+        // transition directly from the previous one instead of flashing a placeholder.
         _artworkCancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
         _artworkTasks.RemoveAll(t => t.IsCompleted);
         _artworkTasks.Add(LoadArtworkAsync(uri, _artworkCancellation.Token));
@@ -434,7 +433,11 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
     private void SetArtwork(LoadedArtwork? bitmap, Color? color = null, BackgroundArtworkFrame? backgroundArtwork = null)
     {
         var previous = _nowArtwork;
-        if (SetProperty(ref _nowArtwork, bitmap, nameof(NowArtwork))) previous?.Dispose();
+        if (SetProperty(ref _nowArtwork, bitmap, nameof(NowArtwork)))
+        {
+            OnPropertyChanged(nameof(NowArtworkReference));
+            previous?.Dispose();
+        }
         if (!Equals(_backgroundArtwork, backgroundArtwork))
         {
             _backgroundArtwork = backgroundArtwork;

@@ -10,6 +10,18 @@ namespace LemonNeo.Desktop.Controls.Lyrics;
 /// <summary>Shapes text once, then sweeps a soft highlight across each timed word, including wrapped words.</summary>
 public sealed class LyricText : TextBlock
 {
+    public static readonly StyledProperty<bool> IsVerticalProperty =
+        AvaloniaProperty.Register<LyricText, bool>(nameof(IsVertical));
+
+    private VerticalLyricLayout? _verticalLayout;
+    private bool _verticalBoundsReady;
+
+    public bool IsVertical
+    {
+        get => GetValue(IsVerticalProperty);
+        set => SetValue(IsVerticalProperty, value);
+    }
+
     public static readonly StyledProperty<IReadOnlyList<LyricsDisplaySegment>?> SegmentsProperty =
         AvaloniaProperty.Register<LyricText, IReadOnlyList<LyricsDisplaySegment>?>(nameof(Segments));
 
@@ -50,6 +62,7 @@ public sealed class LyricText : TextBlock
     {
         AffectsRender<LyricText>(PositionMillisecondsProperty, IsHighlightedProperty, ReduceMotionProperty,
             LineStartTimeMsProperty);
+        AffectsMeasure<LyricText>(IsVerticalProperty);
     }
 
     public IReadOnlyList<LyricsDisplaySegment>? Segments
@@ -108,16 +121,43 @@ public sealed class LyricText : TextBlock
             InvalidateVisual();
         }
 
-        if (change.Property == ReachedBrushProperty)
+        if (change.Property == ReachedBrushProperty || change.Property == IsVerticalProperty ||
+            change.Property == TextProperty || change.Property == FontFamilyProperty ||
+            change.Property == FontSizeProperty || change.Property == FontWeightProperty ||
+            change.Property == FontStyleProperty || change.Property == FontStretchProperty ||
+            change.Property == LetterSpacingProperty || change.Property == ForegroundProperty)
         {
+            _verticalLayout?.Dispose();
+            _verticalLayout = null;
             ClearHighlightLayout();
             InvalidateVisual();
         }
     }
 
+    private VerticalLyricLayout VerticalLayout => _verticalLayout ??= new VerticalLyricLayout(Text ?? "",
+        new Typeface(FontFamily, FontStyle, FontWeight, FontStretch), FontSize, LetterSpacing, Foreground, ReachedBrush);
+
+    protected override Size MeasureOverride(Size availableSize) => IsVertical
+        ? VerticalLayout.Size : base.MeasureOverride(availableSize);
+
+    internal Rect[] GetRangeBounds(int start, int length) => IsVertical
+        ? VerticalLayout.HitTestTextRange(start, length) : TextLayout.HitTestTextRange(start, length).ToArray();
+
+    internal object LayoutIdentity => IsVertical ? VerticalLayout : TextLayout;
+
     protected override void RenderTextLayout(DrawingContext context, Point origin)
     {
-        base.RenderTextLayout(context, origin);
+        if (IsVertical)
+        {
+            origin = new Point(Math.Max(0, (Bounds.Width - VerticalLayout.Size.Width) / 2), 0);
+            VerticalLayout.Draw(context, origin, false);
+        }
+        else base.RenderTextLayout(context, origin);
+        RenderHighlight(context, origin);
+    }
+
+    private void RenderHighlight(DrawingContext context, Point origin)
+    {
         if ((!IsHighlighted && Segments is null) || ReachedBrush is null || string.IsNullOrEmpty(Text)) return;
         EnsureHighlightLayout();
         if (Words is { Count: > 0 } words)
@@ -148,13 +188,20 @@ public sealed class LyricText : TextBlock
                 : Math.Clamp((PositionMilliseconds - LineStartTimeMs.Value) / 240, 0, 1);
             using (context.PushOpacity(opacity))
             {
-                _highlightLayout!.Draw(context, origin);
+                DrawReachedLayout(context, origin);
             }
         }
     }
 
     private void EnsureHighlightLayout()
     {
+        if (IsVertical)
+        {
+            if (_verticalBoundsReady) return;
+            _wordBounds = MeasureWordBounds();
+            _verticalBoundsReady = true;
+            return;
+        }
         var layout = TextLayout;
         if (ReferenceEquals(layout, _sourceLayout)) return;
         ClearHighlightLayout();
@@ -162,12 +209,17 @@ public sealed class LyricText : TextBlock
         _highlightLayout = new TextLayout(Text, new Typeface(FontFamily, FontStyle, FontWeight, FontStretch), FontSize,
             ReachedBrush, TextAlignment, TextWrapping, TextTrimming, TextDecorations, FlowDirection,
             layout.MaxWidth, layout.MaxHeight, LineHeight, LetterSpacing, MaxLines, FontFeatures);
+        _wordBounds = MeasureWordBounds();
+    }
+
+    private Rect[][] MeasureWordBounds()
+    {
         var texts = Words?.Select(w => w.Text) ?? Segments?.Select(s => s.Text) ?? [];
         var offset = 0;
-        _wordBounds = texts.Select(text =>
+        return texts.Select(text =>
         {
             // Keep empty fragments aligned with their timestamps without hit-testing a zero-length range.
-            var bounds = text.Length == 0 ? [] : layout.HitTestTextRange(offset, text.Length).ToArray();
+            var bounds = text.Length == 0 ? [] : GetRangeBounds(offset, text.Length);
             offset += text.Length;
             return bounds;
         }).ToArray();
@@ -176,20 +228,22 @@ public sealed class LyricText : TextBlock
     private void DrawHighlight(DrawingContext context, Point origin, Rect[] bounds, double progress)
     {
         if (progress <= 0) return;
-        var width = bounds.Sum(b => b.Width);
+        _mask.EndPoint = IsVertical ? new RelativePoint(0, 1, RelativeUnit.Relative) : new RelativePoint(1, 0, RelativeUnit.Relative);
+        var width = bounds.Sum(b => IsVertical ? b.Height : b.Width);
         var consumed = 0d;
         foreach (var bound in bounds)
         {
-            if (bound.Width <= 0) continue;
-            var local = Math.Clamp((width * progress - consumed) / bound.Width, 0, 1);
-            consumed += bound.Width;
+            var extent = IsVertical ? bound.Height : bound.Width;
+            if (extent <= 0) continue;
+            var local = Math.Clamp((width * progress - consumed) / extent, 0, 1);
+            consumed += extent;
             if (local <= 0) continue;
             var rectangle = bound.Translate(new Vector(origin.X, origin.Y));
             using (context.PushClip(rectangle))
             {
                 if (local >= 1)
                 {
-                    _highlightLayout!.Draw(context, origin);
+                    DrawReachedLayout(context, origin);
                 }
                 else
                 {
@@ -198,7 +252,7 @@ public sealed class LyricText : TextBlock
                     _mask.GradientStops[2].Offset = Math.Clamp(edge + .15, 0, 1);
                     using (context.PushOpacityMask(_mask, rectangle))
                     {
-                        _highlightLayout!.Draw(context, origin);
+                        DrawReachedLayout(context, origin);
                     }
                 }
             }
@@ -207,15 +261,24 @@ public sealed class LyricText : TextBlock
 
     private void ClearHighlightLayout()
     {
+        _verticalBoundsReady = false;
         _highlightLayout?.Dispose();
         _highlightLayout = null;
         _sourceLayout = null;
         _wordBounds = [];
     }
 
+    private void DrawReachedLayout(DrawingContext context, Point origin)
+    {
+        if (IsVertical) VerticalLayout.Draw(context, origin, true);
+        else _highlightLayout!.Draw(context, origin);
+    }
+
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         ClearHighlightLayout();
+        _verticalLayout?.Dispose();
+        _verticalLayout = null;
         base.OnDetachedFromVisualTree(e);
     }
 }

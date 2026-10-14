@@ -1,7 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
-using Avalonia.Media.TextFormatting;
 using LemonNeo.Core.Lyrics;
 
 namespace LemonNeo.Desktop.Controls.Lyrics;
@@ -9,6 +8,20 @@ namespace LemonNeo.Desktop.Controls.Lyrics;
 /// <summary>Clips a complete lyric line and follows its playback timing without truncating the text.</summary>
 public sealed class LyricLineViewport : Decorator
 {
+    public static readonly StyledProperty<bool> IsVerticalProperty =
+        AvaloniaProperty.Register<LyricLineViewport, bool>(nameof(IsVertical));
+
+    static LyricLineViewport()
+    {
+        AffectsMeasure<LyricLineViewport>(IsVerticalProperty);
+    }
+
+    public bool IsVertical
+    {
+        get => GetValue(IsVerticalProperty);
+        set => SetValue(IsVerticalProperty, value);
+    }
+
     public static readonly StyledProperty<double> PositionMillisecondsProperty =
         AvaloniaProperty.Register<LyricLineViewport, double>(nameof(PositionMilliseconds));
 
@@ -26,7 +39,7 @@ public sealed class LyricLineViewport : Decorator
 
     private readonly TranslateTransform _translation = new();
     private IReadOnlyList<LyricsWord>? _measuredWords;
-    private TextLayout? _wordLayout;
+    private object? _wordLayout;
     private double[] _wordWidths = [];
 
     public LyricLineViewport()
@@ -66,12 +79,15 @@ public sealed class LyricLineViewport : Decorator
     }
 
     public double HorizontalOffset => -_translation.X;
+    public double VerticalOffset => -_translation.Y;
 
     protected override Size MeasureOverride(Size availableSize)
     {
         if (Child is not { } child) return default;
-        child.Measure(new Size(double.PositiveInfinity, availableSize.Height));
-        return new Size(Math.Min(child.DesiredSize.Width, availableSize.Width), child.DesiredSize.Height);
+        child.Measure(IsVertical ? new Size(availableSize.Width, double.PositiveInfinity)
+            : new Size(double.PositiveInfinity, availableSize.Height));
+        return IsVertical ? new Size(child.DesiredSize.Width, Math.Min(child.DesiredSize.Height, availableSize.Height))
+            : new Size(Math.Min(child.DesiredSize.Width, availableSize.Width), child.DesiredSize.Height);
     }
 
     protected override Size ArrangeOverride(Size finalSize)
@@ -79,10 +95,12 @@ public sealed class LyricLineViewport : Decorator
         if (Child is { } child)
         {
             child.RenderTransform = _translation;
-            child.Arrange(new Rect(new Size(Math.Max(finalSize.Width, child.DesiredSize.Width), finalSize.Height)));
+            child.Arrange(new Rect(IsVertical
+                ? new Size(finalSize.Width, Math.Max(finalSize.Height, child.DesiredSize.Height))
+                : new Size(Math.Max(finalSize.Width, child.DesiredSize.Width), finalSize.Height)));
         }
 
-        UpdateOffset(finalSize.Width);
+        UpdateOffset(IsVertical ? finalSize.Height : finalSize.Width);
         return finalSize;
     }
 
@@ -92,20 +110,23 @@ public sealed class LyricLineViewport : Decorator
         if (_translation is null) return;
         if (change.Property == PositionMillisecondsProperty || change.Property == StartTimeMillisecondsProperty ||
             change.Property == EndTimeMillisecondsProperty || change.Property == IsActiveProperty ||
-            change.Property == WordsProperty)
+            change.Property == WordsProperty || change.Property == IsVerticalProperty)
+        {
+            if (change.Property == IsVerticalProperty) _wordLayout = null;
             UpdateOffset();
+        }
     }
 
     private void UpdateOffset(double? availableWidth = null)
     {
-        var width = availableWidth ?? Bounds.Width;
-        var overflow = Math.Max(0, (Child?.DesiredSize.Width ?? 0) - width);
+        var width = availableWidth ?? (IsVertical ? Bounds.Height : Bounds.Width);
+        var overflow = Math.Max(0, (IsVertical ? Child?.DesiredSize.Height ?? 0 : Child?.DesiredSize.Width ?? 0) - width);
         var offset = 0d;
         if (IsActive && width > 0 && overflow > 0 && double.IsFinite(PositionMilliseconds))
         {
             if (Words is { Count: > 0 } words && Child is TextBlock text && text.IsArrangeValid)
             {
-                MeasureWords(text.TextLayout, words);
+                MeasureWords(text, words);
                 var edge = 0d;
                 for (var i = 0; i < words.Count; i++)
                 {
@@ -132,11 +153,15 @@ public sealed class LyricLineViewport : Decorator
             }
         }
 
-        if (Math.Abs(_translation.X + offset) > .01) _translation.X = -offset;
+        var x = IsVertical ? 0 : -offset;
+        var y = IsVertical ? -offset : 0;
+        if (Math.Abs(_translation.X - x) > .01) _translation.X = x;
+        if (Math.Abs(_translation.Y - y) > .01) _translation.Y = y;
     }
 
-    private void MeasureWords(TextLayout layout, IReadOnlyList<LyricsWord> words)
+    private void MeasureWords(TextBlock text, IReadOnlyList<LyricsWord> words)
     {
+        var layout = text is LyricText lyric ? lyric.LayoutIdentity : text.TextLayout;
         if (ReferenceEquals(layout, _wordLayout) && ReferenceEquals(words, _measuredWords)) return;
         _wordLayout = layout;
         _measuredWords = words;
@@ -145,7 +170,9 @@ public sealed class LyricLineViewport : Decorator
         {
             var width = word.Text.Length == 0
                 ? 0
-                : layout.HitTestTextRange(character, word.Text.Length).Sum(rect => rect.Width);
+                : (text is LyricText lyricText ? lyricText.GetRangeBounds(character, word.Text.Length)
+                    : text.TextLayout.HitTestTextRange(character, word.Text.Length))
+                    .Sum(rect => IsVertical ? rect.Height : rect.Width);
             character += word.Text.Length;
             return width;
         }).ToArray();

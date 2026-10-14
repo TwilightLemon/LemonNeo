@@ -11,4 +11,5 @@ public sealed record LyricsPreferences(
     bool ShowRomanization = true,
     bool ShowTranslation = true,
     LyricAlignment Alignment = LyricAlignment.Center,
-    bool Bold = false);
+    bool Bold = false,
+    string LyricFontFamilies = "");

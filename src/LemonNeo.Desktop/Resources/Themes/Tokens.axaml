@@ -2,7 +2,8 @@
     xmlns="https://github.com/avaloniaui"
     xmlns:sys="clr-namespace:System;assembly=System.Runtime"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <FontFamily x:Key="Font.UI">Segoe UI, Microsoft YaHei UI, Noto Sans, sans-serif</FontFamily>
+    <!--  Windows overrides this token with Microsoft YaHei UI during application initialization.  -->
+    <FontFamily x:Key="Font.UI">$Default</FontFamily>
     <FontFamily x:Key="Font.Code">Cascadia Mono, Menlo, DejaVu Sans Mono, monospace</FontFamily>
     <sys:Double x:Key="Font.Body">14</sys:Double>
     <sys:Double x:Key="Font.Caption">12</sys:Double>

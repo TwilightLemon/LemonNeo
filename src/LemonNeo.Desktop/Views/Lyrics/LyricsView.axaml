@@ -62,6 +62,14 @@
                             </StackPanel.Styles>
                             <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.LyricsDisplaySettings}}" />
                             <StackPanel Spacing="8">
+                                <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.LyricsFontFamilies}}" />
+                                <sharedControls:FontFamilyPicker
+                                    Name="LyricsFontPicker"
+                                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.LyricsFontFamilies}}"
+                                    PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.FontFamiliesHint}}"
+                                    SelectedFamilies="{Binding LyricFontFamilies, Mode=TwoWay}" />
+                            </StackPanel>
+                            <StackPanel Spacing="8">
                                 <Grid ColumnDefinitions="*,Auto">
                                     <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.LyricsFontSize}}" />
                                     <TextBlock
@@ -149,11 +157,12 @@
                     Margin="0,0,28,0"
                     Name="CoverArea"
                     VerticalAlignment="Center">
-                    <sharedControls:Artwork
+                    <sharedControls:TransitionArtwork
                         AutomationProperties.Name="{Binding Playback.NowTitle}"
                         CornerRadius="24"
                         Name="NowPlayingCover"
-                        Source="{Binding Playback.NowArtwork}" />
+                        ReduceMotion="{Binding ReduceMotion}"
+                        Source="{Binding Playback.NowArtworkReference}" />
                 </Border>
                 <lyricsControls:LyricsPresenter
                     BoldLyrics="{Binding BoldLyrics}"
@@ -162,6 +171,7 @@
                     EmptyText="{Binding LyricsText}"
                     FollowLabel="{Translate {x:Static i18n:LanguageManager+Keys.FollowCurrentLyric}}"
                     FontSize="{Binding LyricFontSize}"
+                    LyricFontFamilies="{Binding LyricFontFamilies}"
                     Foreground="{DynamicResource Brush.LyricText}"
                     Grid.Column="1"
                     IsPlaying="{Binding Playback.IsPlaying}"

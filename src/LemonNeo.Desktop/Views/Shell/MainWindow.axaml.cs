@@ -24,7 +24,6 @@ public partial class MainWindow : Window
         AvaloniaProperty.Register<MainWindow, bool>(nameof(IsDesktopLyricsOpen));
 
     private DesktopLyricsWindow? _desktopLyrics;
-    private PixelPoint? _desktopLyricsPosition;
     private bool _preserveDesktopLyricsPreference;
     private CancellationTokenSource? _queueAnimation;
     private bool _seeking;
@@ -107,14 +106,13 @@ public partial class MainWindow : Window
         _desktopLyrics = window;
         window.Closed += (_, _) =>
         {
-            _desktopLyricsPosition = window.Position;
             _desktopLyrics = null;
             IsDesktopLyricsOpen = false;
             if (!_preserveDesktopLyricsPreference)
                 vm.SharedContext.Settings.Apply<DesktopLyricsPreferences>(value => value with { IsEnabled = false });
             _preserveDesktopLyricsPreference = false;
         };
-        window.ShowNear(this, _desktopLyricsPosition);
+        window.ShowNear(this);
         IsDesktopLyricsOpen = true;
         if (updatePreference)
             vm.SharedContext.Settings.Apply<DesktopLyricsPreferences>(value => value with { IsEnabled = true });
