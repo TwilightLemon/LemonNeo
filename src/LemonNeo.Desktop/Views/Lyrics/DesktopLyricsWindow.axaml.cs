@@ -1,7 +1,9 @@
+using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LemonNeo.Desktop.Platform;
@@ -20,6 +22,8 @@ public partial class DesktopLyricsWindow : Window
     private double _resizeScaling;
     private Size _resizeSize;
     private WindowEdge? _resizingEdge;
+    private LyricsViewModel? _viewModel;
+    private bool _isVertical;
 
     public DesktopLyricsWindow()
     {
@@ -34,6 +38,7 @@ public partial class DesktopLyricsWindow : Window
         Screens.Changed += OnScreensChanged;
         Closed += (_, _) =>
         {
+            if (_viewModel is not null) _viewModel.PropertyChanged -= OnLyricsPreferenceChanged;
             Screens.Changed -= OnScreensChanged;
             if (DataContext is LyricsViewModel vm) vm.SaveDesktopWindowSize(Bounds.Width, Bounds.Height);
             _horizontalResize.Dispose();
@@ -46,9 +51,55 @@ public partial class DesktopLyricsWindow : Window
     protected override void OnDataContextChanged(EventArgs args)
     {
         base.OnDataContextChanged(args);
+        if (_viewModel is not null) _viewModel.PropertyChanged -= OnLyricsPreferenceChanged;
+        _viewModel = DataContext as LyricsViewModel;
         if (DataContext is not LyricsViewModel vm) return;
+        _viewModel!.PropertyChanged += OnLyricsPreferenceChanged;
+        ApplyDisplayMode(vm.IsVerticalDesktopLyrics, false);
         Width = vm.DesktopLyricWindowWidth;
         Height = vm.DesktopLyricWindowHeight;
+    }
+
+    private void OnLyricsPreferenceChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName == nameof(LyricsViewModel.IsVerticalDesktopLyrics) && _viewModel is { } vm &&
+            _isVertical != vm.IsVerticalDesktopLyrics)
+            ApplyDisplayMode(vm.IsVerticalDesktopLyrics, true);
+    }
+
+    private void ApplyDisplayMode(bool vertical, bool swapSize)
+    {
+        var oldWidth = Width;
+        var oldHeight = Height;
+        _isVertical = vertical;
+        MinWidth = vertical ? 110 : 320;
+        MinHeight = vertical ? 320 : 110;
+        DesktopLayout.ColumnDefinitions = new ColumnDefinitions(vertical ? "40,*" : "*");
+        DesktopLayout.RowDefinitions = new RowDefinitions(vertical ? "*,Auto" : "40,*,Auto");
+        Grid.SetColumn(DesktopLyricsTimeline, vertical ? 1 : 0);
+        Grid.SetRow(DesktopLyricsTimeline, vertical ? 0 : 1);
+        Grid.SetColumn(DesktopLyricsError, vertical ? 1 : 0);
+        Grid.SetRow(DesktopLyricsError, vertical ? 1 : 2);
+        ToolbarLayout.ColumnDefinitions = new ColumnDefinitions(vertical ? "*" : "*,Auto,*");
+        ToolbarLayout.RowDefinitions = new RowDefinitions(vertical ? "Auto,Auto,Auto" : "*");
+        ToolbarDragHandle.HorizontalAlignment = vertical ? HorizontalAlignment.Center : HorizontalAlignment.Left;
+        ToolbarDragHandle.Margin = vertical ? new Thickness(0, 0, 0, 12) : default;
+        Grid.SetColumn(ToolbarButtons, vertical ? 0 : 1);
+        Grid.SetRow(ToolbarButtons, vertical ? 1 : 0);
+        ToolbarButtons.Orientation = vertical ? Orientation.Vertical : Orientation.Horizontal;
+        ToolbarButtons.HorizontalAlignment = HorizontalAlignment.Center;
+        ToolbarButtons.Margin = vertical ? new Thickness(0, 0, 0, 12) : default;
+        Grid.SetColumn(ToolbarActions, vertical ? 0 : 2);
+        Grid.SetRow(ToolbarActions, vertical ? 2 : 0);
+        ToolbarActions.Orientation = vertical ? Orientation.Vertical : Orientation.Horizontal;
+        ToolbarActions.HorizontalAlignment = vertical ? HorizontalAlignment.Center : HorizontalAlignment.Right;
+        ToolbarActions.Spacing = vertical ? 8 : 4;
+        if (swapSize)
+        {
+            Width = Math.Max(MinWidth, oldHeight);
+            Height = Math.Max(MinHeight, oldWidth);
+            _viewModel?.SaveDesktopWindowSize(Width, Height);
+        }
     }
 
     public void ShowNear(Window mainWindow, PixelPoint? savedPosition)
@@ -84,10 +135,19 @@ public partial class DesktopLyricsWindow : Window
     private void KeepOnScreen()
     {
         if (!IsVisible || Bounds.Width <= 0 || Bounds.Height <= 0) return;
-        var minimumHeight = Math.Ceiling(DesktopLyricsTimeline.CompactContentHeight + 72
-            + (DesktopLyricsError.IsVisible ? DesktopLyricsError.DesiredSize.Height : 0));
-        if (double.IsFinite(minimumHeight) && Math.Abs(MinHeight - Math.Max(110, minimumHeight)) > .5)
-            MinHeight = Math.Max(110, minimumHeight);
+        if (_isVertical)
+        {
+            var minimumWidth = Math.Ceiling(DesktopLyricsTimeline.CompactContentWidth + 84);
+            if (double.IsFinite(minimumWidth) && Math.Abs(MinWidth - Math.Max(110, minimumWidth)) > .5)
+                MinWidth = Math.Max(110, minimumWidth);
+        }
+        else
+        {
+            var minimumHeight = Math.Ceiling(DesktopLyricsTimeline.CompactContentHeight + 72
+                + (DesktopLyricsError.IsVisible ? DesktopLyricsError.DesiredSize.Height : 0));
+            if (double.IsFinite(minimumHeight) && Math.Abs(MinHeight - Math.Max(110, minimumHeight)) > .5)
+                MinHeight = Math.Max(110, minimumHeight);
+        }
         var screen = Screens.ScreenFromWindow(this) ?? Screens.Primary;
         if (screen is null) return;
         var area = screen.WorkingArea;
@@ -186,11 +246,13 @@ public partial class DesktopLyricsWindow : Window
 
     private void OnSettingsOpened(object? sender, EventArgs args)
     {
+        DesktopLyricsPlatform.SetSettingsInputEnabled(this, true);
         HoverCard.Classes.Set("settingsOpen", true);
     }
 
     private void OnSettingsClosed(object? sender, EventArgs args)
     {
+        DesktopLyricsPlatform.SetSettingsInputEnabled(this, false);
         HoverCard.Classes.Set("settingsOpen", false);
     }
 

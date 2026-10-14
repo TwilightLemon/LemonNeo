@@ -37,6 +37,21 @@ internal static class DesktopLyricsPlatform
             SendSet(handle, keyWindowSelector, 0);
     }
 
+    public static void SetSettingsInputEnabled(Window window, bool enabled)
+    {
+        // Normal playback stays non-activating. Font editing explicitly needs keyboard/IME focus.
+        if (OperatingSystem.IsMacOS() &&
+            window.TryGetPlatformHandle() is IMacOSTopLevelPlatformHandle { NSWindow: var handle } &&
+            handle != IntPtr.Zero)
+        {
+            var selector = Selector("setCanBecomeKeyWindow:");
+            if (SendResponds(handle, Selector("respondsToSelector:"), selector))
+                SendSet(handle, selector, enabled ? 1u : 0u);
+        }
+
+        if (enabled) window.Activate();
+    }
+
     private static IntPtr Selector(string name)
     {
         return RegisterSelector(name);

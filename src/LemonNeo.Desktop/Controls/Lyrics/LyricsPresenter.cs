@@ -20,6 +20,25 @@ namespace LemonNeo.Desktop.Controls.Lyrics;
 /// <summary>A scrollable lyric timeline with a playback clock and rendering-synchronized animations.</summary>
 public sealed class LyricsPresenter : UserControl
 {
+    // These properties do not inherit through the control tree. Only lyric text receives the chosen fonts.
+    public static readonly StyledProperty<string?> LyricFontFamiliesProperty =
+        AvaloniaProperty.Register<LyricsPresenter, string?>(nameof(LyricFontFamilies));
+
+    public static readonly StyledProperty<bool> IsVerticalProperty =
+        AvaloniaProperty.Register<LyricsPresenter, bool>(nameof(IsVertical));
+
+    public string? LyricFontFamilies
+    {
+        get => GetValue(LyricFontFamiliesProperty);
+        set => SetValue(LyricFontFamiliesProperty, value);
+    }
+
+    public bool IsVertical
+    {
+        get => GetValue(IsVerticalProperty);
+        set => SetValue(IsVerticalProperty, value);
+    }
+
     public static readonly StyledProperty<CoreLyrics?> DocumentProperty =
         AvaloniaProperty.Register<LyricsPresenter, CoreLyrics?>(nameof(Document));
 
@@ -79,7 +98,7 @@ public sealed class LyricsPresenter : UserControl
 
     private readonly Border _bottomSpace = new();
 
-    private readonly TextBlock _empty = new()
+    private readonly LyricText _empty = new()
     {
         TextWrapping = TextWrapping.Wrap, HorizontalAlignment = HorizontalAlignment.Stretch,
         VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(24)
@@ -263,6 +282,7 @@ public sealed class LyricsPresenter : UserControl
     }
 
     private bool IsCompact => VisibleLineCount > 0;
+    private bool UsesVerticalLayout => IsCompact && IsVertical;
     public int CurrentIndex { get; private set; } = -1;
 
     public bool IsFollowing { get; private set; } = true;
@@ -270,6 +290,10 @@ public sealed class LyricsPresenter : UserControl
     public double CompactContentHeight => CurrentIndex < 0
         ? _empty.DesiredSize.Height
         : _rows.Where(row => row.Panel.IsVisible).Sum(row => row.Panel.DesiredSize.Height) +
+          Math.Max(0, Math.Min(VisibleLineCount, _rows.Count - CurrentIndex) - 1) * _lines.Spacing;
+
+    public double CompactContentWidth => CurrentIndex < 0 ? _empty.DesiredSize.Width
+        : _rows.Where(row => row.Panel.IsVisible).Sum(row => row.Panel.DesiredSize.Width) +
           Math.Max(0, Math.Min(VisibleLineCount, _rows.Count - CurrentIndex) - 1) * _lines.Spacing;
 
     private bool NeedsAnimationFrame => _attached && IsEffectivelyVisible &&
@@ -284,7 +308,7 @@ public sealed class LyricsPresenter : UserControl
         // UserControl initialization also changes properties before our child controls exist.
         if (_scroll is null) return;
         if (change.Property == DocumentProperty) RebuildRows();
-        if (change.Property == VisibleLineCountProperty)
+        if (change.Property == VisibleLineCountProperty || change.Property == IsVerticalProperty)
         {
             _scroll.OpacityMask = IsCompact
                 ? null
@@ -299,11 +323,14 @@ public sealed class LyricsPresenter : UserControl
                     ]
                 };
             _scroll.VerticalScrollBarVisibility = IsCompact ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Auto;
-            _scroll.VerticalAlignment = IsCompact ? VerticalAlignment.Center : VerticalAlignment.Stretch;
+            _scroll.VerticalAlignment = IsCompact && !UsesVerticalLayout ? VerticalAlignment.Center : VerticalAlignment.Stretch;
+            _scroll.HorizontalAlignment = UsesVerticalLayout ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
+            _lines.Orientation = UsesVerticalLayout ? Orientation.Horizontal : Orientation.Vertical;
             _lines.Spacing = IsCompact ? 10 : 32;
             _lines.Margin = new Thickness(IsCompact ? 4 : 12, 0);
             _empty.TextWrapping = IsCompact ? TextWrapping.NoWrap : TextWrapping.Wrap;
             _empty.TextTrimming = IsCompact ? TextTrimming.CharacterEllipsis : TextTrimming.None;
+            _empty.IsVertical = UsesVerticalLayout;
             RebuildRows();
         }
 
@@ -329,6 +356,7 @@ public sealed class LyricsPresenter : UserControl
         }
 
         if (change.Property == FontSizeProperty || change.Property == ForegroundProperty ||
+            change.Property == LyricFontFamiliesProperty || change.Property == FontFamilyProperty ||
             change.Property == ReachedBrushProperty || change.Property == UnreachedBrushProperty ||
             change.Property == TextAlignmentProperty || change.Property == ShowRomanizationProperty ||
             change.Property == ShowTranslationProperty ||
@@ -366,29 +394,33 @@ public sealed class LyricsPresenter : UserControl
         IsFollowing = true;
         _follow.IsVisible = false;
         var document = Document is { } lyrics ? LyricsDocument.Create(lyrics) : [];
-        _lines.Children.Add(_topSpace);
+        if (!UsesVerticalLayout) _lines.Children.Add(_topSpace);
         foreach (var (row, index) in document.Select((row, index) => (row, index)))
         {
             var panel = new StackPanel
-                { Spacing = 5, HorizontalAlignment = HorizontalAlignment.Stretch, Background = Brushes.Transparent };
+            {
+                Spacing = 5, HorizontalAlignment = HorizontalAlignment.Stretch, Background = Brushes.Transparent,
+                Orientation = UsesVerticalLayout ? Orientation.Horizontal : Orientation.Vertical
+            };
             var main = new LyricText
                 { Text = row.Main.Text, Words = row.Main.Words, LineStartTimeMs = row.Main.EffectiveStartTimeMs };
             var romanization = new LyricText();
-            var translation = new TextBlock { Opacity = SubTextOpacity };
+            var translation = new LyricText { Opacity = SubTextOpacity };
             foreach (var text in new[] { main, romanization, translation })
             {
                 text.TextWrapping = IsCompact ? TextWrapping.NoWrap : TextWrapping.Wrap;
                 text.TextTrimming = TextTrimming.None;
+                text.IsVertical = UsesVerticalLayout;
             }
 
             Control Wrap(TextBlock text)
             {
-                return IsCompact ? new LyricLineViewport { Child = text } : text;
+                return IsCompact ? new LyricLineViewport { Child = text, IsVertical = UsesVerticalLayout } : text;
             }
 
-            panel.Children.Add(Wrap(romanization));
+            panel.Children.Add(Wrap(UsesVerticalLayout ? translation : romanization));
             panel.Children.Add(Wrap(main));
-            panel.Children.Add(Wrap(translation));
+            panel.Children.Add(Wrap(UsesVerticalLayout ? romanization : translation));
             var controls = new RowControls(row, panel, main, romanization, translation)
                 { NextStartTimeMs = document.ElementAtOrDefault(index + 1)?.Main.EffectiveStartTimeMs };
             panel.Tapped += async (_, e) =>
@@ -405,11 +437,13 @@ public sealed class LyricsPresenter : UserControl
             };
             AutomationProperties.SetName(panel, row.Main.Text);
             _rows.Add(controls);
-            _lines.Children.Add(panel);
+            // Physical column order is right-to-left; text shaping keeps its own script direction.
+            if (UsesVerticalLayout) _lines.Children.Insert(0, panel);
+            else _lines.Children.Add(panel);
             UpdateAuxiliary(controls, row.Main.EffectiveStartTimeMs ?? 0);
         }
 
-        _lines.Children.Add(_bottomSpace);
+        if (!UsesVerticalLayout) _lines.Children.Add(_bottomSpace);
         _timedRows = _rows.Select((r, i) => (Index: i, Start: r.Source.Main.EffectiveStartTimeMs))
             .Where(r => r.Start is not null).Select(r => (r.Index, r.Start!.Value)).ToArray();
         _empty.IsVisible = _rows.Count == 0;
@@ -425,12 +459,15 @@ public sealed class LyricsPresenter : UserControl
 
     private void UpdateAppearance()
     {
+        var lyricFont = ResolveLyricFont();
+        _empty.FontFamily = lyricFont;
         _empty.FontSize = FontSize * .8;
         _empty.Foreground = Foreground;
         _empty.TextAlignment = TextAlignment;
         for (var index = 0; index < _rows.Count; index++)
         {
             var row = _rows[index];
+            row.Main.FontFamily = row.Romanization.FontFamily = row.Translation.FontFamily = lyricFont;
             row.Main.FontSize = FontSize;
             row.Romanization.FontSize = FontSize * .72;
             row.Translation.FontSize = FontSize * .78;
@@ -450,6 +487,20 @@ public sealed class LyricsPresenter : UserControl
         }
 
         UpdateCompactRows();
+    }
+
+    private FontFamily ResolveLyricFont()
+    {
+        if (string.IsNullOrWhiteSpace(LyricFontFamilies)) return FontFamily;
+        try
+        {
+            return new FontFamily(LyricFontFamilies);
+        }
+        catch (ArgumentException)
+        {
+            // A partially typed family list must not interrupt playback or crash a settings flyout.
+            return FontFamily;
+        }
     }
 
     private void UpdatePosition(double position, bool animate)
@@ -500,7 +551,7 @@ public sealed class LyricsPresenter : UserControl
         // Keep the completed line highlighted through any gap until the next main line begins.
         row.Main.IsHighlighted = selected >= 0;
         UpdateAuxiliary(row, position);
-        UpdateHorizontalPosition(row.Main, row.Source.Main, row, position);
+        UpdateLinePosition(row.Main, row.Source.Main, row, position);
     }
 
     private void UpdateCompactRows()
@@ -520,7 +571,7 @@ public sealed class LyricsPresenter : UserControl
                 row.Main.IsHighlighted = row.Romanization.IsHighlighted = false;
                 // Keep next-row auxiliary text aligned with that row, even before its first timestamp.
                 UpdateAuxiliary(row, row.Source.Main.EffectiveStartTimeMs ?? 0);
-                UpdateHorizontalPosition(row.Main, row.Source.Main, row, 0);
+                UpdateLinePosition(row.Main, row.Source.Main, row, 0);
             }
         }
     }
@@ -541,13 +592,13 @@ public sealed class LyricsPresenter : UserControl
         row.Romanization.IsHighlighted = row.Main.IsHighlighted && romanization?.EffectiveStartTimeMs is { } start &&
                                          start <= position;
         row.Translation.Text = LyricDocumentRow.SelectAuxiliary(row.Source.Translation, position)?.Text;
-        UpdateHorizontalPosition(row.Romanization, romanization, row, position);
-        UpdateHorizontalPosition(row.Translation, LyricDocumentRow.SelectAuxiliary(row.Source.Translation, position),
+        UpdateLinePosition(row.Romanization, romanization, row, position);
+        UpdateLinePosition(row.Translation, LyricDocumentRow.SelectAuxiliary(row.Source.Translation, position),
             row, position);
         UpdateVisibility(row);
     }
 
-    private void UpdateHorizontalPosition(TextBlock text, LyricsLine? source, RowControls row, double position)
+    private void UpdateLinePosition(TextBlock text, LyricsLine? source, RowControls row, double position)
     {
         if (text.Parent is not LyricLineViewport viewport) return;
         var start = source?.EffectiveStartTimeMs ?? row.Source.Main.EffectiveStartTimeMs ?? 0;

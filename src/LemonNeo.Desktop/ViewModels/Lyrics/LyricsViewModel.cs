@@ -34,6 +34,8 @@ public sealed class LyricsViewModel : PageViewModel
         AlignCenterCommand = new RelayCommand(() => SetAlignment(LyricAlignment.Center));
         SingleDesktopLineCommand = new RelayCommand(() => DesktopLyricLineCount = 1);
         TwoDesktopLinesCommand = new RelayCommand(() => DesktopLyricLineCount = 2);
+        HorizontalDesktopLyricsCommand = new RelayCommand(() => SetDesktopDisplayMode(LyricDisplayMode.Horizontal));
+        VerticalDesktopLyricsCommand = new RelayCommand(() => SetDesktopDisplayMode(LyricDisplayMode.Vertical));
         SeekLyricCommand = new AsyncRelayCommand<double>(position => Playback.SeekAsync(position / 1000),
             position => position >= 0 && Playback.CanSeek);
         _lyricsSubscription = Context.Settings.Subscribe<LyricsPreferences>(_ => RefreshLyricsPreferenceProperties());
@@ -58,6 +60,28 @@ public sealed class LyricsViewModel : PageViewModel
     public RelayCommand AlignCenterCommand { get; }
     public RelayCommand SingleDesktopLineCommand { get; }
     public RelayCommand TwoDesktopLinesCommand { get; }
+    public RelayCommand HorizontalDesktopLyricsCommand { get; }
+    public RelayCommand VerticalDesktopLyricsCommand { get; }
+    public bool IsVerticalDesktopLyrics => _desktopPreferences.DisplayMode == LyricDisplayMode.Vertical;
+    public bool IsHorizontalDesktopLyrics => !IsVerticalDesktopLyrics;
+
+    public string LyricFontFamilies
+    {
+        get => _lyricsPreferences.LyricFontFamilies;
+        set
+        {
+            if (value != LyricFontFamilies) ApplyLyricsPreferences(p => p with { LyricFontFamilies = value ?? "" });
+        }
+    }
+
+    public string DesktopLyricFontFamilies
+    {
+        get => _desktopPreferences.LyricFontFamilies;
+        set
+        {
+            if (value != DesktopLyricFontFamilies) ApplyDesktopPreferences(p => p with { LyricFontFamilies = value ?? "" });
+        }
+    }
     public bool IsSingleDesktopLine => DesktopLyricLineCount == 1;
     public bool IsTwoDesktopLines => DesktopLyricLineCount == 2;
 
@@ -178,6 +202,11 @@ public sealed class LyricsViewModel : PageViewModel
         ApplyLyricsPreferences(p => p with { Alignment = alignment });
     }
 
+    private void SetDesktopDisplayMode(LyricDisplayMode mode)
+    {
+        if (_desktopPreferences.DisplayMode != mode) ApplyDesktopPreferences(p => p with { DisplayMode = mode });
+    }
+
     private void ApplyLyricsPreferences(Func<LyricsPreferences, LyricsPreferences> update)
     {
         if (!_lifetime.IsCancellationRequested) Context.Settings.Apply(update);
@@ -193,7 +222,7 @@ public sealed class LyricsViewModel : PageViewModel
         foreach (var name in new[]
                  {
                      nameof(LyricFontSize), nameof(ShowRomanization), nameof(ShowTranslation), nameof(BoldLyrics),
-                     nameof(IsLeftAligned), nameof(IsCenterAligned), nameof(LyricTextAlignment)
+                     nameof(IsLeftAligned), nameof(IsCenterAligned), nameof(LyricTextAlignment), nameof(LyricFontFamilies)
                  }) OnPropertyChanged(name);
     }
 
@@ -203,7 +232,8 @@ public sealed class LyricsViewModel : PageViewModel
                  {
                      nameof(DesktopLyricLineCount), nameof(IsSingleDesktopLine), nameof(IsTwoDesktopLines),
                      nameof(DesktopLyricFontSize), nameof(DesktopShowRomanization), nameof(DesktopShowTranslation),
-                     nameof(DesktopLyricWindowWidth), nameof(DesktopLyricWindowHeight)
+                     nameof(DesktopLyricWindowWidth), nameof(DesktopLyricWindowHeight), nameof(DesktopLyricFontFamilies),
+                     nameof(IsVerticalDesktopLyrics), nameof(IsHorizontalDesktopLyrics)
                  }) OnPropertyChanged(name);
     }
 
