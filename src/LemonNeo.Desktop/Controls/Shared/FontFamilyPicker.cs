@@ -4,10 +4,13 @@ using Avalonia.Controls.Templates;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Threading;
 
 namespace LemonNeo.Desktop.Controls.Shared;
 
-/// <summary>An editable fallback-font list. Suggestions replace only the final comma-separated family.</summary>
+/// <summary>An editable fallback-font list. Suggestions replace only the final comma-separated family.
+/// Keystrokes stay local and are committed on Enter, on focus loss, or when a suggestion is picked,
+/// so a partially typed list never reaches the settings store.</summary>
 public sealed class FontFamilyPicker : AutoCompleteBox
 {
     public static readonly StyledProperty<string?> SelectedFamiliesProperty =
@@ -55,12 +58,33 @@ public sealed class FontFamilyPicker : AutoCompleteBox
         SetCurrentValue(IsDropDownOpenProperty, true);
     }
 
+    protected override void OnLostFocus(FocusChangedEventArgs e)
+    {
+        base.OnLostFocus(e);
+        QueueCommit();
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.Key == Key.Enter) QueueCommit();
+    }
+
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
+        // Settings flow into the editor; keystrokes stay local until an edit is committed.
         if (change.Property == SelectedFamiliesProperty && Text != SelectedFamilies)
             SetCurrentValue(TextProperty, SelectedFamilies ?? "");
-        else if (change.Property == TextProperty && SelectedFamilies != Text)
-            SetCurrentValue(SelectedFamiliesProperty, Text ?? "");
+        else if (change.Property == SelectedItemProperty && change.NewValue is not null)
+            QueueCommit();
+    }
+
+    /// <summary>Commits once the box has settled, so a picked suggestion has already reached <see cref="AutoCompleteBox.Text"/>.</summary>
+    private void QueueCommit() => Dispatcher.UIThread.Post(Commit, DispatcherPriority.Background);
+
+    private void Commit()
+    {
+        if (SelectedFamilies != Text) SetCurrentValue(SelectedFamiliesProperty, Text ?? "");
     }
 }

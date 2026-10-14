@@ -99,6 +99,8 @@ public sealed class LyricsViewModel : PageViewModel
     public AsyncRelayCommand<double> SeekLyricCommand { get; }
     public double DesktopLyricWindowWidth => _desktopPreferences.WindowWidth;
     public double DesktopLyricWindowHeight => _desktopPreferences.WindowHeight;
+    public int? DesktopLyricWindowX => _desktopPreferences.WindowX;
+    public int? DesktopLyricWindowY => _desktopPreferences.WindowY;
 
     public double DesktopLyricFontSize
     {
@@ -196,6 +198,13 @@ public sealed class LyricsViewModel : PageViewModel
         ApplyDesktopPreferences(p => p with { WindowWidth = width, WindowHeight = height });
     }
 
+    /// <summary>Persist the placement when the window closes; dragging only moves the window.</summary>
+    public void SaveDesktopWindowPosition(int x, int y)
+    {
+        if (x == DesktopLyricWindowX && y == DesktopLyricWindowY) return;
+        ApplyDesktopPreferences(p => p with { WindowX = x, WindowY = y });
+    }
+
     private void SetAlignment(LyricAlignment alignment)
     {
         if (_lyricsPreferences.Alignment == alignment) return;
@@ -232,7 +241,8 @@ public sealed class LyricsViewModel : PageViewModel
                  {
                      nameof(DesktopLyricLineCount), nameof(IsSingleDesktopLine), nameof(IsTwoDesktopLines),
                      nameof(DesktopLyricFontSize), nameof(DesktopShowRomanization), nameof(DesktopShowTranslation),
-                     nameof(DesktopLyricWindowWidth), nameof(DesktopLyricWindowHeight), nameof(DesktopLyricFontFamilies),
+                     nameof(DesktopLyricWindowWidth), nameof(DesktopLyricWindowHeight),
+                     nameof(DesktopLyricWindowX), nameof(DesktopLyricWindowY), nameof(DesktopLyricFontFamilies),
                      nameof(IsVerticalDesktopLyrics), nameof(IsHorizontalDesktopLyrics)
                  }) OnPropertyChanged(name);
     }

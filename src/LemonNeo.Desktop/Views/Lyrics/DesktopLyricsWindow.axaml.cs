@@ -36,11 +36,20 @@ public partial class DesktopLyricsWindow : Window
         Opened += (_, _) => DesktopLyricsPlatform.OnOpened(this);
         LayoutUpdated += (_, _) => KeepOnScreen();
         Screens.Changed += OnScreensChanged;
+        // Save while the native window is still alive: by the time Closed fires, PlatformImpl is gone and
+        // Position reads back (0, 0). Placement is written once here; dragging and resizing never touch config.
+        Closing += (_, _) =>
+        {
+            if (_viewModel is { } viewModel)
+            {
+                viewModel.SaveDesktopWindowSize(Bounds.Width, Bounds.Height);
+                viewModel.SaveDesktopWindowPosition(Position.X, Position.Y);
+            }
+        };
         Closed += (_, _) =>
         {
-            if (_viewModel is not null) _viewModel.PropertyChanged -= OnLyricsPreferenceChanged;
             Screens.Changed -= OnScreensChanged;
-            if (DataContext is LyricsViewModel vm) vm.SaveDesktopWindowSize(Bounds.Width, Bounds.Height);
+            if (_viewModel is { } viewModel) viewModel.PropertyChanged -= OnLyricsPreferenceChanged;
             _horizontalResize.Dispose();
             _verticalResize.Dispose();
             _diagonalResize.Dispose();
@@ -102,8 +111,12 @@ public partial class DesktopLyricsWindow : Window
         }
     }
 
-    public void ShowNear(Window mainWindow, PixelPoint? savedPosition)
+    public void ShowNear(Window mainWindow)
     {
+        // The saved placement is read once here; the window then owns the position until it closes.
+        var savedPosition = _viewModel is { DesktopLyricWindowX: { } x, DesktopLyricWindowY: { } y }
+            ? new PixelPoint(x, y)
+            : (PixelPoint?)null;
         var screen = Screens.ScreenFromWindow(mainWindow) ?? Screens.Primary;
         if (screen is not null)
             Width = Math.Min(Width, Math.Max(MinWidth, screen.WorkingArea.Width / mainWindow.DesktopScaling - 48));

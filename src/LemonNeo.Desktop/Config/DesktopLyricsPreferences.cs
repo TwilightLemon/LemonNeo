@@ -14,5 +14,7 @@ public sealed record DesktopLyricsPreferences(
     bool ShowTranslation = true,
     double WindowWidth = 760,
     double WindowHeight = 300,
+    int? WindowX = null,
+    int? WindowY = null,
     LyricDisplayMode DisplayMode = LyricDisplayMode.Horizontal,
     string LyricFontFamilies = "");
