@@ -178,6 +178,11 @@ jobs:
       GH_REPO: ${{ github.repository }}
       GH_TOKEN: ${{ github.token }}
     steps:
+      # Reads the install instructions from the tagged commit, so the notes describe the code
+      # that was actually built.
+      - name: Checkout
+        uses: actions/checkout@v7
+
       - name: Download packages
         uses: actions/download-artifact@v8
         with:
@@ -189,25 +194,19 @@ jobs:
         run: |
           set -euo pipefail
           ls -lh dist
-          cat > release-notes.md <<'NOTES'
-          Desktop packages for Windows (x64) and macOS (Apple silicon).
 
-          Both platforms ship two variants:
+          # Install instructions are the same for every release and live in
+          # .github/release-notes-body.md; the changelog is generated from the merged pull
+          # requests since the previous tag, grouped by label in .github/release.yml.
+          generated=$(gh api "repos/$GH_REPO/releases/generate-notes" \
+            -f tag_name="$GITHUB_REF_NAME" --jq .body)
+          {
+            cat .github/release-notes-body.md
+            if [[ -n "${generated//[[:space:]]/}" ]]; then
+              printf '\n---\n\n%s\n' "$generated"
+            fi
+          } > release-notes.md
 
-          - `-self-contained` bundles the .NET runtime, so there is nothing to install first.
-          - `-framework-dependent` requires the [.NET 10 desktop runtime](https://dotnet.microsoft.com/download/dotnet/10.0).
-
-          Windows downloads are ZIP archives. macOS downloads are DMG disk images: open one,
-          then drag `Lemon Neo.app` onto the `Applications` shortcut.
-
-          Plugins live in the `plugins/` folder next to the app; deleting one of those folders
-          uninstalls that plugin. The macOS builds are not signed with a valid Apple Developer ID,
-          so Gatekeeper may refuse the first launch. If the app will not open:
-
-          1. Clear the quarantine attribute:
-             `xattr -dr com.apple.quarantine "/Applications/Lemon Neo.app"`
-          2. Or open **System Settings → Privacy & Security** and choose **Open Anyway**.
-          NOTES
           args=(--title "Lemon Neo ${GITHUB_REF_NAME#v}" --verify-tag --notes-file release-notes.md)
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then
             args+=(--prerelease)
