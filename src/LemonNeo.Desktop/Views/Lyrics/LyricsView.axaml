@@ -7,20 +7,33 @@
     xmlns:lyricsVm="using:LemonNeo.Desktop.ViewModels.Lyrics"
     xmlns:sharedControls="using:LemonNeo.Desktop.Controls.Shared"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Styles>
+        <!-- Additive highlight: the colour the header adds to the artwork behind it, so the
+             RGB value is what shows over a dark cover rather than an alpha composited grey. -->
+        <Style Selector="TextBlock.additiveTitle">
+            <Setter Property="Foreground" Value="#AEAEAE" />
+        </Style>
+        <Style Selector="TextBlock.additiveArtist">
+            <Setter Property="Foreground" Value="#999999" />
+        </Style>
+    </UserControl.Styles>
     <Grid ClipToBounds="True" RowDefinitions="Auto,Auto,*">
         <Grid ColumnDefinitions="44,*,44" Margin="0,0,0,18">
             <StackPanel
                 Grid.Column="1"
                 Spacing="6"
                 VerticalAlignment="Center">
-                <TextBlock
+                <sharedControls:AdditiveTextBlock
+                    Classes="additiveTitle"
                     FontSize="22"
-                    FontWeight="Medium"
+                    FontWeight="Bold"
+                    IsHighlightEnabled="True"
                     Text="{Binding Playback.NowTitle}"
                     TextAlignment="Center"
                     TextTrimming="CharacterEllipsis" />
-                <TextBlock
-                    Classes="muted"
+                <sharedControls:AdditiveTextBlock
+                    Classes="additiveArtist"
+                    IsHighlightEnabled="True"
                     Text="{Binding Playback.NowArtist}"
                     TextAlignment="Center"
                     TextTrimming="CharacterEllipsis" />

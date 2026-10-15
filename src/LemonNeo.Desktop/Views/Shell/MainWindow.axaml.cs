@@ -23,6 +23,13 @@ public partial class MainWindow : Window
     public static readonly StyledProperty<bool> IsDesktopLyricsOpenProperty =
         AvaloniaProperty.Register<MainWindow, bool>(nameof(IsDesktopLyricsOpen));
 
+    private readonly LinearGradientBrush _pageFade = new()
+    {
+        StartPoint = new RelativePoint(0, .9, RelativeUnit.Relative),
+        EndPoint = new RelativePoint(0, 1, RelativeUnit.Relative),
+        GradientStops = { new GradientStop(Colors.White, 0), new GradientStop(Colors.Transparent, 1) }
+    };
+
     private DesktopLyricsWindow? _desktopLyrics;
     private bool _preserveDesktopLyricsPreference;
     private CancellationTokenSource? _queueAnimation;
@@ -31,6 +38,8 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        PageContent.OpacityMask = _pageFade;
+        PageContent.Classes.CollectionChanged += (_, _) => UpdatePageFade();
         _ = new ListReorderBehavior(PlaylistList, () => DataContext is MainViewModel { CanInteract: true },
             (source, target, after) => DataContext is MainViewModel vm &&
                                        source is PlaylistMenuItemViewModel playlist &&
@@ -197,11 +206,21 @@ public partial class MainWindow : Window
 
     private void OnPageContentSizeChanged(object? sender, SizeChangedEventArgs args)
     {
-        // A fixed fade distance keeps the transition consistent when the window is resized.
+        // A fixed fade distance keeps the transition consistent when the window is resized. The
+        // lyrics page hides the mask, so the geometry is tracked even while it is unattached.
         var height = args.NewSize.Height;
-        if (height <= 0 || PageContent.OpacityMask is not LinearGradientBrush fade) return;
-        fade.StartPoint = new RelativePoint(0, Math.Max(0, height - 64), RelativeUnit.Absolute);
-        fade.EndPoint = new RelativePoint(0, height, RelativeUnit.Absolute);
+        if (height <= 0) return;
+        _pageFade.StartPoint = new RelativePoint(0, Math.Max(0, height - 64), RelativeUnit.Absolute);
+        _pageFade.EndPoint = new RelativePoint(0, height, RelativeUnit.Absolute);
+    }
+
+    /// <summary>
+    /// The lyrics page samples the artwork painted beneath it to light up its header, which a
+    /// page-sized opacity mask would hide by rendering the page into its own layer.
+    /// </summary>
+    private void UpdatePageFade()
+    {
+        PageContent.OpacityMask = PageContent.Classes.Contains("lyrics") ? null : _pageFade;
     }
 
     private async void OnQueueOpened(object? sender, EventArgs args)

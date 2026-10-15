@@ -377,19 +377,13 @@
                 </Grid>
             </Border>
             <ContentControl
+                Classes.lyrics="{Binding Navigation.IsLyrics}"
                 Content="{Binding Navigation.Host}"
                 Grid.Row="1"
                 HorizontalContentAlignment="Stretch"
                 Name="PageContent"
                 SizeChanged="OnPageContentSizeChanged"
-                VerticalContentAlignment="Stretch">
-                <ContentControl.OpacityMask>
-                    <LinearGradientBrush EndPoint="0%,100%" StartPoint="0%,90%">
-                        <GradientStop Color="White" Offset="0" />
-                        <GradientStop Color="Transparent" Offset="1" />
-                    </LinearGradientBrush>
-                </ContentControl.OpacityMask>
-            </ContentControl>
+                VerticalContentAlignment="Stretch" />
             <Grid
                 Grid.Row="1"
                 HorizontalAlignment="Left"
