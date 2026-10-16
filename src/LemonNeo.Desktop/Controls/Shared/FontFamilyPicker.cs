@@ -55,7 +55,16 @@ public sealed class FontFamilyPicker : AutoCompleteBox
     protected override void OnGotFocus(FocusChangedEventArgs e)
     {
         base.OnGotFocus(e);
-        SetCurrentValue(IsDropDownOpenProperty, true);
+        // AutoCompleteBox selects all text when it gains focus; that's unwanted for a
+        // picker, so collapse the selection and leave the caret at the end. The first
+        // write forces a change even when the caret already sits at the end (a
+        // same-value write would be a no-op).
+        var length = Text?.Length ?? 0;
+        if (length > 0)
+        {
+            SetCurrentValue(CaretIndexProperty, 0);
+            SetCurrentValue(CaretIndexProperty, length);
+        }
     }
 
     protected override void OnLostFocus(FocusChangedEventArgs e)

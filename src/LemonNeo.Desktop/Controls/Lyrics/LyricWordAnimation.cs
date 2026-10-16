@@ -82,7 +82,7 @@ internal sealed class LyricWordAnimation : Control, IDisposable
         pages.Add((cells, new PixelSize(atlasWidth, Math.Max(1, y + rowHeight))));
         try
         {
-            var blur = new BlurEffect { Radius = fontSize * .12 };
+            var blur = new BlurEffect { Radius = fontSize * .36 };
             foreach (var page in pages)
             {
                 // Atlas coordinates are pixels. Keep its public image size in the same units for

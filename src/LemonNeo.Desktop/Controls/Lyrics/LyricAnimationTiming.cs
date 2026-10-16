@@ -9,7 +9,15 @@ internal readonly record struct LyricAnimationTiming(
     int Start, int Length, double StartTimeMs, double EndTimeMs, double WordEndTimeMs, bool IsEmphasized)
 {
     public const double DefaultDurationMultiplier = 2;
-    private static readonly CubicEaseOut LiftEasing = new();
+
+    // Whole words lift with an exponential ease-out, while emphasized words split
+    // per character and lift with a back ease
+    private static readonly ExponentialEaseOut WordLiftEasing = new();
+    private static readonly BackEaseOut CharacterLiftEasing = new();
+
+    // The halo follows the lift's timing but stays monotonic: the back ease's
+    // overshoot is a movement flourish that would otherwise flicker the opacity.
+    private static readonly CubicEaseOut GlowEasing = new();
 
     // Movement has its own clock: long words sweep across with staggered lifts,
     // while their highlight continues to follow the original per-character timing.
@@ -27,10 +35,10 @@ internal readonly record struct LyricAnimationTiming(
             timedCount++;
         }
 
-        // A whole word lifts over 1.5× the line's average word duration (at least 187 ms),
-        // as in the WPF reference, so the lift stays connected across the whole line.
+        // A whole word lifts over 1.5× the line's average word duration (at least 1200 ms),
+        // so the lift stays connected across the whole line.
         var averageDuration = timedCount > 0 ? totalDuration / timedCount : 0;
-        var liftUpDuration = Math.Max(187, averageDuration * 1.5);
+        var liftUpDuration = Math.Max(1200, averageDuration * 1.5);
 
         var result = new List<LyricAnimationTiming>();
         var offset = 0;
@@ -38,13 +46,14 @@ internal readonly record struct LyricAnimationTiming(
         {
             var duration = (double)word.EndTimeMs - word.StartTimeMs;
             // Empty/untimed tokens are not sung peers. A lone word has no comparison baseline.
-            var emphasized = timedCount > 1 && duration > 0 && !string.IsNullOrWhiteSpace(word.Text) &&
+            var emphasized = duration > 1800 &&
+                             timedCount > 1 && duration > 0 && !string.IsNullOrWhiteSpace(word.Text) &&
                              duration > multiplier * ((totalDuration - duration) / (timedCount - 1));
             if (emphasized)
             {
                 // Text elements preserve surrogate pairs, combining marks and joined emoji.
                 var starts = StringInfo.ParseCombiningCharacters(word.Text);
-                // Reference the WPF lift-up wave: unit shapes both the per-character lift
+                // The unit shapes both the per-character lift
                 // duration (unit * p) and the stagger between neighbors, so the sweep reads
                 // left to right and trails ~20% past the word's end.
                 var unit = duration * 1.2 / starts.Length;
@@ -82,11 +91,15 @@ internal readonly record struct LyricAnimationTiming(
         : EndTimeMs <= StartTimeMs ? 1
         : Math.Clamp((position - StartTimeMs) / (EndTimeMs - StartTimeMs), 0, 1);
 
-    public double LiftProgress(double position) => LiftEasing.Ease(
-        Math.Clamp((position - LiftStartTimeMs) / LiftDurationMs, 0, 1));
+    public double LiftProgress(double position) => IsEmphasized
+        ? CharacterLiftEasing.Ease(RawLiftProgress(position))
+        : WordLiftEasing.Ease(RawLiftProgress(position));
 
     public double GlowProgress(double position) => IsEmphasized
-        ? LiftProgress(position) * (1 - SmoothStep((position - WordEndTimeMs) / 450)) : 0;
+        ? GlowEasing.Ease(RawLiftProgress(position)) * (1 - SmoothStep((position - WordEndTimeMs) / 450)) : 0;
+
+    private double RawLiftProgress(double position) =>
+        Math.Clamp((position - LiftStartTimeMs) / LiftDurationMs, 0, 1);
 
     private static double SmoothStep(double value)
     {
