@@ -11,10 +11,10 @@ internal readonly record struct LyricAnimationTiming(
     public const double DefaultDurationMultiplier = 2;
     private static readonly CubicEaseOut LiftEasing = new();
 
-    // Movement has its own clock: long words sweep across with overlapping lifts,
+    // Movement has its own clock: long words sweep across with staggered lifts,
     // while their highlight continues to follow the original per-character timing.
     public double LiftStartTimeMs { get; init; } = StartTimeMs;
-    public double LiftDurationMs { get; init; } = Math.Clamp(EndTimeMs - StartTimeMs, 450, 900);
+    public double LiftDurationMs { get; init; } = EndTimeMs - StartTimeMs;
 
     public static LyricAnimationTiming[] Create(IReadOnlyList<LyricsWord> words, double multiplier)
     {
@@ -26,6 +26,11 @@ internal readonly record struct LyricAnimationTiming(
             totalDuration += (double)word.EndTimeMs - word.StartTimeMs;
             timedCount++;
         }
+
+        // A whole word lifts over 1.5× the line's average word duration (at least 187 ms),
+        // as in the WPF reference, so the lift stays connected across the whole line.
+        var averageDuration = timedCount > 0 ? totalDuration / timedCount : 0;
+        var liftUpDuration = Math.Max(187, averageDuration * 1.5);
 
         var result = new List<LyricAnimationTiming>();
         var offset = 0;
@@ -39,10 +44,13 @@ internal readonly record struct LyricAnimationTiming(
             {
                 // Text elements preserve surrogate pairs, combining marks and joined emoji.
                 var starts = StringInfo.ParseCombiningCharacters(word.Text);
-                // Start neighbors at most 80 ms apart and cap the entire stagger at 480 ms.
-                // Short words compress the wave so the final character still settles within the word.
-                var stagger = starts.Length > 1 ? Math.Min(80, Math.Min(480, duration * .25) / (starts.Length - 1)) : 0;
-                var liftDuration = Math.Min(duration - stagger * (starts.Length - 1), Math.Clamp(duration * .7, 600, 1100));
+                // Reference the WPF lift-up wave: unit shapes both the per-character lift
+                // duration (unit * p) and the stagger between neighbors, so the sweep reads
+                // left to right and trails ~20% past the word's end.
+                var unit = duration * 1.2 / starts.Length;
+                var p = starts.Length * .6;
+                var stagger = starts.Length > 1 ? unit - (p - 1) * unit / (starts.Length - 1) : 0;
+                var liftDuration = unit * p;
                 for (var i = 0; i < starts.Length; i++)
                 {
                     var end = i + 1 < starts.Length ? starts[i + 1] : word.Text.Length;
@@ -58,7 +66,10 @@ internal readonly record struct LyricAnimationTiming(
             else if (word.Text.Length > 0)
             {
                 result.Add(new LyricAnimationTiming(offset, word.Text.Length, word.StartTimeMs,
-                    word.EndTimeMs, word.EndTimeMs, false));
+                    word.EndTimeMs, word.EndTimeMs, false)
+                {
+                    LiftDurationMs = liftUpDuration
+                });
             }
 
             offset += word.Text.Length;
