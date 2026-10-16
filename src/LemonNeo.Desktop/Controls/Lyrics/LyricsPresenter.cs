@@ -67,6 +67,9 @@ public sealed class LyricsPresenter : UserControl
     public static readonly StyledProperty<bool> ReduceMotionProperty =
         AvaloniaProperty.Register<LyricsPresenter, bool>(nameof(ReduceMotion));
 
+    public static readonly StyledProperty<double> LongWordDurationMultiplierProperty =
+        LyricText.LongWordDurationMultiplierProperty.AddOwner<LyricsPresenter>();
+
     public static readonly StyledProperty<TextAlignment> TextAlignmentProperty =
         AvaloniaProperty.Register<LyricsPresenter, TextAlignment>(nameof(TextAlignment), TextAlignment.Center);
 
@@ -140,7 +143,7 @@ public sealed class LyricsPresenter : UserControl
         {
             Name = "LyricsScrollViewer", Content = _lines,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+            VerticalScrollBarVisibility = ScrollBarVisibility.Hidden
         };
         // Fade only the viewport edges so the current line remains legible in both themes.
         _scroll.OpacityMask = new LinearGradientBrush
@@ -230,6 +233,13 @@ public sealed class LyricsPresenter : UserControl
     {
         get => GetValue(ReduceMotionProperty);
         set => SetValue(ReduceMotionProperty, value);
+    }
+
+    /// <summary>Emphasize words longer than this multiple of the other timed words' mean duration.</summary>
+    public double LongWordDurationMultiplier
+    {
+        get => GetValue(LongWordDurationMultiplierProperty);
+        set => SetValue(LongWordDurationMultiplierProperty, value);
     }
 
     public TextAlignment TextAlignment
@@ -369,7 +379,8 @@ public sealed class LyricsPresenter : UserControl
             change.Property == ReachedBrushProperty || change.Property == UnreachedBrushProperty ||
             change.Property == TextAlignmentProperty || change.Property == ShowRomanizationProperty ||
             change.Property == ShowTranslationProperty ||
-            change.Property == BoldLyricsProperty || change.Property == ReduceMotionProperty)
+            change.Property == BoldLyricsProperty || change.Property == ReduceMotionProperty ||
+            change.Property == LongWordDurationMultiplierProperty)
         {
             _transition.ReduceMotion = ReduceMotion;
             UpdateAppearance();
@@ -430,7 +441,7 @@ public sealed class LyricsPresenter : UserControl
             };
             var main = new LyricText
                 { Text = row.Main.Text, Words = row.Main.Words, LineStartTimeMs = row.Main.EffectiveStartTimeMs };
-            var romanization = new LyricText();
+            var romanization = new LyricText { EnableWordAnimation = false };
             var translation = new LyricText { Opacity = SubTextOpacity };
             foreach (var text in new[] { main, romanization, translation })
             {
@@ -505,6 +516,7 @@ public sealed class LyricsPresenter : UserControl
             row.Translation.Foreground = Foreground;
             row.Main.ReachedBrush = row.Romanization.ReachedBrush = ReachedBrush;
             row.Main.ReduceMotion = row.Romanization.ReduceMotion = ReduceMotion;
+            row.Main.LongWordDurationMultiplier = LongWordDurationMultiplier;
             row.Panel.Transitions = ReduceMotion
                 ? null
                 : new Transitions

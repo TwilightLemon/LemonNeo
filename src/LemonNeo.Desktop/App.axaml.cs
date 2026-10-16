@@ -14,8 +14,6 @@ public class App : Avalonia.Application
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
-        if (OperatingSystem.IsWindows())
-            Resources["Font.UI"] = new FontFamily("Microsoft YaHei UI");
     }
 
     public override void OnFrameworkInitializationCompleted()
