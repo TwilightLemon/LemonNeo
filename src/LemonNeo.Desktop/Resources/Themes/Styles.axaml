@@ -8,7 +8,6 @@
     <Style Selector="Window">
         <Setter Property="Background" Value="{DynamicResource Brush.Canvas}" />
         <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
-        <Setter Property="FontFamily" Value="{DynamicResource Font.UI}" />
         <Setter Property="FontSize" Value="{DynamicResource Font.Body}" />
     </Style>
     <Style Selector="TextBlock">

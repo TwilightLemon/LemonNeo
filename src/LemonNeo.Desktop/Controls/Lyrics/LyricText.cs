@@ -7,7 +7,7 @@ using LemonNeo.Core.Lyrics;
 
 namespace LemonNeo.Desktop.Controls.Lyrics;
 
-/// <summary>Shapes text once, then sweeps a soft highlight across each timed word, including wrapped words.</summary>
+/// <summary>Shapes text once, then highlights and lifts timed words, including wrapped words.</summary>
 public sealed class LyricText : TextBlock
 {
     public static readonly StyledProperty<bool> IsVerticalProperty =
@@ -40,6 +40,14 @@ public sealed class LyricText : TextBlock
     public static readonly StyledProperty<bool> ReduceMotionProperty =
         AvaloniaProperty.Register<LyricText, bool>(nameof(ReduceMotion));
 
+    public static readonly StyledProperty<bool> EnableWordAnimationProperty =
+        AvaloniaProperty.Register<LyricText, bool>(nameof(EnableWordAnimation), true);
+
+    public static readonly StyledProperty<double> LongWordDurationMultiplierProperty =
+        AvaloniaProperty.Register<LyricText, double>(nameof(LongWordDurationMultiplier),
+            LyricAnimationTiming.DefaultDurationMultiplier,
+            coerce: (_, value) => double.IsFinite(value) ? Math.Max(1, value) : LyricAnimationTiming.DefaultDurationMultiplier);
+
     public static readonly StyledProperty<int?> LineStartTimeMsProperty =
         AvaloniaProperty.Register<LyricText, int?>(nameof(LineStartTimeMs));
 
@@ -57,12 +65,15 @@ public sealed class LyricText : TextBlock
     private TextLayout? _highlightLayout;
     private TextLayout? _sourceLayout;
     private Rect[][] _wordBounds = [];
+    private LyricAnimationTiming[]? _animationTiming;
+    private Rect[][]? _animationBounds;
+    private LyricWordAnimation? _wordAnimation;
 
     static LyricText()
     {
-        AffectsRender<LyricText>(PositionMillisecondsProperty, IsHighlightedProperty, ReduceMotionProperty,
+        AffectsRender<LyricText>(IsHighlightedProperty, ReduceMotionProperty, EnableWordAnimationProperty,
             LineStartTimeMsProperty);
-        AffectsMeasure<LyricText>(IsVerticalProperty);
+        AffectsMeasure<LyricText>(IsVerticalProperty, WordsProperty, EnableWordAnimationProperty);
     }
 
     public IReadOnlyList<LyricsDisplaySegment>? Segments
@@ -101,6 +112,18 @@ public sealed class LyricText : TextBlock
         set => SetValue(ReduceMotionProperty, value);
     }
 
+    public bool EnableWordAnimation
+    {
+        get => GetValue(EnableWordAnimationProperty);
+        set => SetValue(EnableWordAnimationProperty, value);
+    }
+
+    public double LongWordDurationMultiplier
+    {
+        get => GetValue(LongWordDurationMultiplierProperty);
+        set => SetValue(LongWordDurationMultiplierProperty, value);
+    }
+
     public int? LineStartTimeMs
     {
         get => GetValue(LineStartTimeMsProperty);
@@ -110,14 +133,42 @@ public sealed class LyricText : TextBlock
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
+        if (change.Property == PositionMillisecondsProperty)
+        {
+            if (CanAnimateWords && _wordAnimation is { } animation) animation.UpdatePosition(PositionMilliseconds);
+            else
+            {
+                if (CanAnimateWords) InvalidateArrange();
+                else ClearWordAnimation();
+                InvalidateVisual();
+            }
+        }
+
+        if (change.Property == IsHighlightedProperty || change.Property == ReduceMotionProperty ||
+            change.Property == EnableWordAnimationProperty)
+        {
+            if (!CanAnimateWords) ClearWordAnimation();
+            InvalidateArrange();
+        }
+
         if (change.Property == WordsProperty || change.Property == SegmentsProperty)
         {
+            _animationTiming = null;
             SetCurrentValue(TextProperty, Words is { Count: > 0 } words
                 ? string.Concat(words.Select(w => w.Text))
                 : Segments is { } segments
                     ? string.Concat(segments.Select(s => s.Text))
                     : Text);
             ClearHighlightLayout();
+            InvalidateVisual();
+        }
+
+        if (change.Property == LongWordDurationMultiplierProperty)
+        {
+            _animationTiming = null;
+            _animationBounds = null;
+            ClearWordAnimation();
+            InvalidateArrange();
             InvalidateVisual();
         }
 
@@ -130,6 +181,7 @@ public sealed class LyricText : TextBlock
             _verticalLayout?.Dispose();
             _verticalLayout = null;
             ClearHighlightLayout();
+            InvalidateArrange();
             InvalidateVisual();
         }
     }
@@ -137,8 +189,55 @@ public sealed class LyricText : TextBlock
     private VerticalLyricLayout VerticalLayout => _verticalLayout ??= new VerticalLyricLayout(Text ?? "",
         new Typeface(FontFamily, FontStyle, FontWeight, FontStretch), FontSize, LetterSpacing, Foreground, ReachedBrush);
 
-    protected override Size MeasureOverride(Size availableSize) => IsVertical
-        ? VerticalLayout.Size : base.MeasureOverride(availableSize);
+    // Reserve space even before the line becomes active, so lifting never changes its layout
+    // or gets cropped by the compact desktop viewport.
+    private Thickness AnimationPadding => EnableWordAnimation && Words is { Count: > 0 }
+        ? new Thickness(FontSize * .18, FontSize * .32, FontSize * .18, FontSize * .18) : default;
+
+    protected override Size MeasureOverride(Size availableSize) => (IsVertical
+        ? VerticalLayout.Size : base.MeasureOverride(availableSize.Deflate(AnimationPadding))).Inflate(AnimationPadding);
+
+    protected override Size ArrangeOverride(Size finalSize)
+    {
+        base.ArrangeOverride(finalSize.Deflate(AnimationPadding));
+        if (CanAnimateWords)
+        {
+            EnsureHighlightLayout();
+            var scaling = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1;
+            // Supersample on low-DPI screens to keep cached text sharp during fractional translations.
+            var rasterScaling = Math.Max(2, scaling);
+            if (_wordAnimation?.RenderScaling != rasterScaling) ClearWordAnimation();
+            if (_wordAnimation is null)
+            {
+                _animationTiming ??= LyricAnimationTiming.Create(Words!, LongWordDurationMultiplier);
+                _animationBounds ??= _animationTiming.Select(timing => GetRangeBounds(timing.Start, timing.Length)).ToArray();
+                _wordAnimation = new LyricWordAnimation(_animationTiming, _animationBounds, FontSize, rasterScaling, IsVertical,
+                    context => DrawNormalLayout(context, default),
+                    ReachedBrush is null ? null : context => DrawReachedLayout(context, default));
+                VisualChildren.Add(_wordAnimation);
+            }
+            var padding = Padding;
+            if (UseLayoutRounding)
+                padding = new Thickness(Math.Round(padding.Left * scaling) / scaling,
+                    Math.Round(padding.Top * scaling) / scaling, Math.Round(padding.Right * scaling) / scaling,
+                    Math.Round(padding.Bottom * scaling) / scaling);
+            var y = padding.Top + AnimationPadding.Top;
+            if (!IsVertical && finalSize.Height < TextLayout.Height)
+                y += VerticalAlignment switch
+                {
+                    Avalonia.Layout.VerticalAlignment.Center => (finalSize.Height - TextLayout.Height) / 2,
+                    Avalonia.Layout.VerticalAlignment.Bottom => finalSize.Height - TextLayout.Height,
+                    _ => 0
+                };
+            _wordAnimation.SetOrigin(IsVertical
+                ? new Point(Math.Max(0, (finalSize.Width - VerticalLayout.Size.Width) / 2), AnimationPadding.Top)
+                : new Point(padding.Left + AnimationPadding.Left, y));
+            _wordAnimation.Measure(finalSize);
+            _wordAnimation.Arrange(new Rect(finalSize));
+            _wordAnimation.UpdatePosition(PositionMilliseconds);
+        }
+        return finalSize;
+    }
 
     internal Rect[] GetRangeBounds(int start, int length) => IsVertical
         ? VerticalLayout.HitTestTextRange(start, length) : TextLayout.HitTestTextRange(start, length).ToArray();
@@ -149,12 +248,18 @@ public sealed class LyricText : TextBlock
     {
         if (IsVertical)
         {
-            origin = new Point(Math.Max(0, (Bounds.Width - VerticalLayout.Size.Width) / 2), 0);
-            VerticalLayout.Draw(context, origin, false);
+            origin = new Point(Math.Max(0, (Bounds.Width - VerticalLayout.Size.Width) / 2), AnimationPadding.Top);
         }
-        else base.RenderTextLayout(context, origin);
+        else origin += new Vector(AnimationPadding.Left, AnimationPadding.Top);
+
+        if (CanAnimateWords && _wordAnimation is not null) return;
+
+        DrawNormalLayout(context, origin);
         RenderHighlight(context, origin);
     }
+
+    private bool CanAnimateWords => EnableWordAnimation && IsHighlighted && !ReduceMotion &&
+                                    Words is { Count: > 0 } && double.IsFinite(PositionMilliseconds);
 
     private void RenderHighlight(DrawingContext context, Point origin)
     {
@@ -266,6 +371,22 @@ public sealed class LyricText : TextBlock
         _highlightLayout = null;
         _sourceLayout = null;
         _wordBounds = [];
+        _animationBounds = null;
+        ClearWordAnimation();
+    }
+
+    private void ClearWordAnimation()
+    {
+        if (_wordAnimation is not { } animation) return;
+        VisualChildren.Remove(animation);
+        animation.Dispose();
+        _wordAnimation = null;
+    }
+
+    private void DrawNormalLayout(DrawingContext context, Point origin)
+    {
+        if (IsVertical) VerticalLayout.Draw(context, origin, false);
+        else base.RenderTextLayout(context, origin);
     }
 
     private void DrawReachedLayout(DrawingContext context, Point origin)

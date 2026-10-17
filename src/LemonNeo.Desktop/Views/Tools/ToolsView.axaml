@@ -13,7 +13,6 @@
         <DataTemplate x:DataType="x:String" x:Key="PluginNamespaceTemplate">
             <Border Classes="namespaceTag">
                 <SelectableTextBlock
-                    FontFamily="{DynamicResource Font.Code}"
                     FontSize="12"
                     Text="{Binding}"
                     TextWrapping="Wrap" />
@@ -234,7 +233,6 @@
                                                                         Text="{Binding Name}"
                                                                         TextWrapping="Wrap" />
                                                                     <SelectableTextBlock
-                                                                        FontFamily="{DynamicResource Font.Code}"
                                                                         FontSize="12"
                                                                         Foreground="{DynamicResource Brush.TextSecondary}"
                                                                         Text="{Binding Id}"
@@ -351,7 +349,6 @@
                                                     </Border>
                                                 </StackPanel>
                                                 <SelectableTextBlock
-                                                    FontFamily="{DynamicResource Font.Code}"
                                                     FontSize="12"
                                                     Foreground="{DynamicResource Brush.TextSecondary}"
                                                     Text="{Binding Id}" />
