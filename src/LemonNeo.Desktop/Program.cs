@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Media;
+using LemonNeo.Desktop.Services;
 
 namespace LemonNeo.Desktop;
 
@@ -8,7 +9,34 @@ internal static class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        var singleInstance = SingleInstanceGuard.CreateDefault();
+        if (!singleInstance.TryAcquire())
+        {
+            if (singleInstance.NotifyExistingInstanceAsync().GetAwaiter().GetResult())
+            {
+                singleInstance.Dispose();
+                return;
+            }
+
+            // The previous owner disappeared before it could be reached; take over instead of
+            // silently failing to start.
+            if (!singleInstance.TryAcquire())
+            {
+                singleInstance.Dispose();
+                return;
+            }
+        }
+
+        App.SingleInstance = singleInstance;
+        try
+        {
+            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        }
+        finally
+        {
+            App.SingleInstance = null;
+            singleInstance.Dispose();
+        }
     }
 
     public static AppBuilder BuildAvaloniaApp()

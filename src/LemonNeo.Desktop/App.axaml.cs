@@ -2,7 +2,7 @@ using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
-using Avalonia.Media;
+using Avalonia.Threading;
 using LemonNeo.Desktop.Services;
 using LemonNeo.Desktop.Views.Shell;
 using LemonNeo.Hosting;
@@ -11,6 +11,9 @@ namespace LemonNeo.Desktop;
 
 public class App : Avalonia.Application
 {
+    /// <summary>Set by <see cref="Program"/> so later launches can show this instance's window.</summary>
+    internal static SingleInstanceGuard? SingleInstance { get; set; }
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -60,6 +63,10 @@ public class App : Avalonia.Application
                 OperatingSystem.IsWindows() || OperatingSystem.IsMacOS(),
                 InitializeAsync, ShutdownAsync, this.TryGetFeature<IActivatableLifetime>(),
                 window.PrepareForBackground);
+
+            // A second launch asks this instance to surface its window; it may arrive before the
+            // window is ready, in which case the guard replays it once this handler is registered.
+            SingleInstance?.SetActivationHandler(() => Dispatcher.UIThread.Post(lifetime.ShowMainWindow));
         }
 
         base.OnFrameworkInitializationCompleted();
