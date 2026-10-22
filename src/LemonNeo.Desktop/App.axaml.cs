@@ -55,7 +55,7 @@ public class App : Avalonia.Application
 
                 if (lifetime is not null && (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()))
                     menu = new DesktopApplicationMenu(this, lifetime, applicationService.ViewModel.Playback,
-                        applicationService.Text,
+                        applicationService.Text, applicationService.Shortcuts, window,
                         OperatingSystem.IsWindows());
             }
 

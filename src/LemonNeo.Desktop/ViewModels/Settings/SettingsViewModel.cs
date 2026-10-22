@@ -17,6 +17,7 @@ public sealed class SettingsViewModel : PageViewModel
     private readonly IDisposable _languageSubscription;
     private readonly ISettingsScope _playbackSettings;
     private readonly IDisposable _playbackSubscription;
+    private readonly ShortcutService? _shortcuts;
     private readonly HostStorageLocations _storage;
     private readonly IDesktopStorageService _storageService;
     private readonly IDisposable _visualEffectsSubscription;
@@ -47,6 +48,10 @@ public sealed class SettingsViewModel : PageViewModel
         _visualEffectsSubscription =
             Context.Settings.Subscribe<VisualEffectsPreferences>(_ => RefreshVisualEffectsProperties());
         _appearance.Colors.Changed += OnColorChanged;
+        _shortcuts = Context.Shortcuts;
+        if (_shortcuts is not null) _shortcuts.Changed += OnShortcutsChanged;
+        ShortcutRows = BuildShortcutRows();
+        ResetAllShortcutsCommand = new RelayCommand(() => _shortcuts?.ResetAll());
     }
 
     private AppearanceService _appearance => Context.Appearance;
@@ -67,7 +72,9 @@ public sealed class SettingsViewModel : PageViewModel
     public RelayCommand<string> ThemeCommand { get; }
     public RelayCommand<string> LanguageCommand { get; }
     public RelayCommand RestoreVisualEffectsDefaultsCommand { get; }
+    public RelayCommand ResetAllShortcutsCommand { get; }
     public IReadOnlyList<ThemeColorOption> ThemeColors { get; }
+    public IReadOnlyList<ShortcutRowViewModel> ShortcutRows { get; private set; }
 
     private VisualEffectsPreferences VisualEffects => Context.Settings.Get<VisualEffectsPreferences>();
 
@@ -233,6 +240,22 @@ public sealed class SettingsViewModel : PageViewModel
         OnPropertyChanged(nameof(ThemeColorStatus));
     }
 
+    private IReadOnlyList<ShortcutRowViewModel> BuildShortcutRows()
+    {
+        return _shortcuts is null
+            ? []
+            : _shortcuts.Actions
+                .Select(action => new ShortcutRowViewModel(_shortcuts, _text, action))
+                .ToArray();
+    }
+
+    private void OnShortcutsChanged(object? sender, EventArgs args)
+    {
+        // Rebuilding keeps gesture text, default state, and conflict flags consistent across rows.
+        ShortcutRows = BuildShortcutRows();
+        OnPropertyChanged(nameof(ShortcutRows));
+    }
+
     private void RefreshLanguageProperties()
     {
         foreach (var name in new[] { nameof(IsLanguageSystem), nameof(IsLanguageChinese), nameof(IsLanguageEnglish) })
@@ -272,6 +295,7 @@ public sealed class SettingsViewModel : PageViewModel
         OnPropertyChanged(nameof(MeshFrameRateOptions));
         OnPropertyChanged(nameof(PluginSummary));
         OnPropertyChanged(nameof(PluginDescriptions));
+        OnShortcutsChanged(this, EventArgs.Empty);
     }
 
     public override async ValueTask DisposeAsync()
@@ -283,6 +307,7 @@ public sealed class SettingsViewModel : PageViewModel
         _languageSubscription.Dispose();
         _visualEffectsSubscription.Dispose();
         _appearance.Colors.Changed -= OnColorChanged;
+        if (_shortcuts is not null) _shortcuts.Changed -= OnShortcutsChanged;
         await base.DisposeAsync();
     }
 }

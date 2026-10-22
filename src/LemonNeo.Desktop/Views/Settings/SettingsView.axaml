@@ -31,326 +31,404 @@
             </Grid>
         </Border>
         <Grid Grid.Row="2">
-            <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-                <StackPanel Spacing="18">
-                    <Border Classes="card">
-                        <StackPanel Spacing="14">
-                            <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.AudioQualityPreference}}" />
-                            <ComboBox
-                                AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.AudioQualityPreference}}"
-                                ItemsSource="{Binding AudioQualityOptions}"
-                                MinWidth="220"
-                                Name="AudioQualityPreference"
-                                SelectedIndex="{Binding SelectedAudioQuality}" />
-                            <TextBlock
-                                Classes="muted"
-                                Text="{Translate {x:Static i18n:LanguageManager+Keys.AudioQualityPreferenceDescription}}"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Border>
-                    <Border Classes="card">
-                        <StackPanel Spacing="16">
-                            <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.Appearance}}" />
-                            <TextBlock
-                                Classes="muted"
-                                Text="{Translate {x:Static i18n:LanguageManager+Keys.AppearanceDescription}}"
-                                TextWrapping="Wrap" />
-                            <WrapPanel Orientation="Horizontal">
-                                <Button
-                                    Classes.primary="{Binding IsThemeSystem}"
-                                    Command="{Binding ThemeCommand}"
-                                    CommandParameter="System"
-                                    Content="{Translate {x:Static i18n:LanguageManager+Keys.ThemeSystem}}"
-                                    Margin="0,0,10,8"
-                                    MinWidth="130" />
-                                <Button
-                                    Classes.primary="{Binding IsThemeLight}"
-                                    Command="{Binding ThemeCommand}"
-                                    CommandParameter="Light"
-                                    Content="{Translate {x:Static i18n:LanguageManager+Keys.ThemeLight}}"
-                                    Margin="0,0,10,8"
-                                    MinWidth="130" />
-                                <Button
-                                    Classes.primary="{Binding IsThemeDark}"
-                                    Command="{Binding ThemeCommand}"
-                                    CommandParameter="Dark"
-                                    Content="{Translate {x:Static i18n:LanguageManager+Keys.ThemeDark}}"
-                                    Margin="0,0,10,8"
-                                    MinWidth="130" />
-                            </WrapPanel>
-                            <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.ThemeColors}}" />
-                            <ToggleSwitch Content="{Translate {x:Static i18n:LanguageManager+Keys.UseArtworkColors}}" IsChecked="{Binding UseArtworkColors}" />
-                            <TextBlock
-                                Classes="caption"
-                                Text="{Binding ThemeColorStatus}"
-                                TextWrapping="Wrap" />
-                            <ItemsControl ItemsSource="{Binding ThemeColors}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <WrapPanel />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="settingsVm:ThemeColorOption">
-                                        <Button
-                                            AutomationProperties.Name="{Binding Name}"
-                                            Classes="themeColor"
-                                            Classes.selected="{Binding IsSelected}"
-                                            Command="{Binding SelectCommand}"
-                                            HorizontalContentAlignment="Stretch"
-                                            Margin="0,0,10,10"
-                                            Width="176">
-                                            <StackPanel Spacing="10">
-                                                <Border
-                                                    ClipToBounds="True"
-                                                    CornerRadius="6"
-                                                    Height="32">
-                                                    <Grid ColumnDefinitions="2*,*,*">
-                                                        <Border Background="{Binding Accent}" />
-                                                        <Border Background="{Binding Dark}" Grid.Column="1" />
-                                                        <Border Background="{Binding Light}" Grid.Column="2" />
-                                                    </Grid>
-                                                </Border>
-                                                <Grid ColumnDefinitions="*,Auto">
-                                                    <TextBlock Text="{Binding Name}" />
-                                                    <Path
-                                                        Classes="icon"
-                                                        Data="M 2,7 L 5,10 L 12,3"
-                                                        Fill="Transparent"
-                                                        Grid.Column="1"
-                                                        Height="14"
-                                                        IsVisible="{Binding IsSelected}"
-                                                        Stroke="{DynamicResource Brush.AccentText}"
-                                                        StrokeThickness="2"
-                                                        Width="14" />
-                                                </Grid>
-                                            </StackPanel>
-                                        </Button>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                    </Border>
-                    <Border Classes="card">
-                        <StackPanel Spacing="16">
-                            <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.VisualEffects}}" />
-                            <TextBlock
-                                Classes="muted"
-                                Text="{Translate {x:Static i18n:LanguageManager+Keys.VisualEffectsDescription}}"
-                                TextWrapping="Wrap" />
-                            <StackPanel Spacing="6">
-                                <ToggleSwitch
-                                    Content="{Translate {x:Static i18n:LanguageManager+Keys.EnableAudioVisualizer}}"
-                                    IsChecked="{Binding AudioVisualizerEnabled, Mode=TwoWay}" />
-                                <TextBlock
-                                    Classes="caption"
-                                    Margin="0,0,0,6"
-                                    Text="{Translate {x:Static i18n:LanguageManager+Keys.AudioVisualizerDescription}}"
-                                    TextWrapping="Wrap" />
-                                <ToggleSwitch
-                                    Content="{Translate {x:Static i18n:LanguageManager+Keys.EnableAppleMusicMesh}}"
-                                    IsChecked="{Binding AppleMusicMeshEnabled, Mode=TwoWay}" />
-                                <TextBlock
-                                    Classes="caption"
-                                    Text="{Translate {x:Static i18n:LanguageManager+Keys.AppleMusicMeshDescription}}"
-                                    TextWrapping="Wrap" />
-                            </StackPanel>
-                            <StackPanel
-                                IsEnabled="{Binding AppleMusicMeshEnabled}"
-                                Margin="20,0,0,0"
-                                Spacing="12">
-                                <ToggleSwitch
-                                    Content="{Translate {x:Static i18n:LanguageManager+Keys.AppleMusicMeshLyricsOnly}}"
-                                    IsChecked="{Binding AppleMusicMeshLyricsOnly, Mode=TwoWay}" />
-                                <StackPanel Spacing="7">
-                                    <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.AppleMusicMeshPreset}}" />
+            <TabControl>
+                <TabItem Header="{Translate {x:Static i18n:LanguageManager+Keys.General}}">
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Margin="0,16,12,16" Spacing="18">
+                            <Border Classes="card">
+                                <StackPanel Spacing="14">
+                                    <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.AudioQualityPreference}}" />
                                     <ComboBox
-                                        ItemsSource="{Binding MeshPresetOptions}"
+                                        AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.AudioQualityPreference}}"
+                                        ItemsSource="{Binding AudioQualityOptions}"
                                         MinWidth="220"
-                                        SelectedIndex="{Binding SelectedMeshPresetIndex, Mode=TwoWay}" />
+                                        Name="AudioQualityPreference"
+                                        SelectedIndex="{Binding SelectedAudioQuality}" />
+                                    <TextBlock
+                                        Classes="muted"
+                                        Text="{Translate {x:Static i18n:LanguageManager+Keys.AudioQualityPreferenceDescription}}"
+                                        TextWrapping="Wrap" />
                                 </StackPanel>
-                            </StackPanel>
-                            <Expander
-                                Header="{Translate {x:Static i18n:LanguageManager+Keys.VisualEffectsAdvanced}}"
-                                HorizontalAlignment="Stretch"
-                                HorizontalContentAlignment="Stretch">
-                                <StackPanel Margin="0,14,0,0" Spacing="18">
-                                    <StackPanel IsEnabled="{Binding AudioVisualizerEnabled}" Spacing="8">
-                                        <Grid ColumnDefinitions="*,Auto">
-                                            <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.AudioVisualizerStripCount}}" />
-                                            <TextBlock
-                                                Classes="muted"
-                                                Grid.Column="1"
-                                                Text="{Binding AudioVisualizerStripCount, StringFormat={}{0:0}}" />
-                                        </Grid>
-                                        <Slider
-                                            IsSnapToTickEnabled="True"
-                                            Maximum="256"
-                                            Minimum="2"
-                                            TickFrequency="1"
-                                            Value="{Binding AudioVisualizerStripCount, Mode=TwoWay}" />
-                                    </StackPanel>
-                                    <Border Background="{DynamicResource Brush.Border}" Height="1" />
-                                    <StackPanel IsEnabled="{Binding AppleMusicMeshEnabled}" Spacing="16">
-                                        <StackPanel Spacing="7">
-                                            <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.MeshFrameRate}}" />
-                                            <ComboBox
-                                                ItemsSource="{Binding MeshFrameRateOptions}"
-                                                MinWidth="220"
-                                                SelectedIndex="{Binding SelectedMeshFrameRateIndex, Mode=TwoWay}" />
-                                        </StackPanel>
-                                        <StackPanel Spacing="8">
-                                            <Grid ColumnDefinitions="*,Auto">
-                                                <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.MeshRenderScale}}" />
-                                                <TextBlock
-                                                    Classes="muted"
-                                                    Grid.Column="1"
-                                                    Text="{Binding MeshRenderScale, StringFormat={}{0:P0}}" />
-                                            </Grid>
-                                            <Slider
-                                                IsSnapToTickEnabled="True"
-                                                Maximum="1"
-                                                Minimum="0.125"
-                                                TickFrequency="0.025"
-                                                Value="{Binding MeshRenderScale, Mode=TwoWay}" />
-                                        </StackPanel>
-                                        <StackPanel Spacing="8">
-                                            <Grid ColumnDefinitions="*,Auto">
-                                                <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.MeshRotationScale}}" />
-                                                <TextBlock
-                                                    Classes="muted"
-                                                    Grid.Column="1"
-                                                    Text="{Binding MeshRotationScale, StringFormat={}{0:0.0}×}" />
-                                            </Grid>
-                                            <Slider
-                                                IsSnapToTickEnabled="True"
-                                                Maximum="2"
-                                                Minimum="0"
-                                                TickFrequency="0.1"
-                                                Value="{Binding MeshRotationScale, Mode=TwoWay}" />
-                                        </StackPanel>
-                                        <StackPanel Spacing="8">
-                                            <Grid ColumnDefinitions="*,Auto">
-                                                <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.MeshBassPulseScale}}" />
-                                                <TextBlock
-                                                    Classes="muted"
-                                                    Grid.Column="1"
-                                                    Text="{Binding MeshBassPulseScale, StringFormat={}{0:0.0}×}" />
-                                            </Grid>
-                                            <Slider
-                                                IsSnapToTickEnabled="True"
-                                                Maximum="2"
-                                                Minimum="0"
-                                                TickFrequency="0.1"
-                                                Value="{Binding MeshBassPulseScale, Mode=TwoWay}" />
-                                        </StackPanel>
-                                        <StackPanel Spacing="8">
-                                            <Grid ColumnDefinitions="*,Auto">
-                                                <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.MeshBlurScale}}" />
-                                                <TextBlock
-                                                    Classes="muted"
-                                                    Grid.Column="1"
-                                                    Text="{Binding MeshBlurScale, StringFormat={}{0:0.0}×}" />
-                                            </Grid>
-                                            <Slider
-                                                IsSnapToTickEnabled="True"
-                                                Maximum="3"
-                                                Minimum="0"
-                                                TickFrequency="0.1"
-                                                Value="{Binding MeshBlurScale, Mode=TwoWay}" />
-                                        </StackPanel>
-                                    </StackPanel>
+                            </Border>
+                            <Border Classes="card">
+                                <StackPanel Spacing="16">
+                                    <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.Language}}" />
+                                    <TextBlock
+                                        Classes="muted"
+                                        Text="{Translate {x:Static i18n:LanguageManager+Keys.LanguageDescription}}"
+                                        TextWrapping="Wrap" />
+                                    <WrapPanel Orientation="Horizontal">
+                                        <Button
+                                            Classes.primary="{Binding IsLanguageSystem}"
+                                            Command="{Binding LanguageCommand}"
+                                            CommandParameter="System"
+                                            Content="{Translate {x:Static i18n:LanguageManager+Keys.LanguageSystem}}"
+                                            Margin="0,0,10,8"
+                                            MinWidth="130" />
+                                        <Button
+                                            Classes.primary="{Binding IsLanguageChinese}"
+                                            Command="{Binding LanguageCommand}"
+                                            CommandParameter="Chinese"
+                                            Content="{Translate {x:Static i18n:LanguageManager+Keys.LanguageChinese}}"
+                                            Margin="0,0,10,8"
+                                            MinWidth="130" />
+                                        <Button
+                                            Classes.primary="{Binding IsLanguageEnglish}"
+                                            Command="{Binding LanguageCommand}"
+                                            CommandParameter="English"
+                                            Content="{Translate {x:Static i18n:LanguageManager+Keys.LanguageEnglish}}"
+                                            Margin="0,0,10,8"
+                                            MinWidth="130" />
+                                    </WrapPanel>
                                 </StackPanel>
-                            </Expander>
-                            <Button
-                                Command="{Binding RestoreVisualEffectsDefaultsCommand}"
-                                Content="{Translate {x:Static i18n:LanguageManager+Keys.RestoreVisualEffectsDefaults}}"
-                                HorizontalAlignment="Left" />
+                            </Border>
+                            <Border Classes="card">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.Storage}}" />
+                                    <TextBlock
+                                        Classes="muted"
+                                        Text="{Translate {x:Static i18n:LanguageManager+Keys.StorageDescription}}"
+                                        TextWrapping="Wrap" />
+                                    <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.LibraryPath}}" />
+                                    <SelectableTextBlock Text="{Binding LibraryPath}" TextWrapping="Wrap" />
+                                    <Button
+                                        Click="OnChangeLibraryPath"
+                                        Content="{Translate {x:Static i18n:LanguageManager+Keys.ChangeLibraryPath}}"
+                                        HorizontalAlignment="Left" />
+                                    <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.ConfigurationPath}}" />
+                                    <SelectableTextBlock Text="{Binding ConfigurationPath}" TextWrapping="Wrap" />
+                                    <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.CachePath}}" />
+                                    <SelectableTextBlock Text="{Binding CachePath}" TextWrapping="Wrap" />
+                                    <Button
+                                        Click="OnChangeCachePath"
+                                        Content="{Translate {x:Static i18n:LanguageManager+Keys.ChangeCachePath}}"
+                                        HorizontalAlignment="Left" />
+                                </StackPanel>
+                            </Border>
+                            <Border Classes="card">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.Plugins}}" />
+                                    <TextBlock Classes="muted" Text="{Binding PluginSummary}" />
+                                    <ItemsControl ItemsSource="{Binding PluginDescriptions}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="x:String">
+                                                <TextBlock
+                                                    Margin="0,4"
+                                                    Text="{Binding}"
+                                                    TextWrapping="Wrap" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
-                    </Border>
-                    <Border Classes="card">
-                        <StackPanel Spacing="16">
-                            <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.Language}}" />
-                            <TextBlock
-                                Classes="muted"
-                                Text="{Translate {x:Static i18n:LanguageManager+Keys.LanguageDescription}}"
-                                TextWrapping="Wrap" />
-                            <WrapPanel Orientation="Horizontal">
-                                <Button
-                                    Classes.primary="{Binding IsLanguageSystem}"
-                                    Command="{Binding LanguageCommand}"
-                                    CommandParameter="System"
-                                    Content="{Translate {x:Static i18n:LanguageManager+Keys.LanguageSystem}}"
-                                    Margin="0,0,10,8"
-                                    MinWidth="130" />
-                                <Button
-                                    Classes.primary="{Binding IsLanguageChinese}"
-                                    Command="{Binding LanguageCommand}"
-                                    CommandParameter="Chinese"
-                                    Content="{Translate {x:Static i18n:LanguageManager+Keys.LanguageChinese}}"
-                                    Margin="0,0,10,8"
-                                    MinWidth="130" />
-                                <Button
-                                    Classes.primary="{Binding IsLanguageEnglish}"
-                                    Command="{Binding LanguageCommand}"
-                                    CommandParameter="English"
-                                    Content="{Translate {x:Static i18n:LanguageManager+Keys.LanguageEnglish}}"
-                                    Margin="0,0,10,8"
-                                    MinWidth="130" />
-                            </WrapPanel>
-                        </StackPanel>
-                    </Border>
-                    <Border Classes="card">
-                        <StackPanel Spacing="14">
-                            <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.Motion}}" />
-                            <ToggleSwitch Content="{Translate {x:Static i18n:LanguageManager+Keys.ReduceMotion}}" IsChecked="{Binding ReduceMotion}" />
-                            <TextBlock
-                                Classes="muted"
-                                Text="{Translate {x:Static i18n:LanguageManager+Keys.MotionDescription}}"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Border>
-                    <Border Classes="card">
-                        <StackPanel Spacing="12">
-                            <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.Plugins}}" />
-                            <TextBlock Classes="muted" Text="{Binding PluginSummary}" />
-                            <ItemsControl ItemsSource="{Binding PluginDescriptions}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="x:String">
+                    </ScrollViewer>
+                </TabItem>
+                <TabItem Header="{Translate {x:Static i18n:LanguageManager+Keys.Appearance}}">
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Margin="0,16,12,16" Spacing="18">
+                            <Border Classes="card">
+                                <StackPanel Spacing="16">
+                                    <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.Appearance}}" />
+                                    <TextBlock
+                                        Classes="muted"
+                                        Text="{Translate {x:Static i18n:LanguageManager+Keys.AppearanceDescription}}"
+                                        TextWrapping="Wrap" />
+                                    <WrapPanel Orientation="Horizontal">
+                                        <Button
+                                            Classes.primary="{Binding IsThemeSystem}"
+                                            Command="{Binding ThemeCommand}"
+                                            CommandParameter="System"
+                                            Content="{Translate {x:Static i18n:LanguageManager+Keys.ThemeSystem}}"
+                                            Margin="0,0,10,8"
+                                            MinWidth="130" />
+                                        <Button
+                                            Classes.primary="{Binding IsThemeLight}"
+                                            Command="{Binding ThemeCommand}"
+                                            CommandParameter="Light"
+                                            Content="{Translate {x:Static i18n:LanguageManager+Keys.ThemeLight}}"
+                                            Margin="0,0,10,8"
+                                            MinWidth="130" />
+                                        <Button
+                                            Classes.primary="{Binding IsThemeDark}"
+                                            Command="{Binding ThemeCommand}"
+                                            CommandParameter="Dark"
+                                            Content="{Translate {x:Static i18n:LanguageManager+Keys.ThemeDark}}"
+                                            Margin="0,0,10,8"
+                                            MinWidth="130" />
+                                    </WrapPanel>
+                                    <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.ThemeColors}}" />
+                                    <ToggleSwitch Content="{Translate {x:Static i18n:LanguageManager+Keys.UseArtworkColors}}" IsChecked="{Binding UseArtworkColors}" />
+                                    <TextBlock
+                                        Classes="caption"
+                                        Text="{Binding ThemeColorStatus}"
+                                        TextWrapping="Wrap" />
+                                    <ItemsControl ItemsSource="{Binding ThemeColors}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="settingsVm:ThemeColorOption">
+                                                <Button
+                                                    AutomationProperties.Name="{Binding Name}"
+                                                    Classes="themeColor"
+                                                    Classes.selected="{Binding IsSelected}"
+                                                    Command="{Binding SelectCommand}"
+                                                    HorizontalContentAlignment="Stretch"
+                                                    Margin="0,0,10,10"
+                                                    Width="176">
+                                                    <StackPanel Spacing="10">
+                                                        <Border
+                                                            ClipToBounds="True"
+                                                            CornerRadius="6"
+                                                            Height="32">
+                                                            <Grid ColumnDefinitions="2*,*,*">
+                                                                <Border Background="{Binding Accent}" />
+                                                                <Border Background="{Binding Dark}" Grid.Column="1" />
+                                                                <Border Background="{Binding Light}" Grid.Column="2" />
+                                                            </Grid>
+                                                        </Border>
+                                                        <Grid ColumnDefinitions="*,Auto">
+                                                            <TextBlock Text="{Binding Name}" />
+                                                            <Path
+                                                                Classes="icon"
+                                                                Data="M 2,7 L 5,10 L 12,3"
+                                                                Fill="Transparent"
+                                                                Grid.Column="1"
+                                                                Height="14"
+                                                                IsVisible="{Binding IsSelected}"
+                                                                Stroke="{DynamicResource Brush.AccentText}"
+                                                                StrokeThickness="2"
+                                                                Width="14" />
+                                                        </Grid>
+                                                    </StackPanel>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                            <Border Classes="card">
+                                <StackPanel Spacing="16">
+                                    <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.VisualEffects}}" />
+                                    <TextBlock
+                                        Classes="muted"
+                                        Text="{Translate {x:Static i18n:LanguageManager+Keys.VisualEffectsDescription}}"
+                                        TextWrapping="Wrap" />
+                                    <StackPanel Spacing="6">
+                                        <ToggleSwitch
+                                            Content="{Translate {x:Static i18n:LanguageManager+Keys.EnableAudioVisualizer}}"
+                                            IsChecked="{Binding AudioVisualizerEnabled, Mode=TwoWay}" />
                                         <TextBlock
-                                            Margin="0,4"
-                                            Text="{Binding}"
+                                            Classes="caption"
+                                            Margin="0,0,0,6"
+                                            Text="{Translate {x:Static i18n:LanguageManager+Keys.AudioVisualizerDescription}}"
                                             TextWrapping="Wrap" />
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                                        <ToggleSwitch
+                                            Content="{Translate {x:Static i18n:LanguageManager+Keys.EnableAppleMusicMesh}}"
+                                            IsChecked="{Binding AppleMusicMeshEnabled, Mode=TwoWay}" />
+                                        <TextBlock
+                                            Classes="caption"
+                                            Text="{Translate {x:Static i18n:LanguageManager+Keys.AppleMusicMeshDescription}}"
+                                            TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <StackPanel
+                                        IsEnabled="{Binding AppleMusicMeshEnabled}"
+                                        Margin="20,0,0,0"
+                                        Spacing="12">
+                                        <ToggleSwitch
+                                            Content="{Translate {x:Static i18n:LanguageManager+Keys.AppleMusicMeshLyricsOnly}}"
+                                            IsChecked="{Binding AppleMusicMeshLyricsOnly, Mode=TwoWay}" />
+                                        <StackPanel Spacing="7">
+                                            <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.AppleMusicMeshPreset}}" />
+                                            <ComboBox
+                                                ItemsSource="{Binding MeshPresetOptions}"
+                                                MinWidth="220"
+                                                SelectedIndex="{Binding SelectedMeshPresetIndex, Mode=TwoWay}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <Expander
+                                        Header="{Translate {x:Static i18n:LanguageManager+Keys.VisualEffectsAdvanced}}"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Stretch">
+                                        <StackPanel Margin="0,14,0,0" Spacing="18">
+                                            <StackPanel IsEnabled="{Binding AudioVisualizerEnabled}" Spacing="8">
+                                                <Grid ColumnDefinitions="*,Auto">
+                                                    <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.AudioVisualizerStripCount}}" />
+                                                    <TextBlock
+                                                        Classes="muted"
+                                                        Grid.Column="1"
+                                                        Text="{Binding AudioVisualizerStripCount, StringFormat={}{0:0}}" />
+                                                </Grid>
+                                                <Slider
+                                                    IsSnapToTickEnabled="True"
+                                                    Maximum="256"
+                                                    Minimum="2"
+                                                    TickFrequency="1"
+                                                    Value="{Binding AudioVisualizerStripCount, Mode=TwoWay}" />
+                                            </StackPanel>
+                                            <Border Background="{DynamicResource Brush.Border}" Height="1" />
+                                            <StackPanel IsEnabled="{Binding AppleMusicMeshEnabled}" Spacing="16">
+                                                <StackPanel Spacing="7">
+                                                    <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.MeshFrameRate}}" />
+                                                    <ComboBox
+                                                        ItemsSource="{Binding MeshFrameRateOptions}"
+                                                        MinWidth="220"
+                                                        SelectedIndex="{Binding SelectedMeshFrameRateIndex, Mode=TwoWay}" />
+                                                </StackPanel>
+                                                <StackPanel Spacing="8">
+                                                    <Grid ColumnDefinitions="*,Auto">
+                                                        <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.MeshRenderScale}}" />
+                                                        <TextBlock
+                                                            Classes="muted"
+                                                            Grid.Column="1"
+                                                            Text="{Binding MeshRenderScale, StringFormat={}{0:P0}}" />
+                                                    </Grid>
+                                                    <Slider
+                                                        IsSnapToTickEnabled="True"
+                                                        Maximum="1"
+                                                        Minimum="0.125"
+                                                        TickFrequency="0.025"
+                                                        Value="{Binding MeshRenderScale, Mode=TwoWay}" />
+                                                </StackPanel>
+                                                <StackPanel Spacing="8">
+                                                    <Grid ColumnDefinitions="*,Auto">
+                                                        <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.MeshRotationScale}}" />
+                                                        <TextBlock
+                                                            Classes="muted"
+                                                            Grid.Column="1"
+                                                            Text="{Binding MeshRotationScale, StringFormat={}{0:0.0}×}" />
+                                                    </Grid>
+                                                    <Slider
+                                                        IsSnapToTickEnabled="True"
+                                                        Maximum="2"
+                                                        Minimum="0"
+                                                        TickFrequency="0.1"
+                                                        Value="{Binding MeshRotationScale, Mode=TwoWay}" />
+                                                </StackPanel>
+                                                <StackPanel Spacing="8">
+                                                    <Grid ColumnDefinitions="*,Auto">
+                                                        <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.MeshBassPulseScale}}" />
+                                                        <TextBlock
+                                                            Classes="muted"
+                                                            Grid.Column="1"
+                                                            Text="{Binding MeshBassPulseScale, StringFormat={}{0:0.0}×}" />
+                                                    </Grid>
+                                                    <Slider
+                                                        IsSnapToTickEnabled="True"
+                                                        Maximum="2"
+                                                        Minimum="0"
+                                                        TickFrequency="0.1"
+                                                        Value="{Binding MeshBassPulseScale, Mode=TwoWay}" />
+                                                </StackPanel>
+                                                <StackPanel Spacing="8">
+                                                    <Grid ColumnDefinitions="*,Auto">
+                                                        <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.MeshBlurScale}}" />
+                                                        <TextBlock
+                                                            Classes="muted"
+                                                            Grid.Column="1"
+                                                            Text="{Binding MeshBlurScale, StringFormat={}{0:0.0}×}" />
+                                                    </Grid>
+                                                    <Slider
+                                                        IsSnapToTickEnabled="True"
+                                                        Maximum="3"
+                                                        Minimum="0"
+                                                        TickFrequency="0.1"
+                                                        Value="{Binding MeshBlurScale, Mode=TwoWay}" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Expander>
+                                    <Button
+                                        Command="{Binding RestoreVisualEffectsDefaultsCommand}"
+                                        Content="{Translate {x:Static i18n:LanguageManager+Keys.RestoreVisualEffectsDefaults}}"
+                                        HorizontalAlignment="Left" />
+                                </StackPanel>
+                            </Border>
+                            <Border Classes="card">
+                                <StackPanel Spacing="14">
+                                    <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.Motion}}" />
+                                    <ToggleSwitch Content="{Translate {x:Static i18n:LanguageManager+Keys.ReduceMotion}}" IsChecked="{Binding ReduceMotion}" />
+                                    <TextBlock
+                                        Classes="muted"
+                                        Text="{Translate {x:Static i18n:LanguageManager+Keys.MotionDescription}}"
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
-                    </Border>
-                    <Border Classes="card">
-                        <StackPanel Spacing="12">
-                            <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.Storage}}" />
-                            <TextBlock
-                                Classes="muted"
-                                Text="{Translate {x:Static i18n:LanguageManager+Keys.StorageDescription}}"
-                                TextWrapping="Wrap" />
-                            <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.LibraryPath}}" />
-                            <SelectableTextBlock Text="{Binding LibraryPath}" TextWrapping="Wrap" />
-                            <Button
-                                Click="OnChangeLibraryPath"
-                                Content="{Translate {x:Static i18n:LanguageManager+Keys.ChangeLibraryPath}}"
-                                HorizontalAlignment="Left" />
-                            <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.ConfigurationPath}}" />
-                            <SelectableTextBlock Text="{Binding ConfigurationPath}" TextWrapping="Wrap" />
-                            <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.CachePath}}" />
-                            <SelectableTextBlock Text="{Binding CachePath}" TextWrapping="Wrap" />
-                            <Button
-                                Click="OnChangeCachePath"
-                                Content="{Translate {x:Static i18n:LanguageManager+Keys.ChangeCachePath}}"
-                                HorizontalAlignment="Left" />
+                    </ScrollViewer>
+                </TabItem>
+                <TabItem Header="{Translate {x:Static i18n:LanguageManager+Keys.KeyboardShortcuts}}">
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Margin="0,16,12,16" Spacing="18">
+                            <Border Classes="card">
+                                <StackPanel Spacing="14">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock
+                                            Classes="section"
+                                            Text="{Translate {x:Static i18n:LanguageManager+Keys.KeyboardShortcuts}}"
+                                            VerticalAlignment="Center" />
+                                        <Button
+                                            Command="{Binding ResetAllShortcutsCommand}"
+                                            Content="{Translate {x:Static i18n:LanguageManager+Keys.ShortcutResetAll}}"
+                                            Grid.Column="1" />
+                                    </Grid>
+                                    <TextBlock
+                                        Classes="muted"
+                                        Text="{Translate {x:Static i18n:LanguageManager+Keys.KeyboardShortcutsDescription}}"
+                                        TextWrapping="Wrap" />
+                                    <ItemsControl ItemsSource="{Binding ShortcutRows}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="settingsVm:ShortcutRowViewModel">
+                                                <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" Margin="0,0,0,8">
+                                                    <TextBlock
+                                                        Margin="0,0,12,0"
+                                                        Text="{Binding Name}"
+                                                        VerticalAlignment="Center" />
+                                                    <TextBlock
+                                                        Classes="caption"
+                                                        Foreground="{DynamicResource Brush.Danger}"
+                                                        Grid.Column="1"
+                                                        IsVisible="{Binding HasConflict}"
+                                                        Margin="0,0,12,0"
+                                                        MaxWidth="280"
+                                                        Text="{Binding ConflictText}"
+                                                        TextAlignment="Right"
+                                                        TextWrapping="Wrap"
+                                                        VerticalAlignment="Center" />
+                                                    <sharedControls:ShortcutCaptureBox
+                                                        CapturePrompt="{Binding CapturePrompt}"
+                                                        CapturedCommand="{Binding CapturedCommand}"
+                                                        CancelledCommand="{Binding CancelCaptureCommand}"
+                                                        GestureText="{Binding GestureText}"
+                                                        Grid.Column="2"
+                                                        IsCapturing="{Binding IsCapturing, Mode=TwoWay}"
+                                                        VerticalAlignment="Center" />
+                                                    <Button
+                                                        Classes="ghost"
+                                                        Command="{Binding ResetCommand}"
+                                                        Content="{Translate {x:Static i18n:LanguageManager+Keys.ShortcutReset}}"
+                                                        Grid.Column="3"
+                                                        IsEnabled="{Binding CanReset}"
+                                                        Margin="8,0,0,0" />
+                                                    <Button
+                                                        Classes="ghost"
+                                                        Command="{Binding ClearCommand}"
+                                                        Content="{Translate {x:Static i18n:LanguageManager+Keys.ShortcutClear}}"
+                                                        Grid.Column="4"
+                                                        Margin="6,0,0,0" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
-                    </Border>
-                </StackPanel>
-            </ScrollViewer>
+                    </ScrollViewer>
+                </TabItem>
+            </TabControl>
         </Grid>
     </Grid>
 </UserControl>
