@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net;
 using System.Runtime.InteropServices;
 using LemonNeo.Abstractions.Playback;
 using LemonNeo.Abstractions.Plugins;
@@ -27,7 +28,7 @@ public sealed class BassPlayerPlugin : ILemonPlugin, IPlayerProvider
     public ValueTask InitializeAsync(IPluginContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        _player = new BassPlayer(context.LoggerFactory.CreateLogger<BassPlayer>());
+        _player = new BassPlayer(context.LoggerFactory.CreateLogger<BassPlayer>(), context.NetworkProxy);
         context.RegisterPlayer(this);
         return ValueTask.CompletedTask;
     }
@@ -75,6 +76,7 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
     private readonly float[] _fftData = new float[FftBinCountValue];
     private readonly object _gate = new();
     private readonly ILogger<BassPlayer> _logger;
+    private readonly IWebProxy? _networkProxy;
     private bool _disposed;
     private BassDownloadForwarder? _downloadForwarder;
     private int _flacPlugin;
@@ -82,9 +84,10 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
     private int _stream;
     private float _volume = 1;
 
-    public BassPlayer(ILogger<BassPlayer> logger)
+    public BassPlayer(ILogger<BassPlayer> logger, IWebProxy? networkProxy)
     {
         _logger = logger;
+        _networkProxy = networkProxy;
         var nativeAsset = GetNativeAsset();
         BassNet.Registration("lemon.app@qq.com", "2X52325160022");
         var initFlags = OperatingSystem.IsWindows()
@@ -425,6 +428,7 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
             ? headers
             : [.. headers, "Accept-Encoding: identity"];
         var sourceWithHeaders = string.Join("\r\n", new[] { source.Uri.ToString() }.Concat(downloadHeaders)) + "\r\n";
+        ApplyNetworkProxy(source.Uri);
         _stream = BassApi.BASS_StreamCreateURL(
             sourceWithHeaders,
             0,
@@ -442,6 +446,32 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
         _isHttpStream = true;
         _downloadForwarder?.SetStream(_stream);
         return source.Uri.ToString();
+    }
+
+    /// <summary>BASS performs its own downloads, so mirror the host proxy into its native configuration.</summary>
+    private void ApplyNetworkProxy(Uri destination)
+    {
+        var value = "";
+        var proxy = _networkProxy;
+        if (proxy is not null && !proxy.IsBypassed(destination))
+        {
+            var address = proxy.GetProxy(destination);
+            if (address is not null && !address.Equals(destination))
+            {
+                var builder = new UriBuilder(address);
+                if (builder.UserName.Length == 0 &&
+                    proxy.Credentials?.GetCredential(address, "Basic") is { } credentials)
+                {
+                    builder.UserName = credentials.UserName;
+                    builder.Password = credentials.Password;
+                }
+
+                value = builder.Uri.GetLeftPart(UriPartial.Authority);
+            }
+        }
+
+        if (!BassApi.BASS_SetConfigString(BASSConfig.BASS_CONFIG_NET_PROXY, value))
+            _logger.LogWarning("Could not apply the network proxy to the BASS stream.");
     }
 
     private void FreeCurrentStream()

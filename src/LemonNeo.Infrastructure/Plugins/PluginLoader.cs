@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using LemonNeo.Abstractions.Playback;
 using LemonNeo.Abstractions.Plugins;
@@ -86,6 +87,7 @@ internal sealed class PluginLoader(
     PlayerRegistry playerRegistry,
     ILoggerFactory loggerFactory,
     IHttpClientFactory httpClientFactory,
+    IWebProxy networkProxy,
     IPluginDataStoreFactory dataStoreFactory,
     IAppSettingsService settings,
     ILogger<PluginLoader> logger,
@@ -203,6 +205,7 @@ internal sealed class PluginLoader(
             var context = new PluginContext(
                 loggerFactory,
                 httpClientFactory,
+                networkProxy,
                 registry,
                 playerRegistry,
                 settings.ForPackage(manifest.Id),

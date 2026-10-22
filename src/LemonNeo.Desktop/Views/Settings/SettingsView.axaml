@@ -360,6 +360,92 @@
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>
+                <TabItem Header="{Translate {x:Static i18n:LanguageManager+Keys.Network}}">
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Margin="0,16,12,16" Spacing="18">
+                            <Border Classes="card">
+                                <StackPanel Spacing="16">
+                                    <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.ProxyMode}}" />
+                                    <WrapPanel Orientation="Horizontal">
+                                        <Button
+                                            Classes.primary="{Binding IsProxySystem}"
+                                            Command="{Binding ProxyModeCommand}"
+                                            CommandParameter="System"
+                                            Content="{Translate {x:Static i18n:LanguageManager+Keys.ProxyModeSystem}}"
+                                            Margin="0,0,10,8"
+                                            MinWidth="130" />
+                                        <Button
+                                            Classes.primary="{Binding IsProxyCustom}"
+                                            Command="{Binding ProxyModeCommand}"
+                                            CommandParameter="Custom"
+                                            Content="{Translate {x:Static i18n:LanguageManager+Keys.ProxyModeCustom}}"
+                                            Margin="0,0,10,8"
+                                            MinWidth="130" />
+                                        <Button
+                                            Classes.primary="{Binding IsProxyNone}"
+                                            Command="{Binding ProxyModeCommand}"
+                                            CommandParameter="None"
+                                            Content="{Translate {x:Static i18n:LanguageManager+Keys.ProxyModeNone}}"
+                                            Margin="0,0,10,8"
+                                            MinWidth="130" />
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Border>
+                            <Border Classes="card" IsEnabled="{Binding IsProxyCustom}">
+                                <StackPanel Spacing="16">
+                                    <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.CustomProxy}}" />
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.ProxyAddress}}" />
+                                        <TextBox
+                                            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.ProxyAddress}}"
+                                            PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.ProxyAddressPlaceholder}}"
+                                            Text="{Binding ProxyAddress, Mode=TwoWay}" />
+                                        <TextBlock
+                                            Classes="caption"
+                                            Foreground="{DynamicResource Brush.Danger}"
+                                            IsVisible="{Binding IsProxyAddressInvalid}"
+                                            Text="{Translate {x:Static i18n:LanguageManager+Keys.ProxyAddressInvalid}}"
+                                            TextWrapping="Wrap" />
+                                        <TextBlock
+                                            Classes="muted"
+                                            Text="{Translate {x:Static i18n:LanguageManager+Keys.ProxyAddressDescription}}"
+                                            TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                                        <StackPanel Spacing="6">
+                                            <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.ProxyUsername}}" />
+                                            <TextBox
+                                                AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.ProxyUsername}}"
+                                                Text="{Binding ProxyUsername, Mode=TwoWay}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Spacing="6">
+                                            <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.ProxyPassword}}" />
+                                            <TextBox
+                                                AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.ProxyPassword}}"
+                                                PasswordChar="●"
+                                                Text="{Binding ProxyPassword, Mode=TwoWay}" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.ProxyBypassList}}" />
+                                        <TextBox
+                                            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.ProxyBypassList}}"
+                                            PlaceholderText="localhost, *.local"
+                                            Text="{Binding ProxyBypassList, Mode=TwoWay}" />
+                                        <TextBlock
+                                            Classes="muted"
+                                            Text="{Translate {x:Static i18n:LanguageManager+Keys.ProxyBypassListDescription}}"
+                                            TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                            <Button
+                                Command="{Binding RestoreNetworkDefaultsCommand}"
+                                Content="{Translate {x:Static i18n:LanguageManager+Keys.RestoreNetworkDefaults}}"
+                                HorizontalAlignment="Left" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
                 <TabItem Header="{Translate {x:Static i18n:LanguageManager+Keys.KeyboardShortcuts}}">
                     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                         <StackPanel Margin="0,16,12,16" Spacing="18">

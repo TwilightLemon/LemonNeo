@@ -1,3 +1,4 @@
+using System.Net;
 using LemonNeo.Abstractions.Playback;
 using LemonNeo.Abstractions.Providers;
 using LemonNeo.Abstractions.Settings;
@@ -21,6 +22,10 @@ public interface IPluginContext
 {
     ILoggerFactory LoggerFactory { get; }
     IHttpClientFactory HttpClientFactory { get; }
+
+    /// <summary>Host-wide proxy for native networking that bypasses <see cref="HttpClientFactory" />.</summary>
+    IWebProxy NetworkProxy => throw new NotSupportedException("This host does not expose network proxy configuration.");
+
     ISettingsScope Settings { get; }
     ICredentialVault Credentials { get; }
 

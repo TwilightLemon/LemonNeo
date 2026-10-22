@@ -1,3 +1,4 @@
+using System.Net;
 using LemonNeo.Abstractions.Playback;
 using LemonNeo.Abstractions.Plugins;
 using LemonNeo.Abstractions.Providers;
@@ -10,6 +11,7 @@ namespace LemonNeo.Infrastructure.Plugins;
 internal sealed class PluginContext(
     ILoggerFactory loggerFactory,
     IHttpClientFactory httpClientFactory,
+    IWebProxy networkProxy,
     ProviderRegistry registry,
     PlayerRegistry playerRegistry,
     ISettingsScope settings,
@@ -24,6 +26,7 @@ internal sealed class PluginContext(
 
     public ILoggerFactory LoggerFactory { get; } = loggerFactory;
     public IHttpClientFactory HttpClientFactory { get; } = httpClientFactory;
+    public IWebProxy NetworkProxy { get; } = networkProxy;
     public ISettingsScope Settings { get; } = settings;
     public ICredentialVault Credentials { get; } = credentials;
     public string CacheDirectory => getCacheDirectory();
