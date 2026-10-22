@@ -7,9 +7,9 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Styling;
-using CommunityToolkit.Mvvm.Input;
 using LemonNeo.Desktop.Config;
 using LemonNeo.Desktop.Controls.Shared;
+using LemonNeo.Desktop.Services;
 using LemonNeo.Desktop.ViewModels.Library;
 using LemonNeo.Desktop.ViewModels.Shell;
 using LemonNeo.Desktop.Views.Library;
@@ -27,6 +27,7 @@ public partial class MainWindow : Window
     private bool _preserveDesktopLyricsPreference;
     private CancellationTokenSource? _queueAnimation;
     private bool _seeking;
+    private ShortcutService? _shortcuts;
 
     public MainWindow()
     {
@@ -42,6 +43,9 @@ public partial class MainWindow : Window
             VolumePopup.IsOpen = false;
             SourceDetailsPopup.IsOpen = false;
             CloseDesktopLyrics();
+            if (_shortcuts is null) return;
+            _shortcuts.Changed -= RebuildShortcuts;
+            _shortcuts.CaptureStateChanged -= RebuildShortcuts;
         };
         // Avalonia draws Windows captions and preserves native macOS traffic lights.
         // Keep system decorations on Linux, where client-area extension varies by window manager.
@@ -54,25 +58,29 @@ public partial class MainWindow : Window
         Timeline.AddHandler(Thumb.DragCompletedEvent, OnThumbDragCompleted, handledEventsToo: true);
         Timeline.AddHandler(KeyDownEvent, OnSeekKeyDown, RoutingStrategies.Tunnel, true);
         Timeline.KeyUp += OnSeekKeyUp;
-        // Command on macOS, Control elsewhere. Keep platform-native editing shortcuts intact.
-        var modifier = OperatingSystem.IsMacOS() ? KeyModifiers.Meta : KeyModifiers.Control;
-        KeyBindings.Add(new KeyBinding
-        {
-            Gesture = new KeyGesture(Key.O, modifier),
-            Command = new AsyncRelayCommand(() => ShowCreatePlaylistAsync(true))
-        });
-        KeyBindings.Add(new KeyBinding
-        {
-            Gesture = new KeyGesture(Key.Left, KeyModifiers.Alt),
-            Command = new AsyncRelayCommand(() =>
-                (DataContext as MainViewModel)?.Navigation.GoBackAsync() ?? Task.CompletedTask)
-        });
-        KeyBindings.Add(new KeyBinding
-        {
-            Gesture = new KeyGesture(Key.Right, KeyModifiers.Alt),
-            Command = new AsyncRelayCommand(() =>
-                (DataContext as MainViewModel)?.Navigation.GoForwardAsync() ?? Task.CompletedTask)
-        });
+    }
+
+    /// <summary>Binds the window accelerators to the shared shortcut catalog and keeps them in sync.</summary>
+    internal void AttachShortcuts(ShortcutService shortcuts)
+    {
+        _shortcuts = shortcuts;
+        shortcuts.Changed += RebuildShortcuts;
+        shortcuts.CaptureStateChanged += RebuildShortcuts;
+        RebuildShortcuts(null, EventArgs.Empty);
+    }
+
+    internal void FocusSearch()
+    {
+        GlobalSearch.Focus();
+        GlobalSearch.SelectAll();
+    }
+
+    private void RebuildShortcuts(object? sender, EventArgs args)
+    {
+        KeyBindings.Clear();
+        // While recording, every key must reach the capture control instead of running an action.
+        if (_shortcuts is null || _shortcuts.IsCapturing) return;
+        foreach (var binding in _shortcuts.BuildKeyBindings()) KeyBindings.Add(binding);
     }
 
     public bool IsDesktopLyricsOpen
@@ -81,7 +89,9 @@ public partial class MainWindow : Window
         private set => SetValue(IsDesktopLyricsOpenProperty, value);
     }
 
-    private void OnToggleDesktopLyrics(object? sender, RoutedEventArgs args)
+    private void OnToggleDesktopLyrics(object? sender, RoutedEventArgs args) => ToggleDesktopLyrics();
+
+    internal void ToggleDesktopLyrics()
     {
         if (_desktopLyrics is not null)
         {
@@ -324,7 +334,7 @@ public partial class MainWindow : Window
         await ShowCreatePlaylistAsync();
     }
 
-    private async Task ShowCreatePlaylistAsync(bool importFolder = false)
+    internal async Task ShowCreatePlaylistAsync(bool importFolder = false)
     {
         if (DataContext is not MainViewModel { SharedContext.IsInitialized: true } shell) return;
         var vm = shell.Library;

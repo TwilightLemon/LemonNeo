@@ -1,0 +1,21 @@
+<UserControl
+    x:Class="LemonNeo.Desktop.Controls.Shared.ShortcutCaptureBox"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Border
+        Name="CaptureSurface"
+        Background="{DynamicResource Brush.SurfaceRaised}"
+        BorderBrush="{DynamicResource Brush.Border}"
+        BorderThickness="1"
+        CornerRadius="10"
+        Cursor="Hand"
+        Focusable="True"
+        MinWidth="128"
+        Padding="14,8"
+        PointerPressed="OnPointerPressed">
+        <TextBlock
+            Name="DisplayTextBlock"
+            HorizontalAlignment="Center"
+            TextWrapping="Wrap" />
+    </Border>
+</UserControl>

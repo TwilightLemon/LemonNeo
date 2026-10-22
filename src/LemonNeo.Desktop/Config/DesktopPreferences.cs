@@ -1,3 +1,4 @@
+using Avalonia.Input;
 using LemonNeo.Abstractions.Settings;
 
 namespace LemonNeo.Desktop.Config;
@@ -50,6 +51,40 @@ public static class DesktopPreferences
             DisplayMode = Enum.IsDefined(value.DisplayMode) ? value.DisplayMode : LyricDisplayMode.Horizontal,
             LyricFontFamilies = value.LyricFontFamilies ?? ""
         });
+        settings.Register(nameof(KeyboardShortcutPreferences), new KeyboardShortcutPreferences(),
+            value => value with { Bindings = NormalizeBindings(value.Bindings) });
+    }
+
+    private static IReadOnlyDictionary<string, string> NormalizeBindings(
+        IReadOnlyDictionary<string, string>? bindings)
+    {
+        var result = new Dictionary<string, string>();
+        if (bindings is null) return result;
+        foreach (var (id, value) in bindings)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                // Empty records an explicit "disabled" choice.
+                result[id] = "";
+                continue;
+            }
+
+            try
+            {
+                _ = KeyGesture.Parse(value);
+                result[id] = value;
+            }
+            catch (FormatException)
+            {
+                // Drop entries that no longer parse instead of failing startup.
+            }
+            catch (ArgumentException)
+            {
+                // Drop entries that no longer parse instead of failing startup.
+            }
+        }
+
+        return result;
     }
 
     private static string? NormalizeOptionalPath(string? path)

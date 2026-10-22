@@ -21,6 +21,7 @@ public sealed class DesktopApplicationService : IDesktopStorageService, IAsyncDi
     private bool _initialized;
     private LocalizationService? _text;
     private MainViewModel? _viewModel;
+    private ShortcutService? _shortcuts;
 
     public DesktopApplicationService(Avalonia.Application application, MainWindow window, IAppPathProvider paths)
     {
@@ -33,12 +34,16 @@ public sealed class DesktopApplicationService : IDesktopStorageService, IAsyncDi
         var text = new LocalizationService(settings);
         var appearance = new AppearanceService(application, settings);
         var viewModel = new MainViewModel(host, text, appearance, host.Get<ArtworkService>());
+        var shortcuts = new ShortcutService(settings, text, viewModel, window);
+        viewModel.SharedContext.Shortcuts = shortcuts;
+        window.AttachShortcuts(shortcuts);
 
         _host = host;
         _settings = settings;
         _text = text;
         _appearance = appearance;
         _viewModel = viewModel;
+        _shortcuts = shortcuts;
         window.DataContext = viewModel;
         window.Title = text[LanguageManager.Keys.AppName];
     }
@@ -47,6 +52,9 @@ public sealed class DesktopApplicationService : IDesktopStorageService, IAsyncDi
         _viewModel ?? throw new ObjectDisposedException(nameof(DesktopApplicationService));
 
     public LocalizationService Text => _text ?? throw new ObjectDisposedException(nameof(DesktopApplicationService));
+
+    public ShortcutService Shortcuts =>
+        _shortcuts ?? throw new ObjectDisposedException(nameof(DesktopApplicationService));
 
     public async ValueTask DisposeAsync()
     {
@@ -237,10 +245,12 @@ public sealed class DesktopApplicationService : IDesktopStorageService, IAsyncDi
             var host = _host;
             var appearance = _appearance;
             var text = _text;
+            var shortcuts = _shortcuts;
             _viewModel = null;
             _host = null;
             _appearance = null;
             _text = null;
+            _shortcuts = null;
             _window.CloseDesktopLyrics();
             _window.DataContext = null;
             try
@@ -261,6 +271,7 @@ public sealed class DesktopApplicationService : IDesktopStorageService, IAsyncDi
                 Trace.WriteLine($"Desktop host shutdown failed: {exception}");
             }
 
+            shortcuts?.Dispose();
             appearance?.Dispose();
             text?.Dispose();
         }
