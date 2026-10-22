@@ -135,7 +135,7 @@
   "MeshBlurScale": "模糊强度",
   "RestoreVisualEffectsDefaults": "还原视觉效果默认设置",
   "KeyboardShortcuts": "键盘快捷键",
-  "KeyboardShortcutsDescription": "快捷键在主窗口获得焦点时生效。点击快捷键后按下新的组合键；按 Backspace 或 Delete 可禁用该快捷键。",
+  "KeyboardShortcutsDescription": "快捷键在主窗口获得焦点时生效。",
   "ShortcutTogglePlayback": "播放/暂停",
   "ShortcutPrevious": "上一首",
   "ShortcutNext": "下一首",

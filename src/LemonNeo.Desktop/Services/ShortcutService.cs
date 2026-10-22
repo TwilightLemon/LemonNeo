@@ -153,16 +153,17 @@ public sealed class ShortcutService : IDisposable
     private static ShortcutAction[] CreateCatalog(MainViewModel viewModel, MainWindow window)
     {
         var modifier = OperatingSystem.IsMacOS() ? KeyModifiers.Meta : KeyModifiers.Control;
+        var playModifier = OperatingSystem.IsMacOS() ? KeyModifiers.Alt: KeyModifiers.Control;
         return
         [
             new ShortcutAction("playback.toggle", LanguageManager.Keys.ShortcutTogglePlayback, ShortcutCategories.Playback,
-                new KeyGesture(Key.Space, modifier), () => viewModel.Playback.TogglePlaybackCommand),
+                new KeyGesture(Key.Space, playModifier), () => viewModel.Playback.TogglePlaybackCommand),
             new ShortcutAction("playback.previous", LanguageManager.Keys.ShortcutPrevious, ShortcutCategories.Playback,
-                new KeyGesture(Key.Left, modifier), () => viewModel.Playback.PreviousCommand),
+                new KeyGesture(Key.Left, playModifier), () => viewModel.Playback.PreviousCommand),
             new ShortcutAction("playback.next", LanguageManager.Keys.ShortcutNext, ShortcutCategories.Playback,
-                new KeyGesture(Key.Right, modifier), () => viewModel.Playback.NextCommand),
-            new ShortcutAction("playback.stop", LanguageManager.Keys.ShortcutStop, ShortcutCategories.Playback,
-                new KeyGesture(Key.S, modifier | KeyModifiers.Alt), () => viewModel.Playback.StopCommand),
+                new KeyGesture(Key.Right, playModifier), () => viewModel.Playback.NextCommand),
+            // new ShortcutAction("playback.stop", LanguageManager.Keys.ShortcutStop, ShortcutCategories.Playback,
+            //     new KeyGesture(Key.S, modifier | KeyModifiers.Alt), () => viewModel.Playback.StopCommand),
             new ShortcutAction("playback.cycleMode", LanguageManager.Keys.ShortcutCycleMode, ShortcutCategories.Playback,
                 new KeyGesture(Key.M, modifier), () => viewModel.Playback.CycleModeCommand),
             new ShortcutAction("navigation.back", LanguageManager.Keys.ShortcutBack, ShortcutCategories.Navigation,

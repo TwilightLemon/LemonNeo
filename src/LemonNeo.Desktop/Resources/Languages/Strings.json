@@ -135,7 +135,7 @@
   "MeshBlurScale": "Blur strength",
   "RestoreVisualEffectsDefaults": "Restore visual-effect defaults",
   "KeyboardShortcuts": "Keyboard shortcuts",
-  "KeyboardShortcutsDescription": "Shortcuts apply while the main window is focused. Click a shortcut, then press the new key combination. Press Backspace or Delete to disable it.",
+  "KeyboardShortcutsDescription": "Shortcuts apply while the main window is focused.",
   "ShortcutTogglePlayback": "Play or pause",
   "ShortcutPrevious": "Previous track",
   "ShortcutNext": "Next track",
