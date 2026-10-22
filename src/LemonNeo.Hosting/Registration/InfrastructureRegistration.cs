@@ -1,3 +1,4 @@
+using System.Net;
 using LemonNeo.Abstractions.Playback;
 using LemonNeo.Abstractions.Plugins;
 using LemonNeo.Abstractions.Providers;
@@ -5,6 +6,7 @@ using LemonNeo.Abstractions.Settings;
 using LemonNeo.Abstractions.Storage;
 using LemonNeo.Infrastructure.Credentials;
 using LemonNeo.Infrastructure.Library;
+using LemonNeo.Infrastructure.Networking;
 using LemonNeo.Infrastructure.Plugins;
 using LemonNeo.Infrastructure.Settings;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,6 +21,8 @@ internal static class InfrastructureRegistration
         services.AddLogging();
         services.AddHttpClient();
         services.AddSingleton(paths);
+        services.AddSingleton<NetworkProxy>();
+        services.AddSingleton<IWebProxy>(provider => provider.GetRequiredService<NetworkProxy>());
         services.AddSingleton<ISettingsEntityStore, JsonSettingsEntityStore>();
         services.AddSingleton<AppSettingsService>();
         services.AddSingleton<IAppSettingsService>(provider => provider.GetRequiredService<AppSettingsService>());

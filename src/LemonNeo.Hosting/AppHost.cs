@@ -4,6 +4,7 @@ using LemonNeo.Abstractions.Storage;
 using LemonNeo.Application.Library;
 using LemonNeo.Application.Playback;
 using LemonNeo.Hosting.Registration;
+using LemonNeo.Infrastructure.Networking;
 using LemonNeo.Infrastructure.Paths;
 using LemonNeo.Infrastructure.Plugins;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,6 +34,8 @@ public class AppHost : IAsyncDisposable
         services.AddApplication(StorageLocations);
         configure?.Invoke(services);
         _services = services.BuildServiceProvider();
+        // Install before anything can create a client so host and plugin requests all use it.
+        HttpClient.DefaultProxy = _services.GetRequiredService<NetworkProxy>();
     }
 
     public IPluginDiagnostics Plugins => Get<IPluginDiagnostics>();

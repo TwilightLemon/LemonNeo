@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.Input;
+using LemonNeo.Abstractions.Networking;
 using LemonNeo.Abstractions.Settings;
 using LemonNeo.Application.Playback;
 using LemonNeo.Core.Playback;
@@ -15,6 +16,8 @@ public sealed class SettingsViewModel : PageViewModel
     private static readonly int[] MeshFrameRates = [-1, 30, 60, 120, 144, 240];
     private readonly IDisposable _appearanceSubscription;
     private readonly IDisposable _languageSubscription;
+    private readonly ISettingsScope _networkSettings;
+    private readonly IDisposable _networkSubscription;
     private readonly ISettingsScope _playbackSettings;
     private readonly IDisposable _playbackSubscription;
     private readonly ShortcutService? _shortcuts;
@@ -31,6 +34,15 @@ public sealed class SettingsViewModel : PageViewModel
         _playbackSettings = _host.Settings.ForPackage(PackageNames.Application);
         _playbackSubscription =
             _playbackSettings.Subscribe<PlaybackPreferences>(_ => OnPropertyChanged(nameof(SelectedAudioQuality)));
+        _networkSettings = _host.Settings.ForPackage(PackageNames.Application);
+        _networkSubscription = _networkSettings.Subscribe<NetworkPreferences>(_ => RefreshNetworkProperties());
+        ProxyModeCommand = new RelayCommand<string>(value =>
+        {
+            if (!_closing && Enum.TryParse<NetworkProxyMode>(value, out var mode) && Enum.IsDefined(mode))
+                ApplyNetwork(current => current with { Mode = mode });
+        });
+        RestoreNetworkDefaultsCommand =
+            new RelayCommand(() => ApplyNetwork(_ => new NetworkPreferences()));
         ThemeCommand = new RelayCommand<string>(value =>
             ApplyAppearance(current => current with { Theme = Enum.Parse<ThemePreference>(value!) }));
         LanguageCommand = new RelayCommand<string>(value =>
@@ -71,12 +83,47 @@ public sealed class SettingsViewModel : PageViewModel
 
     public RelayCommand<string> ThemeCommand { get; }
     public RelayCommand<string> LanguageCommand { get; }
+    public RelayCommand<string> ProxyModeCommand { get; }
+    public RelayCommand RestoreNetworkDefaultsCommand { get; }
     public RelayCommand RestoreVisualEffectsDefaultsCommand { get; }
     public RelayCommand ResetAllShortcutsCommand { get; }
     public IReadOnlyList<ThemeColorOption> ThemeColors { get; }
     public IReadOnlyList<ShortcutRowViewModel> ShortcutRows { get; private set; }
 
     private VisualEffectsPreferences VisualEffects => Context.Settings.Get<VisualEffectsPreferences>();
+
+    private NetworkPreferences Network => _networkSettings.Get<NetworkPreferences>();
+
+    public bool IsProxySystem => Network.Mode == NetworkProxyMode.System;
+    public bool IsProxyCustom => Network.Mode == NetworkProxyMode.Custom;
+    public bool IsProxyNone => Network.Mode == NetworkProxyMode.None;
+
+    public string ProxyAddress
+    {
+        get => Network.ProxyAddress ?? "";
+        set => ApplyNetwork(current => current with { ProxyAddress = value });
+    }
+
+    public string ProxyUsername
+    {
+        get => Network.Username ?? "";
+        set => ApplyNetwork(current => current with { Username = value });
+    }
+
+    public string ProxyPassword
+    {
+        get => Network.Password ?? "";
+        set => ApplyNetwork(current => current with { Password = value });
+    }
+
+    public string ProxyBypassList
+    {
+        get => Network.BypassList ?? "";
+        set => ApplyNetwork(current => current with { BypassList = value });
+    }
+
+    public bool IsProxyAddressInvalid =>
+        IsProxyCustom && !NetworkPreferences.TryGetProxyUri(Network.ProxyAddress, out _);
 
     public bool AudioVisualizerEnabled
     {
@@ -224,6 +271,11 @@ public sealed class SettingsViewModel : PageViewModel
         if (!_closing) Context.Settings.Apply(update);
     }
 
+    private void ApplyNetwork(Func<NetworkPreferences, NetworkPreferences> update)
+    {
+        if (!_closing) _networkSettings.Apply(update);
+    }
+
     private void ApplyVisualEffects(Func<VisualEffectsPreferences, VisualEffectsPreferences> update)
     {
         if (!_closing) Context.Settings.Apply(update);
@@ -272,6 +324,16 @@ public sealed class SettingsViewModel : PageViewModel
         foreach (var option in ThemeColors) option.Refresh();
     }
 
+    private void RefreshNetworkProperties()
+    {
+        foreach (var name in new[]
+                 {
+                     nameof(IsProxySystem), nameof(IsProxyCustom), nameof(IsProxyNone),
+                     nameof(ProxyAddress), nameof(ProxyUsername), nameof(ProxyPassword),
+                     nameof(ProxyBypassList), nameof(IsProxyAddressInvalid)
+                 }) OnPropertyChanged(name);
+    }
+
     private void RefreshVisualEffectsProperties()
     {
         foreach (var name in new[]
@@ -303,6 +365,7 @@ public sealed class SettingsViewModel : PageViewModel
         _closing = true;
         _storage.Changed -= OnStorageChanged;
         _playbackSubscription.Dispose();
+        _networkSubscription.Dispose();
         _appearanceSubscription.Dispose();
         _languageSubscription.Dispose();
         _visualEffectsSubscription.Dispose();
