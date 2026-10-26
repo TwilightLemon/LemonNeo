@@ -21,6 +21,7 @@ public abstract class InteractivePluginBase : IInteractivePlugin
     private Task? _commandTask;
     private IPlaybackInteraction? _playback;
     private bool _stopped;
+    private int _pendingUpdates;
     private Task? _updateTask;
     protected ILogger Logger { get; private set; } = null!;
 
@@ -34,17 +35,28 @@ public abstract class InteractivePluginBase : IInteractivePlugin
         Logger = context.LoggerFactory.CreateLogger(GetType());
         _playback = context.Playback;
         await InitializeCoreAsync(context, cancellationToken);
-        _playback.Changed += OnChanged;
+        _playback.MetadataChanged += OnMetadata;
+        _playback.TimelineChanged += OnTimeline;
+        _playback.StateChanged += OnState;
+        _playback.QueueChanged += OnQueue;
+        _playback.VolumeChanged += OnVolume;
         _updateTask = RunUpdatesAsync(_lifetime.Token);
         _commandTask = RunCommandsAsync(_lifetime.Token);
-        _updates.Writer.TryWrite(true);
+        QueueUpdate(PlaybackUpdateKind.All);
     }
 
     public async ValueTask ShutdownAsync(CancellationToken cancellationToken)
     {
         if (_stopped) return;
         _stopped = true;
-        if (_playback is not null) _playback.Changed -= OnChanged;
+        if (_playback is not null)
+        {
+            _playback.MetadataChanged -= OnMetadata;
+            _playback.TimelineChanged -= OnTimeline;
+            _playback.StateChanged -= OnState;
+            _playback.QueueChanged -= OnQueue;
+            _playback.VolumeChanged -= OnVolume;
+        }
         _updates.Writer.TryComplete();
         _commands.Writer.TryComplete();
         await _lifetime.CancelAsync();
@@ -68,7 +80,8 @@ public abstract class InteractivePluginBase : IInteractivePlugin
     }
 
     protected abstract ValueTask InitializeCoreAsync(IPluginContext context, CancellationToken cancellationToken);
-    protected abstract ValueTask UpdateAsync(InteractivePlaybackSnapshot snapshot, CancellationToken cancellationToken);
+    protected abstract ValueTask UpdateAsync(InteractivePlaybackSnapshot snapshot, PlaybackUpdateKind changes,
+        CancellationToken cancellationToken);
     protected abstract ValueTask ShutdownCoreAsync();
 
     protected bool RequestCommand(PlaybackCommand command, TimeSpan? position = null)
@@ -76,8 +89,15 @@ public abstract class InteractivePluginBase : IInteractivePlugin
         return !_stopped && _commands.Writer.TryWrite((command, position));
     }
 
-    private void OnChanged(object? sender, InteractivePlaybackChangedEventArgs args)
+    private void OnMetadata(object? sender, InteractivePlaybackChangedEventArgs args) => QueueUpdate(PlaybackUpdateKind.Metadata);
+    private void OnTimeline(object? sender, InteractivePlaybackChangedEventArgs args) => QueueUpdate(PlaybackUpdateKind.Timeline);
+    private void OnState(object? sender, InteractivePlaybackChangedEventArgs args) => QueueUpdate(PlaybackUpdateKind.State);
+    private void OnQueue(object? sender, InteractivePlaybackChangedEventArgs args) => QueueUpdate(PlaybackUpdateKind.Queue);
+    private void OnVolume(object? sender, InteractivePlaybackChangedEventArgs args) => QueueUpdate(PlaybackUpdateKind.Volume);
+
+    private void QueueUpdate(PlaybackUpdateKind changes)
     {
+        Interlocked.Or(ref _pendingUpdates, (int)changes);
         _updates.Writer.TryWrite(true);
     }
 
@@ -90,7 +110,8 @@ public abstract class InteractivePluginBase : IInteractivePlugin
                 // commands. Always publish the latest authoritative snapshot.
                 try
                 {
-                    await UpdateAsync(Playback.Snapshot, cancellationToken);
+                    var changes = (PlaybackUpdateKind)Interlocked.Exchange(ref _pendingUpdates, 0);
+                    if (changes != PlaybackUpdateKind.None) await UpdateAsync(Playback.Snapshot, changes, cancellationToken);
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {

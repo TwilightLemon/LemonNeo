@@ -26,7 +26,8 @@ public sealed class PlaybackQueueViewModel : PageViewModel
         _filterTimer.Tick += OnFilterTick;
         PlayTrackCommand = new AsyncRelayCommand<QueueTrackViewModel>(PlayTrackAsync, row => CanPlay && row is not null,
             AsyncRelayCommandOptions.AllowConcurrentExecutions);
-        Playback.Changed += OnPlaybackChanged;
+        Playback.MetadataChanged += OnPlaybackChanged;
+        Playback.QueueChanged += OnPlaybackChanged;
         Playback.PropertyChanged += OnPlaybackPropertyChanged;
         RefreshQueue();
     }
@@ -109,7 +110,7 @@ public sealed class PlaybackQueueViewModel : PageViewModel
         }
 
         foreach (var row in _rows)
-            row.IsCurrent = PlayingTrackMatcher.Matches(row.Row.Track, Playback.Snapshot.SourceDetails?.SourceId);
+            row.IsCurrent = row.Id == Playback.Snapshot.CurrentQueueItemId;
         OnPropertyChanged(nameof(HasPlayingTrack));
         RaiseInteractionProperties();
     }
@@ -152,7 +153,8 @@ public sealed class PlaybackQueueViewModel : PageViewModel
 
     public override async ValueTask DisposeAsync()
     {
-        Playback.Changed -= OnPlaybackChanged;
+        Playback.MetadataChanged -= OnPlaybackChanged;
+        Playback.QueueChanged -= OnPlaybackChanged;
         Playback.PropertyChanged -= OnPlaybackPropertyChanged;
         _filterTimer.Stop();
         _filterTimer.Tick -= OnFilterTick;

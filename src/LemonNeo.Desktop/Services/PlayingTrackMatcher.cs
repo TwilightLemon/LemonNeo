@@ -4,6 +4,14 @@ namespace LemonNeo.Desktop.Services;
 
 public static class PlayingTrackMatcher
 {
+    public static bool Matches(Track track, Track? currentTrack, ExternalMusicId? sourceId = null)
+    {
+        if (currentTrack is null) return false;
+        if (track.Id == currentTrack.Id || Matches(track, sourceId)) return true;
+        return Matches(track, MusicCacheIdentity.FromTrackId(currentTrack.Id)) ||
+               currentTrack.ExternalIds.Any(id => Matches(track, id));
+    }
+
     // Native IDs use the same explicit kind as playback discovery and the audio cache.
     // Scheme names are case insensitive; provider ID values remain case sensitive.
     public static bool Matches(Track track, ExternalMusicId? sourceId)

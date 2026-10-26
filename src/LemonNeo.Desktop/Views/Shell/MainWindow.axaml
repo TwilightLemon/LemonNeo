@@ -488,7 +488,7 @@
                                     AutomationProperties.Name="{Binding Playback.NowTitle}"
                                     CornerRadius="10"
                                     Height="48"
-                                    ReduceMotion="{Binding Lyrics.ReduceMotion}"
+                                    ReduceMotion="{Binding Playback.ReduceMotion}"
                                     Source="{Binding Playback.NowArtworkReference}"
                                     VerticalAlignment="Center"
                                     Width="48" />

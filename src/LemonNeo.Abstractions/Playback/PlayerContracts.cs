@@ -21,6 +21,17 @@ public interface IPlayer
     Track? CurrentTrack { get; }
     PlayerTimeline Timeline { get; }
 
+    /// <summary>
+    ///     Opens a request-owned stream without changing the active stream or starting audio.
+    ///     Slow I/O must not hold the active player's lock. A cancelled preparation must
+    ///     release only its own resources, even when another request has already started.
+    /// </summary>
+    Task<IPreparedPlayback> PrepareAsync(
+        Track track,
+        PlaybackSource source,
+        IPlaybackDownloadSink? downloadSink = null,
+        CancellationToken cancellationToken = default);
+
     Task PlayAsync(
         Track track,
         PlaybackSource source,
@@ -38,6 +49,15 @@ public interface IPlayer
 
     /// <summary>Sets application volume independently of the system volume and retains it for subsequent streams.</summary>
     Task SetVolumeAsync(double volume, CancellationToken cancellationToken = default);
+}
+
+/// <summary>A request-owned stream. Disposal releases this stream, including after activation.</summary>
+public interface IPreparedPlayback : IDisposable
+{
+    AudioStreamInfo? AudioInfo { get; }
+
+    /// <summary>Starts the prepared stream with volume. Must be brief and perform no network I/O.</summary>
+    void Activate(double volume);
 }
 
 /// <summary>Optional decoder capability reporting the currently loaded audio's original format.</summary>

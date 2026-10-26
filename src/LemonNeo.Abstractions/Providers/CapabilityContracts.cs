@@ -146,8 +146,12 @@ public interface IPlaybackProvider
 
 public interface ILyricsProvider
 {
+    /// <summary>External ID schemes accepted by this lyrics source.</summary>
+    IReadOnlyCollection<MusicIdScheme> AcceptedIdSchemes { get; }
+
+    /// <summary>Fetches one known platform ID without searching for other recordings or sources.</summary>
     Task<Lyrics?> GetLyricsAsync(
-        Track track,
+        ExternalMusicId musicId,
         CancellationToken cancellationToken = default);
 }
 

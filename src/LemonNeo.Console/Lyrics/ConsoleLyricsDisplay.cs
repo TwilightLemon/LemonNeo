@@ -1,8 +1,7 @@
-using LemonNeo.Abstractions.Playback;
 using LemonNeo.Application.Lyrics;
 using LemonNeo.Application.Playback;
 using LemonNeo.Core.Lyrics;
-using LemonNeo.Core.Music;
+using LemonNeo.Core.Playback;
 
 namespace LemonNeo.ConsoleApp;
 
@@ -45,62 +44,20 @@ internal sealed record LyricsFrame(LyricsRow Main, LyricsRow? Romanization = nul
 /// </summary>
 internal sealed class ConsoleLyricsDisplay(
     Func<PlaybackSessionSnapshot> snapshotSource,
-    LyricsService lyrics,
-    CancellationToken cancellationToken) : IAsyncDisposable
+    PlaybackLyricsService lyrics) : IAsyncDisposable
 {
-    private readonly List<Task<LyricsLookupResult>> _loads = [];
-    private Task<LyricsLookupResult>? _load;
-    private CancellationTokenSource? _loadCancellation;
-    private MusicItemId? _trackId;
-
-    public async ValueTask DisposeAsync()
-    {
-        _loadCancellation?.Cancel();
-        await Task.WhenAll(_loads);
-        _loadCancellation?.Dispose();
-    }
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     public LyricsFrame GetFrame()
     {
         var snapshot = snapshotSource();
-        var track = snapshot.State == PlayerState.Stopped ? null : snapshot.CurrentTrack;
-        if (_trackId != track?.Id)
-        {
-            _loadCancellation?.Cancel();
-            _loadCancellation?.Dispose();
-            _trackId = track?.Id;
-            _load = null;
-            if (track is not null)
-            {
-                _loadCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                _load = LoadAsync(track, _loadCancellation.Token);
-                _loads.RemoveAll(task => task.IsCompleted);
-                _loads.Add(_load);
-            }
-            else
-            {
-                _loadCancellation = null;
-            }
-        }
-
-        if (track is null) return LyricsFrame.Empty;
-        if (_load is not { IsCompletedSuccessfully: true })
+        if (snapshot.State is not (PlaybackState.Playing or PlaybackState.Paused)) return LyricsFrame.Empty;
+        var value = lyrics.Snapshot;
+        if (value.RequestId != snapshot.RequestId || value.Status is PlaybackLyricsStatus.Empty or PlaybackLyricsStatus.Loading)
             return new LyricsFrame(new LyricsRow([new LyricsSegment("Loading lyrics…", false)]));
-        return _load.Result.Lyrics is { } value
-            ? CreateFrame(value, snapshot.Timeline.Position.TotalMilliseconds)
+        return value.Document is { } document
+            ? CreateFrame(document, snapshot.Timeline.Position.TotalMilliseconds)
             : new LyricsFrame(new LyricsRow([new LyricsSegment("No lyrics available", false)]));
-    }
-
-    private async Task<LyricsLookupResult> LoadAsync(Track track, CancellationToken token)
-    {
-        try
-        {
-            return await lyrics.GetLyricsAsync(track, token);
-        }
-        catch (OperationCanceledException)
-        {
-            return new LyricsLookupResult(null, null, new Dictionary<string, string>());
-        }
     }
 
     internal static LyricsFrame CreateFrame(Lyrics value, double positionMs)

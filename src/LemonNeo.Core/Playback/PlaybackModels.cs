@@ -2,6 +2,17 @@ using LemonNeo.Core.Music;
 
 namespace LemonNeo.Core.Playback;
 
+/// <summary>Host session state; a selected track can exist before a decoder is ready.</summary>
+public enum PlaybackState
+{
+    // The first three values are also used by existing playback resume records.
+    Stopped = 0,
+    Playing = 1,
+    Paused = 2,
+    Loading = 3,
+    Failed = 4
+}
+
 public abstract record PlaybackSource
 {
     /// <summary>Actual resource quality; null means the provider cannot determine it.</summary>
@@ -89,11 +100,4 @@ public sealed record PlaybackQueueItem
     public Guid Id { get; init; } = Guid.NewGuid();
     public required Track Track { get; init; }
     public DateTimeOffset AddedAt { get; init; } = DateTimeOffset.UtcNow;
-}
-
-public enum PlaybackStatus
-{
-    Stopped,
-    Playing,
-    Paused
 }

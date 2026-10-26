@@ -170,7 +170,27 @@ Notes for plugin authors:
   the user can change the cache location while the plugin is running.
 - Settings entities are stored one JSON file per type, named after the type
   (`AccountSettings.json`), with camelCase properties.
-- Plugins are expected to shut down cleanly: unsubscribe from `IPlaybackInteraction.Changed`,
+- Lyrics providers expose an `AcceptedIdSchemes` collection and implement
+  `ILyricsProvider.GetLyricsAsync(ExternalMusicId, CancellationToken)`. The ID contains the
+  platform namespace, kind and value, matching one of the declared schemes rather than the plugin ID.
+  Fetch and parse that recording directly. The host selects the best result and owns caching;
+  cache identity is shared by platform ID across plugins. Metadata expansion and cross-source
+  fallback are outside this capability. A single provider can support multiple platforms and
+  ID kinds; Lyricify's main provider combines search, metadata and lyrics with eight accepted
+  lyric ID schemes. Plugins
+  implementing the previous Track-based or provider-scoped contract must be rebuilt and adapted.
+- Decoders implement `IPlayer.PrepareAsync` to open a request-owned `IPreparedPlayback`
+  without changing the active stream or starting audio. Slow I/O must run outside the active
+  player's lock. `Activate(volume)` must be brief and perform no network I/O. Disposing a
+  preparation must release only its own stream, including after activation. Decoder plugins
+  built against the previous player contract must be rebuilt and implement preparation.
+- Interactive plugins subscribe to `MetadataChanged`, `StateChanged`, `TimelineChanged`,
+  `QueueChanged`, and `VolumeChanged` as needed. A selected track is published in `Loading`
+  before source discovery; `Playing` is published only after activation succeeds.
+  `ExecuteAsync` submits media commands without waiting for source discovery.
+  `InteractivePluginBase.UpdateAsync` receives `PlaybackUpdateKind` flags so a coalesced
+  timeline update does not discard a pending metadata or state change.
+- Plugins are expected to shut down cleanly: unsubscribe from `IPlaybackInteraction` events,
   cancel outstanding work, and release resources. Subscribers must return promptly since events can
   arrive on background threads.
 - `LemonNeo.Plugin.MockMusic` is a small reference implementation to start from.

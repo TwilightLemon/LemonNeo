@@ -81,6 +81,8 @@
   "Playing": "正在播放",
   "Paused": "已暂停",
   "Stopped": "已停止",
+  "PlaybackLoading": "正在加载音频…",
+  "PlaybackFailed": "播放失败",
   "Restored": "已恢复上次播放记录 · 按下播放继续",
   "General": "常规",
   "Appearance": "外观",

@@ -4,6 +4,8 @@ using Windows.Storage;
 using Windows.Storage.Streams;
 using LemonNeo.Abstractions.Playback;
 using LemonNeo.Abstractions.Plugins;
+using LemonNeo.Core.Playback;
+using LemonNeo.Core.Music;
 using Microsoft.Extensions.Logging;
 
 namespace LemonNeo.Plugin.WindowsSmtc;
@@ -30,24 +32,28 @@ public sealed class WindowsSmtcPlugin : InteractivePluginBase
         return ValueTask.CompletedTask;
     }
 
-    protected override async ValueTask UpdateAsync(InteractivePlaybackSnapshot snapshot,
+    protected override async ValueTask UpdateAsync(InteractivePlaybackSnapshot snapshot, PlaybackUpdateKind changes,
         CancellationToken cancellationToken)
     {
         var controls = _controls!;
-        controls.IsEnabled = snapshot.Track is not null;
-        controls.IsPlayEnabled = snapshot.Controls.HasFlag(PlaybackControls.Play);
-        controls.IsPauseEnabled = snapshot.Controls.HasFlag(PlaybackControls.Pause);
-        controls.IsStopEnabled = snapshot.Controls.HasFlag(PlaybackControls.Stop);
-        controls.IsNextEnabled = snapshot.Controls.HasFlag(PlaybackControls.Next);
-        controls.IsPreviousEnabled = snapshot.Controls.HasFlag(PlaybackControls.Previous);
-        controls.PlaybackStatus = snapshot.State switch
+        if (_last is null || (changes & (PlaybackUpdateKind.Metadata | PlaybackUpdateKind.State | PlaybackUpdateKind.Queue)) != 0)
         {
-            PlayerState.Playing => MediaPlaybackStatus.Playing,
-            PlayerState.Paused => MediaPlaybackStatus.Paused,
-            _ => snapshot.Track is null ? MediaPlaybackStatus.Closed : MediaPlaybackStatus.Stopped
-        };
-        controls.PlaybackRate = snapshot.State == PlayerState.Playing ? 1 : 0;
-        if (_last is null || _last.Track != snapshot.Track)
+            controls.IsEnabled = snapshot.Track is not null;
+            controls.IsPlayEnabled = snapshot.Controls.HasFlag(PlaybackControls.Play);
+            controls.IsPauseEnabled = snapshot.Controls.HasFlag(PlaybackControls.Pause);
+            controls.IsStopEnabled = snapshot.Controls.HasFlag(PlaybackControls.Stop);
+            controls.IsNextEnabled = snapshot.Controls.HasFlag(PlaybackControls.Next);
+            controls.IsPreviousEnabled = snapshot.Controls.HasFlag(PlaybackControls.Previous);
+            controls.PlaybackStatus = snapshot.State switch
+            {
+                PlaybackState.Playing => MediaPlaybackStatus.Playing,
+                PlaybackState.Paused => MediaPlaybackStatus.Paused,
+                PlaybackState.Loading => MediaPlaybackStatus.Changing,
+                _ => snapshot.Track is null ? MediaPlaybackStatus.Closed : MediaPlaybackStatus.Stopped
+            };
+            controls.PlaybackRate = snapshot.State == PlaybackState.Playing ? 1 : 0;
+        }
+        if (_last is null || !SameDisplayMetadata(_last.Track, snapshot.Track))
         {
             var display = controls.DisplayUpdater;
             display.ClearAll();
@@ -57,6 +63,8 @@ public sealed class WindowsSmtcPlugin : InteractivePluginBase
                 display.MusicProperties.Title = track.Title;
                 display.MusicProperties.Artist = string.Join(", ", track.Artists.Select(artist => artist.Name));
                 display.MusicProperties.AlbumTitle = track.Album?.Title ?? "";
+                // Publish text immediately; a slow file-based cover must not delay selection metadata.
+                display.Update();
                 if (track.ArtworkUri is { IsAbsoluteUri: true } artwork)
                     try
                     {
@@ -64,6 +72,8 @@ public sealed class WindowsSmtcPlugin : InteractivePluginBase
                         {
                             var file = await StorageFile.GetFileFromPathAsync(artwork.LocalPath)
                                 .AsTask(cancellationToken);
+                            if (Playback.Snapshot.RequestId != snapshot.RequestId || Playback.Snapshot.Track?.ArtworkUri != artwork)
+                                return;
                             display.Thumbnail = RandomAccessStreamReference.CreateFromFile(file);
                         }
                         else if (artwork.Scheme is "http" or "https")
@@ -84,18 +94,25 @@ public sealed class WindowsSmtcPlugin : InteractivePluginBase
             display.Update();
         }
 
-        var duration = snapshot.Duration ?? snapshot.Position;
-        var seek = snapshot.Controls.HasFlag(PlaybackControls.Seek) && snapshot.Duration is not null;
-        controls.UpdateTimelineProperties(new SystemMediaTransportControlsTimelineProperties
+        if (_last is null || (changes & (PlaybackUpdateKind.Timeline | PlaybackUpdateKind.State | PlaybackUpdateKind.Metadata)) != 0)
         {
-            StartTime = TimeSpan.Zero,
-            EndTime = duration,
-            Position = snapshot.Position,
-            MinSeekTime = seek ? TimeSpan.Zero : snapshot.Position,
-            MaxSeekTime = seek ? duration : snapshot.Position
-        });
+            var duration = snapshot.Duration ?? snapshot.Position;
+            var seek = snapshot.Controls.HasFlag(PlaybackControls.Seek) && snapshot.Duration is not null;
+            controls.UpdateTimelineProperties(new SystemMediaTransportControlsTimelineProperties
+            {
+                StartTime = TimeSpan.Zero,
+                EndTime = duration,
+                Position = snapshot.Position,
+                MinSeekTime = seek ? TimeSpan.Zero : snapshot.Position,
+                MaxSeekTime = seek ? duration : snapshot.Position
+            });
+        }
         _last = snapshot;
     }
+
+    private static bool SameDisplayMetadata(Track? left, Track? right) =>
+        left?.Id == right?.Id && left?.Title == right?.Title && left?.Album?.Title == right?.Album?.Title &&
+        left?.ArtworkUri == right?.ArtworkUri && (left is null || right is not null && left.Artists.SequenceEqual(right.Artists));
 
     private void OnButtonPressed(SystemMediaTransportControls sender,
         SystemMediaTransportControlsButtonPressedEventArgs args)
