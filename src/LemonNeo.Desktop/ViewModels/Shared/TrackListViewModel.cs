@@ -21,7 +21,6 @@ public abstract class TrackListViewModel : PageViewModel
     private string _filter = "";
     private bool _hasPlayingTrack;
     private bool _isSelectionMode;
-    private ExternalMusicId? _lastPlayingId;
     private bool _needsRefresh;
     private TrackRow? _selectedTrack;
     private Playlist? _targetPlaylist;
@@ -47,7 +46,7 @@ public abstract class TrackListViewModel : PageViewModel
         ClearSelectionCommand = new RelayCommand(() => SetSelection(false));
         Context.LibraryChanged += OnLibraryChanged;
         Playback.PropertyChanged += OnPlaybackPropertyChanged;
-        Playback.Changed += OnPlaybackChanged;
+        Playback.MetadataChanged += OnPlaybackChanged;
         _preferencesSubscription =
             Context.Settings.Subscribe<LibraryPreferences>(_ => OnPropertyChanged(nameof(InsertAtStart)));
         _targetPlaylist = Playlists.FirstOrDefault();
@@ -249,16 +248,18 @@ public abstract class TrackListViewModel : PageViewModel
     private void OnPlaybackChanged(object? sender, EventArgs args)
     {
         if (!IsNavigationActive) return;
-        if (!Equals(_lastPlayingId, Playback.Snapshot.SourceDetails?.SourceId)) RefreshPlayingTracks();
+        RefreshPlayingTracks();
     }
 
     protected void RefreshPlayingTracks()
     {
-        var source = Playback.Snapshot.SourceDetails?.SourceId;
-        _lastPlayingId = source;
-        foreach (var row in _rows) row.IsCurrent = PlayingTrackMatcher.Matches(row.Track, source);
+        var snapshot = Playback.Snapshot;
+        foreach (var row in _rows)
+            row.IsCurrent = row.QueueItemId is { } queueId
+                ? queueId == snapshot.CurrentQueueItemId
+                : PlayingTrackMatcher.Matches(row.Track, snapshot.CurrentTrack, snapshot.SourceDetails?.SourceId);
         SetProperty(ref _hasPlayingTrack,
-            source is not null && _rows.Any(row => row.IsCurrent),
+            _rows.Any(row => row.IsCurrent),
             nameof(HasPlayingTrack));
     }
 
@@ -354,7 +355,7 @@ public abstract class TrackListViewModel : PageViewModel
     {
         Context.LibraryChanged -= OnLibraryChanged;
         Playback.PropertyChanged -= OnPlaybackPropertyChanged;
-        Playback.Changed -= OnPlaybackChanged;
+        Playback.MetadataChanged -= OnPlaybackChanged;
         _preferencesSubscription.Dispose();
         _filterTimer.Stop();
         _filterTimer.Tick -= OnFilterTick;

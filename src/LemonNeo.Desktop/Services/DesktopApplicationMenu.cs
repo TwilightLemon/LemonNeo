@@ -65,14 +65,18 @@ public sealed class DesktopApplicationMenu : IDisposable
         }
 
         text.Changed += OnChanged;
-        playback.Changed += OnChanged;
+        playback.MetadataChanged += OnChanged;
+        playback.StateChanged += OnChanged;
+        playback.QueueChanged += OnChanged;
         Refresh();
     }
 
     public void Dispose()
     {
         _text.Changed -= OnChanged;
-        _playback.Changed -= OnChanged;
+        _playback.MetadataChanged -= OnChanged;
+        _playback.StateChanged -= OnChanged;
+        _playback.QueueChanged -= OnChanged;
         if (_shortcuts is not null)
         {
             _shortcuts.Changed -= OnChanged;

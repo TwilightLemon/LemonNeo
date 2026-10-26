@@ -21,6 +21,7 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
     private readonly IDisposable _appearanceSubscription;
     private readonly ArtworkService _artwork;
     private readonly List<Task> _artworkTasks = [];
+    private readonly List<Task> _playbackTasks = [];
     private readonly IPlaybackInteraction _interaction;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly PlaybackSessionService _session;
@@ -46,11 +47,11 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
         _artwork = artwork;
         Snapshot = _session.Snapshot;
         _volumePercent = _session.Volume * 100;
-        // The shared operation gate rejects duplicate input without dimming command buttons.
+        // New playback input replaces the previous request in the session.
         const AsyncRelayCommandOptions commandOptions = AsyncRelayCommandOptions.AllowConcurrentExecutions;
         TogglePlaybackCommand = new AsyncRelayCommand(() => ExecutePlaybackAsync(
             ct => _interaction.ExecuteAsync(PlaybackCommand.TogglePlayPause, cancellationToken: ct),
-            Snapshot.State == PlayerState.Stopped), commandOptions);
+            Snapshot.State == PlaybackState.Stopped), commandOptions);
         PreviousCommand =
             new AsyncRelayCommand(
                 () => ExecutePlaybackAsync(ct =>
@@ -69,13 +70,16 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
         ModeCommand = new AsyncRelayCommand<string>(
             mode => ExecutePlaybackAsync(ct => _session.SetModeAsync(Enum.Parse<PlaybackMode>(mode!), ct), false),
             commandOptions);
-        _session.StateChanged += OnPlaybackChanged;
-        _session.TimelineChanged += OnPlaybackChanged;
+        _session.MetadataChanged += OnMetadataChanged;
+        _session.StateChanged += OnStateChanged;
+        _session.TimelineChanged += OnTimelineChanged;
+        _session.QueueChanged += OnQueueChanged;
         _session.VolumeChanged += OnVolumeChanged;
         _appearanceSubscription = Context.Settings.Subscribe<AppearancePreferences>(_ =>
         {
             OnPropertyChanged(nameof(CanVisualizeAudio));
             OnPropertyChanged(nameof(CanAnimateBackground));
+            OnPropertyChanged(nameof(ReduceMotion));
         });
         _visualEffectsSubscription = Context.Settings.Subscribe<VisualEffectsPreferences>(_ =>
             OnPropertyChanged(nameof(CanVisualizeAudio)));
@@ -92,7 +96,7 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
 
     public AsyncRelayCommand<string> ModeCommand { get; }
 
-    // Playback execution is exclusive, but its progress must not disable the whole control bar.
+    // Loading does not disable selection of another track.
     public override bool CanInteract => Context.IsInitialized && !_closing;
     private bool CanControlPlayback => CanInteract;
     public string NowTitle => Snapshot.CurrentTrack?.Title ?? _text[LanguageManager.Keys.NoTrack];
@@ -105,11 +109,18 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
     public Bitmap? NowArtwork => _nowArtwork?.Bitmap;
     public LoadedArtwork? NowArtworkReference => _nowArtwork;
     public BackgroundArtworkFrame? CurrentArtwork => _backgroundArtwork;
-    public bool IsPlaying => Snapshot.State == PlayerState.Playing;
+    public bool IsPlaying => Snapshot.State == PlaybackState.Playing;
+    public bool IsLoading => Snapshot.State == PlaybackState.Loading;
+    public bool ReduceMotion => Context.Appearance.Current.ReduceMotion;
     public string PlayLabel => _text[IsPlaying ? LanguageManager.Keys.Pause : LanguageManager.Keys.Play];
 
     public string PlaybackLabel =>
-        Snapshot.RestoredStatus is not null ? _text[LanguageManager.Keys.Restored] : _text[Snapshot.State.ToString()];
+        Snapshot.RestoredStatus is not null ? _text[LanguageManager.Keys.Restored] : _text[Snapshot.State switch
+        {
+            PlaybackState.Loading => "PlaybackLoading",
+            PlaybackState.Failed => "PlaybackFailed",
+            _ => Snapshot.State.ToString()
+        }];
 
     public string ModeLabel => _text[Snapshot.Mode.ToString()];
     public bool IsSequential => Snapshot.Mode == PlaybackMode.Sequential;
@@ -117,7 +128,7 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
     public bool IsShuffle => Snapshot.Mode == PlaybackMode.Shuffle;
     public bool CanPrevious => CanControlPlayback && _interaction.Snapshot.Controls.HasFlag(PlaybackControls.Previous);
     public bool CanNext => CanControlPlayback && _interaction.Snapshot.Controls.HasFlag(PlaybackControls.Next);
-    public bool CanTogglePlayback => CanControlPlayback && HasCurrentTrack;
+    public bool CanTogglePlayback => CanControlPlayback && HasCurrentTrack && !IsLoading;
 
     public bool CanSeek => CanControlPlayback && _interaction.Snapshot.Controls.HasFlag(PlaybackControls.Seek) &&
                            Snapshot.Timeline.Duration is { Ticks: > 0 };
@@ -251,7 +262,11 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
         Snapshot.CurrentIndex + 1, Snapshot.QueueCount, Snapshot.PlayerId ?? "—",
         Snapshot.RequiredSourceProviderId ?? _text[LanguageManager.Keys.Automatic]);
 
-    public event EventHandler? Changed;
+    public event EventHandler? MetadataChanged;
+    public event EventHandler? TimelineChanged;
+    public event EventHandler? StateChanged;
+    public event EventHandler? QueueChanged;
+    public event EventHandler? VolumeChanged;
 
     public Task SeekAsync(double seconds)
     {
@@ -270,35 +285,68 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
 
     public Task ExecutePlaybackAsync(Func<CancellationToken, Task> action, bool showBusy = true)
     {
-        return RunOperationAsync(async ct =>
-        {
-            try
-            {
-                await Task.Run(() => action(ct), ct);
-            }
-            finally
-            {
-                UpdateSnapshot();
-            }
-        }, showBusy: showBusy, busyDelay: TimeSpan.FromMilliseconds(250));
+        if (!CanInteract) return Task.CompletedTask;
+        _playbackTasks.RemoveAll(task => task.IsCompleted);
+        var task = ExecuteCoreAsync(action);
+        _playbackTasks.Add(task);
+        return task;
     }
 
-    private void OnPlaybackChanged(object? sender, PlaybackSessionChangedEventArgs args)
+    private async Task ExecuteCoreAsync(Func<CancellationToken, Task> action)
+    {
+        try { await action(_lifetime.Token); }
+        catch (OperationCanceledException) { }
+        catch (Exception exception)
+        {
+            if (!_closing) SetError(LanguageManager.Keys.OperationFailed, [exception.Message]);
+        }
+    }
+
+    private void OnMetadataChanged(object? sender, PlaybackSessionChangedEventArgs args) => PostUpdate(PlaybackUpdateKind.Metadata);
+    private void OnStateChanged(object? sender, PlaybackSessionChangedEventArgs args) => PostUpdate(PlaybackUpdateKind.State);
+    private void OnTimelineChanged(object? sender, PlaybackSessionChangedEventArgs args) => PostUpdate(PlaybackUpdateKind.Timeline);
+    private void OnQueueChanged(object? sender, PlaybackSessionChangedEventArgs args) => PostUpdate(PlaybackUpdateKind.Queue);
+
+    private void PostUpdate(PlaybackUpdateKind changes)
     {
         Dispatcher.UIThread.Post(() =>
         {
-            if (Context.IsInitialized && !_closing) UpdateSnapshot();
+            if (Context.IsInitialized && !_closing) ApplySnapshot(changes);
         });
     }
 
-    public void UpdateSnapshot()
+    public void UpdateSnapshot() => ApplySnapshot(PlaybackUpdateKind.All);
+
+    private void ApplySnapshot(PlaybackUpdateKind changes)
     {
         Snapshot = _session.GetCurrentSnapshot();
-        if (!HasSourceDetails) IsSourceDetailsOpen = false;
-        if (!_isUpdatingVolume) SetDisplayedVolume(_session.Volume * 100);
-        UpdateArtwork();
-        RaisePlaybackProperties();
-        Changed?.Invoke(this, EventArgs.Empty);
+        if ((changes & PlaybackUpdateKind.Metadata) != 0)
+        {
+            if (!HasSourceDetails) IsSourceDetailsOpen = false;
+            UpdateArtwork();
+            RaiseMetadataProperties();
+            MetadataChanged?.Invoke(this, EventArgs.Empty);
+        }
+        if ((changes & PlaybackUpdateKind.State) != 0)
+        {
+            IsBusy = IsLoading;
+            if (Snapshot.Error is { } error) SetError(LanguageManager.Keys.OperationFailed, [error]);
+            else SetError(null);
+            RaiseStateProperties();
+            StateChanged?.Invoke(this, EventArgs.Empty);
+        }
+        if ((changes & PlaybackUpdateKind.Queue) != 0)
+        {
+            RaiseQueueProperties();
+            QueueChanged?.Invoke(this, EventArgs.Empty);
+        }
+        if ((changes & PlaybackUpdateKind.Timeline) != 0)
+        {
+            RaiseTimelineProperties();
+            TimelineChanged?.Invoke(this, EventArgs.Empty);
+        }
+        if ((changes & PlaybackUpdateKind.Volume) != 0 && !_isUpdatingVolume)
+            SetDisplayedVolume(Snapshot.Volume * 100);
     }
 
     public Task RefreshVolumeAsync()
@@ -365,7 +413,11 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
     {
         Dispatcher.UIThread.Post(() =>
         {
-            if (!_closing && !_isUpdatingVolume) SetDisplayedVolume(_session.Volume * 100);
+            if (!_closing)
+            {
+                ApplySnapshot(PlaybackUpdateKind.Volume);
+                VolumeChanged?.Invoke(this, EventArgs.Empty);
+            }
         });
     }
 
@@ -447,7 +499,7 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
         Context.Appearance.SetArtworkColor(color);
     }
 
-    private void RaisePlaybackProperties()
+    private void RaiseMetadataProperties()
     {
         foreach (var name in new[]
                  {
@@ -455,21 +507,42 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
                      nameof(SourceNamespace), nameof(SourceKind), nameof(SourceId), nameof(SourceBitrate),
                      nameof(SourcePlayer),
                      nameof(BitrateOrigin), nameof(SourceCodec), nameof(SourceSampleRate), nameof(SourceBitDepth),
-                     nameof(SourceChannels), nameof(AudioFormatLabel)
+                     nameof(SourceChannels), nameof(AudioFormatLabel), nameof(QualityLabel), nameof(NowTitle),
+                     nameof(NowArtist), nameof(HasCurrentTrack), nameof(CanAnimateBackground), nameof(CanTogglePlayback)
                  })
             OnPropertyChanged(name);
+    }
+
+    private void RaiseStateProperties()
+    {
         foreach (var name in new[]
                  {
-                     nameof(QualityLabel), nameof(NowTitle), nameof(NowArtist), nameof(HasCurrentTrack),
-                     nameof(IsPlaying), nameof(PlayLabel), nameof(PlaybackLabel), nameof(ModeLabel),
-                     nameof(IsSequential), nameof(IsRepeatAll), nameof(IsShuffle), nameof(CanPrevious), nameof(CanNext),
+                     nameof(IsPlaying), nameof(IsLoading), nameof(PlayLabel), nameof(PlaybackLabel),
                      nameof(CanTogglePlayback), nameof(CanSeek), nameof(CanAdjustVolume), nameof(CanVisualizeAudio),
-                     nameof(CanAnimateBackground),
-                     nameof(DurationSeconds), nameof(PositionText), nameof(DurationText)
+                     nameof(CanAnimateBackground)
                  }) OnPropertyChanged(name);
+        RaiseQueueProperties();
+    }
+
+    private void RaiseQueueProperties()
+    {
+        foreach (var name in new[] { nameof(ModeLabel), nameof(IsSequential), nameof(IsRepeatAll), nameof(IsShuffle),
+                     nameof(CanPrevious), nameof(CanNext), nameof(PlaybackDetails) }) OnPropertyChanged(name);
+    }
+
+    private void RaiseTimelineProperties()
+    {
+        foreach (var name in new[] { nameof(DurationSeconds), nameof(PositionText), nameof(DurationText), nameof(CanSeek) })
+            OnPropertyChanged(name);
         if (!IsSeeking) OnPropertyChanged(nameof(PositionSeconds));
-        OnPropertyChanged(nameof(PlaybackDetails));
         OnPropertyChanged(nameof(TimeLabel));
+    }
+
+    private void RaisePlaybackProperties()
+    {
+        RaiseMetadataProperties();
+        RaiseStateProperties();
+        RaiseTimelineProperties();
     }
 
     protected override void RaiseInteractionProperties()
@@ -487,8 +560,10 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
     public override async ValueTask DisposeAsync()
     {
         _closing = true;
-        _session.StateChanged -= OnPlaybackChanged;
-        _session.TimelineChanged -= OnPlaybackChanged;
+        _session.MetadataChanged -= OnMetadataChanged;
+        _session.StateChanged -= OnStateChanged;
+        _session.TimelineChanged -= OnTimelineChanged;
+        _session.QueueChanged -= OnQueueChanged;
         _session.VolumeChanged -= OnVolumeChanged;
         _appearanceSubscription.Dispose();
         _visualEffectsSubscription.Dispose();
@@ -496,6 +571,7 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
         await base.DisposeAsync();
         await Task.WhenAll(_volumeUpdateTask, _volumeReadTask);
         await Task.WhenAll(_artworkTasks);
+        await Task.WhenAll(_playbackTasks);
         SetArtwork(null);
         _artworkCancellation?.Dispose();
         _lifetime.Dispose();

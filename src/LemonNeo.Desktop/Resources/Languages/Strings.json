@@ -81,6 +81,8 @@
   "Playing": "Playing",
   "Paused": "Paused",
   "Stopped": "Stopped",
+  "PlaybackLoading": "Loading audio…",
+  "PlaybackFailed": "Playback failed",
   "Restored": "Previous session restored · press play to continue",
   "General": "General",
   "Appearance": "Appearance",

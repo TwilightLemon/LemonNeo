@@ -34,7 +34,8 @@ public sealed class LibraryViewModel : TrackListViewModel
             ? Navigation.NavigateAsync(DesktopRoutes.MatchPlaylist, playlist.Id)
             : Task.CompletedTask);
         RefreshCommand = new AsyncRelayCommand(ReloadLibraryAsync);
-        Playback.Changed += OnPlaybackChanged;
+        Playback.MetadataChanged += OnPlaybackChanged;
+        Playback.QueueChanged += OnPlaybackChanged;
         RefreshTracks();
     }
 
@@ -268,7 +269,8 @@ public sealed class LibraryViewModel : TrackListViewModel
 
     public override async ValueTask DisposeAsync()
     {
-        Playback.Changed -= OnPlaybackChanged;
+        Playback.MetadataChanged -= OnPlaybackChanged;
+        Playback.QueueChanged -= OnPlaybackChanged;
         await base.DisposeAsync();
     }
 }

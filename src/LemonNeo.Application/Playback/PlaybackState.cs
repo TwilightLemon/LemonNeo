@@ -18,7 +18,7 @@ public sealed record PlaybackQueueState
 public sealed record PlaybackResumeState(
     Guid? ItemId = null,
     TimeSpan Position = default,
-    PlaybackStatus Status = PlaybackStatus.Stopped);
+    PlaybackState Status = PlaybackState.Stopped);
 
 public sealed record PlaybackPreferences(
     double Volume = 1,

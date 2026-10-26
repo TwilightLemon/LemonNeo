@@ -77,14 +77,16 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
     private readonly object _gate = new();
     private readonly ILogger<BassPlayer> _logger;
     private readonly IWebProxy? _networkProxy;
+    private readonly int _device;
     private bool _disposed;
-    private BassDownloadForwarder? _downloadForwarder;
+    private readonly Dictionary<int, PreparedStream> _streams = [];
+    private readonly List<Task<IPreparedPlayback>> _preparations = [];
     private int _flacPlugin;
     private bool _isHttpStream;
     private int _stream;
     private float _volume = 1;
 
-    public BassPlayer(ILogger<BassPlayer> logger, IWebProxy? networkProxy)
+    public BassPlayer(ILogger<BassPlayer> logger, IWebProxy? networkProxy, int device = -1)
     {
         _logger = logger;
         _networkProxy = networkProxy;
@@ -93,8 +95,9 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
         var initFlags = OperatingSystem.IsWindows()
             ? BASSInit.BASS_DEVICE_CPSPEAKERS
             : BASSInit.BASS_DEVICE_DEFAULT;
-        if (!BassApi.BASS_Init(-1, 44100, initFlags, IntPtr.Zero))
+        if (!BassApi.BASS_Init(device, 44100, initFlags, IntPtr.Zero))
             throw BassFailure("initialize the default audio device");
+        _device = BassApi.BASS_GetDevice();
 
         var pluginDirectory = Path.GetDirectoryName(typeof(BassPlayerPlugin).Assembly.Location)!;
         var flacPath = Path.Combine(
@@ -106,6 +109,7 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
         _flacPlugin = BassApi.BASS_PluginLoad(flacPath);
         if (_flacPlugin == 0)
         {
+            BassApi.BASS_SetDevice(_device);
             BassApi.BASS_Free();
             throw BassFailure($"load the FLAC decoder '{flacPath}'");
         }
@@ -113,26 +117,33 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
         _logger.LogInformation("BASS audio player initialized ({RuntimeIdentifier}).", nativeAsset.RuntimeIdentifier);
     }
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
+        Task[] preparations;
         lock (_gate)
         {
-            if (_disposed) return ValueTask.CompletedTask;
-
-            FreeCurrentStream();
+            if (_disposed) return;
+            _disposed = true;
+            preparations = _preparations.ToArray();
+        }
+        try { await Task.WhenAll(preparations); }
+        catch (Exception) { /* Each preparation owns and releases its failed resources. */ }
+        int[] streams;
+        lock (_gate) streams = _streams.Keys.ToArray();
+        foreach (var stream in streams) ReleaseStream(stream);
+        lock (_gate)
+        {
             if (_flacPlugin != 0)
             {
                 BassApi.BASS_PluginFree(_flacPlugin);
                 _flacPlugin = 0;
             }
 
+            BassApi.BASS_SetDevice(_device);
             BassApi.BASS_Free();
-            _disposed = true;
             State = PlayerState.Stopped;
             CurrentTrack = null;
         }
-
-        return ValueTask.CompletedTask;
     }
 
     public AudioStreamInfo? AudioInfo
@@ -307,14 +318,13 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
     public Task StopAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        PreparedStream? current;
         lock (_gate)
         {
             ThrowIfDisposed();
-            FreeCurrentStream();
-            CurrentTrack = null;
-            State = PlayerState.Stopped;
+            current = _streams.GetValueOrDefault(_stream);
         }
-
+        current?.Dispose();
         return Task.CompletedTask;
     }
 
@@ -358,61 +368,84 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
         return Task.CompletedTask;
     }
 
-    private Task PlayCoreAsync(
+    private async Task PlayCoreAsync(
         Track track,
         PlaybackSource source,
         IPlaybackDownloadSink? downloadSink,
         CancellationToken cancellationToken)
     {
+        var prepared = await PrepareAsync(track, source, downloadSink, cancellationToken);
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            PreparedStream? previous;
+            lock (_gate) previous = _streams.GetValueOrDefault(_stream);
+            prepared.Activate(_volume);
+            previous?.Dispose();
+        }
+        catch { prepared.Dispose(); throw; }
+    }
+
+    public Task<IPreparedPlayback> PrepareAsync(Track track, PlaybackSource source,
+        IPlaybackDownloadSink? downloadSink = null, CancellationToken cancellationToken = default)
+    {
         cancellationToken.ThrowIfCancellationRequested();
         lock (_gate)
         {
             ThrowIfDisposed();
-            FreeCurrentStream();
-            var sourceDescription = source switch
-            {
-                FilePlaybackSource fileSource => CreateFileStream(fileSource),
-                HttpPlaybackSource { IsDirectAudio: true } httpSource => CreateHttpStream(httpSource, downloadSink),
-                _ => throw new NotSupportedException($"BASS Player does not support '{source.GetType().Name}'.")
-            };
-            if (_stream == InvalidStream) throw BassFailure($"open '{sourceDescription}'");
-
-            // Apply before playback starts so new streams never briefly play at full volume.
-            if (!BassApi.BASS_ChannelSetAttribute(_stream, BASSAttribute.BASS_ATTRIB_VOL, _volume))
-            {
-                var error = BassApi.BASS_ErrorGetCode();
-                FreeCurrentStream();
-                throw BassFailure("set the stream volume", error);
-            }
-
-            if (!BassApi.BASS_ChannelPlay(_stream, false))
-            {
-                var error = BassApi.BASS_ErrorGetCode();
-                FreeCurrentStream();
-                throw BassFailure($"play '{sourceDescription}'", error);
-            }
-
-            CurrentTrack = track;
-            State = PlayerState.Playing;
-            _logger.LogInformation(
-                "Now playing {Title} from {Source}",
-                track.Title ?? track.Id.RemoteId,
-                sourceDescription);
+            _preparations.RemoveAll(task => task.IsCompleted);
+            var task = Task.Run(() => PrepareCore(track, source, downloadSink, cancellationToken), CancellationToken.None);
+            _preparations.Add(task);
+            return task;
         }
-
-        return Task.CompletedTask;
     }
 
-    private string CreateFileStream(FilePlaybackSource source)
+    private IPreparedPlayback PrepareCore(Track track, PlaybackSource source, IPlaybackDownloadSink? sink,
+        CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        if (!BassApi.BASS_SetDevice(_device)) throw BassFailure("select the audio device");
+        var forwarder = sink is null ? null : new BassDownloadForwarder(sink);
+        var stream = InvalidStream;
+        try
+        {
+            // BASS_StreamCreateURL may block in native I/O. No active-player lock is held,
+            // and the returned handle belongs exclusively to this request.
+            stream = source switch
+            {
+                FilePlaybackSource file => CreateFileStream(file),
+                HttpPlaybackSource { IsDirectAudio: true } http => CreateHttpStream(http, forwarder),
+                _ => throw new NotSupportedException($"BASS Player does not support '{source.GetType().Name}'.")
+            };
+            if (stream == InvalidStream) throw BassFailure("open the audio stream");
+            token.ThrowIfCancellationRequested();
+            forwarder?.SetStream(stream);
+            lock (_gate)
+            {
+                ThrowIfDisposed();
+                var prepared = new PreparedStream(this, track, stream, source is HttpPlaybackSource, forwarder);
+                _streams.Add(stream, prepared);
+                return prepared;
+            }
+        }
+        catch
+        {
+            if (stream != InvalidStream) BassApi.BASS_StreamFree(stream);
+            GC.KeepAlive(forwarder);
+            forwarder?.Dispose();
+            throw;
+        }
+    }
+
+    private static int CreateFileStream(FilePlaybackSource source)
     {
         var path = Path.GetFullPath(source.Path);
         if (!File.Exists(path)) throw new FileNotFoundException("The local audio file no longer exists.", path);
 
-        _stream = BassApi.BASS_StreamCreateFile(path, 0, 0, BASSFlag.BASS_SAMPLE_FLOAT);
-        return path;
+        return BassApi.BASS_StreamCreateFile(path, 0, 0, BASSFlag.BASS_SAMPLE_FLOAT);
     }
 
-    private string CreateHttpStream(HttpPlaybackSource source, IPlaybackDownloadSink? downloadSink)
+    private int CreateHttpStream(HttpPlaybackSource source, BassDownloadForwarder? forwarder)
     {
         var headers = source.Headers.Select(header =>
         {
@@ -421,7 +454,6 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
 
             return $"{header.Key}: {header.Value}";
         }).ToArray();
-        _downloadForwarder = downloadSink is null ? null : new BassDownloadForwarder(downloadSink);
         // Keep the callback rooted before BASS begins receiving bytes, which
         // may happen before StreamCreateURL returns. Terminate every header.
         var downloadHeaders = source.Headers.Keys.Contains("Accept-Encoding", StringComparer.OrdinalIgnoreCase)
@@ -429,23 +461,19 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
             : [.. headers, "Accept-Encoding: identity"];
         var sourceWithHeaders = string.Join("\r\n", new[] { source.Uri.ToString() }.Concat(downloadHeaders)) + "\r\n";
         ApplyNetworkProxy(source.Uri);
-        _stream = BassApi.BASS_StreamCreateURL(
+        var stream = BassApi.BASS_StreamCreateURL(
             sourceWithHeaders,
             0,
             BASSFlag.BASS_SAMPLE_FLOAT,
-            _downloadForwarder?.DownloadCallback,
+            forwarder?.DownloadCallback,
             IntPtr.Zero);
-        if (_stream == InvalidStream)
+        if (stream == InvalidStream)
         {
             var error = BassApi.BASS_ErrorGetCode();
-            _downloadForwarder?.Dispose();
-            _downloadForwarder = null;
             throw BassFailure("open the network audio stream", error);
         }
 
-        _isHttpStream = true;
-        _downloadForwarder?.SetStream(_stream);
-        return source.Uri.ToString();
+        return stream;
     }
 
     /// <summary>BASS performs its own downloads, so mirror the host proxy into its native configuration.</summary>
@@ -474,21 +502,73 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
             _logger.LogWarning("Could not apply the network proxy to the BASS stream.");
     }
 
-    private void FreeCurrentStream()
+    private void ReleaseStream(int stream, PreparedStream? expected = null)
     {
-        if (_stream != InvalidStream)
+        BassDownloadForwarder? forwarder;
+        lock (_gate)
         {
-            BassApi.BASS_ChannelStop(_stream);
-            BassApi.BASS_StreamFree(_stream);
+            if (!_streams.TryGetValue(stream, out var owned) || expected is not null && !ReferenceEquals(owned, expected)) return;
+            _streams.Remove(stream);
+            forwarder = owned.Forwarder;
+            if (_stream == stream)
+            {
+                _stream = InvalidStream;
+                _isHttpStream = false;
+                State = PlayerState.Stopped;
+                CurrentTrack = null;
+            }
+        }
+        BassApi.BASS_ChannelStop(stream);
+        BassApi.BASS_StreamFree(stream);
+        GC.KeepAlive(forwarder);
+        forwarder?.Dispose();
+    }
+
+    private sealed class PreparedStream(BassPlayer owner, Track track, int stream, bool isHttp,
+        BassDownloadForwarder? forwarder) : IPreparedPlayback
+    {
+        private int _disposed;
+        public BassDownloadForwarder? Forwarder { get; } = forwarder;
+        public AudioStreamInfo? AudioInfo
+        {
+            get
+            {
+                lock (owner._gate)
+                {
+                    if (!owner._streams.TryGetValue(stream, out var owned) || !ReferenceEquals(owned, this)) return null;
+                    float bitrate = 0;
+                    var available = BassApi.BASS_ChannelGetAttribute(stream, BASSAttribute.BASS_ATTRIB_BITRATE, ref bitrate);
+                    return BassAudioInfo.FromChannel(BassApi.BASS_ChannelGetInfo(stream), available ? bitrate : null);
+                }
+            }
         }
 
-        // StreamFree waits for native callbacks. Only release the delegate
-        // and host sink after those callbacks have stopped.
-        GC.KeepAlive(_downloadForwarder);
-        _downloadForwarder?.Dispose();
-        _downloadForwarder = null;
-        _stream = InvalidStream;
-        _isHttpStream = false;
+        public void Activate(double volume)
+        {
+            lock (owner._gate)
+            {
+                owner.ThrowIfDisposed();
+                ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+                if (!owner._streams.TryGetValue(stream, out var owned) || !ReferenceEquals(owned, this))
+                    throw new ObjectDisposedException(nameof(PreparedStream));
+                if (!BassApi.BASS_ChannelSetAttribute(stream, BASSAttribute.BASS_ATTRIB_VOL, (float)volume))
+                    throw BassFailure("set the stream volume");
+                if (owner._stream != InvalidStream && owner._stream != stream)
+                    BassApi.BASS_ChannelStop(owner._stream);
+                if (!BassApi.BASS_ChannelPlay(stream, false)) throw BassFailure("start playback");
+                owner._stream = stream;
+                owner._volume = (float)volume;
+                owner._isHttpStream = isHttp;
+                owner.CurrentTrack = track;
+                owner.State = PlayerState.Playing;
+                owner._logger.LogInformation("Now playing {Title}.", track.Title);
+            }
+        }
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 0) owner.ReleaseStream(stream, this);
+        }
     }
 
     private static InvalidOperationException BassFailure(string operation)

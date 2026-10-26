@@ -37,6 +37,7 @@ internal static class ApplicationRegistration
         services.AddSingleton<PlaybackSourceDiscoveryService>();
         services.AddSingleton<PlaybackResolver>();
         services.AddSingleton<PlaybackSessionService>();
+        services.AddSingleton<PlaybackLyricsService>();
         services.AddSingleton<IPlaybackInteraction, PlaybackInteractionService>();
     }
 }

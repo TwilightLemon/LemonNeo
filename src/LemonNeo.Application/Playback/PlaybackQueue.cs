@@ -21,6 +21,7 @@ public interface IPlaybackQueue
     PlaybackQueueItem? Select(Guid itemId);
     PlaybackQueueItem? MoveNext();
     PlaybackQueueItem? MovePrevious();
+    IReadOnlyList<PlaybackQueueItem> GetNextCandidates();
     void SetMode(PlaybackMode mode);
     void SetRequest(PlaybackRequest request);
     void Clear();
@@ -309,6 +310,28 @@ public sealed class PlaybackQueue : IPlaybackQueue
             }
 
             return null;
+        }
+    }
+
+    /// <summary>A finite traversal for one automatic advance, including at most one wrap.</summary>
+    public IReadOnlyList<PlaybackQueueItem> GetNextCandidates()
+    {
+        lock (_gate)
+        {
+            if (_items.Count == 0) return [];
+            var index = _items.FindIndex(item => item.Id == _currentItemId);
+            if (_mode == PlaybackMode.Sequential) return _items.Skip(index + 1).ToArray();
+            if (_mode == PlaybackMode.RepeatAll)
+                return _items.Skip(index + 1).Concat(_items.Take(index + 1)).ToArray();
+
+            var upcoming = _shuffleOrder.Skip(_shuffleCursor + 1).ToList();
+            var passed = _items.Select(item => item.Id)
+                .Where(id => id != _currentItemId && !upcoming.Contains(id)).ToList();
+            Shuffle(passed);
+            var order = upcoming.Concat(passed);
+            if (_currentItemId is { } current && !upcoming.Contains(current)) order = order.Append(current);
+            var items = _items.ToDictionary(item => item.Id);
+            return order.Distinct().Where(items.ContainsKey).Select(id => items[id]).ToArray();
         }
     }
 

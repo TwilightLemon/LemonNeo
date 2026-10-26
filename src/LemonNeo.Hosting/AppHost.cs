@@ -2,6 +2,7 @@ using LemonNeo.Abstractions.Plugins;
 using LemonNeo.Abstractions.Settings;
 using LemonNeo.Abstractions.Storage;
 using LemonNeo.Application.Library;
+using LemonNeo.Application.Lyrics;
 using LemonNeo.Application.Playback;
 using LemonNeo.Hosting.Registration;
 using LemonNeo.Infrastructure.Networking;
@@ -103,6 +104,7 @@ public class AppHost : IAsyncDisposable
             }
 
             Settings.Start();
+            _ = Get<PlaybackLyricsService>();
             _initialized = true;
         }
         finally
@@ -184,6 +186,7 @@ public class AppHost : IAsyncDisposable
 
         await Finish(Settings.StopAsync);
         await Finish(Get<PlaybackSessionService>().PrepareForShutdownAsync);
+        await Finish(() => Get<PlaybackLyricsService>().DisposeAsync().AsTask());
         await Finish(Get<PluginLoader>().ShutdownAsync);
         if (_libraryLoaded) await Finish(() => Get<LibraryService>().SaveAsync());
         await Finish(() => Settings.SaveAsync());

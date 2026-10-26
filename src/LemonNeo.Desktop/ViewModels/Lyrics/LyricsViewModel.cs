@@ -1,10 +1,10 @@
 using Avalonia.Media;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
-using LemonNeo.Abstractions.Playback;
 using LemonNeo.Application.Lyrics;
 using LemonNeo.Application.Playback;
 using LemonNeo.Core.Lyrics;
-using LemonNeo.Core.Music;
+using LemonNeo.Core.Playback;
 using LemonNeo.Desktop.Config;
 using LemonNeo.Desktop.Services;
 using LemonNeo.Desktop.ViewModels.Playback;
@@ -19,16 +19,15 @@ public sealed class LyricsViewModel : PageViewModel
     private readonly IDisposable _desktopSubscription;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly IDisposable _lyricsSubscription;
-    private readonly List<Task> _lyricsTasks = [];
+    private readonly PlaybackLyricsService _lyrics;
     private IReadOnlyList<LyricsLine> _lyricLines = [];
-    private CancellationTokenSource? _lyricsCancellation;
     private string _lyricsStatusKey = "NoLyrics";
-    private MusicItemId? _lyricsTrackId;
     private PlaybackSessionSnapshot _snapshot;
 
     public LyricsViewModel(DesktopContext context, PlaybackViewModel playback) : base(context, DesktopRoutes.Lyrics)
     {
         Playback = playback;
+        _lyrics = _host.Get<PlaybackLyricsService>();
         _snapshot = playback.Snapshot;
         AlignLeftCommand = new RelayCommand(() => SetAlignment(LyricAlignment.Left));
         AlignCenterCommand = new RelayCommand(() => SetAlignment(LyricAlignment.Center));
@@ -43,7 +42,10 @@ public sealed class LyricsViewModel : PageViewModel
             Context.Settings.Subscribe<DesktopLyricsPreferences>(_ => RefreshDesktopPreferenceProperties());
         _appearanceSubscription =
             Context.Settings.Subscribe<AppearancePreferences>(_ => OnPropertyChanged(nameof(ReduceMotion)));
-        Playback.Changed += OnPlaybackChanged;
+        Playback.MetadataChanged += OnPlaybackChanged;
+        Playback.StateChanged += OnPlaybackChanged;
+        Playback.TimelineChanged += OnPlaybackTimeline;
+        _lyrics.Changed += OnLyricsChanged;
         UpdateSnapshot();
     }
 
@@ -54,7 +56,7 @@ public sealed class LyricsViewModel : PageViewModel
 
     public double PositionMilliseconds => _snapshot.Timeline.Position.TotalMilliseconds;
     public double DurationMilliseconds => _snapshot.Timeline.Duration?.TotalMilliseconds ?? 0;
-    public bool IsStopped => _snapshot.State == PlayerState.Stopped;
+    public bool IsStopped => _snapshot.State is not (PlaybackState.Playing or PlaybackState.Paused);
     public bool ReduceMotion => Context.Appearance.Current.ReduceMotion;
     public RelayCommand AlignLeftCommand { get; }
     public RelayCommand AlignCenterCommand { get; }
@@ -256,49 +258,38 @@ public sealed class LyricsViewModel : PageViewModel
     {
         _snapshot = Playback.Snapshot;
         SeekLyricCommand.NotifyCanExecuteChanged();
+        UpdateDocument();
         UpdateLyricsPosition();
-        // Source discovery can enrich ExternalIds without changing the song. Keep its lyrics
-        // and any in-flight lookup instead of clearing and reloading the same document.
-        if (_lyricsTrackId == _snapshot.CurrentTrack?.Id) return;
-        _lyricsTrackId = _snapshot.CurrentTrack?.Id;
-        _lyricsCancellation?.Cancel();
-        _lyricsCancellation?.Dispose();
-        _lyricsCancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
-        _lyricsTasks.RemoveAll(t => t.IsCompleted);
-        _lyricsTasks.Add(LoadLyricsAsync(_snapshot.CurrentTrack, _lyricsCancellation.Token));
     }
 
-    private async Task LoadLyricsAsync(Track? track, CancellationToken cancellationToken)
+    private void OnPlaybackTimeline(object? sender, EventArgs args)
     {
-        Document = null;
-        _lyricLines = [];
-        _lyricsStatusKey = track is null ? "NoLyrics" : "LyricsLoading";
+        _snapshot = Playback.Snapshot;
         UpdateLyricsPosition();
+    }
+
+    private void OnLyricsChanged(object? sender, EventArgs args) => Dispatcher.UIThread.Post(() =>
+    {
+        if (!_lifetime.IsCancellationRequested) UpdateSnapshot();
+    });
+
+    private void UpdateDocument()
+    {
+        var snapshot = _lyrics.Snapshot;
+        var current = snapshot.RequestId == _snapshot.RequestId;
+        var document = current ? snapshot.Document : null;
+        _lyricsStatusKey = current ? snapshot.Status switch
+        {
+            PlaybackLyricsStatus.Loading => "LyricsLoading",
+            PlaybackLyricsStatus.Failed => "LyricsError",
+            _ => "NoLyrics"
+        } : "NoLyrics";
+        if (!ReferenceEquals(Document, document))
+        {
+            Document = document;
+            _lyricLines = Document?.Lines?.OrderBy(line => line.EffectiveStartTimeMs ?? int.MaxValue).ToArray() ?? [];
+        }
         RaiseLyricsProperties();
-        if (track is null) return;
-        try
-        {
-            var result = await Task.Run(() => _host.Get<LyricsService>().GetLyricsAsync(track, cancellationToken),
-                cancellationToken);
-            cancellationToken.ThrowIfCancellationRequested();
-            if (_snapshot.CurrentTrack?.Id != track.Id) return;
-            Document = result.Lyrics;
-            _lyricsStatusKey = "NoLyrics";
-            _lyricLines = Document?.Lines?.OrderBy(l => l.EffectiveStartTimeMs ?? int.MaxValue).ToArray() ?? [];
-            UpdateLyricsPosition();
-            RaiseLyricsProperties();
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-        }
-        catch (Exception)
-        {
-            if (!cancellationToken.IsCancellationRequested)
-            {
-                _lyricsStatusKey = "LyricsError";
-                RaiseLyricsProperties();
-            }
-        }
     }
 
     private void UpdateLyricsPosition()
@@ -311,12 +302,12 @@ public sealed class LyricsViewModel : PageViewModel
         for (var i = 0; i < _lyricLines.Count; i++)
             if (_lyricLines[i].EffectiveStartTimeMs is { } start && start <= milliseconds)
                 index = i;
-        var frame = Document is not null && _snapshot.State != PlayerState.Stopped
+        var frame = Document is not null && !IsStopped
             ? LyricsTimeline.CreateFrame(Document, milliseconds)
             : new LyricsDisplayFrame(LyricsDisplayRow.Empty, null, null);
         CurrentLyric = frame.Main.Text;
-        PreviousLyric = _snapshot.State != PlayerState.Stopped && index > 0 ? _lyricLines[index - 1].Text : "";
-        NextLyric = _snapshot.State != PlayerState.Stopped && index + 1 < _lyricLines.Count
+        PreviousLyric = !IsStopped && index > 0 ? _lyricLines[index - 1].Text : "";
+        NextLyric = !IsStopped && index + 1 < _lyricLines.Count
             ? _lyricLines[index + 1].Text
             : "";
         Translation = frame.Translation?.Text ?? "";
@@ -362,14 +353,15 @@ public sealed class LyricsViewModel : PageViewModel
 
     public override async ValueTask DisposeAsync()
     {
-        Playback.Changed -= OnPlaybackChanged;
+        Playback.MetadataChanged -= OnPlaybackChanged;
+        Playback.StateChanged -= OnPlaybackChanged;
+        Playback.TimelineChanged -= OnPlaybackTimeline;
+        _lyrics.Changed -= OnLyricsChanged;
         _lyricsSubscription.Dispose();
         _desktopSubscription.Dispose();
         _appearanceSubscription.Dispose();
         await _lifetime.CancelAsync();
         await base.DisposeAsync();
-        await Task.WhenAll(_lyricsTasks);
-        _lyricsCancellation?.Dispose();
         _lifetime.Dispose();
     }
 }

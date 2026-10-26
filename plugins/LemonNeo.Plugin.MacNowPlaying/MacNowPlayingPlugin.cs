@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using LemonNeo.Abstractions.Playback;
 using LemonNeo.Abstractions.Plugins;
+using LemonNeo.Core.Playback;
 using Microsoft.Extensions.Logging;
 
 namespace LemonNeo.Plugin.MacNowPlaying;
@@ -59,7 +60,7 @@ public sealed class MacNowPlayingPlugin : InteractivePluginBase
         _readTask = ReadCommandsAsync(_readerCancellation.Token);
     }
 
-    protected override async ValueTask UpdateAsync(InteractivePlaybackSnapshot snapshot,
+    protected override async ValueTask UpdateAsync(InteractivePlaybackSnapshot snapshot, PlaybackUpdateKind changes,
         CancellationToken cancellationToken)
     {
         var message = JsonSerializer.Serialize(new
@@ -70,7 +71,7 @@ public sealed class MacNowPlayingPlugin : InteractivePluginBase
             album = snapshot.Track?.Album?.Title,
             trackId = snapshot.Track?.Id.ToString(),
             artwork = snapshot.Track?.ArtworkUri is { IsAbsoluteUri: true } artwork ? artwork.AbsoluteUri : null,
-            state = (int)snapshot.State,
+            state = snapshot.State switch { PlaybackState.Playing => 1, PlaybackState.Paused => 2, _ => 0 },
             position = snapshot.Position.TotalSeconds,
             duration = snapshot.Duration?.TotalSeconds,
             controls = (int)snapshot.Controls

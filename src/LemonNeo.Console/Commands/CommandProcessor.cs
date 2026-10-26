@@ -27,6 +27,7 @@ internal sealed partial class CommandProcessor(
     TrackLookupService trackLookup,
     MetadataService metadata,
     LyricsService lyrics,
+    PlaybackLyricsService playbackLyrics,
     PlaylistService playlists,
     ImportService importer,
     FolderImportService folderImporter,
@@ -61,7 +62,7 @@ internal sealed partial class CommandProcessor(
     {
         await history.LoadAsync(cancellationToken);
         _output.WriteLine("Type a command below. ↑↓ browses history when empty and selects suggestions while typing.");
-        await using var lyricDisplay = new ConsoleLyricsDisplay(playback.GetCurrentSnapshot, lyrics, cancellationToken);
+        await using var lyricDisplay = new ConsoleLyricsDisplay(playback.GetCurrentSnapshot, playbackLyrics);
         var editor = InteractiveLineEditor.IsSupported
             ? new InteractiveLineEditor(completions.Complete, history.Entries, lyricDisplay.GetFrame)
             : null;
