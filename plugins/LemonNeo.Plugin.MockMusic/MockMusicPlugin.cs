@@ -109,13 +109,16 @@ public sealed class MockMusicPlugin :
         return ValueTask.CompletedTask;
     }
 
+    IReadOnlyCollection<MusicIdScheme> ILyricsProvider.AcceptedIdSchemes { get; } = [new("mock", "track-id")];
+
     public Task<Lyrics?> GetLyricsAsync(
-        Track track,
+        ExternalMusicId musicId,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var exists = Tracks.Any(candidate => candidate.Id == track.Id);
-        return Task.FromResult(exists
+        var track = ((ILyricsProvider)this).AcceptedIdSchemes.Any(scheme => scheme.Accepts(musicId))
+            ? Tracks.FirstOrDefault(candidate => candidate.Id.RemoteId == musicId.Value) : null;
+        return Task.FromResult(track is not null
             ? new Lyrics($"Mock lyrics for {track.Title}.", "en")
             : null);
     }

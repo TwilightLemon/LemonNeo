@@ -86,7 +86,7 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
     private int _stream;
     private float _volume = 1;
 
-    public BassPlayer(ILogger<BassPlayer> logger, IWebProxy? networkProxy, int device = -1)
+    public BassPlayer(ILogger<BassPlayer> logger, IWebProxy? networkProxy)
     {
         _logger = logger;
         _networkProxy = networkProxy;
@@ -95,7 +95,7 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
         var initFlags = OperatingSystem.IsWindows()
             ? BASSInit.BASS_DEVICE_CPSPEAKERS
             : BASSInit.BASS_DEVICE_DEFAULT;
-        if (!BassApi.BASS_Init(device, 44100, initFlags, IntPtr.Zero))
+        if (!BassApi.BASS_Init(-1, 44100, initFlags, IntPtr.Zero))
             throw BassFailure("initialize the default audio device");
         _device = BassApi.BASS_GetDevice();
 

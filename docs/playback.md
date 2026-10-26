@@ -60,13 +60,32 @@ guards results with the request identity. Pause, resume and seek do not restart 
 Desktop and Console read the same lyrics snapshot. Explicit inspection remains a separate
 query through `LyricsService`.
 
-The `ILyricsProvider.GetLyricsAsync(Track)` contract and Lyricify's internal matching remain
-in place. Moving to provider-scoped music IDs and host-owned lyrics selection is deferred.
+`LyricsService` matches IDs already carried by the track against each `ILyricsProvider.AcceptedIdSchemes` collection.
+It does not expand metadata or search by title/artist. Each provider receives the matching
+`ExternalMusicId` (platform namespace, ID kind and value) through `GetLyricsAsync`.
+Native track IDs have the explicit `track-id` kind;
+other kinds must be declared in the track's external IDs rather than inferred from a platform name.
 
-## Validation
+All known IDs read their shared platform cache first, even if the producing plugin is absent.
+Uncached IDs are fetched concurrently from compatible plugins,
+then one final result is selected: word timing before line timing before plain text, then the
+number of auxiliary kinds (translation and romanization), then cached before fresh results.
+Empty auxiliary data is ignored. Provider ID and remote ID give a stable final tie-break.
+A cached result with word timing, translation and romanization can return without network requests.
 
-Run `dotnet test tests/LemonNeo.Tests/LemonNeo.Tests.csproj -p:SkipHostPlugins=true`.
-Tests use controlled source/decoder completions to check request replacement, late results,
-metadata timing, notification separation, failed selection identity and finite automatic
-skipping. The native BASS test opens a deliberately stalled loopback HTTP stream while
-preparing and activating another stream, using BASS's no-sound device.
+The cache key is the normalized `ExternalMusicId` (namespace, kind and value), never the plugin
+name. Multiple plugins fetching the same ID share one document; a query persists only its best
+result for that ID. The optional cached provider ID records provenance and does not affect lookup.
+`Lyrics.SourceId` also remains provenance and does not create cache aliases. The original
+platform-ID cache format 1 is supported directly. The intermediate provider-scoped format 2
+is treated as a miss.
+
+The Lyricify main provider combines search, metadata matching and lyrics, accepting lyric ID
+schemes from eight platforms.
+QQ lyrics accepts `qqmusic:song-id`, not `song-mid`. Kugou resolves download credentials by
+the known audio hash. Protocol requests, decryption and parsing remain in the plugin; matching
+and selection are owned by the host.
+
+## Build
+
+Run `dotnet build LemonNeo.slnx`.

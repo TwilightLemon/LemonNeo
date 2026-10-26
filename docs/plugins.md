@@ -170,6 +170,15 @@ Notes for plugin authors:
   the user can change the cache location while the plugin is running.
 - Settings entities are stored one JSON file per type, named after the type
   (`AccountSettings.json`), with camelCase properties.
+- Lyrics providers expose an `AcceptedIdSchemes` collection and implement
+  `ILyricsProvider.GetLyricsAsync(ExternalMusicId, CancellationToken)`. The ID contains the
+  platform namespace, kind and value, matching one of the declared schemes rather than the plugin ID.
+  Fetch and parse that recording directly. The host selects the best result and owns caching;
+  cache identity is shared by platform ID across plugins. Metadata expansion and cross-source
+  fallback are outside this capability. A single provider can support multiple platforms and
+  ID kinds; Lyricify's main provider combines search, metadata and lyrics with eight accepted
+  lyric ID schemes. Plugins
+  implementing the previous Track-based or provider-scoped contract must be rebuilt and adapted.
 - Decoders implement `IPlayer.PrepareAsync` to open a request-owned `IPreparedPlayback`
   without changing the active stream or starting audio. Slow I/O must run outside the active
   player's lock. `Activate(volume)` must be brief and perform no network I/O. Disposing a

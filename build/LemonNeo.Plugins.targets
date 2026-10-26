@@ -14,7 +14,7 @@
 
   <!-- Hosts explicitly request deployment; standalone plugin builds only write their own output. -->
   <Target Name="DeployPluginToHost" AfterTargets="Build"
-          Condition="'$(PluginDeploymentRoot)' != '' and '$(IsTestFixture)' != 'true' and Exists('$(MSBuildProjectDirectory)/plugin.json')">
+          Condition="'$(PluginDeploymentRoot)' != '' and Exists('$(MSBuildProjectDirectory)/plugin.json')">
     <ItemGroup>
       <PluginDeploymentAsset Include="$(TargetDir)**/*" />
     </ItemGroup>

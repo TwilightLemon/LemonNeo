@@ -3,7 +3,6 @@
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     </PropertyGroup>
     <ItemGroup>
-        <InternalsVisibleTo Include="LemonNeo.Tests" />
         <ProjectReference Include="../../src/LemonNeo.Core/LemonNeo.Core.csproj"/>
         <ProjectReference Include="../../src/LemonNeo.Abstractions/LemonNeo.Abstractions.csproj"/>
         <Reference Include="Bass.Net">

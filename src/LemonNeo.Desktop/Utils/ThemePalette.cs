@@ -84,7 +84,7 @@ public static class ThemePalette
         var accentText = EnsureContrast(dark ? accent : HslColor.ToRgb(hsl.H, Math.Min(hsl.S, .60), .32), backgrounds,
             5.5, dark);
         var onAccent = Color.Parse("#172027");
-        var lyricHighlighter = Color.Parse(dark ? "#E0EFEFEF" : "#0f0e0e");
+        var lyricHighlighter = dark? HslColor.ToRgb(hsl.H, hsl.S, .94) : Color.Parse("#0f0e0e");
         var lyricText = Color.Parse(dark ? "#90FEFEFE" : "#90000000");
         var playbackSurface = Color.Parse(dark ? "#4E000000" : "#4EEFEFEF");
         var border=Color.Parse(dark ? "#2EFFFFFF" : "#2E000000");

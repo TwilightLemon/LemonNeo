@@ -127,6 +127,10 @@ public sealed partial class ToolsViewModel : PageViewModel
                     string.Join(", ",
                         playbackProvider.AcceptedIdSchemes.Select(s => $"{s.Namespace}:{s.Kind ?? "*"}")
                             .Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase))));
+            if (provider is ILyricsProvider lyricsProvider && lyricsProvider.AcceptedIdSchemes.Count > 0)
+                details.Add(new PluginDetail(_text[LanguageManager.Keys.AcceptedIds],
+                    string.Join(", ", lyricsProvider.AcceptedIdSchemes.Select(s => $"{s.Namespace}:{s.Kind ?? "*"}")
+                        .Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase))));
             details.AddRange(GetPluginDetails(plugin));
             var playable = sources.FirstOrDefault(s =>
                 string.Equals(s.ProviderId, provider.Id, StringComparison.OrdinalIgnoreCase));
@@ -259,6 +263,7 @@ public sealed partial class ToolsViewModel : PageViewModel
         var namespaces = new List<string>();
         if (provider is ISearchNamespaceProvider search) namespaces.AddRange(search.SearchNamespaces);
         if (provider is IMetadataProvider metadata) namespaces.AddRange(metadata.MetadataNamespaces);
+        if (provider is ILyricsProvider lyrics) namespaces.AddRange(lyrics.AcceptedIdSchemes.Select(s => s.Namespace));
         if (provider is IPlaybackProvider playback)
             namespaces.AddRange(playback.AcceptedIdSchemes.Select(s => s.Namespace));
         return NormalizeNamespaces(namespaces);

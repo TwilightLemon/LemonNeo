@@ -21,7 +21,4 @@
         <Project Path="plugins/LemonNeo.Plugin.Netease/LemonNeo.Plugin.Netease.csproj" />
         <Project Path="plugins/LemonNeo.Plugin.QqMusic/LemonNeo.Plugin.QqMusic.csproj" />
     </Folder>
-    <Folder Name="/tests/">
-        <Project Path="tests/LemonNeo.Tests/LemonNeo.Tests.csproj" />
-    </Folder>
 </Solution>

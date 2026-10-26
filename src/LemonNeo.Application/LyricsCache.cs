@@ -8,8 +8,8 @@ using LyricsModel = LemonNeo.Core.Lyrics.Lyrics;
 namespace LemonNeo.Application;
 
 /// <summary>
-///     Host-owned lyrics storage. The host supplies its resolved cache directory;
-///     providers do not choose paths or need to be available for a cache hit.
+///     Host-owned lyrics storage. The host supplies its resolved cache directory.
+///     Documents are shared by platform, ID kind and value, independently of the fetching plugin.
 /// </summary>
 public sealed class LyricsCache(Func<string> getCacheDirectory, ILogger<LyricsCache> logger)
 {
@@ -37,8 +37,7 @@ public sealed class LyricsCache(Func<string> getCacheDirectory, ILogger<LyricsCa
                 FileShare.Read | FileShare.Delete, 4096, FileOptions.Asynchronous | FileOptions.SequentialScan);
             var entry = await JsonSerializer.DeserializeAsync<CacheEntry>(stream, JsonOptions, cancellationToken);
             if (entry is null || entry.FormatVersion != FormatVersion ||
-                entry.Identifier != identifier ||
-                string.IsNullOrWhiteSpace(entry.ProviderId) || !IsValid(entry.Lyrics)) return null;
+                entry.Identifier != identifier || !IsValid(entry.Lyrics)) return null;
 
             return new LyricsLookupResult(entry.Lyrics, entry.ProviderId, new Dictionary<string, string>());
         }
@@ -54,7 +53,7 @@ public sealed class LyricsCache(Func<string> getCacheDirectory, ILogger<LyricsCa
         }
     }
 
-    public async Task StoreAsync(ExternalMusicId identifier, LyricsModel lyrics, string providerId,
+    public async Task StoreAsync(ExternalMusicId identifier, LyricsModel lyrics, string? providerId = null,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -69,7 +68,7 @@ public sealed class LyricsCache(Func<string> getCacheDirectory, ILogger<LyricsCa
                              FileShare.None, 4096, FileOptions.Asynchronous))
             {
                 await JsonSerializer.SerializeAsync(stream,
-                    new CacheEntry(FormatVersion, identifier, providerId, lyrics), JsonOptions, cancellationToken);
+                    new CacheEntry(FormatVersion, identifier, lyrics, providerId), JsonOptions, cancellationToken);
             }
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -98,7 +97,7 @@ public sealed class LyricsCache(Func<string> getCacheDirectory, ILogger<LyricsCa
         return Path.Combine(directory, MusicCacheIdentity.GetKey(identifier) + ".json");
     }
 
-    private static bool IsValid(LyricsModel? lyrics)
+    internal static bool IsValid(LyricsModel? lyrics)
     {
         return lyrics is not null && lyrics.Text is not null &&
                (!string.IsNullOrWhiteSpace(lyrics.Text) ||
@@ -123,6 +122,7 @@ public sealed class LyricsCache(Func<string> getCacheDirectory, ILogger<LyricsCa
     private sealed record CacheEntry(
         int FormatVersion,
         ExternalMusicId Identifier,
-        string ProviderId,
-        LyricsModel Lyrics);
+        LyricsModel Lyrics,
+        // Provenance only; never part of the key or required for a cache hit.
+        string? ProviderId = null);
 }

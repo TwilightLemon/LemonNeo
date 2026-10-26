@@ -408,6 +408,8 @@ internal sealed partial class CommandProcessor(
                 if (provider is IPlaybackProvider sourceProvider && sourceProvider.AcceptedIdSchemes.Count > 0)
                     _output.WriteLine(
                         $"    Accepted IDs: {string.Join(", ", sourceProvider.AcceptedIdSchemes.Select(scheme => $"{scheme.Namespace}:{scheme.Kind ?? "-"}"))}");
+                if (provider is ILyricsProvider lyricsProvider && lyricsProvider.AcceptedIdSchemes.Count > 0)
+                    _output.WriteLine($"    Lyrics IDs: {string.Join(", ", lyricsProvider.AcceptedIdSchemes.Select(scheme => $"{scheme.Namespace}:{scheme.Kind ?? "-"}"))}");
             }
 
             foreach (var player in plugin.PlayerIds.Select(playersRegistry.Get).OfType<IPlayerProvider>())
