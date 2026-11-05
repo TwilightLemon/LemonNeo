@@ -36,6 +36,35 @@
                     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                         <StackPanel Margin="0,16,12,16" Spacing="18">
                             <Border Classes="card">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.Updates}}" />
+                                    <TextBlock Classes="muted" Text="{Binding Updates.CurrentVersionText}" />
+                                    <CheckBox
+                                        Content="{Translate {x:Static i18n:LanguageManager+Keys.UpdateCheckOnStartup}}"
+                                        IsChecked="{Binding Updates.CheckOnStartup}" />
+                                    <TextBlock
+                                        Classes="muted"
+                                        Text="{Translate {x:Static i18n:LanguageManager+Keys.UpdateDescription}}"
+                                        TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding Updates.Status}" TextWrapping="Wrap" />
+                                    <TextBlock
+                                        Foreground="{DynamicResource Brush.AccentText}"
+                                        IsVisible="{Binding Updates.IsUpdateAvailable}"
+                                        Text="{Binding Updates.AvailableVersionText}"
+                                        TextWrapping="Wrap" />
+                                    <ProgressBar Height="3" IsIndeterminate="True" IsVisible="{Binding Updates.IsChecking}" />
+                                    <WrapPanel>
+                                        <Button
+                                            Command="{Binding Updates.CheckCommand}"
+                                            Content="{Translate {x:Static i18n:LanguageManager+Keys.UpdateCheckNow}}"
+                                            Margin="0,0,10,0" />
+                                        <Button
+                                            Command="{Binding Updates.OpenReleaseCommand}"
+                                            Content="{Translate {x:Static i18n:LanguageManager+Keys.UpdateViewRelease}}" />
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Border>
+                            <Border Classes="card">
                                 <StackPanel Spacing="14">
                                     <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.AudioQualityPreference}}" />
                                     <ComboBox

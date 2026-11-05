@@ -68,6 +68,8 @@ public sealed class SettingsViewModel : PageViewModel
 
     private AppearanceService _appearance => Context.Appearance;
 
+    public UpdateViewModel Updates => Context.Updates;
+
     public IReadOnlyList<string> AudioQualityOptions => Enum.GetValues<AudioQuality>()
         .Select(quality => _text["AudioQuality" + quality]).ToArray();
 

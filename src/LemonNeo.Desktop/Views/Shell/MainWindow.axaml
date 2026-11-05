@@ -355,27 +355,57 @@
             Classes.lyricsExpanded="{Binding IsLyricsExpanded}"
             Name="PageArea"
             RowDefinitions="Auto,*">
-            <Border
-                Background="{DynamicResource Brush.DangerSoft}"
-                CornerRadius="10"
-                IsVisible="{Binding HasError}"
-                Margin="0,0,0,12"
-                Padding="14">
-                <Grid ColumnDefinitions="*,Auto">
-                    <TextBlock
-                        Foreground="{DynamicResource Brush.Danger}"
-                        MaxHeight="90"
-                        Text="{Binding Error}"
-                        TextWrapping="Wrap" />
-                    <Button
-                        AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}"
-                        Classes="ghost icon"
-                        Command="{Binding DismissErrorCommand}"
-                        Grid.Column="1">
-                        <Path Classes="icon" Data="{StaticResource Icon.Close}" />
-                    </Button>
-                </Grid>
-            </Border>
+            <StackPanel>
+                <Border
+                    Background="{DynamicResource Brush.AccentSoft}"
+                    CornerRadius="10"
+                    IsVisible="{Binding SharedContext.Updates.ShowNotification}"
+                    Margin="0,0,0,12"
+                    Padding="14">
+                    <Grid ColumnDefinitions="*,Auto,Auto">
+                        <TextBlock
+                            Foreground="{DynamicResource Brush.AccentText}"
+                            Margin="0,0,12,0"
+                            Text="{Binding SharedContext.Updates.AvailableVersionText}"
+                            TextWrapping="Wrap"
+                            VerticalAlignment="Center" />
+                        <Button
+                            Classes="ghost"
+                            Command="{Binding SharedContext.Updates.OpenReleaseCommand}"
+                            Content="{Translate {x:Static i18n:LanguageManager+Keys.UpdateViewRelease}}"
+                            Grid.Column="1" />
+                        <Button
+                            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.UpdateDismiss}}"
+                            Classes="ghost icon"
+                            Command="{Binding SharedContext.Updates.DismissCommand}"
+                            Grid.Column="2"
+                            Margin="8,0,0,0">
+                            <Path Classes="icon" Data="{StaticResource Icon.Close}" />
+                        </Button>
+                    </Grid>
+                </Border>
+                <Border
+                    Background="{DynamicResource Brush.DangerSoft}"
+                    CornerRadius="10"
+                    IsVisible="{Binding HasError}"
+                    Margin="0,0,0,12"
+                    Padding="14">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock
+                            Foreground="{DynamicResource Brush.Danger}"
+                            MaxHeight="90"
+                            Text="{Binding Error}"
+                            TextWrapping="Wrap" />
+                        <Button
+                            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}"
+                            Classes="ghost icon"
+                            Command="{Binding DismissErrorCommand}"
+                            Grid.Column="1">
+                            <Path Classes="icon" Data="{StaticResource Icon.Close}" />
+                        </Button>
+                    </Grid>
+                </Border>
+            </StackPanel>
             <ContentControl
                 Content="{Binding Navigation.Host}"
                 Grid.Row="1"

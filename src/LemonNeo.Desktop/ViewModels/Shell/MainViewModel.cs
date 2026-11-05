@@ -276,6 +276,7 @@ public sealed class MainViewModel : PageViewModel
         SetStatus(null);
         IsBusy = false;
         RaiseInteractionProperties();
+        Context.Updates.CheckAtStartup();
     }
 
     internal void ReportStartupFailure(string message)
@@ -293,6 +294,7 @@ public sealed class MainViewModel : PageViewModel
         _visualEffectsSubscription.Dispose();
         if (_searchPage is not null) _searchPage.PropertyChanged -= OnSearchChanged;
         await base.DisposeAsync();
+        await Context.Updates.DisposeAsync();
         IsQueueOpen = false;
         if (QueueDrawer is not null) await QueueDrawer.DisposeAsync();
         await Navigation.DisposeAsync();

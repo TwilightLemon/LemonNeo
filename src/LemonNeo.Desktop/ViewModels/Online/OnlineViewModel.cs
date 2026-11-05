@@ -162,7 +162,11 @@ public sealed partial class OnlineViewModel : PageViewModel
                     {
                         var rows = collection.Playlists.Select(playlist => new RemotePlaylistRow(id, playlist.Id,
                             playlist.Name,
-                            collection.Name, playlist.TrackCount?.ToString(_text.Culture) ?? "—")).ToArray();
+                            collection.Name, playlist.TrackCount?.ToString(_text.Culture) ?? "—")
+                        {
+                            ArtworkUri = playlist.ArtworkUri,
+                            ArtworkLoader = _host.Get<ArtworkService>()
+                        }).ToArray();
                         categories.Add(new RemotePlaylistCategory(collection.Id, collection.Name, rows));
                     }
                 }
@@ -171,7 +175,11 @@ public sealed partial class OnlineViewModel : PageViewModel
                     var rows = new List<RemotePlaylistRow>();
                     await foreach (var playlist in provider.GetUserPlaylistsAsync(ct))
                         rows.Add(new RemotePlaylistRow(id, playlist.Id, playlist.Name, _text[LanguageManager.Keys.RemotePlaylists],
-                            playlist.TrackCount?.ToString(_text.Culture) ?? "—"));
+                            playlist.TrackCount?.ToString(_text.Culture) ?? "—")
+                        {
+                            ArtworkUri = playlist.ArtworkUri,
+                            ArtworkLoader = _host.Get<ArtworkService>()
+                        });
                     categories.Add(new RemotePlaylistCategory("", _text[LanguageManager.Keys.RemotePlaylists], rows));
                 }
             }, ct);

@@ -142,7 +142,10 @@ public sealed class NeteaseUserPlugin :
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!TryReadId(playlist, "id", out var id) || !seen.Add(id)) continue;
                 yield return new RemotePlaylistSummary(id, ReadString(playlist, "name") ?? id,
-                    ReadInt32(playlist, "trackCount"));
+                    ReadInt32(playlist, "trackCount"))
+                {
+                    ArtworkUri = TryCreateAvatarUri(ReadString(playlist, "coverImgUrl"))
+                };
             }
 
             var count = playlists.GetArrayLength();

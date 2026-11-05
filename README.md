@@ -51,6 +51,12 @@ dotnet run --project src/LemonNeo.Console
 
 Plugins are deployed into the host's `plugins/` directory automatically; pass `-p:SkipHostPlugins=true` to build a host without them. The console host accepts `--plugins <dir>`, `--library <dir>`, and `--startup <file>`.
 
+## Updates
+
+The desktop app checks this repository's latest stable GitHub Release in the background after startup. When a newer version is available, a dismissible banner opens its release page for download. Install the ZIP or DMG package manually. Settings → General → Updates shows the current version, supports manual checks, and lets you disable startup checks. Checks use the app's network/proxy settings; network failures do not interrupt startup or playback. Prereleases are not offered; a prerelease build can update to the stable release with the same version number.
+
+Release packages get their application version from the `v*` tag through the existing packaging workflow; keep `<Version>` in `LemonNeo.Desktop.csproj` current for local builds.
+
 ## Features
 
 ### Cross-platform

@@ -49,7 +49,10 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
                     created.Add(new RemotePlaylistSummary(
                         $"playlist:{id}",
                         ReadString(item, "title") ?? "我喜欢",
-                        ReadTrackCount(item)));
+                        ReadTrackCount(item) ?? ReadInt32(item, "num0"))
+                    {
+                        ArtworkUri = ParseHttpsUri(ReadString(item, "picurl"))
+                    });
 
         if (TryGetObject(data, out var myDiss, "mydiss") &&
             TryGetArray(myDiss, out var playlists, "list"))
@@ -60,7 +63,10 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
                 created.Add(new RemotePlaylistSummary(
                     $"playlist:{id}",
                     ReadString(item, "title") ?? id,
-                    ReadTrackCount(item)));
+                    ReadTrackCount(item))
+                {
+                    ArtworkUri = ParseHttpsUri(ReadString(item, "picurl"))
+                });
             }
 
         var deduplicated = created
@@ -107,10 +113,56 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
                 result.Add(new RemotePlaylistSummary(
                     $"playlist:{id}",
                     ReadString(item, "dissname") ?? id,
-                    ReadTrackCount(item)));
+                    ReadTrackCount(item))
+                {
+                    ArtworkUri = ParseHttpsUri(ReadString(item, "logo"))
+                });
             }
 
             if (pageCount < pageSize || addedCount == 0) break;
+        }
+
+        return result;
+    }
+
+    public async Task<IReadOnlyList<RemotePlaylistSummary>> GetFollowedAlbumsAsync(
+        QqMusicCredentials authentication,
+        CancellationToken cancellationToken)
+    {
+        const int pageSize = 90;
+        var result = new List<RemotePlaylistSummary>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (var start = 0; ; start += pageSize)
+        {
+            var userId = Uri.EscapeDataString(authentication.UserId);
+            using var document = await GetJsonAsync(
+                $"https://c.y.qq.com/fav/fcgi-bin/fcg_get_profile_order_asset.fcg?" +
+                $"g_tk={authentication.Gtk}&loginUin={userId}&hostUin=0&format=json&" +
+                $"inCharset=utf8&outCharset=utf-8&notice=0&platform=yqq&needNewCode=0&" +
+                $"ct=20&cid=205360956&userid={userId}&reqtype=2&sin={start}&ein={start + pageSize - 1}",
+                authentication.Cookie,
+                cancellationToken);
+            EnsureApiSuccess(document.RootElement, "followed albums");
+            if (!TryGetObject(document.RootElement, out var data, "data") ||
+                !TryGetArray(data, out var albums, "albumlist"))
+                break;
+
+            var addedCount = 0;
+            foreach (var item in albums.EnumerateArray())
+            {
+                if (!TryReadIdentifier(item, out var id, "albummid") || !seen.Add(id)) continue;
+
+                addedCount++;
+                result.Add(new RemotePlaylistSummary(
+                    $"album:{id}",
+                    ReadString(item, "albumname") ?? id,
+                    ReadTrackCount(item))
+                {
+                    ArtworkUri = ParseHttpsUri(ReadString(item, "pic")) ?? GetAlbumArtworkUri(id)
+                });
+            }
+
+            if (ReadInt32(data, "has_more") == 0 || albums.GetArrayLength() < pageSize || addedCount == 0) break;
         }
 
         return result;
@@ -148,7 +200,10 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
                 result.Add(new RemotePlaylistSummary(
                     $"album:{id}",
                     ReadString(item, "album_name") ?? id,
-                    ReadTrackCount(item)));
+                    ReadTrackCount(item))
+                {
+                    ArtworkUri = GetAlbumArtworkUri(id)
+                });
             }
 
             if (pageCount < pageSize || addedCount == 0) break;
@@ -352,7 +407,7 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
             Duration = durationSeconds is > 0 ? TimeSpan.FromSeconds(durationSeconds.Value) : null,
             ArtworkUri = string.IsNullOrWhiteSpace(albumMid)
                 ? null
-                : new Uri($"https://y.gtimg.cn/music/photo_new/T002R500x500M000{albumMid}.jpg"),
+                : GetAlbumArtworkUri(albumMid),
             ExternalIds = externalIds
         };
     }
@@ -366,6 +421,7 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
     private static int? ReadTrackCount(JsonElement value)
     {
         return ReadInt32(value, "songnum") ??
+               ReadInt32(value, "song_cnt") ??
                ReadInt32(value, "song_count") ??
                ReadInt32(value, "songcount") ??
                ReadInt32(value, "total_song_num");
@@ -424,6 +480,9 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
         result = default;
         return false;
     }
+
+    private static Uri GetAlbumArtworkUri(string albumMid) =>
+        new($"https://y.gtimg.cn/music/photo_new/T002R500x500M000{Uri.EscapeDataString(albumMid)}.jpg");
 
     private static Uri? ParseHttpsUri(string? value)
     {

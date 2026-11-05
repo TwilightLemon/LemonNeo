@@ -20,6 +20,11 @@ public sealed class DesktopHost(
         services.AddSingleton(storageService);
         services.AddLogging(builder => builder.AddDebug());
         services.AddSingleton<ArtworkService>();
+        services.AddHttpClient<GitHubReleaseClient>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(15);
+            client.MaxResponseContentBufferSize = 1024 * 1024;
+        });
         foreach (var provider in hostProviders ?? []) services.AddSingleton(provider);
         foreach (var player in hostPlayers ?? []) services.AddSingleton(player);
     });

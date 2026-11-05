@@ -51,6 +51,12 @@ dotnet run --project src/LemonNeo.Console
 
 插件会自动部署到主程序的 `plugins/` 目录；如需构建不带插件的主程序，请传入 `-p:SkipHostPlugins=true`。控制台主程序支持 `--plugins <dir>`、`--library <dir>` 和 `--startup <file>` 参数。
 
+## 应用更新
+
+桌面端启动完成后会在后台检查本仓库最新的 GitHub 正式 Release，发现新版本时显示可关闭的提示，点击即可前往发布页下载，然后手动安装 ZIP 或 DMG 包。在「设置 → 通用 → 应用更新」中可以查看当前版本、手动检查更新或关闭启动检查。检查沿用应用的网络和代理设置，网络异常不会中断启动或播放。不推送预发布版本；预发布构建可以升级到相同版本号的正式版。
+
+发布包的程序版本由现有打包工作流根据 `v*` 标签写入；本地构建时请同步维护 `LemonNeo.Desktop.csproj` 中的 `<Version>`。
+
 ## 功能特性
 
 ### 跨平台

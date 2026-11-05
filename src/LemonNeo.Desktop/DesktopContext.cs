@@ -5,6 +5,7 @@ using LemonNeo.Application.Library;
 using LemonNeo.Core.Library;
 using LemonNeo.Desktop.Config;
 using LemonNeo.Desktop.Services;
+using LemonNeo.Desktop.ViewModels.Shared;
 
 namespace LemonNeo.Desktop;
 
@@ -17,6 +18,8 @@ public sealed class DesktopContext(DesktopHost host, LocalizationService text, A
     public LocalizationService Text { get; } = text;
     public ISettingsScope Settings { get; } = host.Settings.ForPackage(PackageNames.Desktop);
     public AppearanceService Appearance { get; } = appearance;
+    public UpdateViewModel Updates { get; } = new(host.Get<GitHubReleaseClient>(),
+        host.Settings.ForPackage(PackageNames.Desktop), text);
 
     /// <summary>Assigned once the shell view model exists; pages read it through the shared context.</summary>
     public ShortcutService? Shortcuts { get; internal set; }

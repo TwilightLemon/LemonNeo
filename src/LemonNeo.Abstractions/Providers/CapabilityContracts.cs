@@ -12,7 +12,10 @@ public sealed record SearchRequest(
 
 public sealed record SearchResult(string ProviderId, IReadOnlyList<Track> Tracks);
 
-public sealed record RemotePlaylistSummary(string Id, string Name, int? TrackCount = null);
+public sealed record RemotePlaylistSummary(string Id, string Name, int? TrackCount = null)
+{
+    public Uri? ArtworkUri { get; init; }
+}
 
 public sealed record RemotePlaylistCollection(
     string Id,
