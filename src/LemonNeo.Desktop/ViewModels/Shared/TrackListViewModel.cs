@@ -49,10 +49,12 @@ public abstract class TrackListViewModel : PageViewModel
         Playback.MetadataChanged += OnPlaybackChanged;
         _preferencesSubscription =
             Context.Settings.Subscribe<LibraryPreferences>(_ => OnPropertyChanged(nameof(InsertAtStart)));
-        _targetPlaylist = Playlists.FirstOrDefault();
+        _targetPlaylist = EditablePlaylists.FirstOrDefault();
     }
 
     public ObservableCollection<Playlist> Playlists => Context.Playlists;
+    public IReadOnlyList<Playlist> EditablePlaylists => Playlists.Where(playlist =>
+        !_host.Get<PlaylistService>().IsReadOnly(playlist.Id)).ToArray();
     public ObservableCollection<TrackRow> Tracks { get; } = [];
 
     public TrackRow? SelectedTrack
@@ -95,7 +97,8 @@ public abstract class TrackListViewModel : PageViewModel
         : SelectedTrack is { } row ? [row] : [];
 
     public bool HasActionTracks => CanInteract && ActionTracks.Count > 0;
-    public bool CanAddToPlaylist => HasActionTracks && TargetPlaylist is not null;
+    public bool CanAddToPlaylist => HasActionTracks && TargetPlaylist is not null &&
+                                    !_host.Get<PlaylistService>().IsReadOnly(TargetPlaylist.Id);
 
     public bool IsSelectionMode
     {
@@ -305,12 +308,13 @@ public abstract class TrackListViewModel : PageViewModel
 
     private void OnLibraryChanged(object? sender, EventArgs args)
     {
+        OnPropertyChanged(nameof(EditablePlaylists));
         if (!IsNavigationActive)
         {
             MarkTracksDirty();
             return;
         }
-        TargetPlaylist = Playlists.FirstOrDefault(p => p.Id == TargetPlaylist?.Id) ?? Playlists.FirstOrDefault();
+        TargetPlaylist = EditablePlaylists.FirstOrDefault(p => p.Id == TargetPlaylist?.Id) ?? EditablePlaylists.FirstOrDefault();
         RefreshTracks();
         base.RefreshLocalizedProperties();
     }
@@ -323,7 +327,7 @@ public abstract class TrackListViewModel : PageViewModel
 
     public override Task ActivateAsync()
     {
-        TargetPlaylist = Playlists.FirstOrDefault(p => p.Id == TargetPlaylist?.Id) ?? Playlists.FirstOrDefault();
+        TargetPlaylist = EditablePlaylists.FirstOrDefault(p => p.Id == TargetPlaylist?.Id) ?? EditablePlaylists.FirstOrDefault();
         if (_needsRefresh) RefreshTracks();
         else RefreshPlayingTracks();
         return Task.CompletedTask;

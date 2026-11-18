@@ -22,6 +22,7 @@ internal static class ApplicationRegistration
             () => storage.CacheDirectory,
             provider.GetRequiredService<ILogger<FolderImportService>>()));
         services.AddSingleton<ImportService>();
+        services.AddSingleton<PlaylistSyncService>();
         services.AddSingleton<SearchService>();
         services.AddSingleton<TrackLookupService>();
         services.AddSingleton<MetadataService>();

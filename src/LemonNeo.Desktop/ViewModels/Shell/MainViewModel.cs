@@ -277,6 +277,7 @@ public sealed class MainViewModel : PageViewModel
         IsBusy = false;
         RaiseInteractionProperties();
         Context.Updates.CheckAtStartup();
+        Context.Synchronization.Start();
     }
 
     internal void ReportStartupFailure(string message)
@@ -289,6 +290,7 @@ public sealed class MainViewModel : PageViewModel
 
     public override async ValueTask DisposeAsync()
     {
+        await Context.Synchronization.DisposeAsync();
         Context.LibraryChanged -= OnLibraryChanged;
         Navigation.PropertyChanged -= OnNavigationChanged;
         _visualEffectsSubscription.Dispose();

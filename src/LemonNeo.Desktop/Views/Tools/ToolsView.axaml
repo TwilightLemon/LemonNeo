@@ -376,7 +376,81 @@
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>
-                <TabItem Header="{Translate {x:Static i18n:LanguageManager+Keys.About}}">
+                <TabItem Header="{Translate {x:Static i18n:LanguageManager+Keys.Library}}" Name="LibraryTab">
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Margin="0,16,12,16" Spacing="18">
+                            <ItemsControl ItemsSource="{Binding LibraryOverview.Statistics}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><UniformGrid Columns="4" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="toolsVm:LibraryStatistic">
+                                        <Border Classes="card" Margin="0,0,10,0" Padding="16">
+                                            <StackPanel Spacing="8">
+                                                <TextBlock FontSize="26" FontWeight="SemiBold" Text="{Binding Value}" />
+                                                <TextBlock Classes="caption" Text="{Binding Label}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Border Classes="card">
+                                <StackPanel Spacing="12">
+                                    <StackPanel Orientation="Horizontal" Spacing="10">
+                                        <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistSynchronization}}" />
+                                        <TextBlock Classes="caption" VerticalAlignment="Center" Text="{Binding LibraryOverview.SyncedPlaylistCount}" />
+                                    </StackPanel>
+                                    <WrapPanel>
+                                        <ToggleSwitch Margin="0,0,20,6" VerticalAlignment="Center"
+                                                      Content="{Translate {x:Static i18n:LanguageManager+Keys.LibraryAutomaticSync}}"
+                                                      IsChecked="{Binding Synchronization.IsAutomaticSyncEnabled, Mode=TwoWay}"
+                                                      IsEnabled="{Binding Synchronization.CanChangeGlobalPause}"
+                                                      ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistSyncPauseHint}}" />
+                                        <Button Classes="ghost compact" Margin="0,0,0,6"
+                                                Command="{Binding Synchronization.SyncAllCommand}"
+                                                Content="{Translate {x:Static i18n:LanguageManager+Keys.LibrarySyncAll}}" />
+                                    </WrapPanel>
+                                    <TextBlock Classes="caption" IsVisible="{Binding Synchronization.IsPaused}"
+                                               Text="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistSyncGlobalPaused}}" />
+                                    <ItemsControl ItemsSource="{Binding LibraryOverview.SyncedPlaylists}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="toolsVm:PlaylistSyncRowViewModel">
+                                                <Border BorderBrush="{DynamicResource Brush.Border}" BorderThickness="0,1,0,0" Padding="0,12"
+                                                        ToolTip.Tip="{Binding Details}">
+                                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                                                        <StackPanel Spacing="4" VerticalAlignment="Center">
+                                                            <TextBlock FontWeight="SemiBold" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Classes="caption" Text="{Binding Summary}" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Classes="caption" Foreground="{DynamicResource Brush.Danger}"
+                                                                       IsVisible="{Binding HasError}"
+                                                                       Text="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistSyncFailed}}" />
+                                                        </StackPanel>
+                                                        <ToggleSwitch Grid.Column="1" VerticalAlignment="Center"
+                                                                      AutomationProperties.Name="{Binding Name}"
+                                                                      IsChecked="{Binding IsAutoSyncEnabled, Mode=TwoWay}"
+                                                                      IsEnabled="{Binding CanChangeAutoSync}"
+                                                                      OnContent="{Translate {x:Static i18n:LanguageManager+Keys.LibrarySyncOn}}"
+                                                                      OffContent="{Translate {x:Static i18n:LanguageManager+Keys.LibrarySyncOff}}" />
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Classes="caption" IsVisible="{Binding !LibraryOverview.HasSyncedPlaylists}"
+                                               Text="{Translate {x:Static i18n:LanguageManager+Keys.NoSynchronizedPlaylists}}"
+                                               TextWrapping="Wrap" />
+                                    <TextBlock Classes="caption" IsVisible="{Binding Synchronization.IsSyncing}"
+                                               Text="{Translate {x:Static i18n:LanguageManager+Keys.SynchronizingPlaylists}}" />
+                                    <TextBlock Foreground="{DynamicResource Brush.Danger}"
+                                               IsVisible="{Binding Synchronization.HasError}"
+                                               Text="{Binding Synchronization.Error}" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+                <!-- Keep About last; add future tools tabs above it. -->
+                <TabItem Header="{Translate {x:Static i18n:LanguageManager+Keys.About}}" Name="AboutTab">
                     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                         <StackPanel Margin="0,16,12,16" Spacing="18">
                             <Border Classes="card">

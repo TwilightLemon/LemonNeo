@@ -14,6 +14,8 @@ public sealed class DesktopContext(DesktopHost host, LocalizationService text, A
     : ObservableObject
 {
     private bool _initialized;
+    private PlaylistSynchronizationViewModel? _synchronization;
+    public PlaylistSynchronizationViewModel Synchronization => _synchronization ??= new(this);
     public DesktopHost Host { get; } = host;
     public LocalizationService Text { get; } = text;
     public ISettingsScope Settings { get; } = host.Settings.ForPackage(PackageNames.Desktop);

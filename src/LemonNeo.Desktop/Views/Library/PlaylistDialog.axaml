@@ -26,6 +26,11 @@
                 IsVisible="{Binding HasFolder}"
                 Text="{Binding FolderPath}"
                 TextWrapping="Wrap" />
+            <CheckBox
+                IsVisible="{Binding HasFolder}"
+                IsChecked="{Binding Synchronize}"
+                Content="{Translate {x:Static i18n:LanguageManager+Keys.ImportWithAutoSync}}"
+                ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistSyncReadOnlyHint}}" />
         </StackPanel>
         <TextBox
             AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistName}}"

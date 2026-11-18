@@ -15,6 +15,7 @@ public sealed record LibrarySaveSnapshot
     public required DateTimeOffset UpdatedAt { get; init; }
     public required IReadOnlyList<Guid> PlaylistIds { get; init; }
     public required IReadOnlyList<PlaylistMirror> Mirrors { get; init; }
+    public bool IsPlaylistSyncPaused { get; init; }
     public required IReadOnlyList<Playlist> ChangedPlaylists { get; init; }
     public required IReadOnlyList<Guid> DeletedPlaylistIds { get; init; }
     public required bool WriteIndex { get; init; }

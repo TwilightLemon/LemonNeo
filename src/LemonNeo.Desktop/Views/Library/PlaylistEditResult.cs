@@ -1,3 +1,4 @@
 namespace LemonNeo.Desktop.Views.Library;
 
-public sealed record PlaylistEditResult(string Name, string? Description, string? FolderPath = null);
+public sealed record PlaylistEditResult(string Name, string? Description, string? FolderPath = null,
+    bool Synchronize = false);

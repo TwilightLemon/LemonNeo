@@ -98,7 +98,7 @@ public sealed partial class MatchPlaylistPageViewModel : PageViewModel
                 matched++;
                 if (!result.HasChanges) continue;
                 foreach (var item in playlist.Items.Where(item => item.Track.Id == result.Original.Id).ToArray())
-                    playlists.UpdateTrack(_playlistId, item.Id, result.Updated);
+                    playlists.UpdateMetadata(_playlistId, item.Id, result.Updated);
                 changed++;
             }
 

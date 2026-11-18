@@ -36,7 +36,7 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
         Editor = row is null
             ? null
             : new TrackEditorViewModel(row.Track, _text, row.PlaylistId, row.PlaylistItemId, isNew);
-        _targetPlaylist = Playlists.FirstOrDefault();
+        _targetPlaylist = EditablePlaylists.FirstOrDefault();
         CloseEditorCommand = new AsyncRelayCommand(Navigation.GoBackAsync);
         SaveEditorCommand = new AsyncRelayCommand(SaveEditorAsync);
         MetadataCommand = new AsyncRelayCommand(InspectMetadataAsync, () => CanFindMetadata);
@@ -72,6 +72,10 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
 
     public TrackEditorViewModel? Editor { get; }
     public ObservableCollection<Playlist> Playlists => Context.Playlists;
+    public IReadOnlyList<Playlist> EditablePlaylists => Playlists.Where(playlist =>
+        !_host.Get<PlaylistService>().IsReadOnly(playlist.Id)).ToArray();
+    public bool IsSourceReadOnly => Editor?.PlaylistId is { } id && _host.Get<PlaylistService>().IsReadOnly(id);
+    public bool CanEditDetails => CanInteract && !IsSourceReadOnly;
 
     public Playlist? TargetPlaylist
     {
@@ -83,7 +87,8 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
     }
 
     public bool CanSaveEditor => CanInteract && Editor is { } editor &&
-                                 (editor.PlaylistId is not null || TargetPlaylist is not null);
+                                 (editor.PlaylistId ?? TargetPlaylist?.Id) is { } id &&
+                                 (editor.ItemId is not null || !_host.Get<PlaylistService>().IsReadOnly(id));
 
     public bool EditorNeedsPlaylist => Editor is { PlaylistId: null };
     public IReadOnlyList<MetadataSourceOption> MetadataSources { get; }
@@ -112,7 +117,12 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
         {
             var track = editor.Build();
             var service = _host.Get<PlaylistService>();
-            if (editor.ItemId is { } itemId) service.UpdateTrack(destination, itemId, track);
+            if (editor.ItemId is { } itemId)
+            {
+                if (!service.IsReadOnly(destination)) service.UpdateTrack(destination, itemId, track);
+                else if (editor.HasMatchedMetadata) service.UpdateMetadata(destination, itemId, track);
+                else service.UpdateExternalIds(destination, itemId, track.ExternalIds);
+            }
             else editor.AttachItem(destination, service.Add(destination, track).Id);
             await _host.Get<LibraryService>().SaveAsync(ct);
             // Stay in the editor on validation or persistence failure.
@@ -261,13 +271,17 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
 
     private void OnLibraryChanged(object? sender, EventArgs args)
     {
-        TargetPlaylist = Playlists.FirstOrDefault(p => p.Id == TargetPlaylist?.Id) ?? Playlists.FirstOrDefault();
+        OnPropertyChanged(nameof(EditablePlaylists));
+        TargetPlaylist = EditablePlaylists.FirstOrDefault(p => p.Id == TargetPlaylist?.Id) ?? EditablePlaylists.FirstOrDefault();
+        RaiseInteractionProperties();
     }
 
     protected override void RaiseInteractionProperties()
     {
         base.RaiseInteractionProperties();
         OnPropertyChanged(nameof(CanSaveEditor));
+        OnPropertyChanged(nameof(IsSourceReadOnly));
+        OnPropertyChanged(nameof(CanEditDetails));
         RefreshMetadataCommands();
     }
 

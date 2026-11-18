@@ -1,5 +1,6 @@
 <Solution>
     <Folder Name="/tests/">
+        <Project Path="tests/LemonNeo.Application.Tests/LemonNeo.Application.Tests.csproj" />
         <Project Path="tests/LemonNeo.Desktop.Tests/LemonNeo.Desktop.Tests.csproj" />
         <Project Path="tests/LemonNeo.Plugin.QqMusic.Tests/LemonNeo.Plugin.QqMusic.Tests.csproj" />
     </Folder>

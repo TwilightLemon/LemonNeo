@@ -129,6 +129,7 @@ public class AppHost : IAsyncDisposable
         var previous = StorageLocations.LibraryDirectory;
         if (PathEquals(previous, next)) return;
 
+        using var syncLease = await Get<PlaylistSyncService>().AcquireLibraryChangeAsync(cancellationToken);
         var library = Get<LibraryService>();
         await library.SaveAsync(cancellationToken);
         StorageLocations.SetLibraryDirectory(next);

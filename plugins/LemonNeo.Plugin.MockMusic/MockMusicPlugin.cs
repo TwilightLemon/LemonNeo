@@ -68,6 +68,7 @@ public sealed class MockMusicPlugin :
             ["favorites"] = new()
             {
                 Id = "favorites",
+                IsComplete = true,
                 ProviderId = "mock",
                 Name = "Mock Favorites",
                 Description = "A small remote playlist exposed by the mock provider.",
@@ -76,6 +77,7 @@ public sealed class MockMusicPlugin :
             ["coding"] = new()
             {
                 Id = "coding",
+                IsComplete = true,
                 ProviderId = "mock",
                 Name = "Coding Mix",
                 Description = "Music for compiling ideas.",
@@ -84,6 +86,7 @@ public sealed class MockMusicPlugin :
             ["weeknd"] = new()
             {
                 Id = "weeknd",
+                IsComplete = true,
                 ProviderId = "mock",
                 Name = "The Weeknd Essentials",
                 Description = "Popular The Weeknd tracks with metadata only and no mock playback source.",

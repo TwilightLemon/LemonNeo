@@ -682,7 +682,7 @@ internal sealed partial class CommandProcessor(
             }
 
             foreach (var item in playlist.Items.Where(item => item.Track.Id == result.Original.Id))
-                item.Track = result.Track;
+                playlists.UpdateMetadata(playlist.Id, item.Id, result.Track);
 
             matched++;
             var namespaces = result.Track.ExternalIds

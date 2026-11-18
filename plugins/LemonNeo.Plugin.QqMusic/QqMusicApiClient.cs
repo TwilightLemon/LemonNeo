@@ -240,6 +240,7 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
             ProviderId = ProviderId,
             Name = ReadString(playlist, "dissname") ?? playlistId,
             Description = ReadString(playlist, "desc"),
+            IsComplete = IsCompleteTrackArray(playlist, "songlist", tracks.Count),
             Tracks = tracks
         };
     }
@@ -267,6 +268,7 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
             ProviderId = ProviderId,
             Name = ReadString(album, "name") ?? albumMid,
             Description = ReadString(album, "desc"),
+            IsComplete = IsCompleteTrackArray(album, "list", tracks.Count),
             Tracks = tracks
         };
     }
@@ -331,6 +333,10 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
             throw new ProviderException("QQ Music returned an invalid JSON response.", exception);
         }
     }
+
+    private static bool IsCompleteTrackArray(JsonElement parent, string property, int mappedCount) =>
+        TryGetArray(parent, out var values, property) && values.GetArrayLength() == mappedCount &&
+        (ReadTrackCount(parent) ?? ReadInt32(parent, "total")) is { } total && total == mappedCount;
 
     private static IReadOnlyList<Track> MapTrackArray(JsonElement parent, string property)
     {

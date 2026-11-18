@@ -194,6 +194,21 @@ public sealed class QqMusicApiClientTests
             new QqMusicApiClient(http).GetFollowedAlbumsAsync(Authentication, cancellation.Token));
     }
 
+    [Theory]
+    [InlineData("{\"songnum\":1,\"songlist\":[{\"songmid\":\"a\",\"songname\":\"A\"}]}", true)]
+    [InlineData("{\"total_song_num\":0,\"songlist\":[]}", true)]
+    [InlineData("{\"songnum\":2,\"songlist\":[{\"songmid\":\"a\",\"songname\":\"A\"}]}", false)]
+    [InlineData("{\"songnum\":1,\"songlist\":[{\"songname\":\"Missing ID\"}]}", false)]
+    [InlineData("{\"songnum\":0}", false)]
+    [InlineData("{\"songlist\":[]}", false)]
+    public async Task ConfirmsPlaylistCompletenessOnlyWithFullMappedMembership(string playlistJson, bool complete)
+    {
+        using var http = CreateClient(_ => Json("{\"code\":0,\"cdlist\":[" + playlistJson + "]}"));
+        var playlist = await new QqMusicApiClient(http).GetPlaylistAsync(Authentication, "123", default);
+        Assert.NotNull(playlist);
+        Assert.Equal(complete, playlist.IsComplete);
+    }
+
     private static HttpResponseMessage AlbumPage(IEnumerable<int> ids, int hasMore) => Json(JsonSerializer.Serialize(new
     {
         code = 0,

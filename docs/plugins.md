@@ -34,6 +34,12 @@ Each capability is discovered through its interface, so the host knows at runtim
 search, which can resolve playback, which can supply lyrics, and which can play a given file. The
 `Capabilities` section of each plugin's detail page lists exactly what it registered.
 
+For one-way playlist synchronization, set `RemotePlaylist.IsComplete = true` only after retrieving
+the complete ordered membership and all track details. Partial pages, unmapped tracks, missing
+details, or unknown completeness must leave it `false` (the default). One-time imports still work
+with incomplete snapshots. Authenticated providers must expose a stable `AuthenticationState.UserId`
+so source bindings cannot silently follow another account. See [playlist sync](playlist-sync.md).
+
 ### How capabilities are combined at runtime
 
 - **Playback resolution** (`PlaybackSourceDiscoveryService`). A track carries a native ID plus any

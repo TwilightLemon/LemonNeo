@@ -14,7 +14,11 @@ public sealed record FolderScanResult(
     string DirectoryPath,
     string SuggestedPlaylistName,
     IReadOnlyList<Track> Tracks,
-    IReadOnlyList<string> SkippedFiles);
+    IReadOnlyList<string> SkippedFiles)
+{
+    public bool Recursive { get; init; } = true;
+    public bool IsComplete => SkippedFiles.Count == 0;
+}
 
 public sealed record FolderImportResult(
     Playlist Playlist,
@@ -61,7 +65,7 @@ public sealed class FolderImportService(
         var enumerationOptions = new EnumerationOptions
         {
             RecurseSubdirectories = recursive,
-            IgnoreInaccessible = true,
+            IgnoreInaccessible = false,
             ReturnSpecialDirectories = false,
             AttributesToSkip = FileAttributes.Hidden | FileAttributes.System
         };
@@ -71,12 +75,15 @@ public sealed class FolderImportService(
                      .Order(StringComparer.OrdinalIgnoreCase))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!decoders.TryGetValue(Path.GetExtension(path), out var candidates) ||
-                !candidates.Any(player => player.CanPlay(new FilePlaybackSource(path))))
-                continue;
+            if (!decoders.TryGetValue(Path.GetExtension(path), out var candidates)) continue;
 
             try
             {
+                if (!candidates.Any(player => player.CanPlay(new FilePlaybackSource(path))))
+                {
+                    skipped.Add(path);
+                    continue;
+                }
                 tracks.Add(CreateTrack(path));
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
@@ -89,7 +96,9 @@ public sealed class FolderImportService(
 
         var suggestedName = new DirectoryInfo(directory).Name;
         if (string.IsNullOrWhiteSpace(suggestedName)) suggestedName = "Local Music";
-        return new FolderScanResult(directory, suggestedName, tracks, skipped);
+        if (decoders.Count == 0)
+            throw new InvalidOperationException("No audio decoders are available to scan this folder.");
+        return new FolderScanResult(directory, suggestedName, tracks, skipped) { Recursive = recursive };
     }
 
     public FolderImportResult ImportScan(FolderScanResult scan, string? playlistName = null)
@@ -135,8 +144,7 @@ public sealed class FolderImportService(
                 ArtworkUri = ReadArtwork(tag.Pictures)
             };
         }
-        catch (Exception exception) when (exception is CorruptFileException or UnsupportedFormatException or
-                                              IOException or UnauthorizedAccessException or ArgumentException)
+        catch (Exception exception) when (exception is CorruptFileException or UnsupportedFormatException or ArgumentException)
         {
             logger.LogDebug(exception, "Could not read tags from {Path}; using its filename.", fullPath);
             return fallback;

@@ -206,6 +206,9 @@
                                 Text="{Binding SelectedRemotePlaylist.Name}"
                                 TextTrimming="CharacterEllipsis" />
                             <TextBlock Classes="caption" Text="{Binding SelectedPlaylistSummary}" />
+                            <CheckBox IsChecked="{Binding SynchronizeImportedPlaylist}"
+                                      Content="{Translate {x:Static i18n:LanguageManager+Keys.ImportWithAutoSync}}"
+                                      ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistSyncReadOnlyHint}}" />
                         </StackPanel>
                         <Button
                             Classes="primary"

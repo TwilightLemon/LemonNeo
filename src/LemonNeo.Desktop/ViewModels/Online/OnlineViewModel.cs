@@ -12,6 +12,7 @@ public sealed partial class OnlineViewModel : PageViewModel
 {
     private readonly Dictionary<string, string> _playlistSelections = [];
     private bool _activated;
+    [ObservableProperty] private bool _synchronizeImportedPlaylist;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(RemoteEmptyTitle))]
@@ -202,9 +203,12 @@ public sealed partial class OnlineViewModel : PageViewModel
         {
             if (string.IsNullOrWhiteSpace(id)) throw new ArgumentException(_text[LanguageManager.Keys.RemotePlaylistUnavailable]);
             var importer = _host.Get<ImportService>();
+            var synchronize = SynchronizeImportedPlaylist;
+            var sync = _host.Get<PlaylistSyncService>();
+            var accountId = synchronize ? sync.GetAccountId(providerId) : null;
             var remote = await Task.Run(() => importer.GetRemotePlaylistAsync(providerId, id.Trim(), ct), ct);
             ct.ThrowIfCancellationRequested();
-            var playlist = importer.ImportRemote(remote);
+            var playlist = synchronize ? sync.ImportRemote(remote, accountId) : importer.ImportRemote(remote);
             await _host.Get<LibraryService>().SaveAsync(ct);
             Context.RefreshLibrary();
             SetStatus(LanguageManager.Keys.RemoteImported, playlist.Name, playlist.Items.Count);

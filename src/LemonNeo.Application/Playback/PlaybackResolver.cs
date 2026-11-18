@@ -117,14 +117,17 @@ public sealed class PlaybackResolver(
     {
         if (original.ExternalIds.SequenceEqual(updated.ExternalIds)) return;
         var changed = false;
-        foreach (var playlist in library.Current.Playlists.ToArray())
-        foreach (var item in playlist.Items.Where(item => item.Track.Id == original.Id).ToArray())
+        using (library.BeginMutation())
         {
-            var ids = item.Track.ExternalIds.Concat(updated.ExternalIds).DistinctBy(MusicCacheIdentity.GetKey)
-                .ToArray();
-            if (item.Track.ExternalIds.SequenceEqual(ids)) continue;
-            playlists.UpdateTrack(playlist.Id, item.Id, item.Track with { ExternalIds = ids });
-            changed = true;
+            foreach (var playlist in library.Current.Playlists.ToArray())
+                foreach (var item in playlist.Items.Where(item => item.Track.Id == original.Id).ToArray())
+                {
+                    var ids = item.Track.ExternalIds.Concat(updated.ExternalIds).DistinctBy(MusicCacheIdentity.GetKey)
+                        .ToArray();
+                    if (item.Track.ExternalIds.SequenceEqual(ids)) continue;
+                    playlists.EnrichExternalIds(playlist.Id, item.Id, ids);
+                    changed = true;
+                }
         }
         if (changed) await library.SaveAsync(cancellationToken);
     }

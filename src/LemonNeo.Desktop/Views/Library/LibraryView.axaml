@@ -30,7 +30,7 @@
                         <Button
                             AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistMore}}"
                             Classes="ghost icon"
-                            IsEnabled="{Binding CanEditPlaylist}"
+                            IsEnabled="{Binding CanInteract}"
                             IsVisible="{Binding HasSelectedPlaylist}"
                             Name="PlaylistActionsButton"
                             ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistMore}}">
@@ -40,9 +40,14 @@
                                 VerticalAlignment="Center" />
                             <Button.Flyout>
                                 <MenuFlyout>
-                                    <MenuItem Command="{Binding NewTrackCommand}" Header="{Translate {x:Static i18n:LanguageManager+Keys.NewTrack}}" />
-                                    <MenuItem Command="{Binding MatchPlaylistCommand}" Header="{Translate {x:Static i18n:LanguageManager+Keys.MatchPlaylist}}" />
-                                    <MenuItem Click="OnEditPlaylist" Header="{Translate {x:Static i18n:LanguageManager+Keys.EditPlaylist}}" />
+                                    <MenuItem Command="{Binding NewTrackCommand}" IsEnabled="{Binding CanEditPlaylist}" Header="{Translate {x:Static i18n:LanguageManager+Keys.NewTrack}}" />
+                                    <MenuItem Command="{Binding MatchPlaylistCommand}" IsEnabled="{Binding CanMatchPlaylist}" Header="{Translate {x:Static i18n:LanguageManager+Keys.MatchPlaylist}}" />
+                                    <MenuItem Click="OnEditPlaylist" IsEnabled="{Binding CanEditPlaylist}" Header="{Translate {x:Static i18n:LanguageManager+Keys.EditPlaylist}}" />
+                                    <Separator IsVisible="{Binding IsMirrored}" />
+                                    <MenuItem Command="{Binding SyncPlaylistCommand}" IsVisible="{Binding IsMirrored}" IsEnabled="{Binding Synchronization.CanSync}" Header="{Translate {x:Static i18n:LanguageManager+Keys.SyncPlaylistNow}}" />
+                                    <MenuItem Command="{Binding ToggleSyncPauseCommand}" IsVisible="{Binding IsMirrored}" Header="{Binding SyncPauseLabel}" />
+                                    <MenuItem Command="{Binding CopyPlaylistCommand}" Header="{Translate {x:Static i18n:LanguageManager+Keys.CreateEditablePlaylistCopy}}" />
+                                    <MenuItem Command="{Binding DetachPlaylistCommand}" IsVisible="{Binding IsMirrored}" Header="{Translate {x:Static i18n:LanguageManager+Keys.DetachPlaylistSync}}" />
                                     <Separator />
                                     <MenuItem Click="OnDeletePlaylist" Header="{Translate {x:Static i18n:LanguageManager+Keys.DeletePlaylist}}" />
                                 </MenuFlyout>
@@ -96,6 +101,9 @@
                     Margin="0,0,0,14"
                     Name="LibraryToolbar"
                     Spacing="12">
+                    <TextBlock Classes="caption" IsVisible="{Binding IsMirrored}"
+                               Text="{Binding SyncDescription}" TextTrimming="CharacterEllipsis"
+                               ToolTip.Tip="{Binding SyncDetails}" />
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                         <TextBox
                             AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.SearchPlaceholder}}"

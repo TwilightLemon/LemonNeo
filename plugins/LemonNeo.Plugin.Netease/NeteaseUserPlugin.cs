@@ -176,6 +176,7 @@ public sealed class NeteaseUserPlugin :
             return null;
 
         var tracks = new List<Track>();
+        var isComplete = false;
         if (playlist.TryGetProperty("tracks", out var values) && values.ValueKind == JsonValueKind.Array)
             foreach (var value in values.EnumerateArray())
                 if (TryMapTrack(value) is { } track)
@@ -204,10 +205,17 @@ public sealed class NeteaseUserPlugin :
 
             // Removed or unavailable songs may legitimately be absent from song/detail.
             tracks = ids.Where(byId.ContainsKey).Select(id => byId[id]).ToList();
+            isComplete = ids.Length == trackIds.GetArrayLength() && tracks.Count == ids.Length;
         }
         else if (ReadInt32(playlist, "trackCount") is { } total && total > tracks.Count)
         {
             throw new ProviderException("Netease returned an incomplete playlist without track ids. Please retry the import.");
+        }
+        else
+        {
+            isComplete = ReadInt32(playlist, "trackCount") is { } count && count == tracks.Count &&
+                         playlist.TryGetProperty("tracks", out var allTracks) &&
+                         allTracks.ValueKind == JsonValueKind.Array && allTracks.GetArrayLength() == tracks.Count;
         }
 
         return new RemotePlaylist
@@ -216,6 +224,7 @@ public sealed class NeteaseUserPlugin :
             ProviderId = ProviderId,
             Name = ReadString(playlist, "name") ?? playlistId,
             Description = ReadString(playlist, "description"),
+            IsComplete = isComplete,
             Tracks = tracks
         };
     }

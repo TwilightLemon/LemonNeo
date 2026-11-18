@@ -6,6 +6,7 @@ namespace LemonNeo.Desktop.ViewModels.Library;
 public sealed partial class PlaylistDialogViewModel : ObservableObject
 {
     [ObservableProperty] private string? _description;
+    [ObservableProperty] private bool _synchronize;
 
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasFolder))]
     private string? _folderPath;

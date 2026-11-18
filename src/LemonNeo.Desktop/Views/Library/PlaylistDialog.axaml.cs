@@ -58,7 +58,8 @@ public partial class PlaylistDialog : Window
     {
         if (DataContext is PlaylistDialogViewModel { CanSave: true } model)
             Close(new PlaylistEditResult(model.Name.Trim(),
-                string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(), model.FolderPath));
+                string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(), model.FolderPath,
+                model.HasFolder && model.Synchronize));
     }
 
     private void OnCancel(object? sender, RoutedEventArgs args)

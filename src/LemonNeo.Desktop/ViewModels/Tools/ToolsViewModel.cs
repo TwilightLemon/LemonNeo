@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.ComponentModel;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -8,6 +9,7 @@ using LemonNeo.Abstractions.Plugins;
 using LemonNeo.Abstractions.Providers;
 using LemonNeo.Abstractions.Settings;
 using LemonNeo.Application.Playback;
+using LemonNeo.Application.Library;
 using LemonNeo.Desktop.Services;
 using LemonNeo.Desktop.ViewModels.Shared;
 
@@ -33,12 +35,25 @@ public sealed partial class ToolsViewModel : PageViewModel
 
     public ToolsViewModel(DesktopContext context) : base(context, DesktopRoutes.Tools)
     {
+        LibraryOverview = new(() => _host.Get<LibraryService>().Current, _host.Get<IProviderRegistry>(), _text,
+            (id, paused) => Synchronization.SetPausedAsync(id, paused));
+        Context.LibraryChanged += OnLibraryChanged;
+        Synchronization.PropertyChanged += OnSynchronizationChanged;
+        LibraryOverview.Refresh();
         _playbackSettings = _host.Settings.ForPackage(PackageNames.Application);
         _playbackSubscription = _playbackSettings.Subscribe<PlaybackPreferences>(_ => RefreshDecoders());
         RefreshPluginInformation();
     }
 
     public string ApplicationName => "Lemon Neo";
+    public PlaylistSynchronizationViewModel Synchronization => Context.Synchronization;
+    public LibraryOverviewViewModel LibraryOverview { get; }
+
+    private void OnLibraryChanged(object? sender, EventArgs args) => LibraryOverview.Refresh();
+    private void OnSynchronizationChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName == nameof(Synchronization.IsPaused)) LibraryOverview.Refresh();
+    }
 
     public string ApplicationVersion => ApplicationAssembly
                                             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
@@ -283,6 +298,7 @@ public sealed partial class ToolsViewModel : PageViewModel
 
     public override Task ActivateAsync()
     {
+        LibraryOverview.Refresh();
         RefreshPluginInformation();
         return Task.CompletedTask;
     }
@@ -290,12 +306,15 @@ public sealed partial class ToolsViewModel : PageViewModel
     protected override void RefreshLocalizedProperties()
     {
         base.RefreshLocalizedProperties();
+        LibraryOverview.Refresh();
         RefreshPluginInformation();
     }
 
     public override async ValueTask DisposeAsync()
     {
         _closing = true;
+        Context.LibraryChanged -= OnLibraryChanged;
+        Synchronization.PropertyChanged -= OnSynchronizationChanged;
         _playbackSubscription.Dispose();
         await base.DisposeAsync();
     }

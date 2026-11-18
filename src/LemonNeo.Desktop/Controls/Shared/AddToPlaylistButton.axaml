@@ -20,7 +20,7 @@
                         AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.TargetPlaylist}}"
                         Classes="playlistPicker"
                         ItemTemplate="{StaticResource PlaylistOptionTemplate}"
-                        ItemsSource="{Binding Playlists}"
+                        ItemsSource="{Binding EditablePlaylists}"
                         MaxHeight="240"
                         Name="PlaylistPicker"
                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -33,7 +33,7 @@
                     </ListBox>
                     <TextBlock
                         Classes="caption"
-                        IsVisible="{Binding !Playlists.Count}"
+                        IsVisible="{Binding !EditablePlaylists.Count}"
                         Text="{Translate {x:Static i18n:LanguageManager+Keys.NoTargetPlaylists}}"
                         TextWrapping="Wrap" />
                     <Separator />

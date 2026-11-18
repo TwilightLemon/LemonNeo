@@ -30,10 +30,30 @@ public sealed class LibraryViewModel : TrackListViewModel
                 new Track { Id = new MusicItemId("library", Guid.NewGuid().ToString("N")), Title = "" }, 0, _text,
                 PlaylistId: SelectedPlaylist!.Id), true);
         });
-        MatchPlaylistCommand = new AsyncRelayCommand(() => CanEditPlaylist && SelectedPlaylist is { } playlist
+        MatchPlaylistCommand = new AsyncRelayCommand(() => CanMatchPlaylist && SelectedPlaylist is { } playlist
             ? Navigation.NavigateAsync(DesktopRoutes.MatchPlaylist, playlist.Id)
             : Task.CompletedTask);
         RefreshCommand = new AsyncRelayCommand(ReloadLibraryAsync);
+        SyncPlaylistCommand = new AsyncRelayCommand(() => _playlistId is { } id
+            ? Synchronization.SynchronizeAsync(id) : Task.CompletedTask);
+        ToggleSyncPauseCommand = new AsyncRelayCommand(() => _playlistId is { } id && Mirror is { } mirror
+            ? Synchronization.SetPausedAsync(id, !mirror.IsPaused) : Task.CompletedTask);
+        DetachPlaylistCommand = new AsyncRelayCommand(() => ExecuteAsync(async ct =>
+        {
+            if (_playlistId is not { } id) return;
+            await _host.Get<PlaylistSyncService>().DetachAsync(id, ct);
+            Context.RefreshLibrary();
+        }));
+        CopyPlaylistCommand = new AsyncRelayCommand(() => ExecuteAsync(async ct =>
+        {
+            if (_playlistId is not { } id) return;
+            var copy = _host.Get<PlaylistService>().CreateEditableCopy(id);
+            _host.Get<PlaylistService>().Update(copy.Id,
+                _text.Format(LanguageManager.Keys.EditablePlaylistCopyName, copy.Name), copy.Description);
+            await _host.Get<LibraryService>().SaveAsync(ct);
+            Context.RefreshLibrary();
+            await Navigation.NavigateAsync(DesktopRoutes.Library, copy.Id);
+        }));
         Playback.MetadataChanged += OnPlaybackChanged;
         Playback.QueueChanged += OnPlaybackChanged;
         RefreshTracks();
@@ -42,11 +62,28 @@ public sealed class LibraryViewModel : TrackListViewModel
     public Playlist? SelectedPlaylist => Playlists.FirstOrDefault(p => p.Id == _playlistId);
     public bool IsLibrary => Route == DesktopRoutes.Library;
     public bool IsQueue => Route == DesktopRoutes.Queue;
-    public bool CanEditPlaylist => CanInteract && IsLibrary && SelectedPlaylist is not null;
+    public PlaylistSynchronizationViewModel Synchronization => Context.Synchronization;
+    public PlaylistMirror? Mirror => _playlistId is { } id ? _host.Get<PlaylistSyncService>().GetMirror(id) : null;
+    public bool IsMirrored => Mirror is not null;
+    public string SyncPauseLabel => _text[Mirror?.IsPaused == true ? "ResumePlaylistSync" : "PausePlaylistSync"];
+    public string SyncDescription => Mirror is { } mirror
+        ? _text[mirror.IsPaused || Synchronization.IsPaused ? "PlaylistSyncPaused" :
+            mirror.LastError is not null ? "PlaylistSyncFailed" : "PlaylistSyncEnabled"]
+        : "";
+    public string SyncDetails => Mirror is { } mirror
+        ? _text.Format(LanguageManager.Keys.PlaylistSyncStatus,
+            mirror.SourceKind == PlaylistSourceKind.Folder ? mirror.DirectoryPath : mirror.ProviderId,
+            _text[mirror.IsPaused || Synchronization.IsPaused ? "PlaylistSyncPaused" : "PlaylistSyncAutomatic"],
+            mirror.LastSynchronizedAt?.ToLocalTime().ToString("g", _text.Culture) ?? "—") +
+          (mirror.LastError is { } error ? Environment.NewLine + error : "")
+        : "";
+    public bool CanEditPlaylist => CanInteract && IsLibrary && SelectedPlaylist is not null && !IsMirrored;
+    public bool CanMatchPlaylist => CanInteract && HasSelectedPlaylist && SelectedPlaylist!.Items.Count > 0;
     public bool HasSelectedPlaylist => IsLibrary && SelectedPlaylist is not null;
 
     public bool CanEditTrack => CanInspectTrack && SelectedTrack!.PlaylistId is not null &&
-                                SelectedTrack.PlaylistItemId is not null;
+                                SelectedTrack.PlaylistItemId is not null &&
+                                !_host.Get<PlaylistService>().IsReadOnly(SelectedTrack.PlaylistId.Value);
 
     public bool CanRemoveTracks => CanEditPlaylist && HasActionTracks;
     public bool CanReorderTracks => CanEditPlaylist && IsSelectionMode && string.IsNullOrWhiteSpace(Filter);
@@ -73,6 +110,10 @@ public sealed class LibraryViewModel : TrackListViewModel
     public RelayCommand NewTrackCommand { get; }
     public AsyncRelayCommand MatchPlaylistCommand { get; }
     public AsyncRelayCommand RefreshCommand { get; }
+    public AsyncRelayCommand SyncPlaylistCommand { get; }
+    public AsyncRelayCommand ToggleSyncPauseCommand { get; }
+    public AsyncRelayCommand DetachPlaylistCommand { get; }
+    public AsyncRelayCommand CopyPlaylistCommand { get; }
 
     protected override IEnumerable<TrackRow> GetTracks()
     {
@@ -114,7 +155,8 @@ public sealed class LibraryViewModel : TrackListViewModel
         });
     }
 
-    public Task CreatePlaylistAsync(string name, string? description = null, string? folderPath = null)
+    public Task CreatePlaylistAsync(string name, string? description = null, string? folderPath = null,
+        bool synchronize = false)
     {
         return ExecuteAsync(async ct =>
         {
@@ -131,8 +173,16 @@ public sealed class LibraryViewModel : TrackListViewModel
                 var importer = _host.Get<FolderImportService>();
                 var scan = await Task.Run(() => importer.ScanAsync(folderPath, cancellationToken: ct), ct);
                 ct.ThrowIfCancellationRequested();
-                import = importer.ImportScan(scan, name);
-                playlist = playlists.Update(import.Playlist.Id, name, description);
+                if (synchronize)
+                {
+                    playlist = _host.Get<PlaylistSyncService>().ImportFolder(scan, name, description);
+                    import = new FolderImportResult(playlist, scan.Tracks.Count, scan.SkippedFiles);
+                }
+                else
+                {
+                    import = importer.ImportScan(scan, name);
+                    playlist = playlists.Update(import.Playlist.Id, name, description);
+                }
             }
 
             await _host.Get<LibraryService>().SaveAsync(ct);
@@ -263,7 +313,8 @@ public sealed class LibraryViewModel : TrackListViewModel
                      nameof(CanEditPlaylist), nameof(CanEditTrack), nameof(CanMoveUp), nameof(CanMoveDown),
                      nameof(HasSelectedPlaylist),
                      nameof(SelectedPlaylist), nameof(EmptyTitle), nameof(EmptyDescription), nameof(CanRemoveTracks),
-                     nameof(CanReorderTracks)
+                     nameof(CanReorderTracks), nameof(IsMirrored), nameof(SyncPauseLabel), nameof(SyncDescription),
+                     nameof(SyncDetails), nameof(CanMatchPlaylist)
                  }) OnPropertyChanged(name);
     }
 
