@@ -3,6 +3,7 @@ using System.Net;
 using System.Runtime.InteropServices;
 using LemonNeo.Abstractions.Playback;
 using LemonNeo.Abstractions.Plugins;
+using LemonNeo.Abstractions.Settings;
 using LemonNeo.Core.Music;
 using LemonNeo.Core.Playback;
 using Microsoft.Extensions.Logging;
@@ -11,7 +12,7 @@ using BassApi = Un4seen.Bass.Bass;
 
 namespace LemonNeo.Plugin.Bass;
 
-public sealed class BassPlayerPlugin : ILemonPlugin, IPlayerProvider
+public sealed class BassPlayerPlugin : ILemonPlugin, IPlayerProvider, IAudioOutputConfigurable
 {
     private static readonly HashSet<string> Extensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -19,18 +20,24 @@ public sealed class BassPlayerPlugin : ILemonPlugin, IPlayerProvider
     };
 
     private BassPlayer? _player;
+    private ISettingsScope? _settings;
 
     public PluginDescriptor Descriptor { get; } = new(
         "LemonNeo.Plugin.Bass",
         "BASS Player",
         "1.1.0");
 
-    public ValueTask InitializeAsync(IPluginContext context, CancellationToken cancellationToken)
+    public async ValueTask InitializeAsync(IPluginContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        _player = new BassPlayer(context.LoggerFactory.CreateLogger<BassPlayer>(), context.NetworkProxy);
+        if (BassWindowsOutput.IsSupported)
+        {
+            await context.Settings.RegisterAsync("AudioOutput", new AudioOutputConfiguration(), NormalizeOutput, cancellationToken);
+            _settings = context.Settings;
+        }
+
+        _player = new BassPlayer(context.LoggerFactory.CreateLogger<BassPlayer>(), context.NetworkProxy, _settings);
         context.RegisterPlayer(this);
-        return ValueTask.CompletedTask;
     }
 
     public async ValueTask ShutdownAsync(CancellationToken cancellationToken)
@@ -51,6 +58,35 @@ public sealed class BassPlayerPlugin : ILemonPlugin, IPlayerProvider
 
     public IReadOnlyCollection<string> SupportedExtensions => Extensions;
     public IPlayer Player => _player ?? throw new InvalidOperationException("The BASS player is not initialized.");
+
+    public IReadOnlyList<AudioOutputBackend> OutputBackends { get; } = BassWindowsOutput.IsSupported
+        ? Array.AsReadOnly(Enum.GetValues<AudioOutputBackend>())
+        : [];
+
+    public AudioOutputConfiguration OutputConfiguration => _settings?.Get<AudioOutputConfiguration>() ?? new();
+
+    public IReadOnlyList<AudioOutputDevice> GetOutputDevices(AudioOutputBackend backend)
+    {
+        return OutputBackends.Contains(backend) ? BassWindowsOutput.GetDevices(backend) : [];
+    }
+
+    public void SetOutputConfiguration(AudioOutputConfiguration configuration)
+    {
+        if (_settings is null || !OutputBackends.Contains(configuration.Backend))
+            throw new NotSupportedException("This BASS output backend is unavailable on this platform.");
+        _settings.Apply<AudioOutputConfiguration>(_ => configuration);
+    }
+
+    private static AudioOutputConfiguration NormalizeOutput(AudioOutputConfiguration configuration)
+    {
+        if (!Enum.IsDefined(configuration.Backend)) return new AudioOutputConfiguration();
+        return configuration with
+        {
+            DeviceId = string.IsNullOrWhiteSpace(configuration.DeviceId) ? null : configuration.DeviceId,
+            SampleRate = configuration.SampleRate > 0 ? configuration.SampleRate : null,
+            Exclusive = configuration.Backend == AudioOutputBackend.Wasapi && configuration.Exclusive
+        };
+    }
 
     public bool CanPlay(PlaybackSource source)
     {
@@ -77,26 +113,34 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
     private readonly object _gate = new();
     private readonly ILogger<BassPlayer> _logger;
     private readonly IWebProxy? _networkProxy;
+    private readonly ISettingsScope? _outputSettings;
     private readonly int _device;
+    private readonly BASSFlag _streamFlags;
     private bool _disposed;
     private readonly Dictionary<int, PreparedStream> _streams = [];
     private readonly List<Task<IPreparedPlayback>> _preparations = [];
     private int _flacPlugin;
     private bool _isHttpStream;
     private int _stream;
+    private BassWindowsOutput? _windowsOutput;
     private float _volume = 1;
 
-    public BassPlayer(ILogger<BassPlayer> logger, IWebProxy? networkProxy)
+    public BassPlayer(ILogger<BassPlayer> logger, IWebProxy? networkProxy, ISettingsScope? outputSettings)
     {
         _logger = logger;
         _networkProxy = networkProxy;
+        _outputSettings = outputSettings;
         var nativeAsset = GetNativeAsset();
         BassNet.Registration("lemon.app@qq.com", "2X52325160022");
-        var initFlags = OperatingSystem.IsWindows()
+        // Windows prepares decoding streams without opening hardware. Only an
+        // activated stream opens the configured device, including in exclusive mode.
+        var decodeOnly = outputSettings is not null;
+        _streamFlags = BASSFlag.BASS_SAMPLE_FLOAT | (decodeOnly ? BASSFlag.BASS_STREAM_DECODE : 0);
+        var initFlags = !decodeOnly && OperatingSystem.IsWindows()
             ? BASSInit.BASS_DEVICE_CPSPEAKERS
             : BASSInit.BASS_DEVICE_DEFAULT;
-        if (!BassApi.BASS_Init(-1, 44100, initFlags, IntPtr.Zero))
-            throw BassFailure("initialize the default audio device");
+        if (!BassApi.BASS_Init(decodeOnly ? 0 : -1, 44100, initFlags, IntPtr.Zero))
+            throw BassFailure(decodeOnly ? "initialize audio decoding" : "initialize the default audio device");
         _device = BassApi.BASS_GetDevice();
 
         var pluginDirectory = Path.GetDirectoryName(typeof(BassPlayerPlugin).Assembly.Location)!;
@@ -109,9 +153,10 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
         _flacPlugin = BassApi.BASS_PluginLoad(flacPath);
         if (_flacPlugin == 0)
         {
+            var error = BassApi.BASS_ErrorGetCode();
             BassApi.BASS_SetDevice(_device);
             BassApi.BASS_Free();
-            throw BassFailure($"load the FLAC decoder '{flacPath}'");
+            throw BassFailure($"load the FLAC decoder '{flacPath}'", error);
         }
 
         _logger.LogInformation("BASS audio player initialized ({RuntimeIdentifier}).", nativeAsset.RuntimeIdentifier);
@@ -174,10 +219,11 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
             {
                 if (_stream == InvalidStream) return new PlayerTimeline(TimeSpan.Zero, CurrentTrack?.Duration);
 
-                var position = ChannelTime(BassApi.BASS_ChannelGetPosition(_stream)) ?? TimeSpan.Zero;
+                var position = ChannelTime(_windowsOutput?.GetPosition() ?? BassApi.BASS_ChannelGetPosition(_stream))
+                               ?? TimeSpan.Zero;
                 var duration = ChannelTime(BassApi.BASS_ChannelGetLength(_stream)) ?? CurrentTrack?.Duration;
-                var hasEnded = State == PlayerState.Playing &&
-                               BassApi.BASS_ChannelIsActive(_stream) == BASSActive.BASS_ACTIVE_STOPPED;
+                var hasEnded = State == PlayerState.Playing && (_windowsOutput?.HasEnded() ??
+                    BassApi.BASS_ChannelIsActive(_stream) == BASSActive.BASS_ACTIVE_STOPPED);
                 return new PlayerTimeline(position, duration, hasEnded);
             }
         }
@@ -189,10 +235,8 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
         lock (_gate)
         {
             if (_disposed || _stream == InvalidStream || State != PlayerState.Playing) return false;
-            var read = BassApi.BASS_ChannelGetData(
-                _stream,
-                _fftData,
-                (int)(BASSData.BASS_DATA_FFT1024 | BASSData.BASS_DATA_FFT_REMOVEDC));
+            const int flags = (int)(BASSData.BASS_DATA_FFT1024 | BASSData.BASS_DATA_FFT_REMOVEDC);
+            var read = _windowsOutput?.ReadFft(_fftData, flags) ?? BassApi.BASS_ChannelGetData(_stream, _fftData, flags);
             if (read < 0) return false;
             _fftData.AsSpan().CopyTo(destination);
             return true;
@@ -213,9 +257,7 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
         lock (_gate)
         {
             ThrowIfDisposed();
-            if (_stream != InvalidStream && !BassApi.BASS_ChannelPause(_stream)) throw BassFailure("pause playback");
-
-            if (_stream != InvalidStream) State = PlayerState.Paused;
+            if (_stream != InvalidStream && State == PlayerState.Playing) PauseOutput();
         }
 
         return Task.CompletedTask;
@@ -227,10 +269,7 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
         lock (_gate)
         {
             ThrowIfDisposed();
-            if (_stream != InvalidStream && !BassApi.BASS_ChannelPlay(_stream, false))
-                throw BassFailure("resume playback");
-
-            if (_stream != InvalidStream) State = PlayerState.Playing;
+            if (_stream != InvalidStream && State == PlayerState.Paused) ResumeOutput();
         }
 
         return Task.CompletedTask;
@@ -254,12 +293,7 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
             if (bytes < 0) throw BassFailure("convert the playback position", BassApi.BASS_ErrorGetCode());
 
             resumeAfterSeeking = State == PlayerState.Playing;
-            if (resumeAfterSeeking)
-            {
-                if (!BassApi.BASS_ChannelPause(stream))
-                    throw BassFailure("pause while restoring the playback position", BassApi.BASS_ErrorGetCode());
-                State = PlayerState.Paused;
-            }
+            if (resumeAfterSeeking) PauseOutput(flush: true);
         }
 
         var wait = Stopwatch.StartNew();
@@ -274,16 +308,9 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
                     throw new InvalidOperationException(
                         "The audio stream changed while restoring the playback position.");
 
-                if (BassApi.BASS_ChannelSetPosition(stream, bytes, BASSMode.BASS_POS_BYTE))
+                if (_windowsOutput?.Seek(bytes) ?? BassApi.BASS_ChannelSetPosition(stream, bytes, BASSMode.BASS_POS_BYTE))
                 {
-                    if (resumeAfterSeeking)
-                    {
-                        if (!BassApi.BASS_ChannelPlay(stream, false))
-                            throw BassFailure("resume after restoring the playback position",
-                                BassApi.BASS_ErrorGetCode());
-                        State = PlayerState.Playing;
-                    }
-
+                    if (resumeAfterSeeking && State == PlayerState.Paused) ResumeOutput();
                     return;
                 }
 
@@ -437,12 +464,12 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
         }
     }
 
-    private static int CreateFileStream(FilePlaybackSource source)
+    private int CreateFileStream(FilePlaybackSource source)
     {
         var path = Path.GetFullPath(source.Path);
         if (!File.Exists(path)) throw new FileNotFoundException("The local audio file no longer exists.", path);
 
-        return BassApi.BASS_StreamCreateFile(path, 0, 0, BASSFlag.BASS_SAMPLE_FLOAT);
+        return BassApi.BASS_StreamCreateFile(path, 0, 0, _streamFlags);
     }
 
     private int CreateHttpStream(HttpPlaybackSource source, BassDownloadForwarder? forwarder)
@@ -464,7 +491,7 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
         var stream = BassApi.BASS_StreamCreateURL(
             sourceWithHeaders,
             0,
-            BASSFlag.BASS_SAMPLE_FLOAT,
+            _streamFlags,
             forwarder?.DownloadCallback,
             IntPtr.Zero);
         if (stream == InvalidStream)
@@ -510,15 +537,8 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
             if (!_streams.TryGetValue(stream, out var owned) || expected is not null && !ReferenceEquals(owned, expected)) return;
             _streams.Remove(stream);
             forwarder = owned.Forwarder;
-            if (_stream == stream)
-            {
-                _stream = InvalidStream;
-                _isHttpStream = false;
-                State = PlayerState.Stopped;
-                CurrentTrack = null;
-            }
+            if (_stream == stream) StopOutput();
         }
-        BassApi.BASS_ChannelStop(stream);
         BassApi.BASS_StreamFree(stream);
         GC.KeepAlive(forwarder);
         forwarder?.Dispose();
@@ -553,9 +573,18 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
                     throw new ObjectDisposedException(nameof(PreparedStream));
                 if (!BassApi.BASS_ChannelSetAttribute(stream, BASSAttribute.BASS_ATTRIB_VOL, (float)volume))
                     throw BassFailure("set the stream volume");
-                if (owner._stream != InvalidStream && owner._stream != stream)
-                    BassApi.BASS_ChannelStop(owner._stream);
-                if (!BassApi.BASS_ChannelPlay(stream, false)) throw BassFailure("start playback");
+                if (owner._stream == stream)
+                {
+                    if (owner.State == PlayerState.Paused) owner.ResumeOutput();
+                    owner._volume = (float)volume;
+                    return;
+                }
+
+                owner.StopOutput();
+                if (owner._outputSettings is { } settings)
+                    owner._windowsOutput = BassWindowsOutput.Start(stream, owner._device, settings.Get<AudioOutputConfiguration>());
+                else if (!BassApi.BASS_ChannelPlay(stream, false))
+                    throw BassFailure("start playback");
                 owner._stream = stream;
                 owner._volume = (float)volume;
                 owner._isHttpStream = isHttp;
@@ -571,7 +600,38 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
         }
     }
 
-    private static InvalidOperationException BassFailure(string operation)
+    private void PauseOutput(bool flush = false)
+    {
+        if (_windowsOutput is { } output) output.Pause(flush);
+        else if (!BassApi.BASS_ChannelPause(_stream)) throw BassFailure("pause playback");
+        State = PlayerState.Paused;
+    }
+
+    private void ResumeOutput()
+    {
+        if (_windowsOutput is { } output) output.Play();
+        else if (!BassApi.BASS_ChannelPlay(_stream, false)) throw BassFailure("resume playback");
+        State = PlayerState.Playing;
+    }
+
+    private void StopOutput()
+    {
+        if (_windowsOutput is { } output)
+        {
+            output.Dispose();
+            _windowsOutput = null;
+        }
+        else if (_stream != InvalidStream)
+        {
+            BassApi.BASS_ChannelStop(_stream);
+        }
+        _stream = InvalidStream;
+        _isHttpStream = false;
+        State = PlayerState.Stopped;
+        CurrentTrack = null;
+    }
+
+    internal static InvalidOperationException BassFailure(string operation)
     {
         return new InvalidOperationException($"BASS could not {operation}. Error: {BassApi.BASS_ErrorGetCode()}.");
     }

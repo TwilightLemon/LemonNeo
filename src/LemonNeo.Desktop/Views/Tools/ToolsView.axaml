@@ -334,6 +334,64 @@
                                 IsVisible="{Binding !HasDecoders}"
                                 Text="{Translate {x:Static i18n:LanguageManager+Keys.NoDecoders}}"
                                 TextWrapping="Wrap" />
+                            <ItemsControl ItemsSource="{Binding AudioOutputs}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="toolsVm:AudioOutputViewModel">
+                                        <Border Classes="card" Margin="0,0,0,12">
+                                            <StackPanel Spacing="12">
+                                                <TextBlock Classes="section" Text="{Binding Title}" />
+                                                <StackPanel Spacing="6">
+                                                    <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.AudioOutputBackend}}" />
+                                                    <ComboBox
+                                                        AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.AudioOutputBackend}}"
+                                                        HorizontalAlignment="Stretch"
+                                                        ItemsSource="{Binding Backends}"
+                                                        SelectedItem="{Binding SelectedBackend}" />
+                                                </StackPanel>
+                                                <StackPanel Spacing="6">
+                                                    <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.AudioOutputDevice}}" />
+                                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                                        <ComboBox
+                                                            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.AudioOutputDevice}}"
+                                                            HorizontalAlignment="Stretch"
+                                                            ItemsSource="{Binding Devices}"
+                                                            SelectedItem="{Binding SelectedDevice}" />
+                                                        <Button
+                                                            Command="{Binding RefreshDevicesCommand}"
+                                                            Content="{Translate {x:Static i18n:LanguageManager+Keys.AudioOutputRefreshDevices}}"
+                                                            Grid.Column="1" />
+                                                    </Grid>
+                                                    <TextBlock Classes="muted" Text="{Binding DeviceStatus}" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <StackPanel Spacing="6">
+                                                    <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.AudioOutputRate}}" />
+                                                    <CheckBox
+                                                        Content="{Translate {x:Static i18n:LanguageManager+Keys.Automatic}}"
+                                                        IsChecked="{Binding AutomaticRate}" />
+                                                    <NumericUpDown
+                                                        AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.AudioOutputRate}}"
+                                                        FormatString="0"
+                                                        IsVisible="{Binding !AutomaticRate}"
+                                                        Maximum="2147483647"
+                                                        Minimum="1"
+                                                        ShowButtonSpinner="False"
+                                                        Value="{Binding SampleRate}" />
+                                                    <TextBlock Classes="muted" Text="{Binding RateDescription}" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <CheckBox
+                                                    Content="{Translate {x:Static i18n:LanguageManager+Keys.AudioOutputExclusive}}"
+                                                    IsChecked="{Binding Exclusive}"
+                                                    IsVisible="{Binding IsWasapi}" />
+                                                <Button
+                                                    Classes="primary"
+                                                    Command="{Binding ApplyCommand}"
+                                                    Content="{Translate {x:Static i18n:LanguageManager+Keys.Save}}" />
+                                                <TextBlock Classes="muted" Text="{Binding SaveStatus}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
                             <ItemsControl ItemsSource="{Binding Decoders}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="toolsVm:DecoderInformation">
