@@ -128,7 +128,7 @@ public sealed class MainViewModel : PageViewModel
     {
         if (!IsQueueOpen)
         {
-            QueueDrawer ??= new PlaybackQueueViewModel(Context, Playback);
+            QueueDrawer ??= new PlaybackQueueViewModel(Context, Playback, Navigation);
             _ = QueueDrawer.ActivateAsync();
         }
 

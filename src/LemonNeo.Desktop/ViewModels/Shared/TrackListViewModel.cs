@@ -17,8 +17,10 @@ public abstract class TrackListViewModel : PageViewModel
     protected readonly PlaybackViewModel Playback;
     private readonly IDisposable _preferencesSubscription;
     private readonly DispatcherTimer _filterTimer;
+    private readonly TrackCollection<TrackRow> _tracks = [];
     private TrackRow[] _rows = [];
     private string _filter = "";
+    private string _appliedFilter = "";
     private bool _hasPlayingTrack;
     private bool _isSelectionMode;
     private bool _needsRefresh;
@@ -53,7 +55,8 @@ public abstract class TrackListViewModel : PageViewModel
     }
 
     public ObservableCollection<Playlist> Playlists => Context.Playlists;
-    public ObservableCollection<TrackRow> Tracks { get; } = [];
+    public ObservableCollection<TrackRow> Tracks => _tracks;
+    protected IList<TrackRow> UnfilteredTracks => _rows;
 
     public TrackRow? SelectedTrack
     {
@@ -88,7 +91,8 @@ public abstract class TrackListViewModel : PageViewModel
     }
 
     public bool HasTracks => Tracks.Count > 0;
-    public bool CanPlay => CanInteract && Playback.CanInteract && HasTracks;
+    public bool CanPlay => CanInteract && Playback.CanInteract && HasPlayableTracks;
+    protected virtual bool HasPlayableTracks => HasTracks;
     public bool CanInspectTrack => CanInteract && SelectedTrack is not null && !IsSelectionMode;
 
     public IReadOnlyList<TrackRow> ActionTracks => IsSelectionMode ? Tracks.Where(t => t.IsMarked).ToArray()
@@ -211,7 +215,9 @@ public abstract class TrackListViewModel : PageViewModel
         var rows = filter.Length == 0 ? _rows : _rows.Where(t =>
             $"{t.Track.Title} {string.Join(' ', t.Track.Artists.Select(a => a.Name))} {t.Track.Album?.Title}"
                 .Contains(filter, StringComparison.CurrentCultureIgnoreCase)).ToArray();
-        CollectionSynchronizer.Update(Tracks, rows);
+        var replaceResults = !string.Equals(_appliedFilter, filter, StringComparison.Ordinal);
+        _appliedFilter = filter;
+        _tracks.Update(rows, replaceResults);
         SelectedTrack = selected is not null && Tracks.Contains(selected) ? selected : null;
         OnPropertyChanged(nameof(HasTracks));
         OnPropertyChanged(nameof(TrackSummary));
@@ -265,44 +271,11 @@ public abstract class TrackListViewModel : PageViewModel
             nameof(HasPlayingTrack));
     }
 
-    public async Task<bool> AddSelectedTracksAsync()
+    public Task<bool> AddSelectedTracksAsync()
     {
-        if (!CanAddToPlaylist || TargetPlaylist is not { } target) return false;
-        var tracks = ActionTracks.Select(row => row.Track).ToArray();
-        var insertAtStart = InsertAtStart;
-        var succeeded = false;
-        await ExecuteAsync(async ct =>
-        {
-            await _host.Settings.SaveAsync(ct);
-            var playlists = _host.Get<PlaylistService>();
-            var added = playlists.AddRange(target.Id, tracks, insertAtStart);
-            try
-            {
-                await _host.Get<LibraryService>().SaveAsync(ct);
-            }
-            catch
-            {
-                foreach (var item in added) playlists.Remove(target.Id, item.Id);
-                Context.RefreshLibrary();
-                throw;
-            }
-
-            Context.RefreshLibrary();
-            SetStatus(LanguageManager.Keys.TracksAdded, tracks.Length, target.Name);
-            succeeded = true;
-        });
-        return succeeded;
-    }
-
-    public Task AddTrackAsync(Guid playlistId, Track track)
-    {
-        return ExecuteAsync(async ct =>
-        {
-            _host.Get<PlaylistService>().AddRange(playlistId, [track], InsertAtStart);
-            await _host.Get<LibraryService>().SaveAsync(ct);
-            Context.RefreshLibrary();
-            SetStatus(LanguageManager.Keys.TrackAdded);
-        });
+        return CanAddToPlaylist && TargetPlaylist is { } target
+            ? AddTracksToPlaylistAsync(target.Id, ActionTracks.Select(row => row.Track).ToArray())
+            : Task.FromResult(false);
     }
 
     private void OnLibraryChanged(object? sender, EventArgs args)

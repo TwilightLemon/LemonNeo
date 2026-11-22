@@ -76,6 +76,11 @@
         <Setter Property="Padding" Value="7,4" />
         <Setter Property="CornerRadius" Value="8" />
     </Style>
+    <Style Selector="Button.icon.compact">
+        <Setter Property="Width" Value="32" />
+        <Setter Property="Padding" Value="5" />
+        <Setter Property="ToolTip.ShowOnDisabled" Value="True" />
+    </Style>
     <Style Selector="Button.danger">
         <Setter Property="Foreground" Value="{DynamicResource Brush.Danger}" />
         <Setter Property="Background" Value="{DynamicResource Brush.DangerSoft}" />
@@ -122,8 +127,27 @@
         <Setter Property="Stretch" Value="Uniform" />
         <Setter Property="Fill" Value="{DynamicResource Brush.TextSecondary}" />
     </Style>
+    <Style Selector="Viewbox.toolbarIcon">
+        <Setter Property="Width" Value="18" />
+        <Setter Property="Height" Value="18" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="UseLayoutRounding" Value="False" />
+    </Style>
+    <Style Selector="Viewbox.toolbarIcon Path">
+        <!--  Path's layout bounds exclude the stroke. Include half its thickness on each side.  -->
+        <Setter Property="Margin" Value="0.75" />
+        <Setter Property="Stretch" Value="Uniform" />
+        <Setter Property="Stroke" Value="{DynamicResource Brush.TextSecondary}" />
+        <Setter Property="StrokeThickness" Value="1.5" />
+        <Setter Property="StrokeLineCap" Value="Round" />
+        <Setter Property="StrokeJoin" Value="Round" />
+    </Style>
     <Style Selector="Button.primary Path.icon">
         <Setter Property="Fill" Value="{DynamicResource Brush.OnAccent}" />
+    </Style>
+    <Style Selector="Button.danger Viewbox.toolbarIcon Path">
+        <Setter Property="Stroke" Value="{DynamicResource Brush.Danger}" />
     </Style>
     <Style Selector="Button.primary TextBlock">
         <Setter Property="Foreground" Value="{DynamicResource Brush.OnAccent}" />

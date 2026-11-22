@@ -7,11 +7,27 @@
     xmlns:vm="using:LemonNeo.Desktop.ViewModels.Shared"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Button
+        AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.AddToPlaylist}}"
         Classes.compact="{Binding IsCompact, ElementName=Root}"
         Classes.ghost="{Binding IsGhost, ElementName=Root}"
-        Content="{Translate {x:Static i18n:LanguageManager+Keys.AddToPlaylist}}"
+        Classes.icon="{Binding IsIconOnly, ElementName=Root}"
         IsEnabled="{Binding HasActionTracks}"
         Name="AddButton">
+        <Button.Styles>
+            <Style Selector="Button.icon">
+                <Setter Property="ToolTip.Tip" Value="{Translate {x:Static i18n:LanguageManager+Keys.AddToPlaylist}}" />
+            </Style>
+        </Button.Styles>
+        <Panel>
+            <TextBlock
+                IsVisible="{Binding !IsIconOnly, ElementName=Root}"
+                Text="{Translate {x:Static i18n:LanguageManager+Keys.AddToPlaylist}}" />
+            <Viewbox
+                Classes="toolbarIcon"
+                IsVisible="{Binding IsIconOnly, ElementName=Root}">
+                <Path Data="{StaticResource Icon.AddToPlaylist}" />
+            </Viewbox>
+        </Panel>
         <Button.Flyout>
             <Flyout Placement="BottomEdgeAlignedLeft">
                 <StackPanel Spacing="12" Width="300">

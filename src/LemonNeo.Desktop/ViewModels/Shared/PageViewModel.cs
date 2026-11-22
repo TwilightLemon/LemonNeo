@@ -2,6 +2,9 @@ using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Irihi.Lingua;
+using LemonNeo.Application.Library;
+using LemonNeo.Core.Music;
+using LemonNeo.Desktop.Config;
 using LemonNeo.Desktop.Services;
 
 namespace LemonNeo.Desktop.ViewModels.Shared;
@@ -91,6 +94,37 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
     protected Task ExecuteAsync(Func<CancellationToken, Task> action)
     {
         return RunOperationAsync(action);
+    }
+
+    public Task AddTrackAsync(Guid playlistId, Track track) => AddTracksToPlaylistAsync(playlistId, [track]);
+
+    protected async Task<bool> AddTracksToPlaylistAsync(Guid playlistId, Track[] tracks)
+    {
+        if (!CanInteract || Context.Playlists.FirstOrDefault(p => p.Id == playlistId) is not { } target)
+            return false;
+        var insertAtStart = Context.Settings.Get<LibraryPreferences>().InsertAtStart;
+        var succeeded = false;
+        await ExecuteAsync(async ct =>
+        {
+            await _host.Settings.SaveAsync(ct);
+            var playlists = _host.Get<PlaylistService>();
+            var added = playlists.AddRange(target.Id, tracks, insertAtStart);
+            try
+            {
+                await _host.Get<LibraryService>().SaveAsync(ct);
+            }
+            catch
+            {
+                foreach (var item in added) playlists.Remove(target.Id, item.Id);
+                Context.RefreshLibrary();
+                throw;
+            }
+
+            Context.RefreshLibrary();
+            SetStatus(LanguageManager.Keys.TracksAdded, tracks.Length, target.Name);
+            succeeded = true;
+        });
+        return succeeded;
     }
 
     protected Task RunOperationAsync(Func<CancellationToken, Task> action, LinguaKey? status = null,

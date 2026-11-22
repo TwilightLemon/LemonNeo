@@ -20,15 +20,23 @@
                 </TextBlock.Text>
             </TextBlock>
         </StackPanel>
-        <TextBox
-            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.SearchPlaceholder}}"
-            Grid.Row="1"
-            Margin="0,16,0,12"
-            Name="QueueFilter"
-            PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.SearchPlaceholder}}"
-            Text="{Binding Filter}" />
+        <StackPanel Grid.Row="1" Margin="0,16,0,12" Spacing="8">
+            <TextBox
+                AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.SearchPlaceholder}}"
+                Name="QueueFilter"
+                PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.SearchPlaceholder}}"
+                Text="{Binding Filter}" />
+            <TextBlock
+                Foreground="{DynamicResource Brush.Danger}"
+                IsVisible="{Binding HasError}"
+                MaxHeight="80"
+                Text="{Binding Error}"
+                TextWrapping="Wrap" />
+        </StackPanel>
         <ListBox
+            AutoScrollToSelectedItem="False"
             Classes="queueList"
+            ContextRequested="OnTrackContextRequested"
             Grid.Row="2"
             IsVisible="{Binding HasTracks}"
             ItemsSource="{Binding Tracks}"

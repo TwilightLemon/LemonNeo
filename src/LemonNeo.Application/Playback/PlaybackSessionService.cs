@@ -571,6 +571,28 @@ public sealed class PlaybackSessionService : IAsyncDisposable
         lock (_gate) { EnsureReady(); return StopLocked(true, cancellationToken); }
     }
 
+    public Task RemoveQueueItemAsync(Guid itemId, CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            EnsureReady();
+            cancellationToken.ThrowIfCancellationRequested();
+            var wasCurrent = _queue.CurrentItem?.Id == itemId;
+            if (!_queue.Remove(itemId)) return Task.CompletedTask;
+
+            if (wasCurrent)
+            {
+                if (_snapshot.State is PlaybackState.Playing or PlaybackState.Loading && _queue.CurrentItem is { } next)
+                    return BeginLocked([next], PlayOrigin.User, CancellationToken.None);
+                return StopLocked(false, CancellationToken.None);
+            }
+
+            PublishLocked(WithQueue(_snapshot));
+            UpdateSettingsLocked();
+            return Task.CompletedTask;
+        }
+    }
+
     public Task CaptureStateAsync(CancellationToken cancellationToken = default)
     {
         lock (_gate) { EnsureReady(); cancellationToken.ThrowIfCancellationRequested(); UpdateSettingsLocked(); }

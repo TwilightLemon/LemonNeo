@@ -3,6 +3,7 @@ using System.ComponentModel;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using LemonNeo.Application.Playback;
+using LemonNeo.Core.Library;
 using LemonNeo.Desktop.Services;
 using LemonNeo.Desktop.ViewModels.Shared;
 
@@ -12,15 +13,19 @@ namespace LemonNeo.Desktop.ViewModels.Playback;
 public sealed class PlaybackQueueViewModel : PageViewModel
 {
     private readonly PlaybackSessionService _session;
+    private readonly DesktopNavigation _navigation;
     private readonly DispatcherTimer _filterTimer;
+    private readonly TrackCollection<QueueTrackViewModel> _tracks = [];
     private string _filter = "";
+    private string _appliedFilter = "";
     private QueueTrackViewModel[] _rows = [];
     private QueueTrackViewModel? _selectedTrack;
 
-    public PlaybackQueueViewModel(DesktopContext context, PlaybackViewModel playback) : base(context,
+    public PlaybackQueueViewModel(DesktopContext context, PlaybackViewModel playback, DesktopNavigation navigation) : base(context,
         DesktopRoutes.Queue)
     {
         Playback = playback;
+        _navigation = navigation;
         _session = _host.Get<PlaybackSessionService>();
         _filterTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
         _filterTimer.Tick += OnFilterTick;
@@ -33,7 +38,8 @@ public sealed class PlaybackQueueViewModel : PageViewModel
     }
 
     public PlaybackViewModel Playback { get; }
-    public ObservableCollection<QueueTrackViewModel> Tracks { get; } = [];
+    internal IEnumerable<Playlist> Playlists => Context.Playlists;
+    public ObservableCollection<QueueTrackViewModel> Tracks => _tracks;
 
     public QueueTrackViewModel? SelectedTrack
     {
@@ -80,6 +86,14 @@ public sealed class PlaybackQueueViewModel : PageViewModel
             : Task.CompletedTask;
     }
 
+    internal Task InspectTrackAsync(QueueTrackViewModel row) => CanInteract && Tracks.Contains(row)
+        ? _navigation.OpenEditorAsync(row.Row)
+        : Task.CompletedTask;
+
+    internal Task RemoveTrackAsync(QueueTrackViewModel row) => CanInteract && Tracks.Contains(row)
+        ? Playback.ExecutePlaybackAsync(ct => _session.RemoveQueueItemAsync(row.Id, ct))
+        : Task.CompletedTask;
+
     private void OnPlaybackChanged(object? sender, EventArgs args)
     {
         RefreshQueue();
@@ -122,7 +136,9 @@ public sealed class PlaybackQueueViewModel : PageViewModel
         var filter = Filter.Trim();
         var rows = filter.Length == 0 ? _rows : _rows.Where(r =>
             $"{r.Row.Title} {r.Row.Artists} {r.Row.Album}".Contains(filter, StringComparison.CurrentCultureIgnoreCase)).ToArray();
-        CollectionSynchronizer.Update(Tracks, rows);
+        var replaceResults = !string.Equals(_appliedFilter, filter, StringComparison.Ordinal);
+        _appliedFilter = filter;
+        _tracks.Update(rows, replaceResults);
         SelectedTrack = Tracks.FirstOrDefault(r => r.Id == selectedId);
         OnPropertyChanged(nameof(HasTracks));
         OnPropertyChanged(nameof(EmptyTitle));
