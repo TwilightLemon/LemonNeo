@@ -169,6 +169,9 @@
         <Setter Property="MinHeight" Value="40" />
         <Setter Property="Padding" Value="12,10" />
     </Style>
+    <Style Selector="TextBox:not(:focus) /template/ Border#PART_BorderElement">
+        <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
     <Style Selector="TextBox.toolbarSearch">
         <Setter Property="MinHeight" Value="32" />
         <Setter Property="Height" Value="32" />
