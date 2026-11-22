@@ -60,6 +60,12 @@ public interface IPreparedPlayback : IDisposable
     void Activate(double volume);
 }
 
+/// <summary>Optional capability of a prepared stream. Changes apply before activation or during playback.</summary>
+public interface IProfiledPlayback
+{
+    void ApplyProfile(DecodeProfile profile);
+}
+
 /// <summary>Optional decoder capability reporting the currently loaded audio's original format.</summary>
 public interface IAudioInfoPlayer : IPlayer
 {

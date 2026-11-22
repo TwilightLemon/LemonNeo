@@ -1,4 +1,5 @@
 using LemonNeo.Core.Music;
+using LemonNeo.Core.Playback;
 
 namespace LemonNeo.Core.Library;
 
@@ -7,6 +8,7 @@ public sealed class Playlist
     public Guid Id { get; init; } = Guid.NewGuid();
     public required string Name { get; set; }
     public string? Description { get; set; }
+    public DecodeProfile? DecodeProfile { get; set; }
     public List<PlaylistItem> Items { get; init; } = [];
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
@@ -15,6 +17,7 @@ public sealed class Playlist
 public sealed class PlaylistItem
 {
     public Guid Id { get; init; } = Guid.NewGuid();
+    public DecodeProfile? DecodeProfile { get; set; }
     public required Track Track { get; set; }
     public required string SortKey { get; set; }
     public DateTimeOffset AddedAt { get; init; } = DateTimeOffset.UtcNow;

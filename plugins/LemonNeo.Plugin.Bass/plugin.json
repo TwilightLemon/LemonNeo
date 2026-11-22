@@ -28,6 +28,30 @@
       "version": "2.4.14.1",
       "license": "Un4seen BASS.NET license",
       "website": "https://www.radio42.com/bass/bassnet.html"
+    },
+    {
+      "name": "BASSmix",
+      "version": "2.4.13.1",
+      "license": "Un4seen BASS add-on license",
+      "website": "https://www.un4seen.com/bass.html"
+    },
+    {
+      "name": "BASSWASAPI",
+      "version": "2.4.4.1",
+      "license": "Un4seen BASS add-on license",
+      "website": "https://www.un4seen.com/bass.html"
+    },
+    {
+      "name": "BASSASIO",
+      "version": "1.4.3",
+      "license": "Un4seen BASSASIO license",
+      "website": "https://www.un4seen.com/bassasio.html"
+    },
+    {
+      "name": "BASS_FX",
+      "version": "2.4.12.6",
+      "license": "BASS_FX freeware (credit required)",
+      "website": "https://www.un4seen.com/bass.html"
     }
   ]
 }

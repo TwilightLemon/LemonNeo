@@ -151,6 +151,7 @@ public sealed class LibraryService(ILibraryRepository repository)
             Id = playlist.Id,
             Name = playlist.Name,
             Description = playlist.Description,
+            DecodeProfile = playlist.DecodeProfile,
             CreatedAt = playlist.CreatedAt,
             UpdatedAt = playlist.UpdatedAt,
             Items = playlist.Items.Select(item => new PlaylistItem
@@ -158,6 +159,7 @@ public sealed class LibraryService(ILibraryRepository repository)
                 Id = item.Id,
                 SortKey = item.SortKey,
                 AddedAt = item.AddedAt,
+                DecodeProfile = item.DecodeProfile,
                 Track = item.Track with
                 {
                     Artists = item.Track.Artists.ToArray(),

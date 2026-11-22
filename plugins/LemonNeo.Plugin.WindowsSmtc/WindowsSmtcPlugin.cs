@@ -51,8 +51,9 @@ public sealed class WindowsSmtcPlugin : InteractivePluginBase
                 PlaybackState.Loading => MediaPlaybackStatus.Changing,
                 _ => snapshot.Track is null ? MediaPlaybackStatus.Closed : MediaPlaybackStatus.Stopped
             };
-            controls.PlaybackRate = snapshot.State == PlaybackState.Playing ? 1 : 0;
         }
+        if (_last?.State != snapshot.State || _last.PlaybackSpeed != snapshot.PlaybackSpeed)
+            controls.PlaybackRate = snapshot.State == PlaybackState.Playing ? snapshot.PlaybackSpeed : 0;
         if (_last is null || !SameDisplayMetadata(_last.Track, snapshot.Track))
         {
             var display = controls.DisplayUpdater;

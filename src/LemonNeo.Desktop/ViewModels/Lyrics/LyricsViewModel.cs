@@ -54,6 +54,7 @@ public sealed class LyricsViewModel : PageViewModel
     public PlaybackViewModel Playback { get; }
     public CoreLyrics? Document { get; private set; }
 
+    public double PlaybackSpeed => _snapshot.PlaybackSpeed;
     public double PositionMilliseconds => _snapshot.Timeline.Position.TotalMilliseconds;
     public double DurationMilliseconds => _snapshot.Timeline.Duration?.TotalMilliseconds ?? 0;
     public bool IsStopped => _snapshot.State is not (PlaybackState.Playing or PlaybackState.Paused);
@@ -294,6 +295,7 @@ public sealed class LyricsViewModel : PageViewModel
 
     private void UpdateLyricsPosition()
     {
+        OnPropertyChanged(nameof(PlaybackSpeed));
         OnPropertyChanged(nameof(PositionMilliseconds));
         OnPropertyChanged(nameof(DurationMilliseconds));
         OnPropertyChanged(nameof(IsStopped));

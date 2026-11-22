@@ -24,6 +24,7 @@ public sealed partial class ToolsViewModel : PageViewModel
     private string?[] _decoderIds = [];
     [ObservableProperty] private IReadOnlyList<string> _decoderOptions = [];
     [ObservableProperty] private IReadOnlyList<DecoderInformation> _decoders = [];
+    public DecoderControlsViewModel Controls => Context.DecoderControls;
     [ObservableProperty] private IReadOnlyList<string> _playableNamespaces = [];
     [ObservableProperty] private IReadOnlyList<PluginDependencyGroup> _pluginDependencies = [];
     [ObservableProperty] private IReadOnlyList<PluginDetail> _pluginFailures = [];

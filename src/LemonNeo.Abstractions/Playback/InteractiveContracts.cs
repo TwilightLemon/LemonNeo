@@ -38,7 +38,10 @@ public sealed record InteractivePlaybackSnapshot(
     PlaybackControls Controls,
     long RequestId = 0,
     long Revision = 0,
-    double Volume = 1);
+    double Volume = 1)
+{
+    public double PlaybackSpeed { get; init; } = 1;
+}
 
 [Flags]
 public enum PlaybackUpdateKind

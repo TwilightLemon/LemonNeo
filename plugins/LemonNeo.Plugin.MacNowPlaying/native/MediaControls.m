@@ -80,7 +80,7 @@ static void Emit(NSDictionary *message) {
     if (snapshot[@"trackId"] != NSNull.null) info[MPNowPlayingInfoPropertyExternalContentIdentifier] = snapshot[@"trackId"];
     NSInteger state = [snapshot[@"state"] integerValue];
     info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = snapshot[@"position"];
-    info[MPNowPlayingInfoPropertyPlaybackRate] = @(state == 1 ? 1.0 : 0.0);
+    info[MPNowPlayingInfoPropertyPlaybackRate] = @(state == 1 ? [snapshot[@"speed"] doubleValue] : 0.0);
     info[MPNowPlayingInfoPropertyDefaultPlaybackRate] = @1.0;
     info[MPNowPlayingInfoPropertyMediaType] = @(MPNowPlayingInfoMediaTypeAudio);
     NSString *artworkURL = snapshot[@"artwork"] == NSNull.null ? nil : snapshot[@"artwork"];

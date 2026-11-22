@@ -266,6 +266,7 @@ public sealed class MainViewModel : PageViewModel
     internal async Task CompleteStartupAsync()
     {
         Context.IsInitialized = true;
+        Context.DecoderControls.Initialize();
         Context.RefreshLibrary();
         var report = _host.Plugins.LastReport;
         if (report.Failures.Count > 0)
@@ -291,6 +292,7 @@ public sealed class MainViewModel : PageViewModel
         Context.LibraryChanged -= OnLibraryChanged;
         Navigation.PropertyChanged -= OnNavigationChanged;
         _visualEffectsSubscription.Dispose();
+        Context.DecoderControls.Dispose();
         if (_searchPage is not null) _searchPage.PropertyChanged -= OnSearchChanged;
         await base.DisposeAsync();
         IsQueueOpen = false;

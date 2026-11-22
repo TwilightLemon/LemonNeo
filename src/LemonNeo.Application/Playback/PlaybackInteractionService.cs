@@ -83,7 +83,7 @@ public sealed class PlaybackInteractionService : IPlaybackInteraction, IDisposab
         var position = snapshot.Timeline.Position < TimeSpan.Zero ? TimeSpan.Zero : snapshot.Timeline.Position;
         if (duration is { } maximum && position > maximum) position = maximum;
         return new InteractivePlaybackSnapshot(snapshot.State, snapshot.CurrentTrack, position, duration, controls,
-            snapshot.RequestId, snapshot.Revision, snapshot.Volume);
+            snapshot.RequestId, snapshot.Revision, snapshot.Volume) { PlaybackSpeed = snapshot.PlaybackSpeed };
     }
 
     private void OnMetadata(object? sender, PlaybackSessionChangedEventArgs args) => Publish(MetadataChanged, args);

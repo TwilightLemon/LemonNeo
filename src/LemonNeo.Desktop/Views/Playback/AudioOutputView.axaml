@@ -1,0 +1,32 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:LemonNeo.Desktop.ViewModels.Tools"
+    xmlns:i18n="using:LemonNeo.Desktop.Services"
+    x:Class="LemonNeo.Desktop.Views.Playback.AudioOutputView" x:DataType="vm:AudioOutputViewModel" x:Name="Panel">
+    <StackPanel Spacing="7">
+        <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.AudioOutputBackend}}" />
+        <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Backends}" SelectedItem="{Binding SelectedBackend}"
+                  AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.AudioOutputBackend}}" />
+        <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.AudioOutputDevice}}" />
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Devices}" SelectedItem="{Binding SelectedDevice}"
+                      AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.AudioOutputDevice}}" />
+            <Button Grid.Column="1" Command="{Binding RefreshDevicesCommand}" Content="{Translate {x:Static i18n:LanguageManager+Keys.AudioOutputRefreshDevices}}" />
+        </Grid>
+        <TextBlock Classes="caption" Text="{Binding DeviceStatus}" IsVisible="{Binding DeviceStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" TextWrapping="Wrap" />
+        <CheckBox Content="{Translate {x:Static i18n:LanguageManager+Keys.AudioOutputExclusive}}" IsChecked="{Binding Exclusive}" IsVisible="{Binding IsWasapi}" />
+        <StackPanel Spacing="5" IsVisible="{Binding #Panel.ShowAdvanced}">
+            <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.AudioOutputRate}}" />
+            <CheckBox Content="{Translate {x:Static i18n:LanguageManager+Keys.Automatic}}" IsChecked="{Binding AutomaticRate}" />
+            <NumericUpDown FormatString="0" Minimum="1" Maximum="2147483647" ShowButtonSpinner="False"
+                           IsVisible="{Binding !AutomaticRate}" Value="{Binding SampleRate, UpdateSourceTrigger=LostFocus}"
+                           AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.AudioOutputRate}}" />
+            <TextBlock Classes="muted" Text="{Binding RateDescription}" TextWrapping="Wrap" />
+        </StackPanel>
+        <StackPanel Spacing="4" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <TextBlock Classes="caption" Text="{Binding Error}" TextWrapping="Wrap" />
+            <Button HorizontalAlignment="Left" Command="{Binding RestoreSelectionCommand}"
+                    Content="{Translate {x:Static i18n:LanguageManager+Keys.AudioOutputRestore}}" />
+        </StackPanel>
+    </StackPanel>
+</UserControl>
