@@ -46,6 +46,12 @@
       "version": "1.4.3",
       "license": "Un4seen BASSASIO license",
       "website": "https://www.un4seen.com/bassasio.html"
+    },
+    {
+      "name": "BASS_FX",
+      "version": "2.4.12.6",
+      "license": "BASS_FX freeware (credit required)",
+      "website": "https://www.un4seen.com/bass.html"
     }
   ]
 }

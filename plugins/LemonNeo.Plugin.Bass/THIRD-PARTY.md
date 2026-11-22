@@ -2,6 +2,7 @@
 
 This plugin contains the following third-party binaries:
 
+- BASS_FX by Arthur Aminov (JOBnik!), including SoundTouch by Olli Parviainen, for tempo and equalization on Windows, Linux, and macOS
 - Bass.Net.dll 2.4.14.1
 - bass.dll 2.4.16 for Windows x64 and x86
 - bassflac.dll 2.4.5 for Windows x64 and x86

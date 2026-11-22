@@ -34,7 +34,7 @@ internal sealed class BassWindowsOutput(AudioOutputBackend backend, int source) 
         return EnumerateDevices(backend).Select(device => device.Option).ToArray();
     }
 
-    public static BassWindowsOutput Start(int source, int decodeDevice, AudioOutputConfiguration configuration)
+    public static BassWindowsOutput Start(int source, int decodeDevice, AudioOutputConfiguration configuration, bool playing = true)
     {
         var output = new BassWindowsOutput(configuration.Backend, source);
         try
@@ -60,7 +60,12 @@ internal sealed class BassWindowsOutput(AudioOutputBackend backend, int source) 
                     break;
             }
 
-            output.Play();
+            if (playing) output.Play();
+            else
+            {
+                if (configuration.Backend == AudioOutputBackend.Wasapi) output.InitializeWasapi();
+                output._pausedPosition = BassApi.BASS_ChannelGetPosition(source);
+            }
             return output;
         }
         catch

@@ -17,7 +17,8 @@ public sealed partial class AudioOutputViewModel : ObservableObject
     [ObservableProperty] private bool _automaticRate;
     [ObservableProperty] private decimal? _sampleRate;
     [ObservableProperty] private string? _deviceStatus;
-    [ObservableProperty] private string? _saveStatus;
+    [ObservableProperty] private string? _error;
+    private bool _loading;
 
     public AudioOutputViewModel(string playerName, IAudioOutputConfigurable provider, LocalizationService text)
     {
@@ -31,12 +32,14 @@ public sealed partial class AudioOutputViewModel : ObservableObject
             _ => text[LanguageManager.Keys.AudioOutputDefaultBackend]
         })).ToArray();
 
+        _loading = true;
         var configuration = provider.OutputConfiguration;
         _selectedBackend = Backends.FirstOrDefault(option => option.Backend == configuration.Backend) ?? Backends[0];
         _exclusive = configuration.Exclusive;
         _automaticRate = configuration.SampleRate is null;
         _sampleRate = configuration.SampleRate ?? 48000;
         LoadDevices(configuration.DeviceId);
+        _loading = false;
     }
 
     public string Title { get; }
@@ -51,40 +54,63 @@ public sealed partial class AudioOutputViewModel : ObservableObject
 
     partial void OnSelectedBackendChanged(BackendOption value)
     {
-        LoadDevices(null);
+        if (value is null || _loading) return;
+        _loading = true;
+        try { LoadDevices(null); }
+        finally { _loading = false; }
         OnPropertyChanged(nameof(IsWasapi));
         OnPropertyChanged(nameof(RateDescription));
-        DraftChanged();
+        Apply();
     }
 
-    partial void OnSelectedDeviceChanged(DeviceOption? value) => DraftChanged();
-    partial void OnAutomaticRateChanged(bool value) => DraftChanged();
-    partial void OnExclusiveChanged(bool value) => DraftChanged();
-    partial void OnSampleRateChanged(decimal? value) => DraftChanged();
+    partial void OnSelectedDeviceChanged(DeviceOption? value) => Apply();
+    partial void OnAutomaticRateChanged(bool value) => Apply();
+    partial void OnExclusiveChanged(bool value) => Apply();
+    partial void OnSampleRateChanged(decimal? value) => Apply();
 
     [RelayCommand]
-    private void RefreshDevices() => LoadDevices(SelectedDevice?.Id);
-
-    [RelayCommand(CanExecute = nameof(CanApply))]
-    private void Apply()
+    private void RefreshDevices()
     {
-        if (!CanApply()) return;
-        _provider.SetOutputConfiguration(new AudioOutputConfiguration(
-            SelectedBackend.Backend,
-            SelectedDevice!.Id,
-            AutomaticRate ? null : (int)SampleRate!.Value,
-            IsWasapi && Exclusive));
-        SaveStatus = _text[LanguageManager.Keys.AudioOutputSaved];
+        _loading = true;
+        try { LoadDevices(SelectedDevice?.Id); }
+        finally { _loading = false; }
     }
 
-    private bool CanApply() => SelectedDevice is { Available: true } &&
-                               (AutomaticRate || SampleRate is >= 1 and <= int.MaxValue &&
-                                   SampleRate == decimal.Truncate(SampleRate.Value));
-
-    private void DraftChanged()
+    private void Apply()
     {
-        SaveStatus = null;
-        ApplyCommand.NotifyCanExecuteChanged();
+        if (_loading || SelectedBackend is null || SelectedDevice is not { Available: true } ||
+            !AutomaticRate && (SampleRate is null or < 1 or > int.MaxValue || SampleRate != decimal.Truncate(SampleRate.Value)))
+            return;
+        try
+        {
+            _provider.SetOutputConfiguration(new AudioOutputConfiguration(SelectedBackend.Backend, SelectedDevice.Id,
+                AutomaticRate ? null : (int)SampleRate!.Value, IsWasapi && Exclusive));
+            Error = null;
+        }
+        catch (Exception exception)
+        {
+            // Keep the attempted backend editable even when its default device cannot open.
+            Error = exception.GetBaseException().Message;
+        }
+    }
+
+    [RelayCommand]
+    private void RestoreSelection()
+    {
+        _loading = true;
+        try
+        {
+            var saved = _provider.OutputConfiguration;
+            SelectedBackend = Backends.First(option => option.Backend == saved.Backend);
+            AutomaticRate = saved.SampleRate is null;
+            SampleRate = saved.SampleRate ?? 48000;
+            Exclusive = saved.Exclusive;
+            LoadDevices(saved.DeviceId);
+            OnPropertyChanged(nameof(IsWasapi));
+            OnPropertyChanged(nameof(RateDescription));
+            Error = null;
+        }
+        finally { _loading = false; }
     }
 
     private void LoadDevices(string? selectedId)
@@ -102,9 +128,9 @@ public sealed partial class AudioOutputViewModel : ObservableObject
             if (devices.Count == 0)
                 DeviceStatus = _text[asio ? LanguageManager.Keys.AudioOutputNoAsio : LanguageManager.Keys.AudioOutputNoDevices];
         }
-        catch (Exception exception) when (exception is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException)
+        catch (Exception exception)
         {
-            DeviceStatus = _text[LanguageManager.Keys.AudioOutputUnavailable];
+            DeviceStatus = $"{_text[LanguageManager.Keys.AudioOutputUnavailable]} {exception.GetBaseException().Message}";
             options[0] = defaultDevice with { Available = false };
         }
 

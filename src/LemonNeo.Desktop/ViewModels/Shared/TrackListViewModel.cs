@@ -257,7 +257,9 @@ public abstract class TrackListViewModel : PageViewModel
         foreach (var row in _rows)
             row.IsCurrent = row.QueueItemId is { } queueId
                 ? queueId == snapshot.CurrentQueueItemId
-                : PlayingTrackMatcher.Matches(row.Track, snapshot.CurrentTrack, snapshot.SourceDetails?.SourceId);
+                : row.PlaybackEntry is { } entry && snapshot.CurrentPlaylistEntry is { } playingEntry
+                    ? entry == playingEntry
+                    : PlayingTrackMatcher.Matches(row.Track, snapshot.CurrentTrack, snapshot.SourceDetails?.SourceId);
         SetProperty(ref _hasPlayingTrack,
             _rows.Any(row => row.IsCurrent),
             nameof(HasPlayingTrack));

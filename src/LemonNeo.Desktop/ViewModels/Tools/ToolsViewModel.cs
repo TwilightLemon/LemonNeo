@@ -24,7 +24,7 @@ public sealed partial class ToolsViewModel : PageViewModel
     private string?[] _decoderIds = [];
     [ObservableProperty] private IReadOnlyList<string> _decoderOptions = [];
     [ObservableProperty] private IReadOnlyList<DecoderInformation> _decoders = [];
-    [ObservableProperty] private IReadOnlyList<AudioOutputViewModel> _audioOutputs = [];
+    public DecoderControlsViewModel Controls => Context.DecoderControls;
     [ObservableProperty] private IReadOnlyList<string> _playableNamespaces = [];
     [ObservableProperty] private IReadOnlyList<PluginDependencyGroup> _pluginDependencies = [];
     [ObservableProperty] private IReadOnlyList<PluginDetail> _pluginFailures = [];
@@ -91,9 +91,6 @@ public sealed partial class ToolsViewModel : PageViewModel
         var providers = _host.Get<IProviderRegistry>().Providers;
         var sources = _host.Get<IPlaybackSourceProviderRegistry>().Sources;
         var players = _host.Get<IPlayerRegistry>().Players;
-        AudioOutputs = players.Where(player => player is IAudioOutputConfigurable { OutputBackends.Count: > 0 })
-            .Select(player => new AudioOutputViewModel(player.Descriptor.Name, (IAudioOutputConfigurable)player, _text))
-            .ToArray();
         var groups = new Dictionary<string, List<PluginInformation>>
         {
             ["MusicProviders"] = [], ["PlaybackProviders"] = [], ["MetadataProviders"] = [],

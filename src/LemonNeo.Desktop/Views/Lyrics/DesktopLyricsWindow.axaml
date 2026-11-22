@@ -217,6 +217,7 @@
                 IsStopped="{Binding IsStopped}"
                 MinHeight="40"
                 Name="DesktopLyricsTimeline"
+                PlaybackSpeed="{Binding PlaybackSpeed}"
                 PositionMilliseconds="{Binding PositionMilliseconds}"
                 ReachedBrush="{DynamicResource Brush.Accent}"
                 ReduceMotion="{Binding ReduceMotion}"

@@ -63,9 +63,14 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
         SourcesCommand = new AsyncRelayCommand(InspectSourcesAsync);
         PlaySourceCommand = new AsyncRelayCommand(() => SelectedSource is { } source && _sourceTrack is { } track
             ? playback.ExecutePlaybackAsync(ct =>
-                _host.Get<PlaybackSessionService>().PlayTrackAsync(track, new PlaybackRequest(
+                _host.Get<PlaybackSessionService>().PlayItemsAsync([new PlaybackQueueItem
+                {
+                    Track = track,
+                    PlaylistEntry = Editor is { PlaylistId: { } list, ItemId: { } item }
+                        ? new PlaylistEntryId(list, item) : row?.PlaybackEntry
+                }], request: new PlaybackRequest(
                     source.Candidate.Source.Quality ?? AudioQuality.Automatic,
-                    source.Candidate.IsCached ? null : source.Provider, source.Candidate.SourceId), ct))
+                    source.Candidate.IsCached ? null : source.Provider, source.Candidate.SourceId), cancellationToken: ct))
             : Task.CompletedTask);
         Context.LibraryChanged += OnLibraryChanged;
     }

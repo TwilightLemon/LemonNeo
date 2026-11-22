@@ -5,6 +5,7 @@ using LemonNeo.Application.Library;
 using LemonNeo.Core.Library;
 using LemonNeo.Desktop.Config;
 using LemonNeo.Desktop.Services;
+using LemonNeo.Desktop.ViewModels.Tools;
 
 namespace LemonNeo.Desktop;
 
@@ -13,6 +14,8 @@ public sealed class DesktopContext(DesktopHost host, LocalizationService text, A
     : ObservableObject
 {
     private bool _initialized;
+    private DecoderControlsViewModel? _decoderControls;
+    public DecoderControlsViewModel DecoderControls => _decoderControls ??= new(this);
     public DesktopHost Host { get; } = host;
     public LocalizationService Text { get; } = text;
     public ISettingsScope Settings { get; } = host.Settings.ForPackage(PackageNames.Desktop);

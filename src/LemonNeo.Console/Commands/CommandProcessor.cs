@@ -963,9 +963,9 @@ internal sealed partial class CommandProcessor(
         var tracks = playlist.Items
             .OrderBy(item => FractionalPlaylistOrderingService.Parse(item.SortKey))
             .ThenBy(item => item.Id)
-            .Select(item => item.Track)
+            .Select(item => new PlaybackQueueItem { Track = item.Track, PlaylistEntry = new PlaylistEntryId(playlist.Id, item.Id) })
             .ToArray();
-        await playback.PlayPlaylistAsync(
+        await playback.PlayItemsAsync(
             tracks,
             startIndex,
             new PlaybackRequest(RequiredSourceProviderId: requiredSourceProviderId, UseQualityPreference: true),

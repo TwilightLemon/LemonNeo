@@ -8,6 +8,7 @@ using LemonNeo.Core.Music;
 using LemonNeo.Core.Playback;
 using Microsoft.Extensions.Logging;
 using Un4seen.Bass;
+using Un4seen.Bass.AddOn.Fx;
 using BassApi = Un4seen.Bass.Bass;
 
 namespace LemonNeo.Plugin.Bass;
@@ -74,7 +75,7 @@ public sealed class BassPlayerPlugin : ILemonPlugin, IPlayerProvider, IAudioOutp
     {
         if (_settings is null || !OutputBackends.Contains(configuration.Backend))
             throw new NotSupportedException("This BASS output backend is unavailable on this platform.");
-        _settings.Apply<AudioOutputConfiguration>(_ => configuration);
+        _player!.ChangeOutput(NormalizeOutput(configuration));
     }
 
     private static AudioOutputConfiguration NormalizeOutput(AudioOutputConfiguration configuration)
@@ -115,7 +116,7 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
     private readonly IWebProxy? _networkProxy;
     private readonly ISettingsScope? _outputSettings;
     private readonly int _device;
-    private readonly BASSFlag _streamFlags;
+    private const BASSFlag StreamFlags = BASSFlag.BASS_SAMPLE_FLOAT | BASSFlag.BASS_STREAM_DECODE;
     private bool _disposed;
     private readonly Dictionary<int, PreparedStream> _streams = [];
     private readonly List<Task<IPreparedPlayback>> _preparations = [];
@@ -135,7 +136,6 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
         // Windows prepares decoding streams without opening hardware. Only an
         // activated stream opens the configured device, including in exclusive mode.
         var decodeOnly = outputSettings is not null;
-        _streamFlags = BASSFlag.BASS_SAMPLE_FLOAT | (decodeOnly ? BASSFlag.BASS_STREAM_DECODE : 0);
         var initFlags = !decodeOnly && OperatingSystem.IsWindows()
             ? BASSInit.BASS_DEVICE_CPSPEAKERS
             : BASSInit.BASS_DEVICE_DEFAULT;
@@ -198,10 +198,11 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
             lock (_gate)
             {
                 if (_stream == InvalidStream) return null;
-                var channel = BassApi.BASS_ChannelGetInfo(_stream);
+                var source = _streams[_stream].Source;
+                var channel = BassApi.BASS_ChannelGetInfo(source);
                 float bitrate = 0;
                 var hasBitrate =
-                    BassApi.BASS_ChannelGetAttribute(_stream, BASSAttribute.BASS_ATTRIB_BITRATE, ref bitrate);
+                    BassApi.BASS_ChannelGetAttribute(source, BASSAttribute.BASS_ATTRIB_BITRATE, ref bitrate);
                 return BassAudioInfo.FromChannel(channel, hasBitrate ? bitrate : null);
             }
         }
@@ -317,11 +318,12 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
                 // Capture the failing call's error before querying download state:
                 // subsequent BASS calls overwrite the thread-local error code.
                 var error = BassApi.BASS_ErrorGetCode();
+                var source = _streams[stream].Source;
                 var connected = _isHttpStream &&
-                                BassApi.BASS_StreamGetFilePosition(stream,
+                                BassApi.BASS_StreamGetFilePosition(source,
                                     BASSStreamFilePosition.BASS_FILEPOS_CONNECTED) > 0;
                 var blocked = _isHttpStream &&
-                              (BassApi.BASS_ChannelGetInfo(stream)?.flags & BASSFlag.BASS_STREAM_BLOCK) != 0;
+                              (BassApi.BASS_ChannelGetInfo(source)?.flags & BASSFlag.BASS_STREAM_BLOCK) != 0;
                 // A reported BASS_OK alongside a failed network seek is not
                 // grounds to lose the restore attempt while data is arriving.
                 if (!connected || blocked || error is not (BASSError.BASS_ERROR_POSITION or BASSError.BASS_OK))
@@ -446,11 +448,17 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
             };
             if (stream == InvalidStream) throw BassFailure("open the audio stream");
             token.ThrowIfCancellationRequested();
-            forwarder?.SetStream(stream);
+            var decodedSource = stream;
+            forwarder?.SetStream(decodedSource);
+            var flags = BASSFlag.BASS_FX_FREESOURCE | BASSFlag.BASS_SAMPLE_FLOAT;
+            if (_outputSettings is not null) flags |= BASSFlag.BASS_STREAM_DECODE;
+            var tempo = BassFx.BASS_FX_TempoCreate(decodedSource, flags);
+            if (tempo == 0) throw BassFailure("create the tempo stream");
+            stream = tempo; // Freeing this handle also releases the original download/decoder.
             lock (_gate)
             {
                 ThrowIfDisposed();
-                var prepared = new PreparedStream(this, track, stream, source is HttpPlaybackSource, forwarder);
+                var prepared = new PreparedStream(this, track, stream, decodedSource, source is HttpPlaybackSource, forwarder);
                 _streams.Add(stream, prepared);
                 return prepared;
             }
@@ -469,7 +477,7 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
         var path = Path.GetFullPath(source.Path);
         if (!File.Exists(path)) throw new FileNotFoundException("The local audio file no longer exists.", path);
 
-        return BassApi.BASS_StreamCreateFile(path, 0, 0, _streamFlags);
+        return BassApi.BASS_StreamCreateFile(path, 0, 0, StreamFlags);
     }
 
     private int CreateHttpStream(HttpPlaybackSource source, BassDownloadForwarder? forwarder)
@@ -491,7 +499,7 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
         var stream = BassApi.BASS_StreamCreateURL(
             sourceWithHeaders,
             0,
-            _streamFlags,
+            StreamFlags,
             forwarder?.DownloadCallback,
             IntPtr.Zero);
         if (stream == InvalidStream)
@@ -544,10 +552,62 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
         forwarder?.Dispose();
     }
 
-    private sealed class PreparedStream(BassPlayer owner, Track track, int stream, bool isHttp,
-        BassDownloadForwarder? forwarder) : IPreparedPlayback
+    private sealed class PreparedStream(BassPlayer owner, Track track, int stream, int decodedSource, bool isHttp,
+        BassDownloadForwarder? forwarder) : IPreparedPlayback, IProfiledPlayback
     {
+        public int Source { get; } = decodedSource;
+        private int _equalizer;
+        private DecodeProfile _profile = new();
         private int _disposed;
+
+        public void ApplyProfile(DecodeProfile profile)
+        {
+            lock (owner._gate)
+            {
+                ObjectDisposedException.ThrowIf(_disposed != 0, this);
+                var next = profile.Normalize();
+                try
+                {
+                    SetEffects(next, _profile);
+                    _profile = next;
+                }
+                catch
+                {
+                    SetEffects(_profile, null);
+                    throw;
+                }
+            }
+        }
+
+        private void SetEffects(DecodeProfile profile, DecodeProfile? previous)
+        {
+            if (profile.Speed != previous?.Speed &&
+                !BassApi.BASS_ChannelSetAttribute(stream, BASSAttribute.BASS_ATTRIB_TEMPO, (float)((profile.Speed - 1) * 100)))
+                throw BassFailure("set playback speed");
+            if (previous is not null && profile.Gains.SequenceEqual(previous.Gains)) return;
+            if (profile.Gains.All(gain => gain == 0))
+            {
+                if (_equalizer != 0 && !BassApi.BASS_ChannelRemoveFX(stream, _equalizer)) throw BassFailure("bypass the equalizer");
+                _equalizer = 0;
+                return;
+            }
+
+            if (_equalizer == 0) _equalizer = BassApi.BASS_ChannelSetFX(stream, BASSFXType.BASS_FX_BFX_PEAKEQ, 0);
+            if (_equalizer == 0) throw BassFailure("enable the equalizer");
+            var nyquist = BassApi.BASS_ChannelGetInfo(Source).freq / 2d;
+            for (var i = 0; i < DecodeProfile.BandFrequencies.Length; i++)
+            {
+                var center = DecodeProfile.BandFrequencies[i];
+                if (center >= nyquist) break;
+                var band = new BASS_BFX_PEAKEQ
+                {
+                    lBand = i, fCenter = center, fGain = (float)profile.Gains[i],
+                    fBandwidth = 0, fQ = EqualizerResponse.QualityFactor, lChannel = BASSFXChan.BASS_BFX_CHANALL
+                };
+                if (!BassApi.BASS_FXSetParameters(_equalizer, band)) throw BassFailure("adjust the equalizer");
+            }
+        }
+
         public BassDownloadForwarder? Forwarder { get; } = forwarder;
         public AudioStreamInfo? AudioInfo
         {
@@ -557,8 +617,8 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
                 {
                     if (!owner._streams.TryGetValue(stream, out var owned) || !ReferenceEquals(owned, this)) return null;
                     float bitrate = 0;
-                    var available = BassApi.BASS_ChannelGetAttribute(stream, BASSAttribute.BASS_ATTRIB_BITRATE, ref bitrate);
-                    return BassAudioInfo.FromChannel(BassApi.BASS_ChannelGetInfo(stream), available ? bitrate : null);
+                    var available = BassApi.BASS_ChannelGetAttribute(Source, BASSAttribute.BASS_ATTRIB_BITRATE, ref bitrate);
+                    return BassAudioInfo.FromChannel(BassApi.BASS_ChannelGetInfo(Source), available ? bitrate : null);
                 }
             }
         }
@@ -597,6 +657,42 @@ internal sealed class BassPlayer : IPlayer, IStreamingPlayer, IAudioInfoPlayer, 
         public void Dispose()
         {
             if (Interlocked.Exchange(ref _disposed, 1) == 0) owner.ReleaseStream(stream, this);
+        }
+    }
+
+    public void ChangeOutput(AudioOutputConfiguration next)
+    {
+        lock (_gate)
+        {
+            ThrowIfDisposed();
+            var settings = _outputSettings!;
+            var previous = settings.Get<AudioOutputConfiguration>();
+            if (previous == next) return;
+            if (_windowsOutput is { } old)
+            {
+                var playing = State == PlayerState.Playing;
+                if (playing) old.Pause(flush: true);
+                var position = old.GetPosition();
+                old.Dispose();
+                _windowsOutput = null;
+                // Seekable streams resume at the audible position. Live streams continue at the decoding head.
+                if (position >= 0) BassApi.BASS_ChannelSetPosition(_stream, position);
+                try
+                {
+                    _windowsOutput = BassWindowsOutput.Start(_stream, _device, next, playing);
+                }
+                catch (Exception failure)
+                {
+                    try { _windowsOutput = BassWindowsOutput.Start(_stream, _device, previous, playing); }
+                    catch (Exception restore)
+                    {
+                        StopOutput();
+                        throw new AggregateException("Could not switch or restore the audio output.", failure, restore);
+                    }
+                    throw;
+                }
+            }
+            settings.Apply<AudioOutputConfiguration>(_ => next);
         }
     }
 

@@ -24,3 +24,14 @@ public sealed record PlaybackPreferences(
     double Volume = 1,
     AudioQuality Quality = AudioQuality.Automatic,
     string? PreferredPlayerId = null);
+
+/// <summary>The resolved settings and the library scope that supplied them. Both IDs are null for global.</summary>
+public sealed record ResolvedDecodeProfile(DecodeProfile Profile, Guid? PlaylistId = null, Guid? ItemId = null);
+
+public sealed record EqualizerPreset(string Name, ImmutableArray<double> Gains);
+
+public sealed record DecodePreferences
+{
+    public DecodeProfile Global { get; init; } = new();
+    public ImmutableArray<EqualizerPreset> Presets { get; init; } = [];
+}

@@ -178,6 +178,7 @@
                     IsStopped="{Binding IsStopped}"
                     MaxWidth="880"
                     Name="LyricsTimeline"
+                    PlaybackSpeed="{Binding PlaybackSpeed}"
                     PositionMilliseconds="{Binding PositionMilliseconds}"
                     ReachedBrush="{DynamicResource Brush.LyricHighlight}"
                     ReduceMotion="{Binding ReduceMotion}"

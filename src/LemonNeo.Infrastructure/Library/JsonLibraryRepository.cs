@@ -126,6 +126,7 @@ internal sealed class JsonLibraryRepository(Func<string> getLibraryDirectory) : 
             Id = playlist.Id,
             Name = playlist.Name,
             Description = playlist.Description,
+            DecodeProfile = playlist.DecodeProfile,
             CreatedAt = playlist.CreatedAt,
             UpdatedAt = playlist.UpdatedAt,
             Items = playlist.Items

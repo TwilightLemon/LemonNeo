@@ -3,6 +3,7 @@ using LemonNeo.Application.Library;
 using LemonNeo.Application.Playback;
 using LemonNeo.Core.Library;
 using LemonNeo.Core.Music;
+using LemonNeo.Core.Playback;
 using LemonNeo.Desktop.Services;
 using LemonNeo.Desktop.ViewModels.Playback;
 using LemonNeo.Desktop.ViewModels.Shared;
@@ -44,6 +45,7 @@ public sealed class LibraryViewModel : TrackListViewModel
     public bool IsQueue => Route == DesktopRoutes.Queue;
     public bool CanEditPlaylist => CanInteract && IsLibrary && SelectedPlaylist is not null;
     public bool HasSelectedPlaylist => IsLibrary && SelectedPlaylist is not null;
+    internal bool ReduceMotion => Context.Appearance.Current.ReduceMotion;
 
     public bool CanEditTrack => CanInspectTrack && SelectedTrack!.PlaylistId is not null &&
                                 SelectedTrack.PlaylistItemId is not null;
@@ -78,7 +80,7 @@ public sealed class LibraryViewModel : TrackListViewModel
     {
         return IsQueue
             ? _host.Get<PlaybackSessionService>().Queue.Items
-                .Select((i, index) => new TrackRow(i.Track, index + 1, _text, i.Id))
+                .Select((i, index) => new TrackRow(i.Track, index + 1, _text, i.Id, playbackEntry: i.PlaylistEntry))
             : SelectedPlaylist is { } playlist
                 ? playlist.Items.OrderBy(i => FractionalPlaylistOrderingService.Parse(i.SortKey)).ThenBy(i => i.Id)
                     .Select((i, index) =>
@@ -99,9 +101,13 @@ public sealed class LibraryViewModel : TrackListViewModel
                 return;
             }
 
-            var tracks = Tracks.Select(t => t.Track).ToArray();
+            var tracks = Tracks.Select(row => new PlaybackQueueItem
+            {
+                Track = row.Track,
+                PlaylistEntry = row.PlaybackEntry
+            }).ToArray();
             var index = selected is null ? 0 : Tracks.IndexOf(selected);
-            if (tracks.Length > 0 && index >= 0) await session.PlayPlaylistAsync(tracks, index, cancellationToken: ct);
+            if (tracks.Length > 0 && index >= 0) await session.PlayItemsAsync(tracks, index, cancellationToken: ct);
         });
     }
 

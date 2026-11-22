@@ -655,7 +655,7 @@
                                 </Grid>
                             </Button>
                             <Grid
-                                ColumnDefinitions="*,Auto,Auto"
+                                ColumnDefinitions="*,Auto,Auto,Auto"
                                 Grid.Column="1"
                                 Margin="8,0,0,0"
                                 VerticalAlignment="Center">
@@ -680,11 +680,35 @@
                                         TextTrimming="CharacterEllipsis"
                                         VerticalAlignment="Center" />
                                 </StackPanel>
+                                <Button Name="DecoderButton" Grid.Column="1" Classes="ghost icon" Margin="8,0,0,0" Padding="0"
+                                        IsEnabled="{Binding SharedContext.IsInitialized}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DecoderControls}}"
+                                        ToolTip.Tip="{Binding SharedContext.DecoderControls.DecoderToolTip}">
+                                    <Grid>
+                                        <Path Width="19" Height="19" Stretch="Uniform" Stroke="{DynamicResource Brush.TextSecondary}"
+                                              StrokeThickness="1.8" Data="M3,6 L8,6 M12,6 L21,6 M8,3 L8,9 L12,9 L12,3 Z M3,17 L14,17 M18,17 L21,17 M14,14 L14,20 L18,20 L18,14 Z" />
+                                        <Ellipse Width="6" Height="6" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                 Fill="{DynamicResource Brush.AccentText}" IsVisible="{Binding SharedContext.DecoderControls.UsingScopedProfile}" />
+                                    </Grid>
+                                    <Button.Flyout>
+                                        <Flyout Placement="TopEdgeAlignedRight">
+                                            <ScrollViewer MaxHeight="440" Width="310">
+                                                <StackPanel Spacing="12" Margin="4">
+                                                    <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.DecoderControls}}" />
+                                                    <playbackViews:AudioOutputView ShowAdvanced="False" IsVisible="{Binding DataContext, RelativeSource={RelativeSource Self}, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                                        DataContext="{Binding SharedContext.DecoderControls.QuickOutput}" />
+                                                    <TextBlock Classes="caption" IsVisible="{Binding SharedContext.DecoderControls.QuickOutput, Converter={x:Static ObjectConverters.IsNull}}"
+                                                        Text="{Translate {x:Static i18n:LanguageManager+Keys.DecoderDefaultOutput}}" />
+                                                    <playbackViews:DecodeProfileView DataContext="{Binding SharedContext.DecoderControls.QuickProfile}" />
+                                                </StackPanel>
+                                            </ScrollViewer>
+                                        </Flyout>
+                                    </Button.Flyout>
+                                </Button>
                                 <Button
                                     AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Volume}}"
                                     Classes="ghost icon"
                                     Click="OnToggleVolume"
-                                    Grid.Column="1"
+                                    Grid.Column="2"
                                     IsEnabled="{Binding Playback.CanAdjustVolume}"
                                     Margin="8,0,0,0"
                                     Name="VolumeButton"
@@ -715,7 +739,7 @@
                                     AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Queue}}"
                                     Classes="ghost icon"
                                     Command="{Binding ToggleQueueCommand}"
-                                    Grid.Column="2"
+                                    Grid.Column="3"
                                     Margin="8,0,0,0"
                                     Name="QueueButton"
                                     Padding="0"

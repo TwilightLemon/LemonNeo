@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using LemonNeo.Core.Music;
+using LemonNeo.Core.Playback;
 using LemonNeo.Desktop.Services;
 
 namespace LemonNeo.Desktop.ViewModels.Shared;
@@ -10,7 +11,8 @@ public sealed class TrackRow(
     LocalizationService text,
     Guid? QueueItemId = null,
     Guid? PlaylistId = null,
-    Guid? PlaylistItemId = null) : ObservableObject
+    Guid? PlaylistItemId = null,
+    PlaylistEntryId? playbackEntry = null) : ObservableObject
 {
     private bool _isCurrent;
     private bool _isMarked;
@@ -21,6 +23,9 @@ public sealed class TrackRow(
     public Guid? QueueItemId { get; } = QueueItemId;
     public Guid? PlaylistId { get; } = PlaylistId;
     public Guid? PlaylistItemId { get; } = PlaylistItemId;
+
+    public PlaylistEntryId? PlaybackEntry { get; } = playbackEntry ??
+        (PlaylistId is { } list && PlaylistItemId is { } item ? new PlaylistEntryId(list, item) : null);
 
     public bool IsCurrent
     {

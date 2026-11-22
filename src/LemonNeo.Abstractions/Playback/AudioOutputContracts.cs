@@ -18,7 +18,7 @@ public sealed record AudioOutputConfiguration(
     int? SampleRate = null,
     bool Exclusive = false);
 
-/// <summary>Optional player provider capability for configuring the next playback.</summary>
+/// <summary>Optional player provider capability for selecting audio output. Providers supporting live switching apply it to the active stream.</summary>
 public interface IAudioOutputConfigurable
 {
     IReadOnlyList<AudioOutputBackend> OutputBackends { get; }

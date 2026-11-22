@@ -43,6 +43,9 @@ public sealed class LyricsPresenter : UserControl
     public static readonly StyledProperty<CoreLyrics?> DocumentProperty =
         AvaloniaProperty.Register<LyricsPresenter, CoreLyrics?>(nameof(Document));
 
+    public static readonly StyledProperty<double> PlaybackSpeedProperty =
+        AvaloniaProperty.Register<LyricsPresenter, double>(nameof(PlaybackSpeed), 1);
+
     public static readonly StyledProperty<double> PositionMillisecondsProperty =
         AvaloniaProperty.Register<LyricsPresenter, double>(nameof(PositionMilliseconds));
 
@@ -197,6 +200,12 @@ public sealed class LyricsPresenter : UserControl
     {
         get => GetValue(DurationMillisecondsProperty);
         set => SetValue(DurationMillisecondsProperty, value);
+    }
+
+    public double PlaybackSpeed
+    {
+        get => GetValue(PlaybackSpeedProperty);
+        set => SetValue(PlaybackSpeedProperty, value);
     }
 
     public bool IsPlaying
@@ -359,7 +368,7 @@ public sealed class LyricsPresenter : UserControl
         {
             var expected =
                 (double)(change.Property == PositionMillisecondsProperty ? change.OldValue! : PositionMilliseconds) +
-                _positionClock.Elapsed.TotalMilliseconds;
+                _positionClock.Elapsed.TotalMilliseconds * PlaybackSpeed;
             var seeking = change.Property == PositionMillisecondsProperty &&
                           Math.Abs(PositionMilliseconds - expected) > 1500;
             _positionClock.Restart();
@@ -411,7 +420,7 @@ public sealed class LyricsPresenter : UserControl
     }
 
     private double LivePosition => PositionMilliseconds +
-        (IsPlaying && !IsStopped ? _positionClock.Elapsed.TotalMilliseconds : 0);
+        (IsPlaying && !IsStopped ? _positionClock.Elapsed.TotalMilliseconds * PlaybackSpeed : 0);
 
     private void ApplyContent()
     {
@@ -770,7 +779,7 @@ public sealed class LyricsPresenter : UserControl
         _animationFramePending = false;
         if (!NeedsAnimationFrame) return;
         if (IsPlaying && !IsStopped)
-            UpdatePosition(PositionMilliseconds + _positionClock.Elapsed.TotalMilliseconds, true);
+            UpdatePosition(PositionMilliseconds + _positionClock.Elapsed.TotalMilliseconds * PlaybackSpeed, true);
         if (_scrollClock.IsRunning)
         {
             var progress = Math.Clamp(_scrollClock.Elapsed.TotalMilliseconds / 480, 0, 1);
