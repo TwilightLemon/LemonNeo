@@ -87,14 +87,16 @@
                             ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.RemoveSelectedTracks}}">
                             <Path Classes="icon" Data="{StaticResource Icon.Trash}" />
                         </Button>
-                        <TextBlock
-                            Classes="caption"
-                            IsVisible="{Binding CanReorderTracks}"
-                            Margin="6,0,0,0"
-                            Text="{Translate {x:Static i18n:LanguageManager+Keys.DragTracksToReorder}}"
-                            VerticalAlignment="Center" />
                     </WrapPanel>
                 </sharedControls:TrackListToolbar.SelectionActions>
+                <sharedControls:TrackListToolbar.SelectionHint>
+                    <TextBlock
+                        Classes="caption"
+                        IsVisible="{Binding CanReorderTracks}"
+                        Margin="6,0,0,0"
+                        Text="{Translate {x:Static i18n:LanguageManager+Keys.DragTracksToReorder}}"
+                        VerticalAlignment="Center" />
+                </sharedControls:TrackListToolbar.SelectionHint>
             </sharedControls:TrackListToolbar>
         </StackPanel>
         <Grid Grid.Row="2">

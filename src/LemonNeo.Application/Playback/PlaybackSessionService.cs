@@ -704,6 +704,7 @@ public sealed class PlaybackSessionService : IAsyncDisposable
     {
         var request = _queue.Request;
         var preferences = _settings.Get<PlaybackPreferences>();
+        request = request with { PreferCachedResources = request.PreferCachedResources || preferences.PreferCachedResources };
         return request.UseQualityPreference ? request with
         {
             Quality = preferences.Quality, PreferredPlayerId = preferences.PreferredPlayerId, UseQualityPreference = false

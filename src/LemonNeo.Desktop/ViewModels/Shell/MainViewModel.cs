@@ -38,7 +38,7 @@ public sealed class MainViewModel : PageViewModel
         ToggleQueueCommand = new RelayCommand(ToggleQueue);
         CloseQueueCommand = new RelayCommand(() => IsQueueOpen = false, () => IsQueueOpen);
         _visualEffectsSubscription =
-            Context.Settings.Subscribe<VisualEffectsPreferences>(_ => RefreshVisualEffectsProperties());
+            Context.Settings.Subscribe<VisualEffectsPreferences>(_ => OnPropertyChanged(nameof(VisualEffects)));
         Navigation.PropertyChanged += OnNavigationChanged;
         Navigation.Initialize();
         Context.LibraryChanged += OnLibraryChanged;
@@ -49,9 +49,6 @@ public sealed class MainViewModel : PageViewModel
     public DesktopNavigation Navigation { get; }
     public ObservableCollection<PlaylistMenuItemViewModel> Playlists { get; } = [];
     public VisualEffectsPreferences VisualEffects => Context.Settings.Get<VisualEffectsPreferences>();
-
-    public bool IsAppleMusicMeshBackgroundVisible => VisualEffects.AppleMusicMeshEnabled &&
-                                                      (!VisualEffects.AppleMusicMeshLyricsOnly || Navigation.IsLyrics);
 
     public PlaylistMenuItemViewModel? SelectedPlaylist
     {
@@ -198,7 +195,6 @@ public sealed class MainViewModel : PageViewModel
         if (!Navigation.IsLyrics) IsLyricsExpanded = false;
         IsQueueOpen = false;
         ToggleLyricsExpandedCommand.NotifyCanExecuteChanged();
-        OnPropertyChanged(nameof(IsAppleMusicMeshBackgroundVisible));
         SyncPlaylistSelection();
         if (Navigation.Current is SearchViewModel search) SearchQuery = search.SearchQuery;
     }
@@ -233,12 +229,6 @@ public sealed class MainViewModel : PageViewModel
         }
 
         SyncPlaylistSelection();
-    }
-
-    private void RefreshVisualEffectsProperties()
-    {
-        OnPropertyChanged(nameof(VisualEffects));
-        OnPropertyChanged(nameof(IsAppleMusicMeshBackgroundVisible));
     }
 
     public Task ReorderPlaylistsAsync(PlaylistMenuItemViewModel source, PlaylistMenuItemViewModel target, bool after)

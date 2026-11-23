@@ -531,5 +531,18 @@
   "RemoveSelectedTracks": "移除",
   "PlaylistMore": "歌单选项",
   "ManageTracks": "管理",
-  "DragTracksToReorder": "拖动歌曲可调整顺序"
+  "DragTracksToReorder": "拖动歌曲可调整顺序",
+  "PreferCachedResources": "优先使用已缓存资源",
+  "ExportTracks": "导出歌曲",
+  "ExportFolder": "导出文件夹",
+  "ExportLrcLyrics": "导出歌词（.lrc）",
+  "ExportTrackTags": "写入歌曲元数据和封面",
+  "ExportFileNameFormat": "文件名格式",
+  "ExportFileNameFormatDescription": "T 代表标题，A 代表艺术家，I 代表从 1 开始的序号（仅批量导出）。",
+  "ExportTracksStarted": "正在导出 {0} 首歌曲…",
+  "ExportTracksFinished": "已导出 {0} / {1} 首歌曲。",
+  "ExportLyricsMissing": "{0} 首歌曲没有可用歌词。",
+  "ExportTagsUnsupported": "{0} 首歌曲的音频格式不支持写入元数据。",
+  "ExportArtworkMissing": "{0} 首歌曲无法获取封面。",
+  "ExportAdditionalFailures": "另有 {0} 首歌曲导出失败。"
 }

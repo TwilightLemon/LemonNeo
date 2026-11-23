@@ -7,6 +7,9 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Styling;
+using LemonNeo.Abstractions.Settings;
+using LemonNeo.Application.Library;
+using LemonNeo.Application.Playback;
 using LemonNeo.Desktop.Config;
 using LemonNeo.Desktop.Controls.Shared;
 using LemonNeo.Desktop.Services;
@@ -15,6 +18,7 @@ using LemonNeo.Desktop.ViewModels.Shell;
 using LemonNeo.Desktop.Views.Library;
 using LemonNeo.Desktop.Views.Lyrics;
 using LemonNeo.Desktop.Views.Shared;
+using MusicTrack = LemonNeo.Core.Music.Track;
 
 namespace LemonNeo.Desktop.Views.Shell;
 
@@ -29,7 +33,84 @@ public partial class MainWindow : Window
     private bool _preserveDesktopLyricsPreference;
     private CancellationTokenSource? _queueAnimation;
     private bool _seeking;
+    private bool _exportingTracks;
     private ShortcutService? _shortcuts;
+
+    internal async Task ExportTracksAsync(IReadOnlyList<MusicTrack> tracks)
+    {
+        if (_exportingTracks || tracks.Count == 0 ||
+            DataContext is not MainViewModel { SharedContext.IsInitialized: true } vm) return;
+        var context = vm.SharedContext;
+        var text = context.Text;
+        var title = text[LanguageManager.Keys.ExportTracks];
+        _exportingTracks = true;
+        using var cancellation = new CancellationTokenSource();
+        void CancelExport(object? sender, EventArgs args) => cancellation.Cancel();
+        Closed += CancelExport;
+        try
+        {
+            var dialog = new TrackExportDialog(context.Settings.Get<TrackExportPreferences>());
+            var options = await dialog.ShowDialog<TrackExportPreferences?>(this);
+            if (options?.Directory is not { } directory) return;
+            context.Settings.Apply<TrackExportPreferences>(_ => options);
+            var quality = context.Host.Settings.ForPackage(PackageNames.Application).Get<PlaybackPreferences>().Quality;
+            var exporter = context.Host.Get<TrackExportService>();
+            var failures = new List<string>();
+            var missingLyrics = 0;
+            var unsupportedTags = 0;
+            var missingArtwork = 0;
+            context.Notifications.Show(text.Format(LanguageManager.Keys.ExportTracksStarted, tracks.Count));
+            for (var index = 0; index < tracks.Count; index++)
+            {
+                cancellation.Token.ThrowIfCancellationRequested();
+                var track = tracks[index];
+                int? sequenceNumber = tracks.Count > 1 ? index + 1 : null;
+                try
+                {
+                    var result = await Task.Run(() => exporter.ExportAsync(track, directory, quality,
+                        options.WriteLyrics, options.WriteTags, cancellation.Token, options.FileNameFormat,
+                        sequenceNumber), cancellation.Token);
+                    if (result.LyricsMissing) missingLyrics++;
+                    if (result.TagsUnsupported) unsupportedTags++;
+                    if (result.ArtworkMissing) missingArtwork++;
+                }
+                catch (Exception exception) when (!cancellation.IsCancellationRequested)
+                {
+                    failures.Add($"{track.Title} — {exception.Message}");
+                }
+            }
+
+            var summary = text.Format(LanguageManager.Keys.ExportTracksFinished, tracks.Count - failures.Count,
+                tracks.Count);
+            if (failures.Count == 0 && missingLyrics == 0 && unsupportedTags == 0 && missingArtwork == 0)
+            {
+                context.Notifications.Show(summary, NotificationLevel.Success);
+                return;
+            }
+
+            var details = new List<string> { summary };
+            if (missingLyrics > 0) details.Add(text.Format(LanguageManager.Keys.ExportLyricsMissing, missingLyrics));
+            if (unsupportedTags > 0) details.Add(text.Format(LanguageManager.Keys.ExportTagsUnsupported, unsupportedTags));
+            if (missingArtwork > 0) details.Add(text.Format(LanguageManager.Keys.ExportArtworkMissing, missingArtwork));
+            details.AddRange(failures.Take(4));
+            if (failures.Count > 4) details.Add(text.Format(LanguageManager.Keys.ExportAdditionalFailures, failures.Count - 4));
+            if (!cancellation.IsCancellationRequested)
+                await new MessageDialog(title, string.Join(Environment.NewLine, details), text[LanguageManager.Keys.OK])
+                    .ShowDialog(this);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception) when (!cancellation.IsCancellationRequested)
+        {
+            context.Notifications.Show(exception.Message, NotificationLevel.Error);
+        }
+        finally
+        {
+            Closed -= CancelExport;
+            _exportingTracks = false;
+        }
+    }
 
     public MainWindow()
     {

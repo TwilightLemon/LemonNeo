@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.Input;
 using LemonNeo.Core.Library;
 using LemonNeo.Desktop.Services;
 using LemonNeo.Desktop.ViewModels.Shared;
+using LemonNeo.Desktop.Views.Shell;
 
 namespace LemonNeo.Desktop.Controls.Shared;
 
@@ -47,6 +48,12 @@ internal static class TrackContextMenu
             Header = row.Text[LanguageManager.Keys.TrackDetails],
             Command = new AsyncRelayCommand(inspect)
         });
+        if (TopLevel.GetTopLevel(container) is MainWindow window)
+            menu.Items.Add(new MenuItem
+            {
+                Header = row.Text[LanguageManager.Keys.ExportTracks],
+                Command = new AsyncRelayCommand(() => window.ExportTracksAsync([row.Track]))
+            });
         if (remove is not null)
         {
             menu.Items.Add(new Separator());

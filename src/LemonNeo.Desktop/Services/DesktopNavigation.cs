@@ -53,6 +53,7 @@ public sealed class DesktopNavigation : ObservableObject, IAsyncDisposable
     private HistoryEntry _currentEntry = null!;
     private bool _disposed;
     private bool _isNavigating;
+    private bool _isLyricsPageTarget;
 
     public DesktopNavigation(Func<string, Guid?, PageViewModel> factory, DesktopContext context,
         PlaybackViewModel playback)
@@ -96,6 +97,13 @@ public sealed class DesktopNavigation : ObservableObject, IAsyncDisposable
     public bool IsOnline => Current.Route == DesktopRoutes.Online;
     public bool IsQueue => Current.Route == DesktopRoutes.Queue;
     public bool IsLyrics => Current.Route == DesktopRoutes.Lyrics;
+    /// <summary>The lyrics state of the page being presented, including during its transition.</summary>
+    public bool IsLyricsPageTarget
+    {
+        get => _isLyricsPageTarget;
+        private set => SetProperty(ref _isLyricsPageTarget, value);
+    }
+
     public bool IsTools => Current.Route == DesktopRoutes.Tools;
     public bool IsSettings => Current.Route == DesktopRoutes.Settings;
     public AsyncRelayCommand<string> NavigateCommand { get; }
@@ -291,7 +299,7 @@ public sealed class DesktopNavigation : ObservableObject, IAsyncDisposable
         var previous = Host.NavigationStack.LastOrDefault() as ContentPage;
         try
         {
-            await Host.ReplaceAsync(next, Transition());
+            await Host.ReplaceAsync(next, Transition(pageModel.Route));
             if (!ReferenceEquals(Host.NavigationStack.LastOrDefault(), next)) return false;
             Current.SetNavigationActive(false);
             // Releasing the content after the transition severs every history reference to its controls.
@@ -311,6 +319,7 @@ public sealed class DesktopNavigation : ObservableObject, IAsyncDisposable
         }
         finally
         {
+            IsLyricsPageTarget = IsLyrics;
             if (!ReferenceEquals(Host.NavigationStack.LastOrDefault(), next))
             {
                 next.Content = null;
@@ -480,8 +489,9 @@ public sealed class DesktopNavigation : ObservableObject, IAsyncDisposable
         OnPropertyChanged(nameof(HistoryEntryCount));
     }
 
-    private SlideFadeTransition Transition() => new()
+    private SlideFadeTransition Transition(string route) => new()
     {
+        OnStarting = () => IsLyricsPageTarget = route == DesktopRoutes.Lyrics,
         Duration = _appearance.Current.ReduceMotion || TopLevel.GetTopLevel(Host) is null
             ? TimeSpan.Zero
             : TimeSpan.FromMilliseconds(220)

@@ -86,7 +86,10 @@ public sealed record PlaybackRequest(
     ExternalMusicId? RequiredSourceId = null,
     // Host-only: resolve saved playback preferences at each queue playback; explicit Auto still means highest.
     bool UseQualityPreference = false,
-    string? PreferredPlayerId = null);
+    string? PreferredPlayerId = null)
+{
+    public bool PreferCachedResources { get; init; }
+}
 
 public enum PlaybackMode
 {

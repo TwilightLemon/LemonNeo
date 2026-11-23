@@ -22,6 +22,9 @@
                                         MinWidth="220"
                                         Name="AudioQualityPreference"
                                         SelectedIndex="{Binding SelectedAudioQuality}" />
+                                    <ToggleSwitch
+                                        Content="{Translate {x:Static i18n:LanguageManager+Keys.PreferCachedResources}}"
+                                        IsChecked="{Binding PreferCachedResources, Mode=TwoWay}" />
                                     <TextBlock
                                         Classes="muted"
                                         Text="{Translate {x:Static i18n:LanguageManager+Keys.AudioQualityPreferenceDescription}}"

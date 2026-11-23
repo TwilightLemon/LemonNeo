@@ -66,6 +66,9 @@ public sealed class PlaybackSourceDiscoveryService(
                                                            MusicCacheIdentity.GetKey(request.RequiredSourceId))
             .ToArray();
         var qualities = AudioQualities.SearchOrder(request.Quality).ToArray();
+        if (request.PreferCachedResources && await search.FindCachedAsync(known, qualities) is { } cached)
+            return new PlaybackSourceDiscoveryResult([cached], search.Errors, track);
+
         foreach (var identity in known.Where(identity => LocalFileScheme.Accepts(identity.Id)))
             if (search.ResolveLocalFile(identity) is { } local)
                 return new PlaybackSourceDiscoveryResult([local], search.Errors, track);
@@ -114,6 +117,9 @@ public sealed class PlaybackSourceDiscoveryService(
                         ExternalIds = track.ExternalIds.Concat(expanded.Select(i => i.Id))
                             .DistinctBy(MusicCacheIdentity.GetKey).ToArray()
                     };
+                    if (request.PreferCachedResources &&
+                        await search.FindCachedAsync(expanded, qualities) is { } matchedCache)
+                        return new PlaybackSourceDiscoveryResult([matchedCache], search.Errors, updatedTrack, true);
                 }
             }
 
@@ -168,6 +174,7 @@ public sealed class PlaybackSourceDiscoveryService(
             _attempts = [];
 
         private readonly List<PlaybackSourceCandidate> _deferred = [];
+        private readonly Dictionary<(ExternalMusicId, AudioQuality), FilePlaybackSource?> _cacheChecks = [];
 
         public Dictionary<string, string> Errors { get; } = new(StringComparer.OrdinalIgnoreCase);
 
@@ -193,27 +200,43 @@ public sealed class PlaybackSourceDiscoveryService(
                 identity.Method);
         }
 
-        public async Task<PlaybackSourceCandidate?> ResolveAsync(SourceIdentity identity, AudioQuality quality)
+        public async Task<PlaybackSourceCandidate?> FindCachedAsync(IReadOnlyList<SourceIdentity> identities,
+            IEnumerable<AudioQuality> qualities)
+        {
+            foreach (var quality in qualities)
+            foreach (var identity in identities)
+                if (await ResolveCachedAsync(identity, quality) is { } candidate) return candidate;
+            return null;
+        }
+
+        private async Task<PlaybackSourceCandidate?> ResolveCachedAsync(SourceIdentity identity, AudioQuality quality)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var key = MusicCacheIdentity.GetKey(identity.Id);
-            var providers = owner.ProvidersFor(identity, request).ToArray();
+            var provider = owner.ProvidersFor(identity, request).FirstOrDefault();
             // A required provider restricts eligible identities, not the cache key.
             var allowed = request.RequiredSourceProviderId is null || request.RequiredSourceId is not null ||
-                          providers.Length > 0 ||
+                          provider is not null ||
                           string.Equals(identity.NativeProviderId, request.RequiredSourceProviderId,
                               StringComparison.OrdinalIgnoreCase);
             if (!allowed) return null;
-            if (await owner._audioCache.TryGetAsync(identity.Id, quality, cancellationToken) is { } cached)
-                return new PlaybackSourceCandidate(
-                    providers.FirstOrDefault()?.ProviderId ?? identity.NativeProviderId ?? identity.Id.Namespace,
-                    identity.Track, cached, identity.Id, "cache", true);
+            var key = (identity.Id, quality);
+            if (!_cacheChecks.TryGetValue(key, out var cached))
+                _cacheChecks[key] = cached = await owner._audioCache.TryGetAsync(identity.Id, quality, cancellationToken);
+            return cached is null ? null : new PlaybackSourceCandidate(
+                provider?.ProviderId ?? identity.NativeProviderId ?? identity.Id.Namespace,
+                identity.Track, cached, identity.Id, "cache", true);
+        }
 
+        public async Task<PlaybackSourceCandidate?> ResolveAsync(SourceIdentity identity, AudioQuality quality)
+        {
+            if (await ResolveCachedAsync(identity, quality) is { } cached) return cached;
+
+            var key = MusicCacheIdentity.GetKey(identity.Id);
             var retained = _deferred
                 .Where(c => MusicCacheIdentity.GetKey(c.SourceId) == key && c.Source.Quality >= quality)
                 .OrderByDescending(c => c.Source.Quality).FirstOrDefault();
             if (retained is not null) return retained;
-            foreach (var provider in providers)
+            foreach (var provider in owner.ProvidersFor(identity, request))
             {
                 if (_deferred.Any(c => MusicCacheIdentity.GetKey(c.SourceId) == key &&
                                        c.ProviderId == provider.ProviderId && c.Source.Quality is null)) continue;

@@ -69,6 +69,16 @@
                     Margin="0,1,6,1" />
                 <shared:AddToPlaylistButton IsCompact="True" IsGhost="True" IsIconOnly="True" Margin="0,1,6,1" />
                 <ContentPresenter Content="{Binding SelectionActions, ElementName=Root}" VerticalAlignment="Center" />
+                <Button
+                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.ExportTracks}}"
+                    Classes="icon ghost compact"
+                    Click="OnExportTracks"
+                    IsEnabled="{Binding HasActionTracks}"
+                    Margin="0,1,6,1"
+                    ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.ExportTracks}}">
+                    <Path Classes="icon" Data="{StaticResource Icon.Download}" />
+                </Button>
+                <ContentPresenter Content="{Binding SelectionHint, ElementName=Root}" VerticalAlignment="Center" />
             </WrapPanel>
         </Border>
     </StackPanel>

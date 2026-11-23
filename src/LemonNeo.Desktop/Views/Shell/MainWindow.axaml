@@ -53,6 +53,12 @@
         <Style Selector="backgroundControls|AppleMusicMeshBackground#DynamicArtworkBackground.lyrics">
             <Setter Property="Opacity" Value="1" />
         </Style>
+        <Style Selector="backgroundControls|AppleMusicMeshBackground#DynamicArtworkBackground.lyricsOnly:not(.lyrics)">
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+        <Style Selector="backgroundControls|AppleMusicMeshBackground#DynamicArtworkBackground.disabled, backgroundControls|AppleMusicMeshBackground#DynamicArtworkBackground.lyricsOnly:not(.lyrics):transparent">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
         <Style Selector="Border#ContentBackground">
             <Setter Property="Grid.Column" Value="1" />
             <Setter Property="Grid.RowSpan" Value="2" />
@@ -101,14 +107,15 @@
             ArtworkSource="{Binding Playback}"
             BassPulseScale="{Binding VisualEffects.AppleMusicMeshBassPulseScale}"
             BlurScale="{Binding VisualEffects.AppleMusicMeshBlurScale}"
-            Classes.lyrics="{Binding Navigation.IsLyrics}"
+            Classes.disabled="{Binding !VisualEffects.AppleMusicMeshEnabled}"
+            Classes.lyrics="{Binding Navigation.IsLyricsPageTarget}"
             Classes.lyricsExpanded="{Binding IsLyricsExpanded}"
+            Classes.lyricsOnly="{Binding VisualEffects.AppleMusicMeshLyricsOnly}"
             FrameRateLimit="{Binding VisualEffects.AppleMusicMeshFrameRateLimit}"
             IsAnimationEnabled="{Binding Playback.CanAnimateBackground}"
             IsHitTestVisible="False"
             IsMeshEnabled="True"
             IsPlaying="{Binding Playback.IsPlaying}"
-            IsVisible="{Binding IsAppleMusicMeshBackgroundVisible}"
             Name="DynamicArtworkBackground"
             PresetSlot="{Binding VisualEffects.AppleMusicMeshPresetSlot}"
             PulseSource="{Binding Playback}"

@@ -12,10 +12,12 @@ public sealed class SlideFadeTransition : IPageTransition
     public TimeSpan Duration { get; set; } = TimeSpan.FromMilliseconds(220);
     public double Distance { get; set; } = 32;
     public Easing EntranceEasing { get; } = new CubicEaseOut();
+    internal Action? OnStarting { get; init; }
 
     public async Task Start(Visual? from, Visual? to, bool forward, CancellationToken cancellationToken)
     {
         if (cancellationToken.IsCancellationRequested) return;
+        OnStarting?.Invoke();
         if (from is not null) from.IsVisible = false;
         if (to is null) return;
         var toTransform = to.RenderTransform;

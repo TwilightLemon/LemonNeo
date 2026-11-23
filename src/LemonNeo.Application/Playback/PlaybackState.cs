@@ -23,7 +23,10 @@ public sealed record PlaybackResumeState(
 public sealed record PlaybackPreferences(
     double Volume = 1,
     AudioQuality Quality = AudioQuality.Automatic,
-    string? PreferredPlayerId = null);
+    string? PreferredPlayerId = null)
+{
+    public bool PreferCachedResources { get; init; }
+}
 
 /// <summary>The resolved settings and the library scope that supplied them. Both IDs are null for global.</summary>
 public sealed record ResolvedDecodeProfile(DecodeProfile Profile, Guid? PlaylistId = null, Guid? ItemId = null);

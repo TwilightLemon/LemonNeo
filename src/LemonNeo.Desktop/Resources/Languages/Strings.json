@@ -531,5 +531,18 @@
   "RemoveSelectedTracks": "Remove",
   "PlaylistMore": "Playlist options",
   "ManageTracks": "Manage",
-  "DragTracksToReorder": "Drag tracks to reorder"
+  "DragTracksToReorder": "Drag tracks to reorder",
+  "PreferCachedResources": "Prefer cached audio",
+  "ExportTracks": "Export tracks",
+  "ExportFolder": "Export folder",
+  "ExportLrcLyrics": "Export lyrics (.lrc)",
+  "ExportTrackTags": "Write song metadata and cover art",
+  "ExportFileNameFormat": "File name format",
+  "ExportFileNameFormatDescription": "T = title, A = artist, I = number starting at 1 (batch only).",
+  "ExportTracksStarted": "Exporting {0} track(s)…",
+  "ExportTracksFinished": "Exported {0} of {1} track(s).",
+  "ExportLyricsMissing": "Lyrics were unavailable for {0} track(s).",
+  "ExportTagsUnsupported": "The audio format does not support metadata export for {0} track(s).",
+  "ExportArtworkMissing": "Cover art was unavailable for {0} track(s).",
+  "ExportAdditionalFailures": "{0} additional track(s) failed."
 }

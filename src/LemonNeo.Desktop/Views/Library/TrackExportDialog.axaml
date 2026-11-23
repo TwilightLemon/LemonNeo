@@ -1,0 +1,53 @@
+<Window
+    CanResize="False"
+    SizeToContent="Height"
+    Title="{Translate {x:Static i18n:LanguageManager+Keys.ExportTracks}}"
+    Width="470"
+    WindowStartupLocation="CenterOwner"
+    x:Class="LemonNeo.Desktop.Views.Library.TrackExportDialog"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:i18n="using:LemonNeo.Desktop.Services"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel Margin="28" Spacing="14">
+        <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.ExportFolder}}" />
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <TextBox
+                AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.ExportFolder}}"
+                IsReadOnly="True"
+                Name="FolderPath" />
+            <Button
+                Click="OnChooseFolder"
+                Content="{Translate {x:Static i18n:LanguageManager+Keys.ChooseFolder}}"
+                Grid.Column="1"
+                Name="ChooseFolderButton" />
+        </Grid>
+        <StackPanel Spacing="6">
+            <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.ExportFileNameFormat}}" />
+            <TextBox
+                AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.ExportFileNameFormat}}"
+                Name="FileNameFormat"
+                PlaceholderText="T - A" />
+            <TextBlock
+                Classes="caption"
+                Text="{Translate {x:Static i18n:LanguageManager+Keys.ExportFileNameFormatDescription}}"
+                TextWrapping="Wrap" />
+        </StackPanel>
+        <CheckBox
+            Content="{Translate {x:Static i18n:LanguageManager+Keys.ExportLrcLyrics}}"
+            Name="WriteLyrics" />
+        <CheckBox
+            Content="{Translate {x:Static i18n:LanguageManager+Keys.ExportTrackTags}}"
+            Name="WriteTags" />
+        <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="10">
+            <Button
+                Click="OnCancel"
+                Content="{Translate {x:Static i18n:LanguageManager+Keys.Cancel}}"
+                IsCancel="True" />
+            <Button
+                Classes="primary"
+                Click="OnExport"
+                Content="{Translate {x:Static i18n:LanguageManager+Keys.ExportTracks}}"
+                IsDefault="True" />
+        </StackPanel>
+    </StackPanel>
+</Window>
