@@ -10,6 +10,12 @@ namespace LemonNeo.Desktop.Resources.Themes;
 public sealed class ThemeResources : ResourceDictionary
 {
     private readonly Dictionary<string, SolidColorBrush> _brushes = [];
+    private readonly LinearGradientBrush _playbackRow = new()
+    {
+        StartPoint = new RelativePoint(0, .5, RelativeUnit.Relative),
+        EndPoint = new RelativePoint(1, .5, RelativeUnit.Relative),
+        GradientStops = [new GradientStop(default, 0), new GradientStop(default, .28), new GradientStop(default, .70)]
+    };
 
     public ThemeResources()
     {
@@ -19,6 +25,7 @@ public sealed class ThemeResources : ResourceDictionary
             _brushes.Add(role, brush);
             this[$"Brush.{role}"] = brush;
         }
+        this["Brush.PlaybackRow"] = _playbackRow;
         Apply(Snapshot());
     }
 
@@ -30,5 +37,9 @@ public sealed class ThemeResources : ResourceDictionary
     public void Apply(IReadOnlyDictionary<string, Color> colors)
     {
         foreach (var (role, color) in colors) _brushes[role].Color = color;
+        var accent = colors["AccentText"];
+        _playbackRow.GradientStops[0].Color = Color.FromArgb(28, accent.R, accent.G, accent.B);
+        _playbackRow.GradientStops[1].Color = Color.FromArgb(12, accent.R, accent.G, accent.B);
+        _playbackRow.GradientStops[2].Color = Color.FromArgb(0, accent.R, accent.G, accent.B);
     }
 }

@@ -1,6 +1,7 @@
 <Styles
     xmlns="https://github.com/avaloniaui"
     xmlns:i18n="using:LemonNeo.Desktop.Services"
+    xmlns:playbackControls="using:LemonNeo.Desktop.Controls.Playback"
     xmlns:playbackVm="using:LemonNeo.Desktop.ViewModels.Playback"
     xmlns:sharedControls="using:LemonNeo.Desktop.Controls.Shared"
     xmlns:sharedVm="using:LemonNeo.Desktop.ViewModels.Shared"
@@ -27,7 +28,7 @@
     <Style Selector="Border.card">
         <Setter Property="Background" Value="{DynamicResource Brush.Surface}" />
         <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />
-        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderThickness" Value="0" />
         <Setter Property="CornerRadius" Value="{DynamicResource Radius.Card}" />
         <Setter Property="Padding" Value="24" />
     </Style>
@@ -98,8 +99,32 @@
         <Setter Property="CornerRadius" Value="24" />
         <Setter Property="BoxShadow" Value="0 4 16 0 #55000000" />
     </Style>
-    <Style Selector="Border.trackRow.current TextBlock">
+    <Style Selector="Border.trackRow.current TextBlock.trackTitle">
         <Setter Property="Foreground" Value="{DynamicResource Brush.AccentText}" />
+    </Style>
+    <Style Selector="playbackControls|NowPlayingIndicator">
+        <Setter Property="Fill" Value="{DynamicResource Brush.AccentText}" />
+        <Setter Property="Height" Value="22" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="IsHitTestVisible" Value="False" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Width" Value="22" />
+    </Style>
+    <Style Selector="playbackControls|NowPlayingIndicator.managing">
+        <Setter Property="HorizontalAlignment" Value="Right" />
+        <Setter Property="Margin" Value="0,0,4,0" />
+    </Style>
+    <Style Selector="playbackControls|NowPlayingIndicator.playing[IsVisible=True]:not(.reduceMotion)">
+        <Style.Animations>
+            <Animation Duration="0:0:2.2" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Phase" Value="0" />
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Phase" Value="1" />
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
     </Style>
     <Style Selector="ListBoxItem.dragging">
         <Setter Property="Opacity" Value="0.5" />
@@ -249,8 +274,11 @@
     <Style Selector="ListBox.queueList ListBoxItem" x:DataType="playbackVm:QueueTrackViewModel">
         <Setter Property="sharedControls:TrackRowAppearance.IsCurrent" Value="{Binding IsCurrent}" />
     </Style>
-    <Style Selector="ListBoxItem.current /template/ ContentPresenter, ListBoxItem.marked /template/ ContentPresenter">
+    <Style Selector="ListBoxItem.marked /template/ ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource Brush.AccentSoft}" />
+    </Style>
+    <Style Selector="ListBoxItem.current:not(.marked):not(:selected):not(:pointerover) /template/ ContentPresenter, ListBox.managing ListBoxItem.current:not(.marked):not(:pointerover) /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource Brush.PlaybackRow}" />
     </Style>
     <Style Selector="ListBox.managing ListBoxItem:selected:not(.current):not(.marked):not(:pointerover) /template/ ContentPresenter">
         <Setter Property="Background" Value="Transparent" />

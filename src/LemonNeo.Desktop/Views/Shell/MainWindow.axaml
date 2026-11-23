@@ -414,8 +414,8 @@
         <Border
             Background="Transparent"
             BorderBrush="{DynamicResource Brush.Border}"
-            BorderThickness="1"
-            BoxShadow="0 8 28 0 #24000000"
+            BorderThickness="0"
+            BoxShadow="4 4 12 4 #34000000"
             Classes.lyricsExpanded="{Binding IsLyricsExpanded}"
             CornerRadius="20"
             Margin="20,0,20,20"
@@ -547,7 +547,10 @@
                                         Data="{StaticResource Icon.Playback.Play}"
                                         IsVisible="{Binding !Playback.IsPlaying}"
                                         Margin="4,0,0,0" />
-                                    <Path Classes="icon transport" Data="{StaticResource Icon.Playback.Pause}" IsVisible="{Binding Playback.IsPlaying}" />
+                                    <Path
+                                        Classes="icon transport"
+                                        Data="{StaticResource Icon.Playback.Pause}"
+                                        IsVisible="{Binding Playback.IsPlaying}" />
                                 </Grid>
                             </Button>
                             <Button
@@ -575,9 +578,18 @@
                                 ToolTip.Tip="{Binding Playback.ModeLabel}"
                                 VerticalAlignment="Center">
                                 <Grid>
-                                    <Path Classes="icon" Data="{StaticResource Icon.Sequential}" IsVisible="{Binding Playback.IsSequential}" />
-                                    <Path Classes="icon" Data="{StaticResource Icon.RepeatAll}" IsVisible="{Binding Playback.IsRepeatAll}" />
-                                    <Path Classes="icon" Data="{StaticResource Icon.Shuffle}" IsVisible="{Binding Playback.IsShuffle}" />
+                                    <Path
+                                        Classes="icon"
+                                        Data="{StaticResource Icon.Sequential}"
+                                        IsVisible="{Binding Playback.IsSequential}" />
+                                    <Path
+                                        Classes="icon"
+                                        Data="{StaticResource Icon.RepeatAll}"
+                                        IsVisible="{Binding Playback.IsRepeatAll}" />
+                                    <Path
+                                        Classes="icon"
+                                        Data="{StaticResource Icon.Shuffle}"
+                                        IsVisible="{Binding Playback.IsShuffle}" />
                                 </Grid>
                             </Button>
                             <Grid
@@ -606,22 +618,37 @@
                                         TextTrimming="CharacterEllipsis"
                                         VerticalAlignment="Center" />
                                 </StackPanel>
-                                <Button Name="DecoderButton" Grid.Column="1" Classes="ghost icon" Margin="8,0,0,0" Padding="0"
-                                        IsEnabled="{Binding SharedContext.IsInitialized}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DecoderControls}}"
-                                        ToolTip.Tip="{Binding SharedContext.DecoderControls.DecoderToolTip}">
+                                <Button
+                                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DecoderControls}}"
+                                    Classes="ghost icon"
+                                    Grid.Column="1"
+                                    IsEnabled="{Binding SharedContext.IsInitialized}"
+                                    Margin="8,0,0,0"
+                                    Name="DecoderButton"
+                                    Padding="0"
+                                    ToolTip.Tip="{Binding SharedContext.DecoderControls.DecoderToolTip}">
                                     <Grid Height="24" Width="24">
                                         <Path Classes="icon" Data="{StaticResource Icon.Decoder}" />
-                                        <Ellipse Width="5" Height="5" HorizontalAlignment="Right" VerticalAlignment="Top"
-                                                 Fill="{DynamicResource Brush.AccentText}" IsVisible="{Binding SharedContext.DecoderControls.UsingScopedProfile}" />
+                                        <Ellipse
+                                            Fill="{DynamicResource Brush.AccentText}"
+                                            Height="5"
+                                            HorizontalAlignment="Right"
+                                            IsVisible="{Binding SharedContext.DecoderControls.UsingScopedProfile}"
+                                            VerticalAlignment="Top"
+                                            Width="5" />
                                     </Grid>
                                     <Button.Flyout>
                                         <Flyout Placement="TopEdgeAlignedRight">
                                             <ScrollViewer MaxHeight="440" Width="310">
-                                                <StackPanel Spacing="12" Margin="4">
+                                                <StackPanel Margin="4" Spacing="12">
                                                     <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.DecoderControls}}" />
-                                                    <playbackViews:AudioOutputView ShowAdvanced="False" IsVisible="{Binding DataContext, RelativeSource={RelativeSource Self}, Converter={x:Static ObjectConverters.IsNotNull}}"
-                                                        DataContext="{Binding SharedContext.DecoderControls.QuickOutput}" />
-                                                    <TextBlock Classes="caption" IsVisible="{Binding SharedContext.DecoderControls.QuickOutput, Converter={x:Static ObjectConverters.IsNull}}"
+                                                    <playbackViews:AudioOutputView
+                                                        DataContext="{Binding SharedContext.DecoderControls.QuickOutput}"
+                                                        IsVisible="{Binding DataContext, RelativeSource={RelativeSource Self}, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                                        ShowAdvanced="False" />
+                                                    <TextBlock
+                                                        Classes="caption"
+                                                        IsVisible="{Binding SharedContext.DecoderControls.QuickOutput, Converter={x:Static ObjectConverters.IsNull}}"
                                                         Text="{Translate {x:Static i18n:LanguageManager+Keys.DecoderDefaultOutput}}" />
                                                     <playbackViews:DecodeProfileView DataContext="{Binding SharedContext.DecoderControls.QuickProfile}" />
                                                 </StackPanel>
@@ -640,8 +667,14 @@
                                     Padding="0"
                                     ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Volume}}">
                                     <Grid>
-                                        <Path Classes="icon" Data="{StaticResource Icon.Volume}" IsVisible="{Binding !Playback.IsMuted}" />
-                                        <Path Classes="icon" Data="{StaticResource Icon.VolumeMuted}" IsVisible="{Binding Playback.IsMuted}" />
+                                        <Path
+                                            Classes="icon"
+                                            Data="{StaticResource Icon.Volume}"
+                                            IsVisible="{Binding !Playback.IsMuted}" />
+                                        <Path
+                                            Classes="icon"
+                                            Data="{StaticResource Icon.VolumeMuted}"
+                                            IsVisible="{Binding Playback.IsMuted}" />
                                     </Grid>
                                 </Button>
                                 <Button

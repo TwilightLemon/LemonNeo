@@ -14,7 +14,6 @@ namespace LemonNeo.Desktop.ViewModels.Shared;
 public abstract class TrackListViewModel : PageViewModel
 {
     protected readonly DesktopNavigation Navigation;
-    protected readonly PlaybackViewModel Playback;
     private readonly IDisposable _preferencesSubscription;
     private readonly DispatcherTimer _filterTimer;
     private readonly TrackCollection<TrackRow> _tracks = [];
@@ -54,6 +53,7 @@ public abstract class TrackListViewModel : PageViewModel
         _targetPlaylist = Playlists.FirstOrDefault();
     }
 
+    public PlaybackViewModel Playback { get; }
     public ObservableCollection<Playlist> Playlists => Context.Playlists;
     public ObservableCollection<TrackRow> Tracks => _tracks;
     protected IList<TrackRow> UnfilteredTracks => _rows;
