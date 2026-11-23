@@ -45,15 +45,13 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
         {
             if (!CanUseMetadataMatch(row) || string.IsNullOrWhiteSpace(row!.Match.Track.Title)) return;
             Editor!.ApplyMetadata(row!.Match.Track);
-            row.MarkMetadataReplaced();
-            SetStatus(LanguageManager.Keys.MetadataApplied);
+            Notify(NotificationLevel.Success, LanguageManager.Keys.MetadataApplied);
         }, row => CanUseMetadataMatch(row) && !string.IsNullOrWhiteSpace(row!.Match.Track.Title));
         AddMatchExternalIdsCommand = new RelayCommand<MetadataMatchRow>(row =>
         {
             if (!CanUseMetadataMatch(row)) return;
             var added = Editor!.AddExternalIds(row!.Match.Track.ExternalIds);
-            row.MarkExternalIdsAdded();
-            SetStatus(LanguageManager.Keys.MetadataIdsAdded, added);
+            Notify(NotificationLevel.Success, LanguageManager.Keys.MetadataIdsAdded, added);
         }, row => CanUseMetadataMatch(row) && row!.Match.Track.ExternalIds.Count > 0);
         MetadataSources = MetadataSourceOption.Create(_host.Get<IProviderRegistry>(),
             _host.Get<IPlaybackSourceProviderRegistry>());
@@ -123,7 +121,7 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
             // Stay in the editor on validation or persistence failure.
             Context.RefreshLibrary();
             if (ReferenceEquals(Navigation.Current, this)) await Navigation.GoBackAsync();
-            SetStatus(LanguageManager.Keys.LibrarySaved);
+            Notify(NotificationLevel.Success, LanguageManager.Keys.LibrarySaved);
         });
     }
 
@@ -194,7 +192,9 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
                         { ArtworkLoader = _host.Get<ArtworkService>() });
             RefreshMetadataCommands();
             InspectionMessages = FormatErrors(result.SourceErrors);
-            SetStatus(LanguageManager.Keys.MetadataCompleted, result.Matches.Count);
+            Notify(result.SourceErrors.Count > 0 ? NotificationLevel.Warning : NotificationLevel.Information,
+                result.SourceErrors.Count > 0 ? LanguageManager.Keys.MetadataCompletedWithErrors : LanguageManager.Keys.MetadataCompleted,
+                result.Matches.Count);
         });
     }
 
@@ -209,6 +209,8 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
                 ? FormatLyricsDetails(lyrics, result.ProviderId)
                 : _text[LanguageManager.Keys.NoLyrics];
             InspectionMessages = FormatErrors(result.ProviderErrors);
+            if (result.ProviderErrors.Count > 0)
+                Notify(NotificationLevel.Warning, LanguageManager.Keys.InspectionSourcesFailed);
         });
     }
 
@@ -225,7 +227,9 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
             _sourceTrack = track;
             SelectedSource = DiscoveredSources.FirstOrDefault();
             InspectionMessages = FormatErrors(result.ProviderErrors);
-            SetStatus(LanguageManager.Keys.SourcesCompleted, result.Candidates.Count);
+            Notify(result.ProviderErrors.Count > 0 ? NotificationLevel.Warning : NotificationLevel.Information,
+                result.ProviderErrors.Count > 0 ? LanguageManager.Keys.SourcesCompletedWithErrors : LanguageManager.Keys.SourcesCompleted,
+                result.Candidates.Count);
         });
     }
 

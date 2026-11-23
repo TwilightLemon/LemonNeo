@@ -23,10 +23,9 @@
                            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.AudioOutputRate}}" />
             <TextBlock Classes="muted" Text="{Binding RateDescription}" TextWrapping="Wrap" />
         </StackPanel>
-        <StackPanel Spacing="4" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-            <TextBlock Classes="caption" Text="{Binding Error}" TextWrapping="Wrap" />
-            <Button HorizontalAlignment="Left" Command="{Binding RestoreSelectionCommand}"
-                    Content="{Translate {x:Static i18n:LanguageManager+Keys.AudioOutputRestore}}" />
-        </StackPanel>
+        <Button HorizontalAlignment="Left"
+                IsVisible="{Binding CanRestoreSelection}"
+                Command="{Binding RestoreSelectionCommand}"
+                Content="{Translate {x:Static i18n:LanguageManager+Keys.AudioOutputRestore}}" />
     </StackPanel>
 </UserControl>

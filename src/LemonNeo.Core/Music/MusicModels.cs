@@ -54,6 +54,7 @@ public sealed record Artist
 {
     public required MusicItemId Id { get; init; }
     public required string Name { get; init; }
+    public Uri? ArtworkUri { get; init; }
 }
 
 public sealed record Album

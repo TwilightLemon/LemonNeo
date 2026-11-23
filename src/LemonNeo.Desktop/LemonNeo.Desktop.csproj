@@ -2,12 +2,14 @@
     <PropertyGroup>
         <OutputType>WinExe</OutputType>
         <ApplicationIcon>Resources/Icons/App.ico</ApplicationIcon>
+        <ApplicationManifest>Properties/app.manifest</ApplicationManifest>
         <Version>0.1.3</Version>
         <IsLemonNeoHost>true</IsLemonNeoHost>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     </PropertyGroup>
     <ItemGroup>
         <AvaloniaResource Include="Resources/Icons/App.ico" />
+        <PackageReference Include="Avalonia.Controls.WebView" Version="12.1.1" />
         <PackageReference Include="Avalonia.Desktop" Version="12.1.3" />
         <PackageReference Include="Avalonia.Skia" Version="12.1.3" />
         <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.3" />

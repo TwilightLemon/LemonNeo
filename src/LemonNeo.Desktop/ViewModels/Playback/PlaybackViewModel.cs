@@ -29,6 +29,7 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
     private readonly LowFrequencyPulseAnalyzer _pulseAnalyzer = new();
     private CancellationTokenSource? _artworkCancellation;
     private BackgroundArtworkFrame? _backgroundArtwork;
+    private (long RequestId, string Error)? _notifiedPlaybackFailure;
     private Uri? _artworkUri;
     private bool _closing;
     private bool _isSourceDetailsOpen;
@@ -298,7 +299,12 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
         catch (OperationCanceledException) { }
         catch (Exception exception)
         {
-            if (!_closing) SetError(LanguageManager.Keys.OperationFailed, [exception.Message]);
+            if (_closing) return;
+            var snapshot = _session.Snapshot;
+            if (snapshot.Error == exception.Message)
+                ReportSnapshotFailure(snapshot);
+            else
+                Notify(NotificationLevel.Error, LanguageManager.Keys.OperationFailed, exception.Message);
         }
     }
 
@@ -330,8 +336,7 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
         if ((changes & PlaybackUpdateKind.State) != 0)
         {
             IsBusy = IsLoading;
-            if (Snapshot.Error is { } error) SetError(LanguageManager.Keys.OperationFailed, [error]);
-            else SetError(null);
+            ReportSnapshotFailure(Snapshot);
             RaiseStateProperties();
             StateChanged?.Invoke(this, EventArgs.Empty);
         }
@@ -347,6 +352,21 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
         }
         if ((changes & PlaybackUpdateKind.Volume) != 0 && !_isUpdatingVolume)
             SetDisplayedVolume(Snapshot.Volume * 100);
+    }
+
+    private void ReportSnapshotFailure(PlaybackSessionSnapshot snapshot)
+    {
+        if (snapshot.Error is not { } error)
+        {
+            _notifiedPlaybackFailure = null;
+            return;
+        }
+
+        // A command can throw the same failure that the playback session publishes.
+        var failure = (snapshot.RequestId, error);
+        if (_notifiedPlaybackFailure == failure) return;
+        _notifiedPlaybackFailure = failure;
+        Notify(NotificationLevel.Error, LanguageManager.Keys.OperationFailed, error);
     }
 
     public Task RefreshVolumeAsync()
@@ -368,14 +388,13 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
         }
         catch (Exception exception)
         {
-            SetError(LanguageManager.Keys.OperationFailed, [exception.Message]);
+            if (!_closing) Notify(NotificationLevel.Error, LanguageManager.Keys.OperationFailed, exception.Message);
         }
     }
 
     private async Task ApplyVolumeAsync()
     {
         _isUpdatingVolume = true;
-        SetError(null);
         try
         {
             // Coalesce slider input while an asynchronous decoder call is still processing it.
@@ -390,7 +409,7 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
                 }
                 catch (Exception exception)
                 {
-                    SetError(LanguageManager.Keys.OperationFailed, [exception.Message]);
+                    if (!_closing) Notify(NotificationLevel.Error, LanguageManager.Keys.OperationFailed, exception.Message);
                 }
             }
         }

@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
+using LemonNeo.Abstractions.Providers;
 using LemonNeo.Application.Library;
 using LemonNeo.Core.Library;
 using LemonNeo.Core.Music;
@@ -39,8 +40,11 @@ public abstract class TrackListViewModel : PageViewModel
             AsyncRelayCommandOptions.AllowConcurrentExecutions);
         InspectTrackCommand = new RelayCommand(() =>
         {
-            if (CanInspectTrack && SelectedTrack is { } row) _ = Navigation.OpenEditorAsync(row);
+            if (CanInspectTrack && SelectedTrack is { } row) _ = InspectTrackAsync(row);
         });
+        OpenCatalogItemCommand = new AsyncRelayCommand<CatalogItem>(item =>
+            CanInteract && !IsSelectionMode && item is not null
+                ? Navigation.OpenCatalogItemAsync(item) : Task.CompletedTask);
         AddToPlaylistCommand = new AsyncRelayCommand(async () => await AddSelectedTracksAsync());
         ToggleSelectionCommand = new RelayCommand(() => IsSelectionMode = !IsSelectionMode);
         SelectAllCommand = new RelayCommand(() => SetSelection(true));
@@ -91,6 +95,7 @@ public abstract class TrackListViewModel : PageViewModel
     }
 
     public bool HasTracks => Tracks.Count > 0;
+    internal bool ReduceMotion => Context.Appearance.Current.ReduceMotion;
     public bool CanPlay => CanInteract && Playback.CanInteract && HasPlayableTracks;
     protected virtual bool HasPlayableTracks => HasTracks;
     public bool CanInspectTrack => CanInteract && SelectedTrack is not null && !IsSelectionMode;
@@ -144,6 +149,7 @@ public abstract class TrackListViewModel : PageViewModel
     public AsyncRelayCommand PlayAllCommand { get; }
     public AsyncRelayCommand PlaySelectedCommand { get; }
     public RelayCommand InspectTrackCommand { get; }
+    public AsyncRelayCommand<CatalogItem> OpenCatalogItemCommand { get; }
     public AsyncRelayCommand AddToPlaylistCommand { get; }
     public RelayCommand ToggleSelectionCommand { get; }
     public RelayCommand SelectAllCommand { get; }
@@ -157,6 +163,10 @@ public abstract class TrackListViewModel : PageViewModel
     }
 
     public abstract Task PlayAsync(TrackRow? selected = null);
+    internal Task InspectTrackAsync(TrackRow row) => CanInteract && Tracks.Contains(row)
+        ? Navigation.OpenEditorAsync(row)
+        : Task.CompletedTask;
+
     protected abstract IEnumerable<TrackRow> GetTracks();
 
     internal override object CaptureNavigationState() => new TrackListNavigationState(Filter,
@@ -185,6 +195,7 @@ public abstract class TrackListViewModel : PageViewModel
         _filterTimer.Stop();
         var existing = _rows.ToDictionary(RowKey);
         var artwork = _host.Get<ArtworkService>();
+        var providers = _host.Get<IProviderRegistry>();
         _rows = GetTracks().Select(row =>
         {
             if (existing.Remove(RowKey(row), out var previous))
@@ -193,12 +204,27 @@ public abstract class TrackListViewModel : PageViewModel
                 return previous;
             }
             row.ArtworkLoader = artwork;
+            row.CanBrowseCatalog = id => providers.Get(id.ProviderId) is ICatalogProvider;
+            row.FindCatalogTrack = FindCatalogTrack;
             row.IsSelectionMode = IsSelectionMode;
             row.PropertyChanged += OnRowChanged;
             return row;
         }).ToArray();
         foreach (var removed in existing.Values) removed.PropertyChanged -= OnRowChanged;
         ApplyFilter();
+    }
+
+    private MusicItemId? FindCatalogTrack(Track track)
+    {
+        var registry = _host.Get<IProviderRegistry>();
+        if (registry.Get(track.Id.ProviderId) is ICatalogProvider and ITrackLookupProvider) return track.Id;
+        foreach (var id in track.ExternalIds.OrderBy(id => id.Kind == "song-mid" ? 0 : 1))
+        {
+            if (id.Kind is not ("song-mid" or "song-id")) continue;
+            var provider = registry.Get(id.Namespace);
+            if (provider is ICatalogProvider and ITrackLookupProvider) return new MusicItemId(provider.Id, id.Value);
+        }
+        return null;
     }
 
     private void OnFilterTick(object? sender, EventArgs args)

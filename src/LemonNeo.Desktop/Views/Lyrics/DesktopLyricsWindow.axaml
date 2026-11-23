@@ -58,7 +58,7 @@
         Name="HoverCard"
         Padding="16,6,16,14"
         PointerPressed="OnDragWindow">
-        <Grid Name="DesktopLayout" RowDefinitions="40,*,Auto">
+        <Grid Name="DesktopLayout" RowDefinitions="40,*">
             <Border Name="Toolbar" VerticalAlignment="Center">
                 <Grid Name="ToolbarLayout" ColumnDefinitions="*,Auto,*">
                     <Path
@@ -228,14 +228,14 @@
                         Opacity="1" />
                 </lyricsControls:LyricsPresenter.Effect>
             </lyricsControls:LyricsPresenter>
-            <TextBlock
-                Foreground="#FFFFB4AB"
-                Grid.Row="2"
-                IsVisible="{Binding HasError}"
-                Margin="0,8,0,0"
-                Name="DesktopLyricsError"
-                Text="{Binding Error}"
-                TextWrapping="Wrap" />
+            <sharedControls:NotificationHost
+                Grid.ColumnSpan="2"
+                Grid.RowSpan="2"
+                HorizontalAlignment="Center"
+                MaxWidth="440"
+                Source="{Binding DesktopNotifications}"
+                VerticalAlignment="Bottom"
+                ZIndex="1" />
         </Grid>
     </Border>
 </Window>

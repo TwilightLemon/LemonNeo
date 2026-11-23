@@ -62,14 +62,14 @@
             <Setter Property="Grid.Row" Value="1" />
             <Setter Property="Margin" Value="32,20,32,0" />
         </Style>
-        <Style Selector="Border#PlaybackBar">
+        <Style Selector="Border#PlaybackBar, Grid#PlaybackNotifications">
             <Setter Property="Grid.Column" Value="1" />
             <Setter Property="Grid.Row" Value="1" />
         </Style>
         <Style Selector="Border#Sidebar.lyricsExpanded, Border#TopBar.lyricsExpanded">
             <Setter Property="IsVisible" Value="False" />
         </Style>
-        <Style Selector="Border#ContentBackground.lyricsExpanded, backgroundControls|AppleMusicMeshBackground#DynamicArtworkBackground.lyricsExpanded, Border#PlaybackBar.lyricsExpanded">
+        <Style Selector="Border#ContentBackground.lyricsExpanded, backgroundControls|AppleMusicMeshBackground#DynamicArtworkBackground.lyricsExpanded, Border#PlaybackBar.lyricsExpanded, Grid#PlaybackNotifications.lyricsExpanded">
             <Setter Property="Grid.Column" Value="0" />
             <Setter Property="Grid.ColumnSpan" Value="2" />
         </Style>
@@ -346,34 +346,9 @@
                     Width="40" />
             </Grid>
         </Border>
-        <Grid
-            Classes.lyricsExpanded="{Binding IsLyricsExpanded}"
-            Name="PageArea"
-            RowDefinitions="Auto,*">
-            <Border
-                Background="{DynamicResource Brush.DangerSoft}"
-                CornerRadius="10"
-                IsVisible="{Binding HasError}"
-                Margin="0,0,0,12"
-                Padding="14">
-                <Grid ColumnDefinitions="*,Auto">
-                    <TextBlock
-                        Foreground="{DynamicResource Brush.Danger}"
-                        MaxHeight="90"
-                        Text="{Binding Error}"
-                        TextWrapping="Wrap" />
-                    <Button
-                        AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}"
-                        Classes="ghost icon"
-                        Command="{Binding DismissErrorCommand}"
-                        Grid.Column="1">
-                        <Path Classes="icon" Data="{StaticResource Icon.Close}" />
-                    </Button>
-                </Grid>
-            </Border>
+        <Grid Classes.lyricsExpanded="{Binding IsLyricsExpanded}" Name="PageArea">
             <ContentControl
                 Content="{Binding Navigation.Host}"
-                Grid.Row="1"
                 HorizontalContentAlignment="Stretch"
                 Name="PageContent"
                 SizeChanged="OnPageContentSizeChanged"
@@ -386,7 +361,6 @@
                 </ContentControl.OpacityMask>
             </ContentControl>
             <Grid
-                Grid.Row="1"
                 HorizontalAlignment="Left"
                 IsVisible="{Binding Navigation.IsLyrics}"
                 VerticalAlignment="Top"
@@ -415,7 +389,7 @@
             Background="Transparent"
             BorderBrush="{DynamicResource Brush.Border}"
             BorderThickness="0"
-            BoxShadow="4 4 12 4 #34000000"
+            BoxShadow="0 0 12 2 #34000000"
             Classes.lyricsExpanded="{Binding IsLyricsExpanded}"
             CornerRadius="20"
             Margin="20,0,20,20"
@@ -441,28 +415,8 @@
                     Source="{Binding Playback}"
                     StripCount="{Binding VisualEffects.AudioVisualizerStripCount}"
                     VerticalAlignment="Bottom" />
-                <Grid Margin="16,24,16,16" RowDefinitions="Auto,*">
-                    <Grid
-                        ColumnDefinitions="*,Auto"
-                        IsVisible="{Binding Playback.HasError}"
-                        Margin="0,0,0,4">
-                        <TextBlock
-                            Foreground="{DynamicResource Brush.Danger}"
-                            Text="{Binding Playback.Error}"
-                            TextTrimming="CharacterEllipsis"
-                            ToolTip.Tip="{Binding Playback.Error}" />
-                        <Button
-                            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}"
-                            Classes="ghost icon compact"
-                            Command="{Binding Playback.DismissErrorCommand}"
-                            Grid.Column="1"
-                            Height="20"
-                            MinHeight="20"
-                            Padding="4,0">
-                            <Path Classes="icon small" Data="{StaticResource Icon.Close}" />
-                        </Button>
-                    </Grid>
-                    <Grid ColumnDefinitions="*,Auto,*" Grid.Row="1">
+                <Grid Margin="16,24,16,16">
+                    <Grid ColumnDefinitions="*,Auto,*">
                         <Button
                             AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Lyrics}}"
                             Classes="ghost"
@@ -717,6 +671,22 @@
                     VerticalAlignment="Top" />
             </Grid>
         </Border>
+        <Grid
+            Classes.lyricsExpanded="{Binding IsLyricsExpanded}"
+            IsHitTestVisible="False"
+            Margin="20,0,20,0"
+            MaxWidth="1020"
+            Name="PlaybackNotifications"
+            VerticalAlignment="Bottom"
+            ZIndex="2">
+            <Grid Margin="{DynamicResource Space.PlaybackInset}">
+                <sharedControls:NotificationHost
+                    HorizontalAlignment="Left"
+                    Margin="12,0,0,0"
+                    Name="MainNotifications"
+                    Source="{Binding SharedContext.Notifications}" />
+            </Grid>
+        </Grid>
         <Popup
             Closed="OnSourceDetailsClosed"
             IsLightDismissEnabled="True"

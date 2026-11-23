@@ -6,31 +6,9 @@
     xmlns:settingsVm="using:LemonNeo.Desktop.ViewModels.Settings"
     xmlns:sharedControls="using:LemonNeo.Desktop.Controls.Shared"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Grid RowDefinitions="Auto,Auto,*">
+    <Grid RowDefinitions="Auto,*">
         <sharedControls:PageHeader Summary="{Binding PageSummary}" Title="{Binding PageTitle}" />
-        <Border
-            Background="{DynamicResource Brush.DangerSoft}"
-            CornerRadius="10"
-            Grid.Row="1"
-            IsVisible="{Binding HasError}"
-            Margin="0,0,0,12"
-            Padding="14">
-            <Grid ColumnDefinitions="*,Auto">
-                <TextBlock
-                    Foreground="{DynamicResource Brush.Danger}"
-                    MaxHeight="90"
-                    Text="{Binding Error}"
-                    TextWrapping="Wrap" />
-                <Button
-                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}"
-                    Classes="ghost icon"
-                    Command="{Binding DismissErrorCommand}"
-                    Grid.Column="1">
-                    <Path Classes="icon" Data="{StaticResource Icon.Close}" />
-                </Button>
-            </Grid>
-        </Border>
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="1">
             <TabControl>
                 <TabItem Header="{Translate {x:Static i18n:LanguageManager+Keys.General}}">
                     <ScrollViewer HorizontalScrollBarVisibility="Disabled">

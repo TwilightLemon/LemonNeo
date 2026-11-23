@@ -6,28 +6,14 @@
     xmlns:libraryVm="using:LemonNeo.Desktop.ViewModels.Library"
     xmlns:sharedControls="using:LemonNeo.Desktop.Controls.Shared"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <UserControl.Styles>
-        <Style Selector="sharedControls|PageHeader.playlist">
-            <Setter Property="Grid.RowSpan" Value="3" />
-        </Style>
-    </UserControl.Styles>
     <Grid ClipToBounds="True" RowDefinitions="Auto,Auto,*">
-        <Border
-            IsHitTestVisible="False"
-            IsVisible="{Binding HasSelectedPlaylist}"
-            Name="CompactPlaylistHeader"
-            Opacity="0"
-            Padding="0,0,0,12">
-            <TextBlock
-                FontSize="20"
-                FontWeight="SemiBold"
-                MaxLines="1"
-                Name="CompactPlaylistTitle"
-                Text="{Binding PageTitle}"
-                TextTrimming="CharacterEllipsis" />
-        </Border>
+        <TextBlock
+            Classes="compactListTitle"
+            IsVisible="{Binding IsLibrary}"
+            Name="CompactTitle"
+            Text="{Binding PageTitle}" />
         <sharedControls:PageHeader
-            Classes.playlist="{Binding HasSelectedPlaylist}"
+            Classes.collapsible="{Binding IsLibrary}"
             Description="{Binding PageDescription}"
             Name="LibraryHeader"
             Summary="{Binding PageSummary}"
@@ -70,27 +56,6 @@
             Grid.Row="1"
             Name="LibraryTools"
             ZIndex="2">
-            <Border
-                Background="{DynamicResource Brush.DangerSoft}"
-                CornerRadius="10"
-                IsVisible="{Binding HasError}"
-                Margin="0,0,0,12"
-                Padding="14">
-                <Grid ColumnDefinitions="*,Auto">
-                    <TextBlock
-                        Foreground="{DynamicResource Brush.Danger}"
-                        MaxHeight="90"
-                        Text="{Binding Error}"
-                        TextWrapping="Wrap" />
-                    <Button
-                        AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}"
-                        Classes="ghost icon"
-                        Command="{Binding DismissErrorCommand}"
-                        Grid.Column="1">
-                        <Path Classes="icon" Data="{StaticResource Icon.Close}" />
-                    </Button>
-                </Grid>
-            </Border>
             <StackPanel
                 HorizontalAlignment="Right"
                 IsVisible="{Binding IsBusy}"
@@ -109,79 +74,9 @@
                     Command="{Binding CancelOperationCommand}"
                     Content="{Translate {x:Static i18n:LanguageManager+Keys.CancelOperation}}" />
             </StackPanel>
-            <StackPanel
-                Margin="0,0,0,10"
-                Name="LibraryToolbar"
-                Spacing="8">
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                    <TextBox
-                        AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.SearchPlaceholder}}"
-                        Classes="toolbarSearch"
-                        HorizontalAlignment="Left"
-                        Name="LibraryFilter"
-                        PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.SearchPlaceholder}}"
-                        Text="{Binding Filter}"
-                        Width="400" />
-                    <StackPanel
-                        Grid.Column="1"
-                        Margin="0,0,20,0"
-                        Orientation="Horizontal"
-                        Spacing="6"
-                        VerticalAlignment="Center">
-                        <StackPanel
-                            IsVisible="{Binding !IsSelectionMode}"
-                            Orientation="Horizontal"
-                            Spacing="6">
-                            <sharedControls:AddToPlaylistButton IsGhost="True" IsIconOnly="True" />
-                            <Button
-                                AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.TrackDetails}}"
-                                Classes="icon ghost"
-                                Command="{Binding InspectTrackCommand}"
-                                IsEnabled="{Binding CanInspectTrack}"
-                                Name="TrackDetailsButton"
-                                ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.TrackDetails}}">
-                                <Path Classes="icon" Data="{StaticResource Icon.TrackDetails}" />
-                            </Button>
-                        </StackPanel>
-                        <Button
-                            AutomationProperties.Name="{Binding SelectionModeLabel}"
-                            Classes="icon ghost"
-                            Command="{Binding ToggleSelectionCommand}"
-                            IsEnabled="{Binding CanInteract}"
-                            Name="ManageTracksButton"
-                            ToolTip.Tip="{Binding SelectionModeLabel}">
-                            <Panel>
-                                <Path Classes="icon" Data="{StaticResource Icon.ManageTracks}" IsVisible="{Binding !IsSelectionMode}" />
-                                <Path Classes="icon" Data="{StaticResource Icon.Done}" IsVisible="{Binding IsSelectionMode}" />
-                            </Panel>
-                        </Button>
-                    </StackPanel>
-                </Grid>
-                <Border
-                    Background="{DynamicResource Brush.AccentSoft}"
-                    CornerRadius="10"
-                    IsVisible="{Binding IsSelectionMode}"
-                    Padding="8,4">
+            <sharedControls:TrackListToolbar>
+                <sharedControls:TrackListToolbar.SelectionActions>
                     <WrapPanel>
-                        <TextBlock
-                            Margin="4,0,10,0"
-                            Text="{Binding SelectionSummary}"
-                            VerticalAlignment="Center" />
-                        <Button
-                            Classes="ghost compact"
-                            Command="{Binding SelectAllCommand}"
-                            Content="{Translate {x:Static i18n:LanguageManager+Keys.SelectAllTracks}}"
-                            Margin="0,1,6,1" />
-                        <Button
-                            Classes="ghost compact"
-                            Command="{Binding ClearSelectionCommand}"
-                            Content="{Translate {x:Static i18n:LanguageManager+Keys.ClearTrackSelection}}"
-                            Margin="0,1,6,1" />
-                        <sharedControls:AddToPlaylistButton
-                            IsCompact="True"
-                            IsGhost="True"
-                            IsIconOnly="True"
-                            Margin="0,1,6,1" />
                         <Button
                             AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.RemoveSelectedTracks}}"
                             Classes="danger icon compact ghost"
@@ -199,22 +94,19 @@
                             Text="{Translate {x:Static i18n:LanguageManager+Keys.DragTracksToReorder}}"
                             VerticalAlignment="Center" />
                     </WrapPanel>
-                </Border>
-            </StackPanel>
+                </sharedControls:TrackListToolbar.SelectionActions>
+            </sharedControls:TrackListToolbar>
         </StackPanel>
         <Grid Grid.Row="2">
             <ListBox
                 AutoScrollToSelectedItem="False"
                 Classes="trackList"
                 Classes.managing="{Binding IsSelectionMode}"
-                ContextRequested="OnTrackContextRequested"
-                DoubleTapped="OnTrackDoubleTapped"
                 Grid.IsSharedSizeScope="True"
                 IsEnabled="{Binding CanInteract}"
                 IsVisible="{Binding HasTracks}"
                 ItemTemplate="{StaticResource TrackRowTemplate}"
                 ItemsSource="{Binding Tracks}"
-                KeyDown="OnTrackKeyDown"
                 Name="TrackList"
                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                 SelectedItem="{Binding SelectedTrack}" />

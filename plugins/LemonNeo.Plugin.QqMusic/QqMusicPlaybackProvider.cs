@@ -11,7 +11,7 @@ namespace LemonNeo.Plugin.QqMusic;
 
 internal sealed class QqMusicPlaybackProvider(
     HttpClient httpClient,
-    Func<QqMusicCredentials?> getAuthentication,
+    Func<CancellationToken, QqMusicCredentials?, Task<QqMusicCredentials?>> getAuthentication,
     ILogger<QqMusicPlaybackProvider> logger) :
     IMusicProvider,
     IPlaybackProvider
@@ -52,14 +52,19 @@ internal sealed class QqMusicPlaybackProvider(
 
         var quality = SelectQuality(request.Quality);
         if (quality is null) return null;
-        var authentication = getAuthentication()
-                             ?? throw new ProviderException(
-                                 "QQ Music playback requires login. Run 'login qqmusic' first.");
-        var purl = await ResolvePurlAsync(
-            trackId.RemoteId,
-            quality,
-            authentication.Cookie,
-            cancellationToken);
+        const string signIn = "Sign in to QQ Music to play this track.";
+        var authentication = await getAuthentication(cancellationToken, null) ?? throw new ProviderException(signIn);
+        string? purl;
+        try
+        {
+            purl = await ResolvePurlAsync(trackId.RemoteId, quality, authentication.Cookie, cancellationToken);
+        }
+        catch (QqSessionExpiredException)
+        {
+            var refreshed = await getAuthentication(cancellationToken, authentication);
+            if (refreshed is null || refreshed.Cookie == authentication.Cookie) throw new ProviderException(signIn);
+            purl = await ResolvePurlAsync(trackId.RemoteId, quality, refreshed.Cookie, cancellationToken);
+        }
         if (string.IsNullOrWhiteSpace(purl)) return null;
 
         var playbackUri = Uri.TryCreate(purl, UriKind.Absolute, out var absolute)
@@ -164,6 +169,7 @@ internal sealed class QqMusicPlaybackProvider(
             if (!TryGetObject(document.RootElement, "req_0", out var requestResult))
                 throw new ProviderException("QQ Music playback response did not contain req_0.");
 
+            if (ReadInt32(requestResult, "code") is 1000 or 104400 or 104401) throw new QqSessionExpiredException();
             if (ReadInt32(requestResult, "code") is { } code && code != 0)
                 throw new ProviderException($"QQ Music playback API returned code {code}.");
 

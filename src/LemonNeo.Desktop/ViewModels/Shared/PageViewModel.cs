@@ -14,15 +14,11 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
     protected readonly DesktopContext Context;
     private readonly CancellationTokenSource _lifetime = new();
     private bool _closing;
-    private object?[] _errorArguments = [];
-    private string? _errorDetails;
-    private LinguaKey? _errorKey;
     private bool _isBusy;
     private bool _isNavigationActive = true;
     private bool _localizationDirty;
     private Task _operation = Task.CompletedTask;
     private CancellationTokenSource? _operationCancellation;
-    private object?[] _statusArguments = [];
     private LinguaKey? _statusKey;
 
     protected PageViewModel(DesktopContext context, string route)
@@ -31,7 +27,6 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
         Route = route;
         CancelOperationCommand =
             new RelayCommand(() => _operationCancellation?.Cancel(), () => _operationCancellation is not null);
-        DismissErrorCommand = new RelayCommand(() => SetError(null));
         Context.PropertyChanged += OnContextChanged;
         _text.Changed += OnLanguageChanged;
     }
@@ -52,15 +47,7 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
     }
 
     public virtual bool CanInteract => _operationCancellation is null && Context.IsInitialized && !_closing;
-    public bool HasStatus => _statusKey is not null;
-    public string Status => _statusKey is { } key ? _text.Format(key, _statusArguments) : "";
-
-    public string? Error => _errorKey is null
-        ? null
-        : _text.Format(_errorKey, _errorArguments) +
-          (_errorDetails is null ? "" : Environment.NewLine + _errorDetails);
-
-    public bool HasError => _errorKey is not null;
+    public string Status => _statusKey is { } key ? _text[key] : "";
     protected bool IsNavigationActive => _isNavigationActive;
     internal void SetNavigationActive(bool active)
     {
@@ -74,7 +61,6 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
     internal virtual object? CaptureNavigationState() => null;
     internal virtual void RestoreNavigationState(object? state) { }
     public RelayCommand CancelOperationCommand { get; }
-    public RelayCommand DismissErrorCommand { get; }
 
     public virtual async ValueTask DisposeAsync()
     {
@@ -121,7 +107,7 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
             }
 
             Context.RefreshLibrary();
-            SetStatus(LanguageManager.Keys.TracksAdded, tracks.Length, target.Name);
+            Notify(NotificationLevel.Success, LanguageManager.Keys.TracksAdded, added.Count, target.Name);
             succeeded = true;
         });
         return succeeded;
@@ -146,27 +132,24 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
         using var progressCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
         var progress = showBusy ? ShowBusyAsync(busyDelay, progressCancellation.Token) : Task.CompletedTask;
         RaiseInteractionProperties();
-        SetError(null);
         if (showBusy) SetStatus(status);
         try
         {
             await action(cancellation.Token);
-            if (showBusy && _statusKey == status) SetStatus(null);
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {
-            if (showBusy) SetStatus(LanguageManager.Keys.Cancelled);
         }
         catch (Exception exception)
         {
-            SetError(LanguageManager.Keys.OperationFailed, [exception.Message]);
-            if (showBusy) SetStatus(null);
+            Notify(NotificationLevel.Error, LanguageManager.Keys.OperationFailed, exception.Message);
         }
         finally
         {
             progressCancellation.Cancel();
             await progress;
             IsBusy = false;
+            if (showBusy) SetStatus(null);
             _operationCancellation = null;
             cancellation.Dispose();
             RaiseInteractionProperties();
@@ -187,21 +170,15 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
-    protected void SetStatus(LinguaKey? key, params object?[] arguments)
+    protected void SetStatus(LinguaKey? key)
     {
         _statusKey = key;
-        _statusArguments = arguments;
         OnPropertyChanged(nameof(Status));
-        OnPropertyChanged(nameof(HasStatus));
     }
 
-    protected void SetError(LinguaKey? key, object?[]? arguments = null, string? details = null)
+    protected void Notify(NotificationLevel level, LinguaKey key, params object?[] arguments)
     {
-        _errorKey = key;
-        _errorArguments = arguments ?? [];
-        _errorDetails = details;
-        OnPropertyChanged(nameof(Error));
-        OnPropertyChanged(nameof(HasError));
+        if (!_closing) Context.Notifications.Show(_text.Format(key, arguments), level);
     }
 
     protected virtual void RaiseInteractionProperties()
@@ -216,7 +193,6 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
         OnPropertyChanged(nameof(PageDescription));
         OnPropertyChanged(nameof(PageSummary));
         OnPropertyChanged(nameof(Status));
-        OnPropertyChanged(nameof(Error));
     }
 
     private void OnLanguageChanged(object? sender, EventArgs args)

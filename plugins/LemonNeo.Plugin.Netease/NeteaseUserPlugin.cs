@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using LemonNeo.Abstractions.Plugins;
@@ -13,15 +14,21 @@ namespace LemonNeo.Plugin.Netease;
 
 public sealed record AccountSettings(string? UserId = null, string? Nickname = null, string? AvatarUri = null);
 
-public sealed class NeteaseUserPlugin :
+public sealed partial class NeteaseUserPlugin :
     ILemonPlugin,
     IMusicProvider,
     ITrackLookupProvider,
     IPlaylistProvider,
-    IAuthenticationProvider
+    IWebAuthenticationProvider,
+    ISearchProvider,
+    ISearchNamespaceProvider,
+    ICatalogProvider
 {
     private const string ProviderId = "netease";
     private const string CookieKey = "music-163-cookie";
+    private static readonly Uri Site = new("https://music.163.com/");
+    private readonly SemaphoreSlim _sessionGate = new(1, 1);
+    private DateTimeOffset _nextRefresh;
     // Request sizes, not total import limits. Keep song-detail URLs below common proxy limits.
     private const int PlaylistPageSize = 100;
     private const int TrackBatchSize = 100;
@@ -43,7 +50,7 @@ public sealed class NeteaseUserPlugin :
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult<IReadOnlyList<AuthMethod>>([AuthMethod.Cookie]);
+        return Task.FromResult<IReadOnlyList<AuthMethod>>([AuthMethod.Browser, AuthMethod.Cookie]);
     }
 
     public async Task<AuthenticationState> AuthenticateAsync(
@@ -55,26 +62,39 @@ public sealed class NeteaseUserPlugin :
             throw new ProviderException("Netease login requires a complete music.163.com cookie string.");
 
         var cookie = NormalizeCookie(rawCookie);
-        var account = await GetAccountAsync(cookie, cancellationToken);
-        var credentials = Required(_credentials);
-        var configuration = Required(_settings);
-        await credentials.SetSecretAsync(CookieKey, cookie, cancellationToken);
-        configuration.Apply<AccountSettings>(_ =>
-            new AccountSettings(account.UserId, account.Nickname, account.AvatarUri?.AbsoluteUri));
-        _cookie = cookie;
-        State = new AuthenticationState(true, account.Nickname, account.UserId, account.AvatarUri);
-        _logger?.LogInformation("Authenticated Netease user {UserId}.", account.UserId);
-        return State;
+        await _sessionGate.WaitAsync(cancellationToken);
+        try
+        {
+            var account = await GetAccountAsync(cookie, cancellationToken);
+            await Required(_credentials).SetSecretAsync(CookieKey, cookie, cancellationToken);
+            Required(_settings).Apply<AccountSettings>(_ =>
+                new AccountSettings(account.UserId, account.Nickname, account.AvatarUri?.AbsoluteUri));
+            _cookie = cookie;
+            _nextRefresh = DateTimeOffset.UtcNow.AddHours(12);
+            State = new AuthenticationState(true, account.Nickname, account.UserId, account.AvatarUri);
+            _logger?.LogInformation("Authenticated Netease user {UserId}.", account.UserId);
+            return State;
+        }
+        finally
+        {
+            _sessionGate.Release();
+        }
     }
 
     public async Task SignOutAsync(CancellationToken cancellationToken = default)
     {
-        var credentials = Required(_credentials);
-        var configuration = Required(_settings);
-        await credentials.DeleteSecretAsync(CookieKey, cancellationToken);
-        configuration.Apply<AccountSettings>(_ => new AccountSettings());
-        _cookie = null;
-        State = new AuthenticationState(false);
+        await _sessionGate.WaitAsync(cancellationToken);
+        try
+        {
+            await Required(_credentials).DeleteSecretAsync(CookieKey, cancellationToken);
+            Required(_settings).Apply<AccountSettings>(_ => new AccountSettings());
+            _cookie = null;
+            State = new AuthenticationState(false);
+        }
+        finally
+        {
+            _sessionGate.Release();
+        }
     }
 
     public PluginDescriptor Descriptor { get; } = new(
@@ -84,7 +104,10 @@ public sealed class NeteaseUserPlugin :
 
     public async ValueTask InitializeAsync(IPluginContext context, CancellationToken cancellationToken)
     {
-        _httpClient = context.HttpClientFactory.CreateClient(Descriptor.Id);
+        _httpClient = new HttpClient(new SocketsHttpHandler { UseCookies = false, AllowAutoRedirect = false })
+        {
+            Timeout = TimeSpan.FromSeconds(15)
+        };
         _settings = context.Settings;
         await _settings.RegisterAsync(nameof(AccountSettings), new AccountSettings(),
             cancellationToken: cancellationToken);
@@ -95,8 +118,21 @@ public sealed class NeteaseUserPlugin :
         var userId = account.UserId;
         var nickname = account.Nickname;
         var avatar = account.AvatarUri;
-        if (!string.IsNullOrWhiteSpace(_cookie) && !string.IsNullOrWhiteSpace(userId))
-            State = new AuthenticationState(true, nickname ?? userId, userId, TryCreateAvatarUri(avatar));
+        if (!string.IsNullOrWhiteSpace(_cookie))
+        {
+            if (!string.IsNullOrWhiteSpace(userId))
+                State = new AuthenticationState(true, nickname ?? userId, userId, TryCreateAvatarUri(avatar));
+            using var startup = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            startup.CancelAfter(TimeSpan.FromSeconds(4));
+            try
+            {
+                await GetCookieAsync(startup.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                _nextRefresh = default;
+            }
+        }
 
         context.RegisterProvider(this);
     }
@@ -105,6 +141,7 @@ public sealed class NeteaseUserPlugin :
     {
         cancellationToken.ThrowIfCancellationRequested();
         _cookie = null;
+        _httpClient?.Dispose();
         _httpClient = null;
         _settings = null;
         _credentials = null;
@@ -122,15 +159,15 @@ public sealed class NeteaseUserPlugin :
     public async IAsyncEnumerable<RemotePlaylistSummary> GetUserPlaylistsAsync(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var (cookie, userId) = RequiredAuthentication();
+        var (_, userId) = await RequiredAuthenticationAsync(cancellationToken);
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var offset = 0;
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            using var document = await GetJsonAsync(
+            using var document = await GetAuthenticatedJsonAsync(
                 $"api/user/playlist/?offset={offset}&limit={PlaylistPageSize}&uid={Uri.EscapeDataString(userId)}",
-                cookie, cancellationToken);
+                cancellationToken);
             EnsureApiSuccess(document.RootElement);
             if (!document.RootElement.TryGetProperty("playlist", out var playlists) ||
                 playlists.ValueKind != JsonValueKind.Array)
@@ -162,10 +199,8 @@ public sealed class NeteaseUserPlugin :
         if (string.IsNullOrWhiteSpace(playlistId) || !playlistId.All(char.IsAsciiDigit))
             throw new ProviderException("A Netease playlist id must contain only digits.");
 
-        var (cookie, _) = RequiredAuthentication();
-        using var document = await GetJsonAsync(
+        using var document = await GetAuthenticatedJsonAsync(
             $"api/v6/playlist/detail?id={playlistId}&n={TrackBatchSize}",
-            cookie,
             cancellationToken);
         EnsureApiSuccess(document.RootElement);
         if (!document.RootElement.TryGetProperty("playlist", out var playlist) ||
@@ -191,7 +226,7 @@ public sealed class NeteaseUserPlugin :
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var requestValue = Uri.EscapeDataString("[" + string.Join(",", batch.Select(id => $"{{\"id\":{id}}}")) + "]");
-                using var details = await GetJsonAsync($"api/v3/song/detail?c={requestValue}", cookie, cancellationToken);
+                using var details = await GetAuthenticatedJsonAsync($"api/v3/song/detail?c={requestValue}", cancellationToken);
                 EnsureApiSuccess(details.RootElement);
                 if (!details.RootElement.TryGetProperty("songs", out var songs) || songs.ValueKind != JsonValueKind.Array)
                     throw new ProviderException("Netease returned no song collection.");
@@ -224,9 +259,9 @@ public sealed class NeteaseUserPlugin :
         if (string.IsNullOrWhiteSpace(trackId) || !trackId.All(char.IsAsciiDigit)) return null;
 
         var requestValue = Uri.EscapeDataString($"[{{\"id\":{trackId}}}]");
-        using var document = await GetJsonAsync(
+        using var document = await RequestJsonAsync(
             $"api/v3/song/detail?c={requestValue}",
-            _cookie ?? string.Empty,
+            await GetCookieAsync(cancellationToken) ?? "",
             cancellationToken);
         EnsureApiSuccess(document.RootElement);
         if (!document.RootElement.TryGetProperty("songs", out var songs) ||
@@ -241,7 +276,7 @@ public sealed class NeteaseUserPlugin :
         string cookie,
         CancellationToken cancellationToken)
     {
-        using var document = await GetJsonAsync("api/nuser/account/get", cookie, cancellationToken);
+        using var document = await RequestJsonAsync("api/nuser/account/get", cookie, cancellationToken);
         EnsureApiSuccess(document.RootElement);
         if (!document.RootElement.TryGetProperty("profile", out var profile) ||
             profile.ValueKind != JsonValueKind.Object ||
@@ -258,18 +293,21 @@ public sealed class NeteaseUserPlugin :
         return Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" ? uri : null;
     }
 
-    private async Task<JsonDocument> GetJsonAsync(
+    private async Task<JsonDocument> RequestJsonAsync(
         string relativePath,
         string cookie,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        CookieContainer? responseCookies = null,
+        HttpMethod? method = null)
     {
         using var request = new HttpRequestMessage(
-            HttpMethod.Get,
-            new Uri(new Uri("https://music.163.com/"), relativePath));
+            method ?? HttpMethod.Get,
+            new Uri(Site, relativePath));
+        if (method == HttpMethod.Post) request.Content = new FormUrlEncodedContent([]);
         request.Headers.TryAddWithoutValidation("Accept", "application/json, text/plain, */*");
         request.Headers.TryAddWithoutValidation("Accept-Language", "zh-CN,zh;q=0.9");
         request.Headers.TryAddWithoutValidation("Cookie", cookie);
-        request.Headers.Referrer = new Uri("https://music.163.com/");
+        request.Headers.Referrer = Site;
         request.Headers.TryAddWithoutValidation("User-Agent", UserAgent);
 
         using var response = await Required(_httpClient).SendAsync(
@@ -279,6 +317,13 @@ public sealed class NeteaseUserPlugin :
         if (!response.IsSuccessStatusCode)
             throw new ProviderException(
                 $"Netease request failed with HTTP {(int)response.StatusCode} ({response.ReasonPhrase}).");
+
+        if (responseCookies is not null && response.Headers.TryGetValues("Set-Cookie", out var updates))
+            foreach (var update in updates)
+            {
+                try { responseCookies.SetCookies(request.RequestUri!, update); }
+                catch (CookieException) { }
+            }
 
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         try
@@ -295,23 +340,20 @@ public sealed class NeteaseUserPlugin :
     {
         if (!TryReadId(value, "id", out var id) || string.IsNullOrWhiteSpace(ReadString(value, "name"))) return null;
 
-        var artists = new List<ArtistRef>();
-        if (value.TryGetProperty("ar", out var artistValues) && artistValues.ValueKind == JsonValueKind.Array)
-            foreach (var artist in artistValues.EnumerateArray())
-                if (ReadString(artist, "name") is { Length: > 0 } name)
-                    artists.Add(new ArtistRef { Name = name });
-
+        var artists = MapArtists(value);
         AlbumRef? album = null;
         Uri? artwork = null;
-        if (value.TryGetProperty("al", out var albumValue) && albumValue.ValueKind == JsonValueKind.Object)
+        if ((value.TryGetProperty("al", out var albumValue) || value.TryGetProperty("album", out albumValue)) &&
+            albumValue.ValueKind == JsonValueKind.Object)
         {
-            if (ReadString(albumValue, "name") is { Length: > 0 } title) album = new AlbumRef { Title = title };
+            if (ReadString(albumValue, "name") is { Length: > 0 } title)
+                album = new AlbumRef { Title = title, Id = ReadMusicId(albumValue) };
 
             if (Uri.TryCreate(ReadString(albumValue, "picUrl"), UriKind.Absolute, out var parsedArtwork))
                 artwork = parsedArtwork;
         }
 
-        var durationMilliseconds = ReadInt64(value, "dt");
+        var durationMilliseconds = ReadInt64(value, "dt") ?? ReadInt64(value, "duration");
         return new Track
         {
             Id = new MusicItemId(ProviderId, id),
@@ -340,15 +382,6 @@ public sealed class NeteaseUserPlugin :
             throw new ProviderException("The Netease cookie is empty or malformed.");
 
         return cookie;
-    }
-
-    private (string Cookie, string UserId) RequiredAuthentication()
-    {
-        if (!State.IsAuthenticated || string.IsNullOrWhiteSpace(_cookie) ||
-            string.IsNullOrWhiteSpace(State.UserId))
-            throw new ProviderException("Netease is not authenticated. Run 'login netease' first.");
-
-        return (_cookie, State.UserId);
     }
 
     private static void EnsureApiSuccess(JsonElement root)

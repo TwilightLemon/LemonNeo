@@ -8,6 +8,7 @@ using Avalonia.VisualTree;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LemonNeo.Desktop.Controls.Navigation;
+using LemonNeo.Desktop.ViewModels.Catalog;
 using LemonNeo.Desktop.ViewModels.Accounts;
 using LemonNeo.Desktop.ViewModels.Library;
 using LemonNeo.Desktop.ViewModels.Lyrics;
@@ -19,6 +20,7 @@ using LemonNeo.Desktop.ViewModels.Settings;
 using LemonNeo.Desktop.ViewModels.Shared;
 using LemonNeo.Desktop.ViewModels.Tools;
 using LemonNeo.Desktop.Views.Accounts;
+using LemonNeo.Desktop.Views.Catalog;
 using LemonNeo.Desktop.Views.Library;
 using LemonNeo.Desktop.Views.Lyrics;
 using LemonNeo.Desktop.Views.Metadata;
@@ -158,6 +160,25 @@ public sealed class DesktopNavigation : ObservableObject, IAsyncDisposable
                 RetireIfUnreferenced(entry);
                 throw;
             }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task OpenCatalogItemAsync(CatalogItem item)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            if (_disposed || Current is CatalogDetailViewModel current && current.Item.Id == item.Id &&
+                current.Item.Kind == item.Kind && current.Item.ResolveFromTrack == item.ResolveFromTrack &&
+                (!item.ResolveFromTrack || current.Item.Name == item.Name)) return;
+            var page = new CatalogDetailViewModel(_context, this, _playback, item);
+            page.SetNavigationActive(false);
+            Own(page);
+            await NavigateToNewEntryAsync(new HistoryEntry(page.Route, null) { TransientPage = page });
         }
         finally
         {
@@ -314,8 +335,9 @@ public sealed class DesktopNavigation : ObservableObject, IAsyncDisposable
     {
         if (page.Content is not Control view) return null;
         var trackList = view.GetVisualDescendants().OfType<ListBox>()
-            .FirstOrDefault(control => control.Name == "TrackList");
-        return (trackList ?? view).GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+            .FirstOrDefault(control => control.IsEffectivelyVisible && control.Name is "TrackList" or "CatalogList");
+        return (trackList ?? view).GetVisualDescendants().OfType<ScrollViewer>()
+            .FirstOrDefault(control => control.IsEffectivelyVisible);
     }
 
     private PageViewModel GetCachedPage(string route, Guid? playlist)
@@ -472,6 +494,7 @@ public sealed class DesktopNavigation : ObservableObject, IAsyncDisposable
             LibraryViewModel => new LibraryView(), SearchViewModel => new SearchView(),
             OnlineViewModel => new OnlineView(),
             AccountsViewModel => new AccountsView(),
+            CatalogDetailViewModel => new CatalogDetailView(),
             LyricsViewModel => new LyricsView(), TrackEditorPageViewModel => new TrackEditorView(),
             ToolsViewModel => new ToolsView(),
             MatchPlaylistPageViewModel => new MatchPlaylistView(),

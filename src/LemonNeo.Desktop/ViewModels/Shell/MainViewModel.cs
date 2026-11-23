@@ -82,6 +82,7 @@ public sealed class MainViewModel : PageViewModel
         set
         {
             if (!SetProperty(ref _searchQuery, value)) return;
+            if (_searchPage is { } search && ReferenceEquals(Navigation.Current, search)) search.SearchQuery = value;
             OnPropertyChanged(nameof(CanSearch));
             SearchCommand.NotifyCanExecuteChanged();
         }
@@ -252,12 +253,12 @@ public sealed class MainViewModel : PageViewModel
                 preferences with { PlaylistOrder = ids.ToArray() });
             await _host.Settings.SaveAsync(ct);
             Context.RefreshLibrary();
+            Notify(NotificationLevel.Success, LanguageManager.Keys.Saved);
         });
     }
 
     internal void BeginStartup()
     {
-        SetError(null);
         SetStatus(LanguageManager.Keys.Loading);
         IsBusy = true;
         RaiseInteractionProperties();
@@ -270,18 +271,14 @@ public sealed class MainViewModel : PageViewModel
         Context.RefreshLibrary();
         var report = _host.Plugins.LastReport;
         if (report.Failures.Count > 0)
-            SetError(LanguageManager.Keys.PluginFailures, [report.Failures.Count],
-                string.Join(Environment.NewLine, report.Failures.Select(f => f.Error)));
+            Notify(NotificationLevel.Warning, LanguageManager.Keys.PluginFailures, report.Failures.Count);
         Playback.UpdateSnapshot();
         await Navigation.Current.ActivateAsync();
-        SetStatus(null);
-        IsBusy = false;
-        RaiseInteractionProperties();
+        FinishStartup();
     }
 
-    internal void ReportStartupFailure(string message)
+    internal void FinishStartup()
     {
-        SetError(LanguageManager.Keys.StartupFailed, [message]);
         SetStatus(null);
         IsBusy = false;
         RaiseInteractionProperties();

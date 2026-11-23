@@ -13,7 +13,7 @@
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
     </UserControl.Styles>
-    <Grid RowDefinitions="Auto,Auto,Auto,*">
+    <Grid RowDefinitions="Auto,Auto,*">
         <sharedControls:PageHeader Title="{Binding PageTitle}">
             <sharedControls:PageHeader.Actions>
                 <StackPanel
@@ -35,31 +35,9 @@
             </sharedControls:PageHeader.Actions>
         </sharedControls:PageHeader>
         <Border
-            Background="{DynamicResource Brush.DangerSoft}"
-            Grid.Row="1"
-            IsVisible="{Binding HasError}"
-            Margin="0,0,0,12"
-            Padding="14">
-            <Grid ColumnDefinitions="*,Auto">
-                <TextBlock
-                    Foreground="{DynamicResource Brush.Danger}"
-                    Margin="0,0,12,0"
-                    MaxHeight="90"
-                    Text="{Binding Error}"
-                    TextWrapping="Wrap" />
-                <Button
-                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}"
-                    Classes="ghost compact"
-                    Command="{Binding DismissErrorCommand}"
-                    Grid.Column="1">
-                    <Path Classes="icon small" Data="{StaticResource Icon.Close}" />
-                </Button>
-            </Grid>
-        </Border>
-        <Border
             BorderBrush="{DynamicResource Brush.Border}"
             BorderThickness="0,0,0,1"
-            Grid.Row="2"
+            Grid.Row="1"
             IsVisible="{Binding HasServices}">
             <ListBox
                 AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Online}}"
@@ -86,7 +64,7 @@
 
         <Grid
             ColumnDefinitions="Auto,*"
-            Grid.Row="3"
+            Grid.Row="2"
             Margin="0,20,0,0"
             Name="PlaylistSection">
             <Border

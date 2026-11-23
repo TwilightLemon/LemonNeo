@@ -222,6 +222,18 @@
     <Style Selector="TextBox:not(:focus) /template/ Border#PART_BorderElement">
         <Setter Property="BorderBrush" Value="Transparent" />
     </Style>
+    <Style Selector="sharedControls|PageHeader.collapsible">
+        <Setter Property="Grid.RowSpan" Value="3" />
+    </Style>
+    <Style Selector="TextBlock.compactListTitle">
+        <Setter Property="FontSize" Value="20" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="IsHitTestVisible" Value="False" />
+        <Setter Property="MaxLines" Value="1" />
+        <Setter Property="Opacity" Value="0" />
+        <Setter Property="Padding" Value="0,0,0,12" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
     <Style Selector="TextBox.toolbarSearch">
         <Setter Property="MinHeight" Value="32" />
         <Setter Property="Height" Value="32" />
@@ -306,5 +318,17 @@
     </Style>
     <Style Selector="ProgressBar">
         <Setter Property="Foreground" Value="{DynamicResource Brush.AccentText}" />
+    </Style>
+    <Style Selector="Button.catalogLink">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.catalogLink:pointerover TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource Brush.AccentText}" />
+        <Setter Property="TextDecorations" Value="Underline" />
     </Style>
 </Styles>

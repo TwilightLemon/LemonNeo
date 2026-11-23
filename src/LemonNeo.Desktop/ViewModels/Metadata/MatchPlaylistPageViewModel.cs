@@ -107,7 +107,8 @@ public sealed partial class MatchPlaylistPageViewModel : PageViewModel
             foreach (var result in results.OrderBy(result => result.IsSuccessful).ThenBy(result => result.Number))
                 Results.Add(result);
             OnPropertyChanged(nameof(HasResults));
-            SetStatus(LanguageManager.Keys.PlaylistMatchSummary, matched, tracks.Length, changed, tracks.Length - matched);
+            Notify(string.IsNullOrEmpty(InspectionMessages) ? NotificationLevel.Information : NotificationLevel.Warning,
+                LanguageManager.Keys.PlaylistMatchSummary, matched, tracks.Length, changed, tracks.Length - matched);
         });
     }
 

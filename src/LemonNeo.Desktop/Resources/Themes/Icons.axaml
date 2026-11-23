@@ -31,6 +31,7 @@
     <StreamGeometry x:Key="Icon.Add">M8,2.75 V13.25 M2.75,8 H13.25</StreamGeometry>
     <StreamGeometry x:Key="Icon.AddToPlaylist">M2,3.5 H12 M2,7 H7.5 M2,10.5 H5.5 M11.5,7.5 V12.5 M9,10 H14</StreamGeometry>
     <StreamGeometry x:Key="Icon.TrackDetails">M8,2 A6,6 0 1 1 8,14 A6,6 0 1 1 8,2 Z M8,7.5 V11 M8,5 V5.1</StreamGeometry>
+    <StreamGeometry x:Key="Icon.Warning">M8,2 L14.5,13.5 H1.5 Z M8,6 V9 M8,11 V11.1</StreamGeometry>
     <StreamGeometry x:Key="Icon.ManageTracks">M2,4.75 L3.5,6.25 L6,3.75 M8.5,5 H14 M2,10.75 L3.5,12.25 L6,9.75 M8.5,11 H14</StreamGeometry>
     <StreamGeometry x:Key="Icon.Done">M2.75,8 L6.25,11.5 L13.25,4.5</StreamGeometry>
     <StreamGeometry x:Key="Icon.Trash">M2.5,4.5 H13.5 M6,4.5 V2.5 H10 V4.5 M4,4.5 L4.75,12.25 Q4.85,13.5 6,13.5 H10 Q11.15,13.5 11.25,12.25 L12,4.5 M8,7 V11</StreamGeometry>

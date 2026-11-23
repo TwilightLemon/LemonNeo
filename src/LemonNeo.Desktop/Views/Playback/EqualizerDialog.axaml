@@ -1,40 +1,49 @@
 <Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:LemonNeo.Desktop.Controls.Playback"
     xmlns:views="using:LemonNeo.Desktop.Views.Playback"
+    xmlns:shared="using:LemonNeo.Desktop.Controls.Shared"
     xmlns:i18n="using:LemonNeo.Desktop.Services" xmlns:vm="using:LemonNeo.Desktop.ViewModels.Tools"
     x:Class="LemonNeo.Desktop.Views.Playback.EqualizerDialog" x:DataType="vm:ProfileEditorViewModel"
     Title="{Translate {x:Static i18n:LanguageManager+Keys.Equalizer}}" Width="570" MinWidth="360" MaxHeight="760" SizeToContent="Height" WindowStartupLocation="CenterOwner">
-    <ScrollViewer>
-        <StackPanel Margin="24" Spacing="10">
-            <views:ProfileScopeView />
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsEnabled="{Binding CanEditProfile}">
-                <ComboBox ItemsSource="{Binding Presets}" SelectedItem="{Binding SelectedPreset}" HorizontalAlignment="Stretch"
-                          PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.EqPreset}}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.EqPreset}}" />
-                <Button Grid.Column="1" IsEnabled="{Binding CanDelete}" Content="{Translate {x:Static i18n:LanguageManager+Keys.EqDelete}}" Command="{Binding DeletePresetCommand}" />
-            </Grid>
-            <StackPanel Spacing="8" IsEnabled="{Binding CanEditProfile}">
-                <controls:EqualizerCurveEditor Height="218" Focusable="True"
-                    Background="{DynamicResource Brush.Surface}" Foreground="{DynamicResource Brush.TextSecondary}"
-                    CurveBrush="{DynamicResource Brush.AccentText}" BorderBrush="{DynamicResource Brush.Border}"
-                    Gains="{Binding CurveGains, Mode=TwoWay}" SelectedIndex="{Binding SelectedBandIndex, Mode=TwoWay}"
-                    SampleRate="{Binding PreviewSampleRate}"
-                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Equalizer}}" />
-                <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Translate {x:Static i18n:LanguageManager+Keys.EqCurveHint}}" />
-                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="4">
-                    <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.EqBand}}" />
-                    <TextBlock Grid.Column="1" Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.EqGain}}" />
-                    <ComboBox Grid.Row="1" HorizontalAlignment="Stretch" ItemsSource="{Binding FrequencyLabels}"
-                        SelectedIndex="{Binding SelectedBandIndex}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.EqBand}}" />
-                    <NumericUpDown Grid.Row="1" Grid.Column="1" Minimum="-12" Maximum="12" Increment="0.5"
-                        FormatString="0.##" Value="{Binding SelectedGain}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.EqGain}}" />
+    <Grid>
+        <ScrollViewer>
+            <StackPanel Margin="24" Spacing="10">
+                <views:ProfileScopeView />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsEnabled="{Binding CanEditProfile}">
+                    <ComboBox ItemsSource="{Binding Presets}" SelectedItem="{Binding SelectedPreset}" HorizontalAlignment="Stretch"
+                              PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.EqPreset}}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.EqPreset}}" />
+                    <Button Grid.Column="1" IsEnabled="{Binding CanDelete}" Content="{Translate {x:Static i18n:LanguageManager+Keys.EqDelete}}" Command="{Binding DeletePresetCommand}" />
                 </Grid>
+                <StackPanel Spacing="8" IsEnabled="{Binding CanEditProfile}">
+                    <controls:EqualizerCurveEditor Height="218" Focusable="True"
+                        Background="{DynamicResource Brush.Surface}" Foreground="{DynamicResource Brush.TextSecondary}"
+                        CurveBrush="{DynamicResource Brush.AccentText}" BorderBrush="{DynamicResource Brush.Border}"
+                        Gains="{Binding CurveGains, Mode=TwoWay}" SelectedIndex="{Binding SelectedBandIndex, Mode=TwoWay}"
+                        SampleRate="{Binding PreviewSampleRate}"
+                        AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Equalizer}}" />
+                    <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Translate {x:Static i18n:LanguageManager+Keys.EqCurveHint}}" />
+                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="4">
+                        <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.EqBand}}" />
+                        <TextBlock Grid.Column="1" Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.EqGain}}" />
+                        <ComboBox Grid.Row="1" HorizontalAlignment="Stretch" ItemsSource="{Binding FrequencyLabels}"
+                            SelectedIndex="{Binding SelectedBandIndex}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.EqBand}}" />
+                        <NumericUpDown Grid.Row="1" Grid.Column="1" Minimum="-12" Maximum="12" Increment="0.5"
+                            FormatString="0.##" Value="{Binding SelectedGain}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.EqGain}}" />
+                    </Grid>
+                </StackPanel>
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsEnabled="{Binding CanEditProfile}">
+                    <TextBox Text="{Binding PresetName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="64" PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.EqPresetName}}" />
+                    <Button Grid.Column="1" Command="{Binding SavePresetCommand}" Content="{Translate {x:Static i18n:LanguageManager+Keys.EqSave}}" />
+                </Grid>
+                <TextBlock Classes="caption" Text="{Binding Error}" TextWrapping="Wrap" />
+                <Button Content="{Translate {x:Static i18n:LanguageManager+Keys.EqDone}}" IsCancel="True" Click="OnDone" HorizontalAlignment="Right" />
             </StackPanel>
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsEnabled="{Binding CanEditProfile}">
-                <TextBox Text="{Binding PresetName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="64" PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.EqPresetName}}" />
-                <Button Grid.Column="1" Command="{Binding SavePresetCommand}" Content="{Translate {x:Static i18n:LanguageManager+Keys.EqSave}}" />
-            </Grid>
-            <TextBlock Classes="caption" Text="{Binding Error}" TextWrapping="Wrap" />
-            <Button Content="{Translate {x:Static i18n:LanguageManager+Keys.EqDone}}" IsCancel="True" Click="OnDone" HorizontalAlignment="Right" />
-        </StackPanel>
-    </ScrollViewer>
+        </ScrollViewer>
+        <shared:NotificationHost
+            HorizontalAlignment="Left"
+            Margin="24,0,24,16"
+            MaxWidth="420"
+            Source="{Binding EqualizerNotifications}"
+            VerticalAlignment="Bottom" />
+    </Grid>
 </Window>

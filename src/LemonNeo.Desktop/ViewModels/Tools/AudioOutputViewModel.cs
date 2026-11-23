@@ -9,6 +9,7 @@ public sealed partial class AudioOutputViewModel : ObservableObject
 {
     private readonly IAudioOutputConfigurable _provider;
     private readonly LocalizationService _text;
+    private readonly DesktopNotificationService _notifications;
 
     [ObservableProperty] private BackendOption _selectedBackend;
     [ObservableProperty] private IReadOnlyList<DeviceOption> _devices = [];
@@ -17,19 +18,20 @@ public sealed partial class AudioOutputViewModel : ObservableObject
     [ObservableProperty] private bool _automaticRate;
     [ObservableProperty] private decimal? _sampleRate;
     [ObservableProperty] private string? _deviceStatus;
-    [ObservableProperty] private string? _error;
+    [ObservableProperty] private bool _canRestoreSelection;
     private bool _loading;
 
-    public AudioOutputViewModel(string playerName, IAudioOutputConfigurable provider, LocalizationService text)
+    public AudioOutputViewModel(string playerName, IAudioOutputConfigurable provider, DesktopContext context)
     {
         _provider = provider;
-        _text = text;
-        Title = text.Format(LanguageManager.Keys.AudioOutputTitle, playerName);
+        _text = context.Text;
+        _notifications = context.Notifications;
+        Title = _text.Format(LanguageManager.Keys.AudioOutputTitle, playerName);
         Backends = provider.OutputBackends.Select(backend => new BackendOption(backend, backend switch
         {
             AudioOutputBackend.Wasapi => "WASAPI",
             AudioOutputBackend.Asio => "ASIO",
-            _ => text[LanguageManager.Keys.AudioOutputDefaultBackend]
+            _ => _text[LanguageManager.Keys.AudioOutputDefaultBackend]
         })).ToArray();
 
         _loading = true;
@@ -85,12 +87,14 @@ public sealed partial class AudioOutputViewModel : ObservableObject
         {
             _provider.SetOutputConfiguration(new AudioOutputConfiguration(SelectedBackend.Backend, SelectedDevice.Id,
                 AutomaticRate ? null : (int)SampleRate!.Value, IsWasapi && Exclusive));
-            Error = null;
+            CanRestoreSelection = false;
         }
         catch (Exception exception)
         {
             // Keep the attempted backend editable even when its default device cannot open.
-            Error = exception.GetBaseException().Message;
+            CanRestoreSelection = true;
+            _notifications.Show(_text.Format(LanguageManager.Keys.OperationFailed, exception.GetBaseException().Message),
+                NotificationLevel.Error);
         }
     }
 
@@ -108,7 +112,7 @@ public sealed partial class AudioOutputViewModel : ObservableObject
             LoadDevices(saved.DeviceId);
             OnPropertyChanged(nameof(IsWasapi));
             OnPropertyChanged(nameof(RateDescription));
-            Error = null;
+            CanRestoreSelection = false;
         }
         finally { _loading = false; }
     }

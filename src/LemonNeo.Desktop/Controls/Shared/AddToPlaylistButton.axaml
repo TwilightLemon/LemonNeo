@@ -65,12 +65,6 @@
                         HorizontalAlignment="Stretch"
                         IsEnabled="{Binding CanAddToPlaylist}"
                         Name="ConfirmAdd" />
-                    <TextBlock
-                        Foreground="{DynamicResource Brush.Danger}"
-                        IsVisible="{Binding HasError}"
-                        MaxHeight="80"
-                        Text="{Binding Error}"
-                        TextWrapping="Wrap" />
                 </StackPanel>
             </Flyout>
         </Button.Flyout>

@@ -20,6 +20,8 @@ namespace LemonNeo.Desktop.Views.Shell;
 
 public partial class MainWindow : Window
 {
+    private const double NotificationMaxWidth = 440;
+
     public static readonly StyledProperty<bool> IsDesktopLyricsOpenProperty =
         AvaloniaProperty.Register<MainWindow, bool>(nameof(IsDesktopLyricsOpen));
 
@@ -32,6 +34,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        MainNotifications.MaxWidth = NotificationMaxWidth;
         _ = new ListReorderBehavior(PlaylistList, () => DataContext is MainViewModel { CanInteract: true },
             (source, target, after) => DataContext is MainViewModel vm &&
                                        source is PlaylistMenuItemViewModel playlist &&
@@ -218,6 +221,8 @@ public partial class MainWindow : Window
     {
         VolumePopup.IsOpen = false;
         SourceDetailsPopup.IsOpen = false;
+        PlaybackNotifications.LayoutUpdated += OnQueueNotificationLayoutUpdated;
+        OnQueueNotificationLayoutUpdated(null, EventArgs.Empty);
         _queueAnimation?.Cancel();
         QueueCard.Focus();
         if (DataContext is not MainViewModel vm || vm.SharedContext.Appearance.Current.ReduceMotion) return;
@@ -259,8 +264,17 @@ public partial class MainWindow : Window
 
     private void OnQueueClosed(object? sender, EventArgs args)
     {
+        PlaybackNotifications.LayoutUpdated -= OnQueueNotificationLayoutUpdated;
+        MainNotifications.MaxWidth = NotificationMaxWidth;
         _queueAnimation?.Cancel();
         QueueButton.Focus();
+    }
+
+    private void OnQueueNotificationLayoutUpdated(object? sender, EventArgs args)
+    {
+        if (PlaybackNotifications.TranslatePoint(default, ShellRoot) is not { } origin) return;
+        var available = ShellRoot.Bounds.Width - QueueCard.Width - origin.X - MainNotifications.Margin.Left - 8;
+        MainNotifications.MaxWidth = Math.Clamp(available, 0, NotificationMaxWidth);
     }
 
     private void OnQueueKeyDown(object? sender, KeyEventArgs args)

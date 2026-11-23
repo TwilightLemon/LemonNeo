@@ -1,0 +1,93 @@
+<UserControl
+    x:Class="LemonNeo.Desktop.Views.Catalog.CatalogDetailView"
+    x:DataType="vm:CatalogDetailViewModel"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:i18n="using:LemonNeo.Desktop.Services"
+    xmlns:shared="using:LemonNeo.Desktop.Controls.Shared"
+    xmlns:vm="using:LemonNeo.Desktop.ViewModels.Catalog"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid ClipToBounds="True" RowDefinitions="Auto,Auto,*">
+        <TextBlock Classes="compactListTitle" IsVisible="{Binding IsAlbum}" Name="CompactTitle" Text="{Binding PageTitle}" />
+        <shared:PageHeader
+            Classes.collapsible="{Binding IsAlbum}"
+            Name="CatalogHeader"
+            Summary="{Binding PageSummary}"
+            Title="{Binding PageTitle}"
+            VerticalAlignment="Top"
+            ZIndex="1">
+            <shared:PageHeader.Actions>
+                <StackPanel IsVisible="{Binding IsAlbum}" Orientation="Horizontal" Spacing="8">
+                    <Button
+                        Classes="primary"
+                        Command="{Binding ImportCommand}"
+                        IsEnabled="{Binding CanImport}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Path Classes="icon small" Data="{StaticResource Icon.AddToPlaylist}" />
+                            <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.ImportAlbum}}" />
+                        </StackPanel>
+                    </Button>
+                    <Button
+                        AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.PlayAll}}"
+                        Classes="ghost icon"
+                        Command="{Binding PlayAllCommand}"
+                        IsEnabled="{Binding CanPlay}"
+                        ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.PlayAll}}">
+                        <Path Classes="icon" Data="{StaticResource Icon.PlayOutline}" />
+                    </Button>
+                </StackPanel>
+            </shared:PageHeader.Actions>
+        </shared:PageHeader>
+        <StackPanel Grid.Row="1" Name="CatalogTools" ZIndex="2">
+            <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding !IsAlbum}" Margin="0,0,0,18">
+                <shared:Artwork
+                    CornerRadius="10"
+                    Height="116"
+                    Loader="{Binding ArtworkLoader}"
+                    SourceUri="{Binding ArtworkUri}"
+                    Width="116" />
+                <StackPanel Grid.Column="1" Margin="16,0,0,0" Spacing="6" VerticalAlignment="Center">
+                    <TextBlock FontSize="28" FontWeight="SemiBold" Text="{Binding Name}" TextWrapping="Wrap" />
+                </StackPanel>
+            </Grid>
+            <Button
+                Classes="ghost"
+                Command="{Binding ReloadCommand}"
+                Content="{Translate {x:Static i18n:LanguageManager+Keys.ReloadCatalog}}"
+                HorizontalAlignment="Left"
+                IsVisible="{Binding CanReload}"
+                Margin="0,0,0,12" />
+            <StackPanel
+                HorizontalAlignment="Right"
+                IsVisible="{Binding IsBusy}"
+                Margin="0,0,0,12"
+                Orientation="Horizontal"
+                Spacing="10"
+                ToolTip.Tip="{Binding Status}">
+                <ProgressBar
+                    AutomationProperties.Name="{Binding Status}"
+                    Height="3"
+                    IsIndeterminate="True"
+                    VerticalAlignment="Center"
+                    Width="60" />
+                <Button
+                    Classes="ghost"
+                    Command="{Binding CancelOperationCommand}"
+                    Content="{Translate {x:Static i18n:LanguageManager+Keys.CancelOperation}}" />
+            </StackPanel>
+            <shared:TrackListToolbar IsVisible="{Binding IsAlbum}" />
+        </StackPanel>
+        <ListBox
+            AutoScrollToSelectedItem="False"
+            Classes="trackList"
+            Classes.managing="{Binding IsSelectionMode}"
+            Grid.IsSharedSizeScope="True"
+            Grid.Row="2"
+            IsEnabled="{Binding CanInteract}"
+            IsVisible="{Binding IsAlbum}"
+            ItemTemplate="{StaticResource TrackRowTemplate}"
+            ItemsSource="{Binding Tracks}"
+            Name="TrackList"
+            ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+            SelectedItem="{Binding SelectedTrack}" />
+    </Grid>
+</UserControl>

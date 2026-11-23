@@ -27,12 +27,6 @@
                 Name="QueueFilter"
                 PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.SearchPlaceholder}}"
                 Text="{Binding Filter}" />
-            <TextBlock
-                Foreground="{DynamicResource Brush.Danger}"
-                IsVisible="{Binding HasError}"
-                MaxHeight="80"
-                Text="{Binding Error}"
-                TextWrapping="Wrap" />
         </StackPanel>
         <ListBox
             AutoScrollToSelectedItem="False"

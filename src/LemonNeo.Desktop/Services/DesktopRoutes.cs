@@ -4,6 +4,8 @@ public static class DesktopRoutes
 {
     public const string Library = "Library",
         Search = "Search",
+        Album = "AlbumDetail",
+        Artist = "ArtistDetail",
         Accounts = "Accounts",
         Online = "Online",
         Queue = "Queue",

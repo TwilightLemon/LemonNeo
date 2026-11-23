@@ -52,8 +52,6 @@ public sealed partial class OnlineViewModel : PageViewModel
                 if (changedProvider)
                 {
                     ResetRemotePlaylists();
-                    SetError(null);
-                    SetStatus(null);
                 }
 
                 RaiseServiceProperties();
@@ -199,7 +197,7 @@ public sealed partial class OnlineViewModel : PageViewModel
             var playlist = importer.ImportRemote(remote);
             await _host.Get<LibraryService>().SaveAsync(ct);
             Context.RefreshLibrary();
-            SetStatus(LanguageManager.Keys.RemoteImported, playlist.Name, playlist.Items.Count);
+            Notify(NotificationLevel.Success, LanguageManager.Keys.RemoteImported, playlist.Name, playlist.Items.Count);
         });
     }
 
@@ -277,8 +275,6 @@ public sealed partial class OnlineViewModel : PageViewModel
         if (SelectedService?.Id != providerId) return;
         if (CancelOperationCommand.CanExecute(null)) CancelOperationCommand.Execute(null);
         ResetRemotePlaylists();
-        SetError(null);
-        SetStatus(null);
     }
 
     public override async ValueTask DisposeAsync()

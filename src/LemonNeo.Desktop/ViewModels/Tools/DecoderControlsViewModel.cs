@@ -51,7 +51,7 @@ public sealed partial class DecoderControlsViewModel : ObservableObject, IDispos
         var players = _context.Host.Get<IPlayerRegistry>().Players;
         _outputs = players.Where(p => p is IAudioOutputConfigurable { OutputBackends.Count: > 0 })
             .ToDictionary(p => p.Id, p => new AudioOutputViewModel(p.Descriptor.Name,
-                (IAudioOutputConfigurable)p, _context.Text), StringComparer.OrdinalIgnoreCase);
+                (IAudioOutputConfigurable)p, _context), StringComparer.OrdinalIgnoreCase);
         OutputsList = _outputs.Values.ToArray();
         RefreshCurrent(true);
     }
@@ -59,7 +59,11 @@ public sealed partial class DecoderControlsViewModel : ObservableObject, IDispos
     private void OnLibraryChanged(object? sender, EventArgs args)
     {
         try { _session.RefreshActiveProfile(); }
-        catch (Exception ex) { QuickProfile.Error = EditorProfile.Error = ex.Message; }
+        catch (Exception ex)
+        {
+            _context.Notifications.Show(_context.Text.Format(LanguageManager.Keys.OperationFailed, ex.Message),
+                NotificationLevel.Error);
+        }
         RefreshCurrent(true);
     }
     private void OnPlaybackChanged(object? sender, PlaybackSessionChangedEventArgs args) =>

@@ -159,7 +159,7 @@
     <ControlTheme TargetType="sharedControls:PageHeader" x:Key="{x:Type sharedControls:PageHeader}">
         <Setter Property="Template">
             <ControlTemplate>
-                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,28">
+                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
                     <StackPanel Spacing="8">
                         <TextBlock
                             FontSize="{DynamicResource Font.Title}"
@@ -208,9 +208,7 @@
                         Height="80"
                         HorizontalAlignment="Center"
                         Width="80">
-                        <Path
-                            Classes="icon extraLarge accent"
-                            Data="{TemplateBinding Icon}" />
+                        <Path Classes="icon extraLarge accent" Data="{TemplateBinding Icon}" />
                     </Border>
                     <TextBlock
                         FontSize="22"
@@ -261,9 +259,7 @@
                                     Fill="{DynamicResource Brush.Accent}"
                                     Height="44"
                                     Width="44" />
-                                <Path
-                                    Classes="icon large onAccent"
-                                    Data="{StaticResource Icon.MusicNote}" />
+                                <Path Classes="icon large onAccent" Data="{StaticResource Icon.MusicNote}" />
                             </Grid>
                         </Viewbox>
                         <Image

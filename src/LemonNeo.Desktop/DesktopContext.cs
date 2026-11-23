@@ -20,6 +20,7 @@ public sealed class DesktopContext(DesktopHost host, LocalizationService text, A
     public LocalizationService Text { get; } = text;
     public ISettingsScope Settings { get; } = host.Settings.ForPackage(PackageNames.Desktop);
     public AppearanceService Appearance { get; } = appearance;
+    public DesktopNotificationService Notifications { get; } = new();
 
     /// <summary>Assigned once the shell view model exists; pages read it through the shared context.</summary>
     public ShortcutService? Shortcuts { get; internal set; }

@@ -62,6 +62,7 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
     [ObservableProperty] private string? _error;
     [ObservableProperty] private int _selectedBandIndex = 2;
     [ObservableProperty] private int _previewSampleRate = EqualizerResponse.ReferenceSampleRate;
+    public DesktopNotificationService EqualizerNotifications { get; } = new();
     public IReadOnlyList<string> FrequencyLabels { get; } = DecodeProfile.BandFrequencies
         .Select(frequency => frequency >= 1000 ? $"{frequency / 1000} kHz" : $"{frequency} Hz").ToArray();
 
@@ -265,7 +266,7 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            Error = ex.Message;
+            NotifyFailure(ex);
             _notifyEditors();
         }
     }
@@ -279,22 +280,49 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
             Error = _context.Text[LanguageManager.Keys.EqNameRequired];
             return;
         }
-        _settings.Apply<DecodePreferences>(prefs => prefs with { Presets = prefs.Presets.Add(new(name, _profile.Gains)) });
+        try
+        {
+            _settings.Apply<DecodePreferences>(prefs => prefs with { Presets = prefs.Presets.Add(new(name, _profile.Gains)) });
+        }
+        catch (Exception exception)
+        {
+            NotifyFailure(exception);
+            return;
+        }
         PresetName = "";
         Error = null;
         _notifyEditors();
         _reading = true;
         try { SelectedPreset = Presets.First(p => p.Name == name); }
         finally { _reading = false; }
+        EqualizerNotifications.Show(_context.Text.Format(LanguageManager.Keys.EqPresetSaved, name),
+            NotificationLevel.Success);
     }
 
     [RelayCommand]
     private void DeletePreset()
     {
         if (SelectedPreset is not { Custom: true } preset) return;
-        _settings.Apply<DecodePreferences>(prefs => prefs with { Presets = prefs.Presets.RemoveAll(p => p?.Name == preset.Name) });
+        try
+        {
+            _settings.Apply<DecodePreferences>(prefs => prefs with { Presets = prefs.Presets.RemoveAll(p => p?.Name == preset.Name) });
+        }
+        catch (Exception exception)
+        {
+            NotifyFailure(exception);
+            return;
+        }
         Error = null;
         _notifyEditors();
+        EqualizerNotifications.Show(_context.Text.Format(LanguageManager.Keys.EqPresetDeleted, preset.Name),
+            NotificationLevel.Success);
+    }
+
+    private void NotifyFailure(Exception exception)
+    {
+        var notifications = _dialogOpen ? EqualizerNotifications : _context.Notifications;
+        notifications.Show(_context.Text.Format(LanguageManager.Keys.OperationFailed, exception.Message),
+            NotificationLevel.Error);
     }
 
     public sealed record Target(Guid Id, string Name) { public override string ToString() => Name; }

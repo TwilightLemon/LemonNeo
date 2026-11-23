@@ -72,16 +72,50 @@
                         TextTrimming="CharacterEllipsis" />
                     <TextBlock
                         Classes="caption"
+                        IsVisible="{Binding !HasArtistLinks}"
                         Text="{Binding Artists}"
                         TextTrimming="CharacterEllipsis" />
+                    <ItemsControl ClipToBounds="True" IsVisible="{Binding HasArtistLinks}" ItemsSource="{Binding ArtistLinks}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="8" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="sharedVm:ArtistLink">
+                                <Panel>
+                                    <TextBlock Classes="caption" IsVisible="{Binding !CanOpen}" Text="{Binding Name}" />
+                                    <Button
+                                        Classes="catalogLink"
+                                        Command="{Binding $parent[ListBox].((sharedVm:TrackListViewModel)DataContext).OpenCatalogItemCommand}"
+                                        CommandParameter="{Binding Item}"
+                                        IsVisible="{Binding CanOpen}">
+                                        <TextBlock Classes="caption" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                    </Button>
+                                </Panel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </StackPanel>
                 <TextBlock
                     Classes="muted"
                     Grid.Column="3"
+                    IsVisible="{Binding !HasAlbumLink}"
                     Margin="0,0,12,0"
                     Text="{Binding Album}"
                     TextTrimming="CharacterEllipsis"
                     VerticalAlignment="Center" />
+                <Button
+                    Classes="catalogLink"
+                    Command="{Binding $parent[ListBox].((sharedVm:TrackListViewModel)DataContext).OpenCatalogItemCommand}"
+                    CommandParameter="{Binding AlbumLink}"
+                    Grid.Column="3"
+                    HorizontalAlignment="Left"
+                    IsVisible="{Binding HasAlbumLink}"
+                    Margin="0,0,12,0"
+                    VerticalAlignment="Center">
+                    <TextBlock Classes="muted" Text="{Binding Album}" TextTrimming="CharacterEllipsis" />
+                </Button>
                 <TextBlock
                     Classes="caption"
                     Grid.Column="4"
@@ -149,13 +183,6 @@
                         Content="{Translate {x:Static i18n:LanguageManager+Keys.AddMatchExternalIds}}"
                         Margin="0,0,10,8"
                         Name="AddMatchExternalIdsButton" />
-                    <TextBlock
-                        FontWeight="SemiBold"
-                        Foreground="{DynamicResource Brush.AccentText}"
-                        IsVisible="{Binding HasActionStatus}"
-                        Margin="2,0,0,8"
-                        Text="{Binding ActionStatus}"
-                        VerticalAlignment="Center" />
                 </WrapPanel>
             </StackPanel>
         </Border>

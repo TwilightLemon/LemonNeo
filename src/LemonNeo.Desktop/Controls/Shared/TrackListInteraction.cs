@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -6,10 +7,35 @@ using LemonNeo.Desktop.ViewModels.Shared;
 
 namespace LemonNeo.Desktop.Controls.Shared;
 
-public static class TrackSelectionBehavior
+internal static class TrackListInteraction
 {
-    public static void Attach(ListBox list)
+    public static void Attach(ListBox list, Func<TrackRow, Func<Task>?>? getRemove = null)
     {
+        list.ContextRequested += (_, args) =>
+        {
+            if (list.DataContext is not TrackListViewModel { CanInteract: true } vm ||
+                TrackContextMenu.GetTarget<TrackRow>(list, args) is not { } target) return;
+
+            TrackContextMenu.Open(target.Container, args, target.Row, vm.Playlists,
+                id => vm.AddTrackAsync(id, target.Row.Track), () => vm.InspectTrackAsync(target.Row),
+                getRemove?.Invoke(target.Row));
+        };
+        list.DoubleTapped += async (_, args) =>
+        {
+            if (args.Source is Visual source && source.GetSelfAndVisualAncestors().Any(visual => visual is Button))
+                return;
+            if (list.DataContext is TrackListViewModel { CanInteract: true, IsSelectionMode: false, SelectedTrack: { } row } vm)
+                await vm.PlayAsync(row);
+        };
+        list.KeyDown += async (_, args) =>
+        {
+            if (args.Handled || args.Key != Key.Enter || args.Source is Button ||
+                list.DataContext is not TrackListViewModel { CanInteract: true, IsSelectionMode: false, SelectedTrack: { } row } vm)
+                return;
+            args.Handled = true;
+            await vm.PlayAsync(row);
+        };
+
         list.AddHandler(InputElement.PointerReleasedEvent, (_, args) =>
         {
             if (list.DataContext is not TrackListViewModel { IsSelectionMode: true, CanInteract: true }) return;
