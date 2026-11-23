@@ -208,12 +208,7 @@
                             Grid.Column="1"
                             IsEnabled="{Binding SharedContext.IsInitialized}"
                             ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.CreatePlaylist}}">
-                            <Path
-                                Classes="icon"
-                                Data="{StaticResource Icon.Add}"
-                                Height="14"
-                                Stretch="Fill"
-                                Width="14" />
+                            <Path Classes="icon small" Data="{StaticResource Icon.Add}" />
                         </Button>
                     </Grid>
                     <ListBox
@@ -256,7 +251,7 @@
                         Command="{Binding Navigation.NavigateCommand}"
                         CommandParameter="Tools">
                         <StackPanel Orientation="Horizontal" Spacing="12">
-                            <Path Classes="icon" Data="{StaticResource Icon.Queue}" />
+                            <Path Classes="icon" Data="{StaticResource Icon.Tools}" />
                             <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Tools}}" />
                         </StackPanel>
                     </Button>
@@ -332,7 +327,7 @@
                         VerticalContentAlignment="Center" />
                     <Button
                         AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.SearchMusic}}"
-                        Classes="ghost compact"
+                        Classes="ghost icon compact"
                         Command="{Binding SearchCommand}"
                         Grid.Column="1"
                         Margin="4,0,0,0"
@@ -458,17 +453,13 @@
                             ToolTip.Tip="{Binding Playback.Error}" />
                         <Button
                             AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}"
-                            Classes="ghost compact"
+                            Classes="ghost icon compact"
                             Command="{Binding Playback.DismissErrorCommand}"
                             Grid.Column="1"
                             Height="20"
                             MinHeight="20"
                             Padding="4,0">
-                            <Path
-                                Classes="icon"
-                                Data="{StaticResource Icon.Close}"
-                                Height="12"
-                                Width="12" />
+                            <Path Classes="icon small" Data="{StaticResource Icon.Close}" />
                         </Button>
                     </Grid>
                     <Grid ColumnDefinitions="*,Auto,*" Grid.Row="1">
@@ -537,20 +528,11 @@
                                 Name="PreviousButton"
                                 Padding="0"
                                 ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Previous}}">
-                                <Viewbox
-                                    Height="20"
-                                    HorizontalAlignment="Center"
-                                    MaxWidth="22"
-                                    VerticalAlignment="Center">
-                                    <Path
-                                        Data="{StaticResource Icon.Playback.Previous}"
-                                        Fill="{DynamicResource Brush.Text}"
-                                        Stretch="Uniform" />
-                                </Viewbox>
+                                <Path Classes="icon transport" Data="{StaticResource Icon.Playback.Previous}" />
                             </Button>
                             <Button
                                 AutomationProperties.Name="{Binding Playback.PlayLabel}"
-                                Classes="primary"
+                                Classes="primary icon"
                                 Command="{Binding Playback.TogglePlaybackCommand}"
                                 CornerRadius="24"
                                 Height="48"
@@ -560,29 +542,12 @@
                                 ToolTip.Tip="{Binding Playback.PlayLabel}"
                                 Width="48">
                                 <Grid>
-                                    <Viewbox
-                                        Height="20"
-                                        HorizontalAlignment="Center"
+                                    <Path
+                                        Classes="icon transport"
+                                        Data="{StaticResource Icon.Playback.Play}"
                                         IsVisible="{Binding !Playback.IsPlaying}"
-                                        Margin="4,0,0,0"
-                                        MaxWidth="22"
-                                        VerticalAlignment="Center">
-                                        <Path
-                                            Data="{StaticResource Icon.Playback.Play}"
-                                            Fill="{DynamicResource Brush.OnAccent}"
-                                            Stretch="Uniform" />
-                                    </Viewbox>
-                                    <Viewbox
-                                        Height="20"
-                                        HorizontalAlignment="Center"
-                                        IsVisible="{Binding Playback.IsPlaying}"
-                                        MaxWidth="22"
-                                        VerticalAlignment="Center">
-                                        <Path
-                                            Data="{StaticResource Icon.Playback.Pause}"
-                                            Fill="{DynamicResource Brush.OnAccent}"
-                                            Stretch="Uniform" />
-                                    </Viewbox>
+                                        Margin="4,0,0,0" />
+                                    <Path Classes="icon transport" Data="{StaticResource Icon.Playback.Pause}" IsVisible="{Binding Playback.IsPlaying}" />
                                 </Grid>
                             </Button>
                             <Button
@@ -593,16 +558,7 @@
                                 Name="NextButton"
                                 Padding="0"
                                 ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Next}}">
-                                <Viewbox
-                                    Height="20"
-                                    HorizontalAlignment="Center"
-                                    MaxWidth="22"
-                                    VerticalAlignment="Center">
-                                    <Path
-                                        Data="{StaticResource Icon.Playback.Next}"
-                                        Fill="{DynamicResource Brush.Text}"
-                                        Stretch="Uniform" />
-                                </Viewbox>
+                                <Path Classes="icon transport" Data="{StaticResource Icon.Playback.Next}" />
                             </Button>
                         </StackPanel>
                         <Grid
@@ -619,39 +575,9 @@
                                 ToolTip.Tip="{Binding Playback.ModeLabel}"
                                 VerticalAlignment="Center">
                                 <Grid>
-                                    <Viewbox
-                                        Height="18"
-                                        HorizontalAlignment="Center"
-                                        IsVisible="{Binding Playback.IsSequential}"
-                                        MaxWidth="20"
-                                        VerticalAlignment="Center">
-                                        <Path
-                                            Data="{StaticResource Icon.Playback.Sequential}"
-                                            Fill="{DynamicResource Brush.TextSecondary}"
-                                            Stretch="Uniform" />
-                                    </Viewbox>
-                                    <Viewbox
-                                        Height="18"
-                                        HorizontalAlignment="Center"
-                                        IsVisible="{Binding Playback.IsRepeatAll}"
-                                        MaxWidth="20"
-                                        VerticalAlignment="Center">
-                                        <Path
-                                            Data="{StaticResource Icon.Playback.RepeatAll}"
-                                            Fill="{DynamicResource Brush.TextSecondary}"
-                                            Stretch="Uniform" />
-                                    </Viewbox>
-                                    <Viewbox
-                                        Height="18"
-                                        HorizontalAlignment="Center"
-                                        IsVisible="{Binding Playback.IsShuffle}"
-                                        MaxWidth="20"
-                                        VerticalAlignment="Center">
-                                        <Path
-                                            Data="{StaticResource Icon.Playback.Shuffle}"
-                                            Fill="{DynamicResource Brush.TextSecondary}"
-                                            Stretch="Uniform" />
-                                    </Viewbox>
+                                    <Path Classes="icon" Data="{StaticResource Icon.Sequential}" IsVisible="{Binding Playback.IsSequential}" />
+                                    <Path Classes="icon" Data="{StaticResource Icon.RepeatAll}" IsVisible="{Binding Playback.IsRepeatAll}" />
+                                    <Path Classes="icon" Data="{StaticResource Icon.Shuffle}" IsVisible="{Binding Playback.IsShuffle}" />
                                 </Grid>
                             </Button>
                             <Grid
@@ -683,10 +609,9 @@
                                 <Button Name="DecoderButton" Grid.Column="1" Classes="ghost icon" Margin="8,0,0,0" Padding="0"
                                         IsEnabled="{Binding SharedContext.IsInitialized}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DecoderControls}}"
                                         ToolTip.Tip="{Binding SharedContext.DecoderControls.DecoderToolTip}">
-                                    <Grid>
-                                        <Path Width="19" Height="19" Stretch="Uniform" Stroke="{DynamicResource Brush.TextSecondary}"
-                                              StrokeThickness="1.8" Data="M3,6 L8,6 M12,6 L21,6 M8,3 L8,9 L12,9 L12,3 Z M3,17 L14,17 M18,17 L21,17 M14,14 L14,20 L18,20 L18,14 Z" />
-                                        <Ellipse Width="6" Height="6" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                    <Grid Height="24" Width="24">
+                                        <Path Classes="icon" Data="{StaticResource Icon.Decoder}" />
+                                        <Ellipse Width="5" Height="5" HorizontalAlignment="Right" VerticalAlignment="Top"
                                                  Fill="{DynamicResource Brush.AccentText}" IsVisible="{Binding SharedContext.DecoderControls.UsingScopedProfile}" />
                                     </Grid>
                                     <Button.Flyout>
@@ -715,24 +640,8 @@
                                     Padding="0"
                                     ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Volume}}">
                                     <Grid>
-                                        <Viewbox
-                                            Height="18"
-                                            IsVisible="{Binding !Playback.IsMuted}"
-                                            MaxWidth="20">
-                                            <Path
-                                                Data="{StaticResource Icon.Volume}"
-                                                Fill="{DynamicResource Brush.TextSecondary}"
-                                                Stretch="Uniform" />
-                                        </Viewbox>
-                                        <Viewbox
-                                            Height="18"
-                                            IsVisible="{Binding Playback.IsMuted}"
-                                            MaxWidth="20">
-                                            <Path
-                                                Data="{StaticResource Icon.VolumeMuted}"
-                                                Fill="{DynamicResource Brush.TextSecondary}"
-                                                Stretch="Uniform" />
-                                        </Viewbox>
+                                        <Path Classes="icon" Data="{StaticResource Icon.Volume}" IsVisible="{Binding !Playback.IsMuted}" />
+                                        <Path Classes="icon" Data="{StaticResource Icon.VolumeMuted}" IsVisible="{Binding Playback.IsMuted}" />
                                     </Grid>
                                 </Button>
                                 <Button
@@ -744,16 +653,7 @@
                                     Name="QueueButton"
                                     Padding="0"
                                     ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Queue}}">
-                                    <Viewbox
-                                        Height="18"
-                                        HorizontalAlignment="Center"
-                                        MaxWidth="20"
-                                        VerticalAlignment="Center">
-                                        <Path
-                                            Data="{StaticResource Icon.Playback.Queue}"
-                                            Fill="{DynamicResource Brush.TextSecondary}"
-                                            Stretch="Uniform" />
-                                    </Viewbox>
+                                    <Path Classes="icon" Data="{StaticResource Icon.Queue}" />
                                 </Button>
                             </Grid>
                         </Grid>

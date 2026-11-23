@@ -209,11 +209,8 @@
                         HorizontalAlignment="Center"
                         Width="80">
                         <Path
-                            Data="{TemplateBinding Icon}"
-                            Fill="{DynamicResource Brush.AccentText}"
-                            Height="28"
-                            Stretch="Uniform"
-                            Width="28" />
+                            Classes="icon extraLarge accent"
+                            Data="{TemplateBinding Icon}" />
                     </Border>
                     <TextBlock
                         FontSize="22"
@@ -265,11 +262,8 @@
                                     Height="44"
                                     Width="44" />
                                 <Path
-                                    Data="{StaticResource Icon.Music}"
-                                    Fill="{DynamicResource Brush.OnAccent}"
-                                    Height="20"
-                                    Stretch="Uniform"
-                                    Width="20" />
+                                    Classes="icon large onAccent"
+                                    Data="{StaticResource Icon.MusicNote}" />
                             </Grid>
                         </Viewbox>
                         <Image

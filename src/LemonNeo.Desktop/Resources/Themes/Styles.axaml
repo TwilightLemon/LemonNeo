@@ -67,7 +67,10 @@
     <Style Selector="Button.icon">
         <Setter Property="Width" Value="40" />
         <Setter Property="Height" Value="40" />
-        <Setter Property="Padding" Value="10" />
+        <Setter Property="Padding" Value="9" />
+    </Style>
+    <Style Selector="Button.icon /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="UseLayoutRounding" Value="False" />
     </Style>
     <Style Selector="Button.compact">
         <Setter Property="MinWidth" Value="32" />
@@ -122,20 +125,12 @@
         <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentText}" />
     </Style>
     <Style Selector="Path.icon">
-        <Setter Property="Width" Value="18" />
-        <Setter Property="Height" Value="18" />
-        <Setter Property="Stretch" Value="Uniform" />
-        <Setter Property="Fill" Value="{DynamicResource Brush.TextSecondary}" />
-    </Style>
-    <Style Selector="Viewbox.toolbarIcon">
-        <Setter Property="Width" Value="18" />
-        <Setter Property="Height" Value="18" />
+        <!--  Max dimensions preserve the aspect ratio in layout. Margin reserves the stroke.  -->
+        <Setter Property="MaxWidth" Value="16.5" />
+        <Setter Property="MaxHeight" Value="16.5" />
         <Setter Property="HorizontalAlignment" Value="Center" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="UseLayoutRounding" Value="False" />
-    </Style>
-    <Style Selector="Viewbox.toolbarIcon Path">
-        <!--  Path's layout bounds exclude the stroke. Include half its thickness on each side.  -->
         <Setter Property="Margin" Value="0.75" />
         <Setter Property="Stretch" Value="Uniform" />
         <Setter Property="Stroke" Value="{DynamicResource Brush.TextSecondary}" />
@@ -143,23 +138,53 @@
         <Setter Property="StrokeLineCap" Value="Round" />
         <Setter Property="StrokeJoin" Value="Round" />
     </Style>
-    <Style Selector="Button.primary Path.icon">
-        <Setter Property="Fill" Value="{DynamicResource Brush.OnAccent}" />
+    <Style Selector="Path.icon.small">
+        <Setter Property="MaxWidth" Value="12.5" />
+        <Setter Property="MaxHeight" Value="12.5" />
     </Style>
-    <Style Selector="Button.danger Viewbox.toolbarIcon Path">
+    <Style Selector="Path.icon.large, Path.icon.extraLarge">
+        <Setter Property="StrokeThickness" Value="2" />
+        <Setter Property="Margin" Value="1" />
+    </Style>
+    <Style Selector="Path.icon.large">
+        <Setter Property="MaxWidth" Value="20" />
+        <Setter Property="MaxHeight" Value="20" />
+    </Style>
+    <Style Selector="Path.icon.extraLarge">
+        <Setter Property="MaxWidth" Value="26" />
+        <Setter Property="MaxHeight" Value="26" />
+    </Style>
+    <Style Selector="Path.icon.onAccent, Button.primary Path.icon">
+        <Setter Property="Stroke" Value="{DynamicResource Brush.OnAccent}" />
+    </Style>
+    <Style Selector="Path.icon.onDark, Button.desktopControl Path.icon">
+        <Setter Property="Stroke" Value="White" />
+    </Style>
+    <Style Selector="Path.icon.accent, Button.nav.active Path.icon, Button#DesktopLyricsButton.active Path.icon">
+        <Setter Property="Stroke" Value="{DynamicResource Brush.AccentText}" />
+    </Style>
+    <Style Selector="Button.danger Path.icon">
         <Setter Property="Stroke" Value="{DynamicResource Brush.Danger}" />
+    </Style>
+    <Style Selector="Path.icon.filled, Path.icon.transport">
+        <Setter Property="MaxWidth" Value="22" />
+        <Setter Property="MaxHeight" Value="22" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="Stroke" Value="{x:Null}" />
+        <Setter Property="Fill" Value="{Binding $parent[Button].Foreground}" />
+    </Style>
+    <Style Selector="Path.icon.transport">
+        <Setter Property="MaxHeight" Value="20" />
+    </Style>
+    <Style Selector="Button.desktopControl Path.icon.transport">
+        <Setter Property="MaxWidth" Value="18" />
+        <Setter Property="MaxHeight" Value="18" />
     </Style>
     <Style Selector="Button.primary TextBlock">
         <Setter Property="Foreground" Value="{DynamicResource Brush.OnAccent}" />
     </Style>
-    <Style Selector="Button.nav.active Path.icon">
-        <Setter Property="Fill" Value="{DynamicResource Brush.AccentText}" />
-    </Style>
     <Style Selector="Button#DesktopLyricsButton.active">
         <Setter Property="Background" Value="{DynamicResource Brush.AccentSoft}" />
-    </Style>
-    <Style Selector="Button#DesktopLyricsButton.active Path.icon">
-        <Setter Property="Fill" Value="{DynamicResource Brush.AccentText}" />
     </Style>
     <Style Selector="TextBox">
         <Setter Property="CornerRadius" Value="{DynamicResource Radius.Control}" />

@@ -22,11 +22,10 @@
             <TextBlock
                 IsVisible="{Binding !IsIconOnly, ElementName=Root}"
                 Text="{Translate {x:Static i18n:LanguageManager+Keys.AddToPlaylist}}" />
-            <Viewbox
-                Classes="toolbarIcon"
-                IsVisible="{Binding IsIconOnly, ElementName=Root}">
-                <Path Data="{StaticResource Icon.AddToPlaylist}" />
-            </Viewbox>
+            <Path
+                Classes="icon"
+                Data="{StaticResource Icon.AddToPlaylist}"
+                IsVisible="{Binding IsIconOnly, ElementName=Root}" />
         </Panel>
         <Button.Flyout>
             <Flyout Placement="BottomEdgeAlignedLeft">

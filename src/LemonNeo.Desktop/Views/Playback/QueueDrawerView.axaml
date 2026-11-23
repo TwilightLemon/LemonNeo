@@ -116,11 +116,7 @@
                 Click="OnLocatePlaying"
                 Name="LocatePlayingButton"
                 ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.LocatePlayingTrack}}">
-                <Path
-                    Classes="icon"
-                    Data="{StaticResource Icon.Locate}"
-                    Height="22"
-                    Width="22" />
+                <Path Classes="icon filled" Data="{StaticResource Icon.Locate}" />
             </Button>
         </Border>
         <StackPanel

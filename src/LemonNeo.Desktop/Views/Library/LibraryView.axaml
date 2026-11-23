@@ -41,11 +41,7 @@
                         Command="{Binding PlayAllCommand}"
                         IsEnabled="{Binding CanPlay}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Path
-                                Classes="icon"
-                                Data="{StaticResource Icon.Play}"
-                                Height="14"
-                                Width="14" />
+                            <Path Classes="icon small" Data="{StaticResource Icon.PlayOutline}" />
                             <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.PlayAll}}" />
                         </StackPanel>
                     </Button>
@@ -56,10 +52,7 @@
                         IsVisible="{Binding HasSelectedPlaylist}"
                         Name="PlaylistActionsButton"
                         ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistMore}}">
-                        <Path
-                            Classes="icon"
-                            Data="{StaticResource Icon.More}"
-                            VerticalAlignment="Center" />
+                        <Path Classes="icon" Data="{StaticResource Icon.More}" />
                         <Button.Flyout>
                             <MenuFlyout>
                                 <MenuItem Command="{Binding NewTrackCommand}" Header="{Translate {x:Static i18n:LanguageManager+Keys.NewTrack}}" />
@@ -147,9 +140,7 @@
                                 IsEnabled="{Binding CanInspectTrack}"
                                 Name="TrackDetailsButton"
                                 ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.TrackDetails}}">
-                                <Viewbox Classes="toolbarIcon">
-                                    <Path Data="{StaticResource Icon.TrackDetails}" />
-                                </Viewbox>
+                                <Path Classes="icon" Data="{StaticResource Icon.TrackDetails}" />
                             </Button>
                         </StackPanel>
                         <Button
@@ -159,12 +150,10 @@
                             IsEnabled="{Binding CanInteract}"
                             Name="ManageTracksButton"
                             ToolTip.Tip="{Binding SelectionModeLabel}">
-                            <Viewbox Classes="toolbarIcon">
-                                <Panel>
-                                    <Path Data="{StaticResource Icon.ManageTracks}" IsVisible="{Binding !IsSelectionMode}" />
-                                    <Path Data="{StaticResource Icon.Done}" IsVisible="{Binding IsSelectionMode}" />
-                                </Panel>
-                            </Viewbox>
+                            <Panel>
+                                <Path Classes="icon" Data="{StaticResource Icon.ManageTracks}" IsVisible="{Binding !IsSelectionMode}" />
+                                <Path Classes="icon" Data="{StaticResource Icon.Done}" IsVisible="{Binding IsSelectionMode}" />
+                            </Panel>
                         </Button>
                     </StackPanel>
                 </Grid>
@@ -201,9 +190,7 @@
                             IsVisible="{Binding HasSelectedPlaylist}"
                             Margin="0,1,6,1"
                             ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.RemoveSelectedTracks}}">
-                            <Viewbox Classes="toolbarIcon">
-                                <Path Data="{StaticResource Icon.Trash}" />
-                            </Viewbox>
+                            <Path Classes="icon" Data="{StaticResource Icon.Trash}" />
                         </Button>
                         <TextBlock
                             Classes="caption"
@@ -243,16 +230,12 @@
                     Click="OnLocatePlaying"
                     Name="LocatePlayingButton"
                     ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.LocatePlayingTrack}}">
-                    <Path
-                        Classes="icon"
-                        Data="{StaticResource Icon.Locate}"
-                        Height="22"
-                        Width="22" />
+                    <Path Classes="icon filled" Data="{StaticResource Icon.Locate}" />
                 </Button>
             </Border>
             <sharedControls:EmptyState
                 Description="{Binding EmptyDescription}"
-                Icon="{StaticResource Icon.Music}"
+                Icon="{StaticResource Icon.MusicNote}"
                 IsVisible="{Binding !HasTracks}"
                 Name="LibraryEmptyState"
                 Title="{Binding EmptyTitle}" />
