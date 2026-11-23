@@ -414,8 +414,9 @@
                     CornerRadius="20"
                     IsHitTestVisible="False">
                     <Border.BackdropEffect>
-                        <BlurEffect Radius="24" />
+                        <BlurEffect Radius="2" />
                     </Border.BackdropEffect>
+                    <sharedControls:LiquidGlassRim CornerRadius="20" />
                 </Border>
                 <playbackControls:AudioVisualizer
                     Fill="{DynamicResource Brush.Accent}"
@@ -905,8 +906,9 @@
                         CornerRadius="16,0,0,16"
                         IsHitTestVisible="False">
                         <Border.BackdropEffect>
-                            <BlurEffect Radius="24" />
+                            <BlurEffect Radius="12" />
                         </Border.BackdropEffect>
+                        <sharedControls:LiquidGlassRim CornerRadius="16,0,0,16" />
                     </Border>
                     <ContentControl
                         Content="{Binding QueueDrawer}"
