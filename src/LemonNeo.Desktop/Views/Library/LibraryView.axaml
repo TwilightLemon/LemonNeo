@@ -40,7 +40,7 @@
                         ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistMore}}">
                         <Path Classes="icon" Data="{StaticResource Icon.More}" />
                         <Button.Flyout>
-                            <MenuFlyout>
+                            <MenuFlyout Placement="Bottom" VerticalOffset="-2">
                                 <MenuItem Command="{Binding NewTrackCommand}" Header="{Translate {x:Static i18n:LanguageManager+Keys.NewTrack}}" />
                                 <MenuItem Command="{Binding MatchPlaylistCommand}" Header="{Translate {x:Static i18n:LanguageManager+Keys.MatchPlaylist}}" />
                                 <MenuItem Click="OnEditPlaylist" Header="{Translate {x:Static i18n:LanguageManager+Keys.EditPlaylist}}" />

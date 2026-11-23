@@ -1,4 +1,5 @@
 <Window
+    Classes="acrylicDialog"
     CanResize="False"
     SizeToContent="Height"
     Title="{Translate {x:Static i18n:LanguageManager+Keys.DeletePlaylist}}"

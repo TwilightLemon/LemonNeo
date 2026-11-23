@@ -21,10 +21,23 @@ public sealed class ThemeResources : ResourceDictionary
     {
         foreach (var (role, color) in ThemePalette.Create(ThemePalette.Get(ThemeColorPreset.Classic), false))
         {
-            var brush = new SolidColorBrush(color) { Opacity = role == "SidebarTranslucent" ? .85 : 1 };
+            var brush = new SolidColorBrush(color)
+            {
+                Opacity = role switch
+                {
+                    "SidebarTranslucent" => .85,
+                    "DialogTint" => .88,
+                    _ => 1
+                }
+            };
             _brushes.Add(role, brush);
             this[$"Brush.{role}"] = brush;
         }
+        // The Fluent submenu and dropdown templates read these brushes directly.
+        this["MenuFlyoutPresenterBackground"] = _brushes["SurfaceRaised"];
+        this["MenuFlyoutPresenterBorderBrush"] = _brushes["Border"];
+        this["ComboBoxDropDownBackground"] = _brushes["SurfaceRaised"];
+        this["ComboBoxDropDownBorderBrush"] = _brushes["Border"];
         this["Brush.PlaybackRow"] = _playbackRow;
         Apply(Snapshot());
     }

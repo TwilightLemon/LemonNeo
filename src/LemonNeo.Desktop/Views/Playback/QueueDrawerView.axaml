@@ -56,9 +56,16 @@
                         Padding="8,12"
                         ToolTip.Tip="{Binding Row.Title}">
                         <Grid ColumnDefinitions="30,44,*,Auto">
+                            <TextBlock
+                                Classes="caption"
+                                HorizontalAlignment="Center"
+                                IsVisible="{Binding !IsCurrent}"
+                                Text="{Binding Row.Number}"
+                                VerticalAlignment="Center" />
                             <playbackControls:NowPlayingIndicator
                                 Classes.playing="{Binding $parent[ListBox].((playbackVm:PlaybackQueueViewModel)DataContext).Playback.IsPlaying}"
                                 Classes.reduceMotion="{Binding $parent[ListBox].((playbackVm:PlaybackQueueViewModel)DataContext).Playback.ReduceMotion}"
+                                HorizontalAlignment="Center"
                                 IsVisible="{Binding IsCurrent}" />
                             <sharedControls:Artwork
                                 CornerRadius="8"

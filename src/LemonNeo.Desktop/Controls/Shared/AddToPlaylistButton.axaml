@@ -28,7 +28,7 @@
                 IsVisible="{Binding IsIconOnly, ElementName=Root}" />
         </Panel>
         <Button.Flyout>
-            <Flyout Placement="BottomEdgeAlignedLeft">
+            <Flyout Placement="Bottom" VerticalOffset="-2">
                 <StackPanel Spacing="12" Width="300">
                     <TextBlock FontWeight="SemiBold" Text="{Translate {x:Static i18n:LanguageManager+Keys.TargetPlaylist}}" />
                     <ListBox

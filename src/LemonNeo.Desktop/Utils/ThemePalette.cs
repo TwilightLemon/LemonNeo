@@ -90,7 +90,7 @@ public static class ThemePalette
         return new Dictionary<string, Color>
         {
             ["Canvas"] = background, ["Sidebar"] = sidebar, ["SidebarTranslucent"] = sidebar,
-            ["Surface"] = surface, ["SurfaceRaised"] = raised, ["Text"] = text,
+            ["Surface"] = surface, ["SurfaceRaised"] = raised, ["DialogTint"] = raised, ["Text"] = text,
             ["TextSecondary"] = secondary, ["Border"] = border,
             ["Accent"] = accent, ["OnAccent"] = onAccent, ["AccentText"] = accentText,
             ["LyricText"] = lyricText, ["LyricHighlight"] = lyricHighlighter,

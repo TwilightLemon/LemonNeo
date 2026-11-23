@@ -35,7 +35,7 @@ internal static class TrackContextMenu
         }).ToArray();
         var menu = new ContextMenu
         {
-            Placement = args.TryGetPosition(null, out _) ? PlacementMode.Pointer : PlacementMode.BottomEdgeAlignedLeft
+            Placement = args.TryGetPosition(null, out _) ? PlacementMode.Pointer : PlacementMode.Bottom
         };
         menu.Items.Add(new MenuItem
         {

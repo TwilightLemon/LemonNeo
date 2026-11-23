@@ -126,7 +126,8 @@
                                 <Flyout
                                     Closed="OnSettingsClosed"
                                     Opened="OnSettingsOpened"
-                                    Placement="TopEdgeAlignedRight">
+                                    Placement="Top"
+                                    VerticalOffset="2">
                                     <StackPanel
                                         Margin="8"
                                         Spacing="16"

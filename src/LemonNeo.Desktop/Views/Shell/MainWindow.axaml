@@ -407,10 +407,16 @@
             VerticalAlignment="Bottom"
             ZIndex="1">
             <Grid>
-                <sharedControls:FrostedGlass
+                <Border
+                    BackdropEffectCache="Retained"
                     Background="{DynamicResource Brush.PlaybackSurface}"
+                    ClipToBounds="True"
                     CornerRadius="20"
-                    IsHitTestVisible="False" />
+                    IsHitTestVisible="False">
+                    <Border.BackdropEffect>
+                        <BlurEffect Radius="24" />
+                    </Border.BackdropEffect>
+                </Border>
                 <playbackControls:AudioVisualizer
                     Fill="{DynamicResource Brush.Accent}"
                     Height="64"
@@ -599,7 +605,7 @@
                                             Width="5" />
                                     </Grid>
                                     <Button.Flyout>
-                                        <Flyout Placement="TopEdgeAlignedRight">
+                                        <Flyout Placement="Top" VerticalOffset="2">
                                             <ScrollViewer MaxHeight="440" Width="310">
                                                 <StackPanel Margin="4" Spacing="12">
                                                     <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.DecoderControls}}" />
@@ -701,16 +707,11 @@
             Name="SourceDetailsPopup"
             Opened="OnSourceDetailsOpened"
             OverlayDismissEventPassThrough="False"
-            Placement="TopEdgeAlignedRight"
+            Placement="Top"
             PlacementTarget="CurrentAudioQuality"
-            ShouldUseOverlayLayer="True"
-            VerticalOffset="-8">
+            VerticalOffset="2">
             <Border
-                Background="{DynamicResource Brush.SurfaceRaised}"
-                BorderBrush="{DynamicResource Brush.Border}"
-                BorderThickness="1"
-                BoxShadow="0 4 20 0 #26000000"
-                CornerRadius="16"
+                Classes="popupCard"
                 Focusable="True"
                 KeyDown="OnSourceDetailsKeyDown"
                 Name="SourceDetailsCard"
@@ -844,16 +845,11 @@
             Name="VolumePopup"
             Opened="OnVolumeOpened"
             OverlayDismissEventPassThrough="False"
-            Placement="TopEdgeAlignedRight"
+            Placement="Top"
             PlacementTarget="VolumeButton"
-            ShouldUseOverlayLayer="True"
-            VerticalOffset="-8">
+            VerticalOffset="2">
             <Border
-                Background="{DynamicResource Brush.SurfaceRaised}"
-                BorderBrush="{DynamicResource Brush.Border}"
-                BorderThickness="1"
-                BoxShadow="0 4 20 0 #26000000"
-                CornerRadius="16"
+                Classes="popupCard"
                 KeyDown="OnVolumeKeyDown"
                 Padding="16"
                 Width="220">
@@ -894,6 +890,7 @@
                 Background="Transparent"
                 BorderBrush="{DynamicResource Brush.Border}"
                 BorderThickness="1,0,0,0"
+                BoxShadow="-2 0 8 0 #40000000"
                 CornerRadius="16,0,0,16"
                 Focusable="True"
                 Height="{Binding #ShellRoot.Bounds.Height}"
@@ -901,10 +898,16 @@
                 Name="QueueCard"
                 Width="380">
                 <Grid>
-                    <sharedControls:FrostedGlass
+                    <Border
+                        BackdropEffectCache="Retained"
                         Background="{DynamicResource Brush.PlaybackSurface}"
-                        CornerRadius="16"
-                        IsHitTestVisible="False" />
+                        ClipToBounds="True"
+                        CornerRadius="16,0,0,16"
+                        IsHitTestVisible="False">
+                        <Border.BackdropEffect>
+                            <BlurEffect Radius="24" />
+                        </Border.BackdropEffect>
+                    </Border>
                     <ContentControl
                         Content="{Binding QueueDrawer}"
                         HorizontalContentAlignment="Stretch"
