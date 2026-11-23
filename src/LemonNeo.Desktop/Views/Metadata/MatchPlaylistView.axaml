@@ -186,11 +186,10 @@
                                                                 <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.BeforeMatch}}" />
                                                                 <TextBlock Text="{Binding Before}" TextWrapping="Wrap" />
                                                             </StackPanel>
-                                                            <TextBlock
-                                                                Classes="muted"
-                                                                Grid.Column="2"
-                                                                Text="→"
-                                                                VerticalAlignment="Center" />
+                                                            <Path
+                                                                Classes="icon small"
+                                                                Data="{StaticResource Icon.ArrowRight}"
+                                                                Grid.Column="2" />
                                                             <StackPanel Grid.Column="3" Spacing="3">
                                                                 <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.AfterMatch}}" />
                                                                 <TextBlock Text="{Binding After}" TextWrapping="Wrap" />

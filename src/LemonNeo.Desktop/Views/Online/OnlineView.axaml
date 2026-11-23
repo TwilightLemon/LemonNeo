@@ -52,11 +52,7 @@
                     Classes="ghost compact"
                     Command="{Binding DismissErrorCommand}"
                     Grid.Column="1">
-                    <Path
-                        Classes="icon"
-                        Data="{StaticResource Icon.Close}"
-                        Height="14"
-                        Width="14" />
+                    <Path Classes="icon small" Data="{StaticResource Icon.Close}" />
                 </Button>
             </Grid>
         </Border>
@@ -158,15 +154,11 @@
                                     ColumnDefinitions="Auto,*,Auto"
                                     MinHeight="44"
                                     ToolTip.Tip="{Binding Name}">
-                                    <Path
-                                        Classes="icon"
-                                        Data="{StaticResource Icon.Music}"
-                                        Margin="0,0,18,0"
-                                        VerticalAlignment="Center" />
+                                    <Path Classes="icon" Data="{StaticResource Icon.MusicNote}" />
                                     <TextBlock
                                         FontWeight="SemiBold"
                                         Grid.Column="1"
-                                        Margin="0,0,16,0"
+                                        Margin="18,0,16,0"
                                         Text="{Binding Name}"
                                         TextTrimming="CharacterEllipsis"
                                         VerticalAlignment="Center" />

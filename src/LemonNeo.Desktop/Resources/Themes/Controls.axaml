@@ -164,12 +164,14 @@
                         <TextBlock
                             FontSize="{DynamicResource Font.Title}"
                             FontWeight="SemiBold"
+                            Name="HeaderTitle"
                             Text="{TemplateBinding Title}"
                             TextWrapping="Wrap" />
                         <TextBlock
                             Foreground="{DynamicResource Brush.TextSecondary}"
                             IsVisible="{Binding Description, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}"
                             MaxLines="1"
+                            Name="HeaderDescription"
                             Text="{TemplateBinding Description}"
                             TextTrimming="CharacterEllipsis"
                             TextWrapping="NoWrap" />
@@ -177,6 +179,7 @@
                             Classes="caption"
                             IsVisible="{Binding Summary, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}"
                             MaxLines="1"
+                            Name="HeaderSummary"
                             Text="{TemplateBinding Summary}"
                             TextTrimming="CharacterEllipsis"
                             TextWrapping="NoWrap" />
@@ -185,6 +188,7 @@
                         Content="{TemplateBinding Actions}"
                         Grid.Column="1"
                         Margin="16,0,0,0"
+                        Name="HeaderActions"
                         VerticalAlignment="Center" />
                 </Grid>
             </ControlTemplate>
@@ -205,11 +209,8 @@
                         HorizontalAlignment="Center"
                         Width="80">
                         <Path
-                            Data="{TemplateBinding Icon}"
-                            Fill="{DynamicResource Brush.AccentText}"
-                            Height="28"
-                            Stretch="Uniform"
-                            Width="28" />
+                            Classes="icon extraLarge accent"
+                            Data="{TemplateBinding Icon}" />
                     </Border>
                     <TextBlock
                         FontSize="22"
@@ -261,11 +262,8 @@
                                     Height="44"
                                     Width="44" />
                                 <Path
-                                    Data="{StaticResource Icon.Music}"
-                                    Fill="{DynamicResource Brush.OnAccent}"
-                                    Height="20"
-                                    Stretch="Uniform"
-                                    Width="20" />
+                                    Classes="icon large onAccent"
+                                    Data="{StaticResource Icon.MusicNote}" />
                             </Grid>
                         </Viewbox>
                         <Image

@@ -142,7 +142,7 @@
         <Grid Grid.Row="2">
             <sharedControls:EmptyState
                 Description="{Translate {x:Static i18n:LanguageManager+Keys.NoTrackDescription}}"
-                Icon="{StaticResource Icon.Music}"
+                Icon="{StaticResource Icon.MusicNote}"
                 IsVisible="{Binding !Playback.HasCurrentTrack}"
                 Title="{Translate {x:Static i18n:LanguageManager+Keys.NoTrack}}" />
             <Grid

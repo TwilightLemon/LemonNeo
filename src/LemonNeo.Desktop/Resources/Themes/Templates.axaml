@@ -1,8 +1,10 @@
 <ResourceDictionary
     xmlns="https://github.com/avaloniaui"
+    xmlns:converters="using:Avalonia.Data.Converters"
     xmlns:core="using:LemonNeo.Core.Library"
     xmlns:i18n="using:LemonNeo.Desktop.Services"
     xmlns:metadataVm="using:LemonNeo.Desktop.ViewModels.Metadata"
+    xmlns:playbackControls="using:LemonNeo.Desktop.Controls.Playback"
     xmlns:sharedControls="using:LemonNeo.Desktop.Controls.Shared"
     xmlns:sharedVm="using:LemonNeo.Desktop.ViewModels.Shared"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
@@ -20,7 +22,7 @@
             CornerRadius="8">
             <Grid MinHeight="44" ToolTip.Tip="{Binding Identity}">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="38" />
+                    <ColumnDefinition Width="50" />
                     <ColumnDefinition Width="56" />
                     <ColumnDefinition Width="3*" />
                     <ColumnDefinition Width="2*" />
@@ -28,15 +30,27 @@
                 </Grid.ColumnDefinitions>
                 <TextBlock
                     Classes="caption"
-                    IsVisible="{Binding !IsSelectionMode}"
                     Text="{Binding Number}"
-                    VerticalAlignment="Center" />
+                    VerticalAlignment="Center">
+                    <TextBlock.IsVisible>
+                        <MultiBinding Converter="{x:Static converters:BoolConverters.And}">
+                            <Binding Path="!IsSelectionMode" />
+                            <Binding Path="!IsCurrent" />
+                        </MultiBinding>
+                    </TextBlock.IsVisible>
+                </TextBlock>
                 <CheckBox
                     AutomationProperties.Name="{Binding Title}"
+                    HorizontalAlignment="Left"
                     IsChecked="{Binding IsMarked}"
                     IsVisible="{Binding IsSelectionMode}"
                     MinWidth="0"
                     VerticalAlignment="Center" />
+                <playbackControls:NowPlayingIndicator
+                    Classes.managing="{Binding IsSelectionMode}"
+                    Classes.playing="{Binding $parent[ListBox].((sharedVm:TrackListViewModel)DataContext).Playback.IsPlaying}"
+                    Classes.reduceMotion="{Binding $parent[ListBox].((sharedVm:TrackListViewModel)DataContext).Playback.ReduceMotion}"
+                    IsVisible="{Binding IsCurrent}" />
                 <sharedControls:Artwork
                     CornerRadius="8"
                     Grid.Column="1"
@@ -52,6 +66,7 @@
                     Margin="0,0,16,0"
                     Spacing="5">
                     <TextBlock
+                        Classes="trackTitle"
                         FontWeight="Medium"
                         Text="{Binding Title}"
                         TextTrimming="CharacterEllipsis" />

@@ -69,13 +69,7 @@
                         Tag="{Binding Website}">
                         <StackPanel Orientation="Horizontal" Spacing="7">
                             <TextBlock Text="{Binding Website}" TextWrapping="Wrap" />
-                            <Path
-                                Classes="icon"
-                                Data="{StaticResource Icon.ExternalLink}"
-                                Height="14"
-                                Stretch="Uniform"
-                                VerticalAlignment="Center"
-                                Width="14" />
+                            <Path Classes="icon small accent" Data="{StaticResource Icon.ExternalLink}" />
                         </StackPanel>
                     </Button>
                 </Grid>
@@ -116,9 +110,6 @@
         <Style Selector="Button.dependencyLink">
             <Setter Property="Padding" Value="0,7,8,0" />
             <Setter Property="Foreground" Value="{DynamicResource Brush.AccentText}" />
-        </Style>
-        <Style Selector="Button.dependencyLink Path.icon">
-            <Setter Property="Fill" Value="{DynamicResource Brush.AccentText}" />
         </Style>
     </UserControl.Styles>
     <Grid RowDefinitions="Auto,Auto,*">
@@ -432,12 +423,7 @@
                                             Command="{Binding OpenRepositoryCommand}"
                                             HorizontalAlignment="Center">
                                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <Path
-                                                    Classes="icon"
-                                                    Data="{StaticResource Icon.ExternalLink}"
-                                                    Height="16"
-                                                    Stretch="Uniform"
-                                                    Width="16" />
+                                                <Path Classes="icon small" Data="{StaticResource Icon.ExternalLink}" />
                                                 <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.SourceCode}}" />
                                             </StackPanel>
                                         </Button>

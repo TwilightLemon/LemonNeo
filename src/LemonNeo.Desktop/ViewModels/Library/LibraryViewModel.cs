@@ -45,6 +45,7 @@ public sealed class LibraryViewModel : TrackListViewModel
     public bool IsQueue => Route == DesktopRoutes.Queue;
     public bool CanEditPlaylist => CanInteract && IsLibrary && SelectedPlaylist is not null;
     public bool HasSelectedPlaylist => IsLibrary && SelectedPlaylist is not null;
+    protected override bool HasPlayableTracks => HasSelectedPlaylist ? UnfilteredTracks.Count > 0 : base.HasPlayableTracks;
     internal bool ReduceMotion => Context.Appearance.Current.ReduceMotion;
 
     public bool CanEditTrack => CanInspectTrack && SelectedTrack!.PlaylistId is not null &&
@@ -101,13 +102,15 @@ public sealed class LibraryViewModel : TrackListViewModel
                 return;
             }
 
-            var tracks = Tracks.Select(row => new PlaybackQueueItem
+            var rows = HasSelectedPlaylist ? UnfilteredTracks : Tracks;
+            var index = selected is null ? 0 : rows.IndexOf(selected);
+            if (rows.Count == 0 || index < 0) return;
+            var tracks = rows.Select(row => new PlaybackQueueItem
             {
                 Track = row.Track,
                 PlaylistEntry = row.PlaybackEntry
             }).ToArray();
-            var index = selected is null ? 0 : Tracks.IndexOf(selected);
-            if (tracks.Length > 0 && index >= 0) await session.PlayItemsAsync(tracks, index, cancellationToken: ct);
+            await session.PlayItemsAsync(tracks, index, cancellationToken: ct);
         });
     }
 
@@ -183,9 +186,31 @@ public sealed class LibraryViewModel : TrackListViewModel
     {
         if (!CanRemoveTracks || SelectedPlaylist is not { } playlist) return Task.CompletedTask;
         var ids = ActionTracks.Select(t => t.PlaylistItemId).OfType<Guid>().ToArray();
+        return RemovePlaylistTracksAsync(playlist.Id, ids);
+    }
+
+    internal Task InspectTrackAsync(TrackRow row) => CanInteract && Tracks.Contains(row)
+        ? Navigation.OpenEditorAsync(row)
+        : Task.CompletedTask;
+
+    internal bool CanRemoveTrack(TrackRow row) => CanInteract &&
+        (IsQueue && row.QueueItemId is not null ||
+         CanEditPlaylist && row.PlaylistItemId is not null && row.PlaylistId == SelectedPlaylist?.Id);
+
+    internal Task RemoveTrackAsync(TrackRow row)
+    {
+        if (!CanRemoveTrack(row) || !Tracks.Contains(row)) return Task.CompletedTask;
+        if (IsQueue && row.QueueItemId is { } queueId)
+            return Playback.ExecutePlaybackAsync(ct => _host.Get<PlaybackSessionService>().RemoveQueueItemAsync(queueId, ct));
+        return RemovePlaylistTracksAsync(row.PlaylistId!.Value, [row.PlaylistItemId!.Value]);
+    }
+
+    private Task RemovePlaylistTracksAsync(Guid playlistId, IReadOnlyList<Guid> ids)
+    {
         return ExecuteAsync(async ct =>
         {
-            foreach (var id in ids) _host.Get<PlaylistService>().Remove(playlist.Id, id);
+            var playlists = _host.Get<PlaylistService>();
+            foreach (var id in ids) playlists.Remove(playlistId, id);
             await _host.Get<LibraryService>().SaveAsync(ct);
             Context.RefreshLibrary();
             SetStatus(LanguageManager.Keys.LibrarySaved);

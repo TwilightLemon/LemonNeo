@@ -193,15 +193,10 @@
                                                         <Grid ColumnDefinitions="*,Auto">
                                                             <TextBlock Text="{Binding Name}" />
                                                             <Path
-                                                                Classes="icon"
-                                                                Data="M 2,7 L 5,10 L 12,3"
-                                                                Fill="Transparent"
+                                                                Classes="icon small accent"
+                                                                Data="{StaticResource Icon.Done}"
                                                                 Grid.Column="1"
-                                                                Height="14"
-                                                                IsVisible="{Binding IsSelected}"
-                                                                Stroke="{DynamicResource Brush.AccentText}"
-                                                                StrokeThickness="2"
-                                                                Width="14" />
+                                                                IsVisible="{Binding IsSelected}" />
                                                         </Grid>
                                                     </StackPanel>
                                                 </Button>

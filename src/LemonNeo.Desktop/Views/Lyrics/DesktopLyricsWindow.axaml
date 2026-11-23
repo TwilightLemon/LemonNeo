@@ -44,10 +44,7 @@
             <Setter Property="Width" Value="34" />
             <Setter Property="Height" Value="34" />
             <Setter Property="MinHeight" Value="34" />
-            <Setter Property="Padding" Value="8" />
-        </Style>
-        <Style Selector="Button.desktopControl Path.icon">
-            <Setter Property="Fill" Value="White" />
+            <Setter Property="Padding" Value="7" />
         </Style>
         <Style Selector="Button.lineMode.active">
             <Setter Property="Background" Value="{DynamicResource Brush.AccentSoft}" />
@@ -64,13 +61,13 @@
         <Grid Name="DesktopLayout" RowDefinitions="40,*,Auto">
             <Border Name="Toolbar" VerticalAlignment="Center">
                 <Grid Name="ToolbarLayout" ColumnDefinitions="*,Auto,*">
-                    <TextBlock
+                    <Path
+                        Classes="icon onDark"
+                        Data="{StaticResource Icon.DragHandle}"
+                        HorizontalAlignment="Left"
                         Name="ToolbarDragHandle"
-                        FontSize="20"
-                        Foreground="#BFFFFFFF"
-                        Text="⋮⋮"
-                        ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.DragDesktopLyrics}}"
-                        VerticalAlignment="Center" />
+                        Opacity="0.75"
+                        ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.DragDesktopLyrics}}" />
                     <StackPanel
                         Grid.Column="1"
                         Name="ToolbarButtons"
@@ -78,39 +75,39 @@
                         Spacing="8">
                         <Button
                             AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Previous}}"
-                            Classes="ghost desktopControl"
+                            Classes="ghost icon desktopControl"
                             Command="{Binding Playback.PreviousCommand}"
                             IsEnabled="{Binding Playback.CanPrevious}"
                             Name="DesktopPreviousButton"
                             ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Previous}}">
-                            <Path Classes="icon" Data="{StaticResource Icon.Previous}" />
+                            <Path Classes="icon transport" Data="{StaticResource Icon.Previous}" />
                         </Button>
                         <Button
                             AutomationProperties.Name="{Binding Playback.PlayLabel}"
-                            Classes="ghost desktopControl"
+                            Classes="ghost icon desktopControl"
                             Command="{Binding Playback.TogglePlaybackCommand}"
                             IsEnabled="{Binding Playback.CanTogglePlayback}"
                             Name="DesktopPlayPauseButton"
                             ToolTip.Tip="{Binding Playback.PlayLabel}">
                             <Grid>
                                 <Path
-                                    Classes="icon"
+                                    Classes="icon transport"
                                     Data="{StaticResource Icon.Play}"
                                     IsVisible="{Binding !Playback.IsPlaying}" />
                                 <Path
-                                    Classes="icon"
+                                    Classes="icon transport"
                                     Data="{StaticResource Icon.Pause}"
                                     IsVisible="{Binding Playback.IsPlaying}" />
                             </Grid>
                         </Button>
                         <Button
                             AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Next}}"
-                            Classes="ghost desktopControl"
+                            Classes="ghost icon desktopControl"
                             Command="{Binding Playback.NextCommand}"
                             IsEnabled="{Binding Playback.CanNext}"
                             Name="DesktopNextButton"
                             ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Next}}">
-                            <Path Classes="icon" Data="{StaticResource Icon.Next}" />
+                            <Path Classes="icon transport" Data="{StaticResource Icon.Next}" />
                         </Button>
                     </StackPanel>
                     <StackPanel
@@ -121,7 +118,7 @@
                         Spacing="4">
                         <Button
                             AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.LyricsDisplaySettings}}"
-                            Classes="ghost desktopControl"
+                            Classes="ghost icon desktopControl"
                             Name="DesktopLyricsSettingsButton"
                             ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.LyricsDisplaySettings}}">
                             <Path Classes="icon" Data="{StaticResource Icon.Settings}" />
@@ -190,15 +187,11 @@
                         </Button>
                         <Button
                             AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.CloseDesktopLyrics}}"
-                            Classes="ghost desktopControl"
+                            Classes="ghost icon desktopControl"
                             Click="OnCloseWindow"
                             Name="DesktopLyricsCloseButton"
                             ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.CloseDesktopLyrics}}">
-                            <Path
-                                Classes="icon"
-                                Data="{StaticResource Icon.Close}"
-                                Height="14"
-                                Width="14" />
+                            <Path Classes="icon small" Data="{StaticResource Icon.Close}" />
                         </Button>
                     </StackPanel>
                 </Grid>

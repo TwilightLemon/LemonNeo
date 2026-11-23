@@ -38,7 +38,7 @@ internal readonly record struct LyricAnimationTiming(
         // A whole word lifts over 1.5× the line's average word duration (at least 1200 ms),
         // so the lift stays connected across the whole line.
         var averageDuration = timedCount > 0 ? totalDuration / timedCount : 0;
-        var liftUpDuration = Math.Max(1200, averageDuration * 1.5);
+        var liftUpDuration = Math.Max(1200, averageDuration * 3);
 
         var result = new List<LyricAnimationTiming>();
         var offset = 0;
