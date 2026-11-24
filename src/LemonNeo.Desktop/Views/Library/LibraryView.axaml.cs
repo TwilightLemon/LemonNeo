@@ -14,6 +14,8 @@ public partial class LibraryView : UserControl
     public LibraryView()
     {
         InitializeComponent();
+        // Composite the faded list before the floating button samples its backdrop.
+        //PageBottomFade.Attach(TrackList);
         CollapsibleListHeader.Attach(LibraryHeader, CompactTitle, LibraryTools, LibraryEmptyState, TrackList);
         _ = new ListReorderBehavior(TrackList, () => DataContext is LibraryViewModel { CanReorderTracks: true },
             (source, target, after) => DataContext is LibraryViewModel vm && source is TrackRow row &&

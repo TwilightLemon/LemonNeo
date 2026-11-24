@@ -51,6 +51,49 @@
             <Setter Property="BorderBrush" Value="{DynamicResource Brush.Focus}" />
         </Style>
     </ControlTheme>
+    <ControlTheme BasedOn="{StaticResource LemonButton}" TargetType="Button" x:Key="LemonGlassFloatingButton">
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Panel>
+                    <Border
+                        BackdropEffectCache="Retained"
+                        Background="{DynamicResource Brush.PlaybackSurface}"
+                        ClipToBounds="True"
+                        CornerRadius="{TemplateBinding CornerRadius}"
+                        IsHitTestVisible="False">
+                        <Border.BackdropEffect>
+                            <BlurEffect Radius="2" />
+                        </Border.BackdropEffect>
+                        <sharedControls:LiquidGlassRim CornerRadius="{TemplateBinding CornerRadius}" />
+                    </Border>
+                    <Border
+                        Background="{DynamicResource Brush.Accent}"
+                        CornerRadius="{TemplateBinding CornerRadius}"
+                        IsHitTestVisible="False"
+                        Name="AccentTint"
+                        Opacity="0.12" />
+                    <ContentPresenter
+                        Background="Transparent"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        Content="{TemplateBinding Content}"
+                        ContentTemplate="{TemplateBinding ContentTemplate}"
+                        CornerRadius="{TemplateBinding CornerRadius}"
+                        HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                        Name="PART_ContentPresenter"
+                        Padding="{TemplateBinding Padding}"
+                        RecognizesAccessKey="True"
+                        VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                </Panel>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover /template/ Border#AccentTint">
+            <Setter Property="Opacity" Value="0.22" />
+        </Style>
+        <Style Selector="^:pressed /template/ Border#AccentTint">
+            <Setter Property="Opacity" Value="0.30" />
+        </Style>
+    </ControlTheme>
     <ControlTheme TargetType="ListBoxItem" x:Key="ServiceTabTheme">
         <Setter Property="BorderThickness" Value="0,0,0,2" />
         <Setter Property="BorderBrush" Value="Transparent" />

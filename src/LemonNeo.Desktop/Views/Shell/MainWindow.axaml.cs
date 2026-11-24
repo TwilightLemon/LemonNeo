@@ -289,15 +289,6 @@ public partial class MainWindow : Window
         Resources["Space.PlaybackFloatingInset"] = new Thickness(0, 0, 16, inset);
     }
 
-    private void OnPageContentSizeChanged(object? sender, SizeChangedEventArgs args)
-    {
-        // A fixed fade distance keeps the transition consistent when the window is resized.
-        var height = args.NewSize.Height;
-        if (height <= 0 || PageContent.OpacityMask is not LinearGradientBrush fade) return;
-        fade.StartPoint = new RelativePoint(0, Math.Max(0, height - 64), RelativeUnit.Absolute);
-        fade.EndPoint = new RelativePoint(0, height, RelativeUnit.Absolute);
-    }
-
     private async void OnQueueOpened(object? sender, EventArgs args)
     {
         VolumePopup.IsOpen = false;

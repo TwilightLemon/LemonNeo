@@ -8,6 +8,7 @@ using Avalonia.VisualTree;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LemonNeo.Desktop.Controls.Navigation;
+using LemonNeo.Desktop.Controls.Shared;
 using LemonNeo.Desktop.ViewModels.Catalog;
 using LemonNeo.Desktop.ViewModels.Accounts;
 using LemonNeo.Desktop.ViewModels.Library;
@@ -517,6 +518,7 @@ public sealed class DesktopNavigation : ObservableObject, IAsyncDisposable
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
             VerticalContentAlignment = VerticalAlignment.Stretch
         };
+        if (view is not LibraryView) PageBottomFade.Attach(page);
         NavigationPage.SetHasNavigationBar(page, false);
         return page;
     }

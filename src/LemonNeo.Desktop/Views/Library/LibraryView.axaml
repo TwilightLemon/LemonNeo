@@ -120,7 +120,7 @@
                 VerticalAlignment="Bottom">
                 <Button
                     AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.LocatePlayingTrack}}"
-                    Classes="primary floating"
+                    Classes="floating"
                     Click="OnLocatePlaying"
                     Name="LocatePlayingButton"
                     ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.LocatePlayingTrack}}">

@@ -74,10 +74,10 @@ public sealed class LiquidGlassRim : TemplatedControl
         {
             var w = (float)bounds.Width;
             var h = (float)bounds.Height;
-            var limit = Math.Min(w, h) * .5f;
-            var width = Math.Min(requestedWidth, limit);
-            _samplingHalo = 1 + 2.2f * width; // Reach of the furthest wavelength plus bilinear sampling.
-            float Radius(double r) => Math.Clamp((float)r, 0, limit);
+            var shortSide = Math.Min(w, h);
+            var width = Math.Min(requestedWidth, shortSide * .2f);
+            _samplingHalo = 1 + 2.32f * width; // Maximum bend (1.96) plus dispersion (0.36) and bilinear sampling.
+            float Radius(double r) => Math.Clamp((float)r, 0, shortSide * .5f);
             float[] radii = [Radius(corners.TopLeft), Radius(corners.TopRight),
                 Radius(corners.BottomRight), Radius(corners.BottomLeft)];
             _outer.SetRectRadii(SKRect.Create(w, h), Array.ConvertAll(radii, r => new SKPoint(r, r)));
@@ -171,7 +171,7 @@ public sealed class LiquidGlassRim : TemplatedControl
 
                 // Bend towards the glass interior so all wavelengths sample the same frosted scene.
                 float2 bent = p - n * (rimWidth * curve * (1.72 + 0.24 * corner));
-                float2 spread = n * (rimWidth * curve * (0.025 + 0.20 * corner));
+                float2 spread = n * (rimWidth * curve * (0.04 + 0.32 * corner));
                 half4 centre = scene.eval(bent);
                 half4 red = scene.eval(bent - spread);
                 half4 blue = scene.eval(bent + spread);
