@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.VisualTree;
 using LemonNeo.Desktop.ViewModels.Online;
 using LemonNeo.Desktop.ViewModels.Shared;
 
@@ -24,7 +25,7 @@ public partial class OnlineView : UserControl
     private void OnServiceTabTapped(object? sender, RoutedEventArgs args)
     {
         // Selection loads new tabs; tapping the current tab refreshes it once.
-        if (DataContext is OnlineViewModel model && args.Source is StyledElement { DataContext: ProviderOption option }
+        if (DataContext is OnlineViewModel model && GetServiceTab(args) is { DataContext: ProviderOption option }
                                                  && option.Id == _serviceBeforePress &&
                                                  option.Id == model.SelectedService?.Id && model.CanBrowseRemote)
             model.RemotePlaylistsCommand.Execute(null);
@@ -32,10 +33,13 @@ public partial class OnlineView : UserControl
 
     private async void OnServiceTabKeyDown(object? sender, KeyEventArgs args)
     {
-        if (args.Key is not (Key.Enter or Key.Space) ||
+        if (args.Key is not (Key.Enter or Key.Space) || GetServiceTab(args) is null ||
             DataContext is not OnlineViewModel { CanBrowseRemote: true } model) return;
         args.Handled = true;
         await model.RemotePlaylistsCommand.ExecuteAsync(null);
         if (IsEffectivelyVisible) ServiceTabs.ContainerFromIndex(ServiceTabs.SelectedIndex)?.Focus();
     }
+
+    private static TabItem? GetServiceTab(RoutedEventArgs args) =>
+        (args.Source as Visual)?.GetSelfAndVisualAncestors().OfType<TabItem>().FirstOrDefault();
 }

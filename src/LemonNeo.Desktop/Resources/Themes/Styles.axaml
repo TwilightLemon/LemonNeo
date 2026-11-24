@@ -308,21 +308,6 @@
     <Style Selector="ListBox.managing ListBoxItem:selected:not(.marked):pointerover /template/ ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource Brush.NeutralHover}" />
     </Style>
-    <Style Selector="ListBox.serviceTabs ListBoxItem">
-        <Setter Property="Padding" Value="16,10" />
-        <Setter Property="Margin" Value="0" />
-        <Setter Property="CornerRadius" Value="0" />
-    </Style>
-    <Style Selector="ListBox.serviceTabs ListBoxItem TextBlock">
-        <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}" />
-    </Style>
-    <Style Selector="ListBox.serviceTabs ListBoxItem:selected TextBlock">
-        <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
-        <Setter Property="FontWeight" Value="SemiBold" />
-    </Style>
-    <Style Selector="ListBox.serviceTabs ListBoxItem:pointerover TextBlock">
-        <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
-    </Style>
     <Style Selector="Slider">
         <Setter Property="Foreground" Value="{DynamicResource Brush.AccentText}" />
     </Style>

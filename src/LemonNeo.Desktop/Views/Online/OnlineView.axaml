@@ -5,7 +5,6 @@
     xmlns:i18n="using:LemonNeo.Desktop.Services"
     xmlns:onlineVm="using:LemonNeo.Desktop.ViewModels.Online"
     xmlns:sharedControls="using:LemonNeo.Desktop.Controls.Shared"
-    xmlns:sharedVm="using:LemonNeo.Desktop.ViewModels.Shared"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <UserControl.Styles>
         <Style Selector="ListBox.categoryMenu ListBoxItem:selected TextBlock">
@@ -13,7 +12,7 @@
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
     </UserControl.Styles>
-    <Grid RowDefinitions="Auto,Auto,*">
+    <Grid RowDefinitions="Auto,*">
         <sharedControls:PageHeader Title="{Binding PageTitle}">
             <sharedControls:PageHeader.Actions>
                 <StackPanel
@@ -34,169 +33,163 @@
                 </StackPanel>
             </sharedControls:PageHeader.Actions>
         </sharedControls:PageHeader>
-        <Border
-            BorderBrush="{DynamicResource Brush.Border}"
-            BorderThickness="0,0,0,1"
+        <TabControl
+            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Online}}"
             Grid.Row="1"
-            IsVisible="{Binding HasServices}">
-            <ListBox
-                AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Online}}"
-                Classes="serviceTabs"
-                IsEnabled="{Binding CanInteract}"
-                ItemContainerTheme="{StaticResource ServiceTabTheme}"
-                ItemsSource="{Binding Services}"
-                Name="ServiceTabs"
-                Padding="0"
-                ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                SelectedItem="{Binding SelectedService}">
-                <ListBox.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel Orientation="Horizontal" />
-                    </ItemsPanelTemplate>
-                </ListBox.ItemsPanel>
-                <ListBox.ItemTemplate>
-                    <DataTemplate x:DataType="sharedVm:ProviderOption">
-                        <TextBlock Text="{Binding Name}" />
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
-        </Border>
-
-        <Grid
-            ColumnDefinitions="Auto,*"
-            Grid.Row="2"
-            Margin="0,20,0,0"
-            Name="PlaylistSection">
-            <Border
-                BorderBrush="{DynamicResource Brush.Border}"
-                BorderThickness="0,0,1,0"
-                IsVisible="{Binding HasCategoryMenu}"
-                Margin="0,0,20,0"
-                Name="PlaylistCategorySidebar"
-                Padding="0,0,16,0"
-                Width="192">
-                <ListBox
-                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistCategories}}"
-                    Classes="categoryMenu"
-                    IsEnabled="{Binding CanInteract}"
-                    ItemsSource="{Binding PlaylistCategories}"
-                    Name="PlaylistCategoryMenu"
-                    Padding="0"
-                    ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                    SelectedItem="{Binding SelectedCategory}">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate x:DataType="onlineVm:RemotePlaylistCategory">
-                            <TextBlock
-                                MinHeight="24"
-                                Text="{Binding Name}"
-                                TextWrapping="Wrap"
-                                VerticalAlignment="Center" />
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-            </Border>
-            <Grid
-                Grid.Column="1"
-                Name="PlaylistContent"
-                RowDefinitions="*,Auto">
-                <Grid ClipToBounds="True">
-                    <StackPanel
-                        HorizontalAlignment="Left"
-                        IsVisible="{Binding !HasRemotePlaylists}"
-                        MaxWidth="440"
-                        Name="RemoteEmptyState"
-                        Spacing="8"
-                        VerticalAlignment="Center">
-                        <TextBlock
-                            FontSize="18"
-                            FontWeight="SemiBold"
-                            Text="{Binding RemoteEmptyTitle}"
-                            TextWrapping="Wrap" />
-                        <TextBlock
-                            Classes="caption"
-                            Text="{Binding RemoteEmptyDescription}"
-                            TextWrapping="Wrap" />
-                    </StackPanel>
-                    <ListBox
-                        AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.RemotePlaylists}}"
-                        IsEnabled="{Binding CanInteract}"
-                        IsVisible="{Binding HasRemotePlaylists}"
-                        ItemsSource="{Binding RemotePlaylists}"
-                        Name="RemotePlaylistList"
-                        Padding="0"
-                        ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                        SelectedItem="{Binding SelectedRemotePlaylist}">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate x:DataType="onlineVm:RemotePlaylistRow">
-                                <Grid
-                                    ColumnDefinitions="Auto,*,Auto"
-                                    MinHeight="44"
-                                    ToolTip.Tip="{Binding Name}">
-                                    <sharedControls:Artwork
-                                        CornerRadius="8"
-                                        Height="44"
-                                        Loader="{Binding ArtworkLoader}"
-                                        SourceUri="{Binding ArtworkUri}"
-                                        VerticalAlignment="Center"
-                                        Width="44" />
-                                    <TextBlock
-                                        FontWeight="SemiBold"
-                                        Grid.Column="1"
-                                        Margin="18,0,16,0"
-                                        Text="{Binding Name}"
-                                        TextTrimming="CharacterEllipsis"
-                                        VerticalAlignment="Center" />
-                                    <StackPanel
-                                        Grid.Column="2"
-                                        Spacing="3"
-                                        VerticalAlignment="Center">
-                                        <TextBlock HorizontalAlignment="Right" Text="{Binding TrackCount}" />
+            IsEnabled="{Binding CanInteract}"
+            IsVisible="{Binding HasServices}"
+            ItemTemplate="{StaticResource ProviderTabHeaderTemplate}"
+            ItemsSource="{Binding Services}"
+            Name="ServiceTabs"
+            SelectedItem="{Binding SelectedService}">
+            <TabControl.ContentTemplate>
+                <DataTemplate>
+                    <Grid
+                        x:DataType="onlineVm:OnlineViewModel"
+                        ColumnDefinitions="Auto,*"
+                        DataContext="{Binding $parent[TabControl].((onlineVm:OnlineViewModel)DataContext)}"
+                        Margin="0,16,0,0"
+                        Name="PlaylistSection">
+                        <Border
+                            BorderBrush="{DynamicResource Brush.Border}"
+                            BorderThickness="0,0,1,0"
+                            IsVisible="{Binding HasCategoryMenu}"
+                            Margin="0,0,20,0"
+                            Name="PlaylistCategorySidebar"
+                            Padding="0,0,16,0"
+                            Width="192">
+                            <ListBox
+                                AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistCategories}}"
+                                Classes="categoryMenu"
+                                IsEnabled="{Binding CanInteract}"
+                                ItemsSource="{Binding PlaylistCategories}"
+                                Name="PlaylistCategoryMenu"
+                                Padding="0"
+                                ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                SelectedItem="{Binding SelectedCategory}">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate x:DataType="onlineVm:RemotePlaylistCategory">
                                         <TextBlock
-                                            Classes="caption"
-                                            HorizontalAlignment="Right"
-                                            Text="{Translate {x:Static i18n:LanguageManager+Keys.RemoteTracksLabel}}" />
-                                    </StackPanel>
-                                </Grid>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                </Grid>
-                <Border
-                    BorderBrush="{DynamicResource Brush.Border}"
-                    BorderThickness="0,1,0,0"
-                    Grid.Row="1"
-                    IsVisible="{Binding HasSelectedRemotePlaylist}"
-                    Margin="{DynamicResource Space.PlaybackFooterInset}"
-                    Name="PlaylistImportBar"
-                    Padding="0,12,0,0">
-                    <Grid ColumnDefinitions="*,Auto">
-                        <StackPanel
-                            Margin="0,0,12,0"
-                            Spacing="4"
-                            VerticalAlignment="Center">
-                            <TextBlock
-                                FontWeight="SemiBold"
-                                Text="{Binding SelectedRemotePlaylist.Name}"
-                                TextTrimming="CharacterEllipsis" />
-                            <TextBlock Classes="caption" Text="{Binding SelectedPlaylistSummary}" />
-                            <CheckBox IsChecked="{Binding SynchronizeImportedPlaylist}"
-                                      Content="{Translate {x:Static i18n:LanguageManager+Keys.ImportWithAutoSync}}"
-                                      ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistSyncReadOnlyHint}}" />
-                        </StackPanel>
-                        <Button
-                            Classes="primary"
-                            Command="{Binding ImportRemoteCommand}"
+                                            MinHeight="24"
+                                            Text="{Binding Name}"
+                                            TextWrapping="Wrap"
+                                            VerticalAlignment="Center" />
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Border>
+                        <Grid
                             Grid.Column="1"
-                            IsEnabled="{Binding CanImportRemote}"
-                            Name="ImportSelectedButton">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <Path Classes="icon" Data="{StaticResource Icon.Download}" />
-                                <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.ImportRemote}}" />
-                            </StackPanel>
-                        </Button>
+                            Name="PlaylistContent"
+                            RowDefinitions="*,Auto">
+                            <Grid ClipToBounds="True">
+                                <StackPanel
+                                    HorizontalAlignment="Left"
+                                    IsVisible="{Binding !HasRemotePlaylists}"
+                                    MaxWidth="440"
+                                    Name="RemoteEmptyState"
+                                    Spacing="8"
+                                    VerticalAlignment="Center">
+                                    <TextBlock
+                                        FontSize="18"
+                                        FontWeight="SemiBold"
+                                        Text="{Binding RemoteEmptyTitle}"
+                                        TextWrapping="Wrap" />
+                                    <TextBlock
+                                        Classes="caption"
+                                        Text="{Binding RemoteEmptyDescription}"
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ListBox
+                                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.RemotePlaylists}}"
+                                    IsEnabled="{Binding CanInteract}"
+                                    IsVisible="{Binding HasRemotePlaylists}"
+                                    ItemsSource="{Binding RemotePlaylists}"
+                                    Name="RemotePlaylistList"
+                                    Padding="0"
+                                    ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                    SelectedItem="{Binding SelectedRemotePlaylist}">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:DataType="onlineVm:RemotePlaylistRow">
+                                            <Grid
+                                                ColumnDefinitions="Auto,*,Auto"
+                                                MinHeight="44"
+                                                ToolTip.Tip="{Binding Name}">
+                                                <sharedControls:Artwork
+                                                    CornerRadius="8"
+                                                    Height="44"
+                                                    Loader="{Binding ArtworkLoader}"
+                                                    SourceUri="{Binding ArtworkUri}"
+                                                    VerticalAlignment="Center"
+                                                    Width="44" />
+                                                <TextBlock
+                                                    FontWeight="SemiBold"
+                                                    Grid.Column="1"
+                                                    Margin="18,0,16,0"
+                                                    Text="{Binding Name}"
+                                                    TextTrimming="CharacterEllipsis"
+                                                    VerticalAlignment="Center" />
+                                                <StackPanel
+                                                    Grid.Column="2"
+                                                    Spacing="3"
+                                                    VerticalAlignment="Center">
+                                                    <TextBlock HorizontalAlignment="Right" Text="{Binding TrackCount}" />
+                                                    <TextBlock
+                                                        Classes="caption"
+                                                        HorizontalAlignment="Right"
+                                                        Text="{Translate {x:Static i18n:LanguageManager+Keys.RemoteTracksLabel}}" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Grid>
+                            <Border
+                                BorderBrush="{DynamicResource Brush.Border}"
+                                BorderThickness="0,1,0,0"
+                                Grid.Row="1"
+                                IsVisible="{Binding HasSelectedRemotePlaylist}"
+                                Margin="{DynamicResource Space.PlaybackFooterInset}"
+                                Name="PlaylistImportBar"
+                                Padding="0,12,0,0">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel
+                                        Margin="0,0,12,0"
+                                        Spacing="4"
+                                        VerticalAlignment="Center">
+                                        <TextBlock
+                                            FontWeight="SemiBold"
+                                            Text="{Binding SelectedRemotePlaylist.Name}"
+                                            TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Classes="caption" Text="{Binding SelectedPlaylistSummary}" />
+                                        <CheckBox IsChecked="{Binding SynchronizeImportedPlaylist}"
+                                                  Content="{Translate {x:Static i18n:LanguageManager+Keys.ImportWithAutoSync}}"
+                                                  ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistSyncReadOnlyHint}}" />
+                                    </StackPanel>
+                                    <Button
+                                        Classes="primary"
+                                        Command="{Binding ImportRemoteCommand}"
+                                        Grid.Column="1"
+                                        IsEnabled="{Binding CanImportRemote}"
+                                        Name="ImportSelectedButton"
+                                        VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Path Classes="icon" Data="{StaticResource Icon.Download}" />
+                                            <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.ImportRemote}}" />
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                            </Border>
+                        </Grid>
                     </Grid>
-                </Border>
-            </Grid>
-        </Grid>
+                </DataTemplate>
+            </TabControl.ContentTemplate>
+        </TabControl>
+        <sharedControls:EmptyState
+            Description="{Binding RemoteEmptyDescription}"
+            Grid.Row="1"
+            Icon="{StaticResource Icon.MusicNote}"
+            IsVisible="{Binding !HasServices}"
+            Title="{Binding RemoteEmptyTitle}" />
     </Grid>
 </UserControl>

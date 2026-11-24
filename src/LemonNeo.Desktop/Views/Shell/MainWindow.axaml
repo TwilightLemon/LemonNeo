@@ -86,7 +86,7 @@
             <Setter Property="Grid.RowSpan" Value="2" />
             <Setter Property="Margin" Value="32,48,32,0" />
         </Style>
-        <Style Selector="ContentControl#PageContent ListBox:not(.serviceTabs):not(.playlistPicker) /template/ ItemsPresenter#PART_ItemsPresenter">
+        <Style Selector="ContentControl#PageContent ListBox:not(.playlistPicker) /template/ ItemsPresenter#PART_ItemsPresenter">
             <Setter Property="Margin" Value="{DynamicResource Space.PlaybackInset}" />
         </Style>
         <Style Selector="ContentControl#PageContent ScrollViewer:not(#PART_ScrollViewer):not(#LyricsScrollViewer)">

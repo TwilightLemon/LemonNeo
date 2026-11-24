@@ -24,7 +24,7 @@
   "LibraryTrackEntries": "Playlist entries",
   "LibraryKnownDuration": "Known duration",
   "LibraryAutomaticSync": "Automatic sync",
-  "LibrarySyncAll": "Sync all",
+  "LibrarySyncAll": "Sync all now",
   "LibrarySyncOn": "Enabled",
   "LibrarySyncOff": "Paused",
   "PlaylistSyncGlobalPaused": "All automatic sync paused",

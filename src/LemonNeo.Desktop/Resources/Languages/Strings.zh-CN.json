@@ -24,7 +24,7 @@
   "LibraryTrackEntries": "歌单项",
   "LibraryKnownDuration": "已知总时长",
   "LibraryAutomaticSync": "自动同步",
-  "LibrarySyncAll": "全部同步",
+  "LibrarySyncAll": "立即同步全部",
   "LibrarySyncOn": "已启用",
   "LibrarySyncOff": "已暂停",
   "PlaylistSyncGlobalPaused": "已暂停所有自动同步",

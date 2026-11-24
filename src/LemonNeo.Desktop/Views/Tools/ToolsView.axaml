@@ -388,16 +388,25 @@
                                         <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistSynchronization}}" />
                                         <TextBlock Classes="caption" VerticalAlignment="Center" Text="{Binding LibraryOverview.SyncedPlaylistCount}" />
                                     </StackPanel>
-                                    <WrapPanel>
-                                        <ToggleSwitch Margin="0,0,20,6" VerticalAlignment="Center"
-                                                      Content="{Translate {x:Static i18n:LanguageManager+Keys.LibraryAutomaticSync}}"
-                                                      IsChecked="{Binding Synchronization.IsAutomaticSyncEnabled, Mode=TwoWay}"
-                                                      IsEnabled="{Binding Synchronization.CanChangeGlobalPause}"
-                                                      ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistSyncPauseHint}}" />
-                                        <Button Classes="ghost compact" Margin="0,0,0,6"
-                                                Command="{Binding Synchronization.SyncAllCommand}"
-                                                Content="{Translate {x:Static i18n:LanguageManager+Keys.LibrarySyncAll}}" />
-                                    </WrapPanel>
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                                        <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                                            <TextBlock
+                                                Text="{Translate {x:Static i18n:LanguageManager+Keys.LibraryAutomaticSync}}"
+                                                VerticalAlignment="Center" />
+                                            <ToggleSwitch
+                                                AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.LibraryAutomaticSync}}"
+                                                IsChecked="{Binding Synchronization.IsAutomaticSyncEnabled, Mode=TwoWay}"
+                                                IsEnabled="{Binding Synchronization.CanChangeGlobalPause}"
+                                                ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistSyncPauseHint}}"
+                                                VerticalAlignment="Center" />
+                                        </StackPanel>
+                                        <Button
+                                            Classes="primary"
+                                            Command="{Binding Synchronization.SyncAllCommand}"
+                                            Content="{Translate {x:Static i18n:LanguageManager+Keys.LibrarySyncAll}}"
+                                            Grid.Column="1"
+                                            VerticalAlignment="Center" />
+                                    </Grid>
                                     <TextBlock Classes="caption" IsVisible="{Binding Synchronization.IsPaused}"
                                                Text="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistSyncGlobalPaused}}" />
                                     <ItemsControl ItemsSource="{Binding LibraryOverview.SyncedPlaylists}">
