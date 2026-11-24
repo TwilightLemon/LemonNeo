@@ -72,8 +72,13 @@ public static class ThemePalette
         var tintHsl = tintAccent.ToHsl();
         var soft = Mix(raised, tintAccent, dark ? .13 : .22);
         var hover = Mix(raised, tintAccent, dark ? .07 : .08);
+        var neutralHover = Color.Parse(dark ? "#1AFFFFFF" : "#12000000");
+        var selection = Color.Parse(dark ? "#26FFFFFF" : "#1F000000");
+        var selectionHover = Color.Parse(dark ? "#31FFFFFF" : "#29000000");
 
-        var backgrounds = new[] { background, sidebar, surface, raised, soft, hover };
+        var neutral = dark ? Colors.White : Colors.Black;
+        var backgrounds = new[] { background, sidebar, surface, raised, soft, hover,
+            Mix(sidebar, neutral, selectionHover.A / 255d), Mix(raised, neutral, selectionHover.A / 255d) };
         var text = EnsureContrast(dark ? Color.Parse("#EEF1F4") : Color.Parse("#20252C"), backgrounds, 7, dark);
         // Leave headroom for the intermediate colors and hover opacity during transitions.
         var secondary = Color.Parse(dark ? "#C0FEFEFE" : "#C0000000");
@@ -83,7 +88,7 @@ public static class ThemePalette
             ? HslColor.ToRgb(hsl.H, hsl.S, .94)
             : EnsureContrast(HslColor.ToRgb(tintHsl.H, Math.Min(tintHsl.S, .35), .12), backgrounds, 7, false);
         var lyricText = Color.Parse(dark ? "#90FEFEFE" : "#90000000");
-        var playbackSurface = Color.Parse(dark ? "#4E000000" : "#4EEFEFEF");
+        var playbackSurface = Color.Parse(dark ? "#9E000000" : "#9EEFEFEF");
         var border = Color.Parse(dark ? "#2EFFFFFF" : "#2E000000");
         var dangerSoft = Color.Parse(dark ? "#442B28" : "#FAE9E8");
         var danger = EnsureContrast(Color.Parse(dark ? "#FFAB9F" : "#B33232"), [.. backgrounds, dangerSoft], 4.5, dark);
@@ -94,7 +99,8 @@ public static class ThemePalette
             ["TextSecondary"] = secondary, ["Border"] = border,
             ["Accent"] = accent, ["OnAccent"] = onAccent, ["AccentText"] = accentText,
             ["LyricText"] = lyricText, ["LyricHighlight"] = lyricHighlighter,
-            ["AccentSoft"] = soft, ["Hover"] = hover, ["Danger"] = danger,
+            ["AccentSoft"] = soft, ["Hover"] = hover, ["NeutralHover"] = neutralHover,
+            ["Selection"] = selection, ["SelectionHover"] = selectionHover, ["Danger"] = danger,
             ["DangerSoft"] = dangerSoft, ["Focus"] = accentText,
             ["PlaybackSurface"] = playbackSurface,
             ["Artwork"] = Mix(raised, tintAccent, .20)

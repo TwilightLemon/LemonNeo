@@ -106,6 +106,10 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
         ? track.Artists.Count > 0 ? string.Join(" / ", track.Artists.Select(a => a.Name)) : _text[LanguageManager.Keys.UnknownArtist]
         : _text[LanguageManager.Keys.NoTrackDescription];
 
+    public string NowSubtitle => Snapshot.CurrentTrack?.Album?.Title is { Length: > 0 } album
+        ? $"{NowArtist} · {album}"
+        : NowArtist;
+
     public bool HasCurrentTrack => Snapshot.CurrentTrack is not null;
     public Bitmap? NowArtwork => _nowArtwork?.Bitmap;
     public LoadedArtwork? NowArtworkReference => _nowArtwork;
@@ -257,8 +261,6 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
         : "";
 
     public string SourcePlayer => Snapshot.PlayerId ?? _text[LanguageManager.Keys.PlaybackSourceUnknown];
-    public string TimeLabel => $"{PositionText} / {DurationText}";
-
     public string PlaybackDetails => _text.Format(LanguageManager.Keys.PlaybackDetailsFormat, Snapshot.CurrentTrack?.Id.ToString() ?? "—",
         Snapshot.CurrentIndex + 1, Snapshot.QueueCount, Snapshot.PlayerId ?? "—",
         Snapshot.RequiredSourceProviderId ?? _text[LanguageManager.Keys.Automatic]);
@@ -527,7 +529,8 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
                      nameof(SourcePlayer),
                      nameof(BitrateOrigin), nameof(SourceCodec), nameof(SourceSampleRate), nameof(SourceBitDepth),
                      nameof(SourceChannels), nameof(AudioFormatLabel), nameof(QualityLabel), nameof(NowTitle),
-                     nameof(NowArtist), nameof(HasCurrentTrack), nameof(CanAnimateBackground), nameof(CanTogglePlayback)
+                     nameof(NowArtist), nameof(NowSubtitle), nameof(HasCurrentTrack), nameof(CanAnimateBackground),
+                     nameof(CanTogglePlayback)
                  })
             OnPropertyChanged(name);
     }
@@ -554,7 +557,6 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
         foreach (var name in new[] { nameof(DurationSeconds), nameof(PositionText), nameof(DurationText), nameof(CanSeek) })
             OnPropertyChanged(name);
         if (!IsSeeking) OnPropertyChanged(nameof(PositionSeconds));
-        OnPropertyChanged(nameof(TimeLabel));
     }
 
     private void RaisePlaybackProperties()

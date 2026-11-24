@@ -46,6 +46,9 @@
             <Setter Property="MinHeight" Value="34" />
             <Setter Property="Padding" Value="7" />
         </Style>
+        <Style Selector="Button.desktopControl.transport">
+            <Setter Property="Padding" Value="0" />
+        </Style>
         <Style Selector="Button.lineMode.active">
             <Setter Property="Background" Value="{DynamicResource Brush.AccentSoft}" />
             <Setter Property="Foreground" Value="{DynamicResource Brush.AccentText}" />
@@ -75,16 +78,16 @@
                         Spacing="8">
                         <Button
                             AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Previous}}"
-                            Classes="ghost icon desktopControl"
+                            Classes="ghost icon desktopControl transport"
                             Command="{Binding Playback.PreviousCommand}"
                             IsEnabled="{Binding Playback.CanPrevious}"
                             Name="DesktopPreviousButton"
                             ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Previous}}">
-                            <Path Classes="icon transport" Data="{StaticResource Icon.Previous}" />
+                            <Path Classes="icon transport" Data="{StaticResource Icon.Playback.Previous}" />
                         </Button>
                         <Button
                             AutomationProperties.Name="{Binding Playback.PlayLabel}"
-                            Classes="ghost icon desktopControl"
+                            Classes="ghost icon desktopControl transport playPause"
                             Command="{Binding Playback.TogglePlaybackCommand}"
                             IsEnabled="{Binding Playback.CanTogglePlayback}"
                             Name="DesktopPlayPauseButton"
@@ -92,22 +95,22 @@
                             <Grid>
                                 <Path
                                     Classes="icon transport"
-                                    Data="{StaticResource Icon.Play}"
+                                    Data="{StaticResource Icon.Playback.Play}"
                                     IsVisible="{Binding !Playback.IsPlaying}" />
                                 <Path
                                     Classes="icon transport"
-                                    Data="{StaticResource Icon.Pause}"
+                                    Data="{StaticResource Icon.Playback.Pause}"
                                     IsVisible="{Binding Playback.IsPlaying}" />
                             </Grid>
                         </Button>
                         <Button
                             AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Next}}"
-                            Classes="ghost icon desktopControl"
+                            Classes="ghost icon desktopControl transport"
                             Command="{Binding Playback.NextCommand}"
                             IsEnabled="{Binding Playback.CanNext}"
                             Name="DesktopNextButton"
                             ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Next}}">
-                            <Path Classes="icon transport" Data="{StaticResource Icon.Next}" />
+                            <Path Classes="icon transport" Data="{StaticResource Icon.Playback.Next}" />
                         </Button>
                     </StackPanel>
                     <StackPanel

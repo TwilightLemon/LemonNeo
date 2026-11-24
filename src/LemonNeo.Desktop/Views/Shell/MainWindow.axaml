@@ -25,7 +25,7 @@
     xmlns:shellVm="using:LemonNeo.Desktop.ViewModels.Shell"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Window.Resources>
-        <Thickness x:Key="Space.PlaybackInset">0,0,0,132</Thickness>
+        <Thickness x:Key="Space.PlaybackInset">0,0,0,104</Thickness>
     </Window.Resources>
     <Window.Styles>
         <Style Selector="Border#TopBar">
@@ -91,6 +91,61 @@
         </Style>
         <Style Selector="ContentControl#PageContent ScrollViewer:not(#PART_ScrollViewer):not(#LyricsScrollViewer)">
             <Setter Property="Padding" Value="{DynamicResource Space.PlaybackInset}" />
+        </Style>
+        <Style Selector="Panel#NowPlayingArtwork">
+            <Setter Property="IsHitTestVisible" Value="False" />
+            <Setter Property="RenderTransform" Value="scale(1)" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Duration="{DynamicResource Motion.Fast}" Property="RenderTransform" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button#NowPlayingArtworkButton:pointerover Panel#NowPlayingArtwork, Button#NowPlayingArtworkButton:focus-visible Panel#NowPlayingArtwork">
+            <Setter Property="RenderTransform" Value="scale(1.08)" />
+        </Style>
+        <Style Selector="Border#ArtworkExpand, Grid#SeekTimes">
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Duration="{DynamicResource Motion.Fast}" Property="Opacity" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button#NowPlayingArtworkButton:pointerover Border#ArtworkExpand, Button#NowPlayingArtworkButton:focus-visible Border#ArtworkExpand">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="Grid#TrackInfo">
+            <Setter Property="Effect">
+                <BlurEffect Radius="0" />
+            </Setter>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <EffectTransition Duration="{DynamicResource Motion.Normal}" Property="Effect" />
+                    <DoubleTransition Duration="{DynamicResource Motion.Normal}" Property="Opacity" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Grid#NowPlaying.seekHover Grid#TrackInfo, Grid#NowPlaying.scrubbing Grid#TrackInfo">
+            <Setter Property="Effect">
+                <BlurEffect Radius="5" />
+            </Setter>
+            <Setter Property="Opacity" Value="0.24" />
+        </Style>
+        <Style Selector="Grid#NowPlaying.seekHover Grid#SeekTimes, Grid#NowPlaying.scrubbing Grid#SeekTimes">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="TextBlock.seekTime">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontFeatures" Value="tnum" />
+        </Style>
+        <Style Selector="Button.qualityBadge">
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="MinHeight" Value="17" />
+            <Setter Property="Padding" Value="4,0" />
         </Style>
     </Window.Styles>
     <Grid
@@ -385,15 +440,11 @@
             </Grid>
         </Grid>
         <Border
-            Background="Transparent"
-            BorderBrush="{DynamicResource Brush.Border}"
-            BorderThickness="0"
-            BoxShadow="0 0 12 2 #34000000"
+            BoxShadow="0 4 18 0 #34000000"
             Classes.lyricsExpanded="{Binding IsLyricsExpanded}"
-            CornerRadius="20"
+            CornerRadius="36"
             Margin="20,0,20,20"
-            MaxWidth="1020"
-            MinHeight="100"
+            MaxWidth="860"
             Name="PlaybackBar"
             SizeChanged="OnPlaybackBarSizeChanged"
             VerticalAlignment="Bottom"
@@ -402,279 +453,253 @@
                 <Border
                     BackdropEffectCache="Retained"
                     Background="{DynamicResource Brush.PlaybackSurface}"
+                    BorderBrush="{DynamicResource Brush.Border}"
+                    BorderThickness="1"
                     ClipToBounds="True"
-                    CornerRadius="20"
+                    CornerRadius="36"
                     IsHitTestVisible="False">
                     <Border.BackdropEffect>
                         <BlurEffect Radius="2" />
                     </Border.BackdropEffect>
-                    <sharedControls:LiquidGlassRim CornerRadius="20" />
+                    <Grid>
+                        <playbackControls:AudioVisualizer
+                            Fill="{DynamicResource Brush.Accent}"
+                            Height="54"
+                            IsPlaying="{Binding Playback.IsPlaying}"
+                            IsVisible="{Binding Playback.CanVisualizeAudio}"
+                            Margin="28,0,28,2"
+                            Opacity="0.25"
+                            Source="{Binding Playback}"
+                            StripCount="{Binding VisualEffects.AudioVisualizerStripCount}"
+                            VerticalAlignment="Bottom" />
+                        <sharedControls:LiquidGlassRim CornerRadius="35" />
+                    </Grid>
                 </Border>
-                <playbackControls:AudioVisualizer
-                    Fill="{DynamicResource Brush.Accent}"
-                    Height="64"
-                    IsHitTestVisible="False"
-                    IsPlaying="{Binding Playback.IsPlaying}"
-                    IsVisible="{Binding Playback.CanVisualizeAudio}"
-                    Margin="20,0,20,2"
-                    Opacity="0.34"
-                    Source="{Binding Playback}"
-                    StripCount="{Binding VisualEffects.AudioVisualizerStripCount}"
-                    VerticalAlignment="Bottom" />
-                <Grid Margin="16,24,16,16">
-                    <Grid ColumnDefinitions="*,Auto,*">
-                        <Button
-                            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Lyrics}}"
-                            Classes="ghost"
-                            Command="{Binding Navigation.NavigateCommand}"
-                            CommandParameter="Lyrics"
-                            CornerRadius="12"
-                            HorizontalContentAlignment="Stretch"
-                            Margin="0,0,76,0"
-                            Name="NowPlayingButton"
-                            Padding="8,0"
-                            ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Lyrics}}">
-                            <Grid ColumnDefinitions="48,*">
-                                <sharedControls:TransitionArtwork
-                                    AutomationProperties.Name="{Binding Playback.NowTitle}"
-                                    CornerRadius="10"
-                                    Height="48"
-                                    ReduceMotion="{Binding Playback.ReduceMotion}"
-                                    Source="{Binding Playback.NowArtworkReference}"
-                                    VerticalAlignment="Center"
-                                    Width="48" />
-                                <StackPanel
-                                    Grid.Column="1"
-                                    Margin="12,0,0,0"
-                                    Spacing="4"
-                                    VerticalAlignment="Center">
-                                    <TextBlock
-                                        FontWeight="SemiBold"
-                                        Text="{Binding Playback.NowTitle}"
-                                        TextTrimming="CharacterEllipsis"
-                                        ToolTip.Tip="{Binding Playback.NowTitle}" />
-                                    <TextBlock
-                                        Classes="caption"
-                                        Text="{Binding Playback.NowArtist}"
-                                        TextTrimming="CharacterEllipsis"
-                                        ToolTip.Tip="{Binding Playback.NowArtist}" />
-                                </StackPanel>
-                            </Grid>
-                        </Button>
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14" Margin="14,5">
+                    <StackPanel
+                        Orientation="Horizontal"
+                        Spacing="2"
+                        VerticalAlignment="Center">
                         <Button
                             AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DesktopLyrics}}"
-                            Classes="ghost icon"
+                            Classes="ghost icon compact"
                             Classes.active="{Binding #DesktopWindow.IsDesktopLyricsOpen}"
                             Click="OnToggleDesktopLyrics"
-                            HorizontalAlignment="Right"
-                            Margin="0,0,16,0"
                             Name="DesktopLyricsButton"
-                            Padding="0"
-                            ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.DesktopLyrics}}"
-                            VerticalAlignment="Center">
+                            ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.DesktopLyrics}}">
                             <Path Classes="icon" Data="{StaticResource Icon.DesktopLyrics}" />
                         </Button>
-                        <StackPanel
-                            Grid.Column="1"
-                            Name="PlaybackControls"
-                            Orientation="Horizontal"
-                            Spacing="12"
-                            VerticalAlignment="Center">
-                            <Button
-                                AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Previous}}"
-                                Classes="ghost icon"
-                                Command="{Binding Playback.PreviousCommand}"
-                                IsEnabled="{Binding Playback.CanPrevious}"
-                                Name="PreviousButton"
-                                Padding="0"
-                                ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Previous}}">
-                                <Path Classes="icon transport" Data="{StaticResource Icon.Playback.Previous}" />
-                            </Button>
-                            <Button
-                                AutomationProperties.Name="{Binding Playback.PlayLabel}"
-                                Classes="primary icon"
-                                Command="{Binding Playback.TogglePlaybackCommand}"
-                                CornerRadius="24"
-                                Height="48"
-                                IsEnabled="{Binding Playback.CanTogglePlayback}"
-                                Name="PlayPauseButton"
-                                Padding="0"
-                                ToolTip.Tip="{Binding Playback.PlayLabel}"
-                                Width="48">
-                                <Grid>
-                                    <Path
-                                        Classes="icon transport"
-                                        Data="{StaticResource Icon.Playback.Play}"
-                                        IsVisible="{Binding !Playback.IsPlaying}"
-                                        Margin="4,0,0,0" />
-                                    <Path
-                                        Classes="icon transport"
-                                        Data="{StaticResource Icon.Playback.Pause}"
-                                        IsVisible="{Binding Playback.IsPlaying}" />
-                                </Grid>
-                            </Button>
-                            <Button
-                                AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Next}}"
-                                Classes="ghost icon"
-                                Command="{Binding Playback.NextCommand}"
-                                IsEnabled="{Binding Playback.CanNext}"
-                                Name="NextButton"
-                                Padding="0"
-                                ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Next}}">
-                                <Path Classes="icon transport" Data="{StaticResource Icon.Playback.Next}" />
-                            </Button>
-                        </StackPanel>
-                        <Grid
-                            ColumnDefinitions="Auto,*"
-                            Grid.Column="2"
-                            Margin="16,0,0,0">
-                            <Button
-                                AutomationProperties.Name="{Binding Playback.ModeLabel}"
-                                Classes="ghost icon"
-                                Command="{Binding Playback.CycleModeCommand}"
-                                IsEnabled="{Binding Playback.CanInteract}"
-                                Name="PlaybackModeButton"
-                                Padding="0"
-                                ToolTip.Tip="{Binding Playback.ModeLabel}"
-                                VerticalAlignment="Center">
-                                <Grid>
-                                    <Path
-                                        Classes="icon"
-                                        Data="{StaticResource Icon.Sequential}"
-                                        IsVisible="{Binding Playback.IsSequential}" />
-                                    <Path
-                                        Classes="icon"
-                                        Data="{StaticResource Icon.RepeatAll}"
-                                        IsVisible="{Binding Playback.IsRepeatAll}" />
-                                    <Path
-                                        Classes="icon"
-                                        Data="{StaticResource Icon.Shuffle}"
-                                        IsVisible="{Binding Playback.IsShuffle}" />
-                                </Grid>
-                            </Button>
-                            <Grid
-                                ColumnDefinitions="*,Auto,Auto,Auto"
-                                Grid.Column="1"
-                                Margin="8,0,0,0"
-                                VerticalAlignment="Center">
-                                <StackPanel
-                                    HorizontalAlignment="Right"
-                                    Orientation="Horizontal"
-                                    Spacing="8"
-                                    VerticalAlignment="Center">
-                                    <Button
-                                        AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.PlaybackSourceDetails}}"
-                                        Classes="ghost"
-                                        Click="OnToggleSourceDetails"
-                                        IsEnabled="{Binding Playback.HasSourceDetails}"
-                                        Name="CurrentAudioQuality"
-                                        Padding="6,2"
-                                        ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.PlaybackSourceDetails}}">
-                                        <TextBlock Classes="caption" Text="{Binding Playback.QualityLabel}" />
-                                    </Button>
+                        <Button
+                            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Previous}}"
+                            Classes="ghost icon transport"
+                            Command="{Binding Playback.PreviousCommand}"
+                            IsEnabled="{Binding Playback.CanPrevious}"
+                            ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Previous}}">
+                            <Path Classes="icon transport" Data="{StaticResource Icon.Playback.Previous}" />
+                        </Button>
+                        <Button
+                            AutomationProperties.Name="{Binding Playback.PlayLabel}"
+                            Classes="ghost icon transport playPause"
+                            Command="{Binding Playback.TogglePlaybackCommand}"
+                            IsEnabled="{Binding Playback.CanTogglePlayback}"
+                            ToolTip.Tip="{Binding Playback.PlayLabel}">
+                            <Grid>
+                                <Path
+                                    Classes="icon transport"
+                                    Data="{StaticResource Icon.Playback.Play}"
+                                    IsVisible="{Binding !Playback.IsPlaying}" />
+                                <Path
+                                    Classes="icon transport"
+                                    Data="{StaticResource Icon.Playback.Pause}"
+                                    IsVisible="{Binding Playback.IsPlaying}" />
+                            </Grid>
+                        </Button>
+                        <Button
+                            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Next}}"
+                            Classes="ghost icon transport"
+                            Command="{Binding Playback.NextCommand}"
+                            IsEnabled="{Binding Playback.CanNext}"
+                            ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Next}}">
+                            <Path Classes="icon transport" Data="{StaticResource Icon.Playback.Next}" />
+                        </Button>
+                        <Button
+                            AutomationProperties.Name="{Binding Playback.ModeLabel}"
+                            Classes="ghost icon compact"
+                            Command="{Binding Playback.CycleModeCommand}"
+                            IsEnabled="{Binding Playback.CanInteract}"
+                            ToolTip.Tip="{Binding Playback.ModeLabel}">
+                            <Grid>
+                                <Path
+                                    Classes="icon"
+                                    Data="{StaticResource Icon.Sequential}"
+                                    IsVisible="{Binding Playback.IsSequential}" />
+                                <Path
+                                    Classes="icon accent"
+                                    Data="{StaticResource Icon.RepeatAll}"
+                                    IsVisible="{Binding Playback.IsRepeatAll}" />
+                                <Path
+                                    Classes="icon accent"
+                                    Data="{StaticResource Icon.Shuffle}"
+                                    IsVisible="{Binding Playback.IsShuffle}" />
+                            </Grid>
+                        </Button>
+                    </StackPanel>
+                    <Grid
+                        Classes.seekHover="{Binding #Timeline.IsPointerOver}"
+                        Grid.Column="1"
+                        Name="NowPlaying"
+                        RowDefinitions="50,12">
+                        <Grid ClipToBounds="True">
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" Margin="3,2,3,0" Name="TrackInfo">
+                                <Button
+                                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Lyrics}}"
+                                    Classes="ghost"
+                                    Command="{Binding Navigation.NavigateCommand}"
+                                    CommandParameter="Lyrics"
+                                    CornerRadius="9"
+                                    Height="44"
+                                    Name="NowPlayingArtworkButton"
+                                    Padding="2"
+                                    ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Lyrics}}"
+                                    Width="44">
+                                    <Panel Name="NowPlayingArtwork">
+                                        <sharedControls:TransitionArtwork
+                                            CornerRadius="7"
+                                            Height="40"
+                                            ReduceMotion="{Binding Playback.ReduceMotion}"
+                                            Source="{Binding Playback.NowArtworkReference}"
+                                            Width="40" />
+                                        <Border Background="#72000000" CornerRadius="7" Name="ArtworkExpand">
+                                            <Path Classes="icon onDark" Data="{StaticResource Icon.Expand}" />
+                                        </Border>
+                                    </Panel>
+                                </Button>
+                                <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
+                                    <DockPanel HorizontalAlignment="Left">
+                                        <Button
+                                            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.PlaybackSourceDetails}}"
+                                            Classes="ghost qualityBadge"
+                                            Click="OnToggleSourceDetails"
+                                            DockPanel.Dock="Right"
+                                            IsEnabled="{Binding Playback.HasSourceDetails}"
+                                            IsVisible="{Binding Playback.HasCurrentTrack}"
+                                            Margin="6,0,0,0"
+                                            Name="CurrentAudioQuality"
+                                            ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.PlaybackSourceDetails}}">
+                                            <TextBlock FontSize="10" FontWeight="Medium" Text="{Binding Playback.QualityLabel}" />
+                                        </Button>
+                                        <TextBlock
+                                            FontWeight="SemiBold"
+                                            Text="{Binding Playback.NowTitle}"
+                                            TextTrimming="CharacterEllipsis"
+                                            ToolTip.Tip="{Binding Playback.NowTitle}"
+                                            VerticalAlignment="Center" />
+                                    </DockPanel>
                                     <TextBlock
                                         Classes="caption"
-                                        Text="{Binding Playback.TimeLabel}"
+                                        Text="{Binding Playback.NowSubtitle}"
                                         TextTrimming="CharacterEllipsis"
-                                        VerticalAlignment="Center" />
+                                        ToolTip.Tip="{Binding Playback.NowSubtitle}" />
                                 </StackPanel>
-                                <Button
-                                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DecoderControls}}"
-                                    Classes="ghost icon"
-                                    Grid.Column="1"
-                                    IsEnabled="{Binding SharedContext.IsInitialized}"
-                                    Margin="8,0,0,0"
-                                    Name="DecoderButton"
-                                    Padding="0"
-                                    ToolTip.Tip="{Binding SharedContext.DecoderControls.DecoderToolTip}">
-                                    <Grid Height="24" Width="24">
-                                        <Path Classes="icon" Data="{StaticResource Icon.Decoder}" />
-                                        <Ellipse
-                                            Fill="{DynamicResource Brush.AccentText}"
-                                            Height="5"
-                                            HorizontalAlignment="Right"
-                                            IsVisible="{Binding SharedContext.DecoderControls.UsingScopedProfile}"
-                                            VerticalAlignment="Top"
-                                            Width="5" />
-                                    </Grid>
-                                    <Button.Flyout>
-                                        <Flyout Placement="Top" VerticalOffset="2">
-                                            <ScrollViewer MaxHeight="440" Width="310">
-                                                <StackPanel Margin="4" Spacing="12">
-                                                    <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.DecoderControls}}" />
-                                                    <playbackViews:AudioOutputView
-                                                        DataContext="{Binding SharedContext.DecoderControls.QuickOutput}"
-                                                        IsVisible="{Binding DataContext, RelativeSource={RelativeSource Self}, Converter={x:Static ObjectConverters.IsNotNull}}"
-                                                        ShowAdvanced="False" />
-                                                    <TextBlock
-                                                        Classes="caption"
-                                                        IsVisible="{Binding SharedContext.DecoderControls.QuickOutput, Converter={x:Static ObjectConverters.IsNull}}"
-                                                        Text="{Translate {x:Static i18n:LanguageManager+Keys.DecoderDefaultOutput}}" />
-                                                    <playbackViews:DecodeProfileView DataContext="{Binding SharedContext.DecoderControls.QuickProfile}" />
-                                                </StackPanel>
-                                            </ScrollViewer>
-                                        </Flyout>
-                                    </Button.Flyout>
-                                </Button>
-                                <Button
-                                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Volume}}"
-                                    Classes="ghost icon"
-                                    Click="OnToggleVolume"
-                                    Grid.Column="2"
-                                    IsEnabled="{Binding Playback.CanAdjustVolume}"
-                                    Margin="8,0,0,0"
-                                    Name="VolumeButton"
-                                    Padding="0"
-                                    ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Volume}}">
-                                    <Grid>
-                                        <Path
-                                            Classes="icon"
-                                            Data="{StaticResource Icon.Volume}"
-                                            IsVisible="{Binding !Playback.IsMuted}" />
-                                        <Path
-                                            Classes="icon"
-                                            Data="{StaticResource Icon.VolumeMuted}"
-                                            IsVisible="{Binding Playback.IsMuted}" />
-                                    </Grid>
-                                </Button>
-                                <Button
-                                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Queue}}"
-                                    Classes="ghost icon"
-                                    Command="{Binding ToggleQueueCommand}"
-                                    Grid.Column="3"
-                                    Margin="8,0,0,0"
-                                    Name="QueueButton"
-                                    Padding="0"
-                                    ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Queue}}">
-                                    <Path Classes="icon" Data="{StaticResource Icon.Queue}" />
-                                </Button>
                             </Grid>
                         </Grid>
+                        <Grid
+                            ColumnDefinitions="*,*"
+                            IsHitTestVisible="False"
+                            Name="SeekTimes"
+                            VerticalAlignment="Bottom">
+                            <TextBlock Classes="seekTime" Name="SeekElapsed" Text="0:00" />
+                            <TextBlock Classes="seekTime" Grid.Column="1" HorizontalAlignment="Right" Name="SeekRemaining" Text="—" />
+                        </Grid>
+                        <Slider
+                            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Seek}}"
+                            Foreground="{DynamicResource Brush.Text}"
+                            Grid.Row="1"
+                            IsEnabled="{Binding Playback.CanSeek}"
+                            IsVisible="{Binding !Playback.IsBusy}"
+                            Margin="0,-2,0,-2"
+                            Maximum="{Binding Playback.DurationSeconds}"
+                            Minimum="0"
+                            Name="Timeline"
+                            Theme="{StaticResource PlaybackTimeline}"
+                            Value="{Binding Playback.PositionSeconds, Mode=OneWay}" />
+                        <ProgressBar
+                            AutomationProperties.Name="{Binding Playback.Status}"
+                            Background="Transparent"
+                            Foreground="{DynamicResource Brush.AccentText}"
+                            Grid.Row="1"
+                            Height="2"
+                            IsHitTestVisible="False"
+                            IsIndeterminate="True"
+                            IsVisible="{Binding Playback.IsBusy}"
+                            MinHeight="0"
+                            VerticalAlignment="Center" />
                     </Grid>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                        <Button
+                            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DecoderControls}}"
+                            Classes="ghost icon compact"
+                            IsEnabled="{Binding SharedContext.IsInitialized}"
+                            Name="DecoderButton"
+                            ToolTip.Tip="{Binding SharedContext.DecoderControls.DecoderToolTip}">
+                            <Grid Height="24" Width="24">
+                                <Path Classes="icon" Data="{StaticResource Icon.Decoder}" />
+                                <Ellipse
+                                    Fill="{DynamicResource Brush.AccentText}"
+                                    Height="5"
+                                    HorizontalAlignment="Right"
+                                    IsVisible="{Binding SharedContext.DecoderControls.UsingScopedProfile}"
+                                    VerticalAlignment="Top"
+                                    Width="5" />
+                            </Grid>
+                            <Button.Flyout>
+                                <Flyout Placement="Top" VerticalOffset="2">
+                                    <ScrollViewer MaxHeight="440" Width="310">
+                                        <StackPanel Margin="4" Spacing="12">
+                                            <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.DecoderControls}}" />
+                                            <playbackViews:AudioOutputView
+                                                DataContext="{Binding SharedContext.DecoderControls.QuickOutput}"
+                                                IsVisible="{Binding DataContext, RelativeSource={RelativeSource Self}, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                                ShowAdvanced="False" />
+                                            <TextBlock
+                                                Classes="caption"
+                                                IsVisible="{Binding SharedContext.DecoderControls.QuickOutput, Converter={x:Static ObjectConverters.IsNull}}"
+                                                Text="{Translate {x:Static i18n:LanguageManager+Keys.DecoderDefaultOutput}}" />
+                                            <playbackViews:DecodeProfileView DataContext="{Binding SharedContext.DecoderControls.QuickProfile}" />
+                                        </StackPanel>
+                                    </ScrollViewer>
+                                </Flyout>
+                            </Button.Flyout>
+                        </Button>
+                        <Button
+                            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Queue}}"
+                            Classes="ghost icon compact"
+                            Classes.active="{Binding IsQueueOpen}"
+                            Command="{Binding ToggleQueueCommand}"
+                            Name="QueueButton"
+                            ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Queue}}">
+                            <Path Classes="icon" Data="{StaticResource Icon.Queue}" />
+                        </Button>
+                        <Button
+                            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Volume}}"
+                            Classes="ghost icon compact"
+                            Click="OnToggleVolume"
+                            IsEnabled="{Binding Playback.CanAdjustVolume}"
+                            Name="VolumeButton"
+                            ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Volume}}">
+                            <Grid>
+                                <Path
+                                    Classes="icon"
+                                    Data="{StaticResource Icon.Volume}"
+                                    IsVisible="{Binding !Playback.IsMuted}" />
+                                <Path
+                                    Classes="icon"
+                                    Data="{StaticResource Icon.VolumeMuted}"
+                                    IsVisible="{Binding Playback.IsMuted}" />
+                            </Grid>
+                        </Button>
+                    </StackPanel>
                 </Grid>
-                <Slider
-                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Seek}}"
-                    IsEnabled="{Binding Playback.CanSeek}"
-                    IsVisible="{Binding !Playback.IsBusy}"
-                    Margin="20,2,20,0"
-                    Maximum="{Binding Playback.DurationSeconds}"
-                    Minimum="0"
-                    Name="Timeline"
-                    Theme="{StaticResource PlaybackTimeline}"
-                    Value="{Binding Playback.PositionSeconds, Mode=OneWay}"
-                    VerticalAlignment="Top" />
-                <ProgressBar
-                    AutomationProperties.Name="{Binding Playback.Status}"
-                    Background="Transparent"
-                    Foreground="{DynamicResource Brush.AccentText}"
-                    Height="2"
-                    IsHitTestVisible="False"
-                    IsIndeterminate="True"
-                    IsVisible="{Binding Playback.IsBusy}"
-                    Margin="20,10,20,0"
-                    MinHeight="0"
-                    Name="PlaybackLoading"
-                    VerticalAlignment="Top" />
             </Grid>
         </Border>
         <Grid

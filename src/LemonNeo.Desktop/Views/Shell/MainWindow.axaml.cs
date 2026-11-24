@@ -14,6 +14,7 @@ using LemonNeo.Desktop.Config;
 using LemonNeo.Desktop.Controls.Shared;
 using LemonNeo.Desktop.Services;
 using LemonNeo.Desktop.ViewModels.Library;
+using LemonNeo.Desktop.ViewModels.Shared;
 using LemonNeo.Desktop.ViewModels.Shell;
 using LemonNeo.Desktop.Views.Library;
 using LemonNeo.Desktop.Views.Lyrics;
@@ -139,9 +140,10 @@ public partial class MainWindow : Window
         MacCaptionDragArea.IsVisible = OperatingSystem.IsMacOS();
         Timeline.AddHandler(PointerPressedEvent, OnSeekStarted, RoutingStrategies.Tunnel, true);
         Timeline.AddHandler(PointerReleasedEvent, OnSeekFinished, RoutingStrategies.Bubble, true);
-        Timeline.AddHandler(Thumb.DragCompletedEvent, OnThumbDragCompleted, handledEventsToo: true);
         Timeline.AddHandler(KeyDownEvent, OnSeekKeyDown, RoutingStrategies.Tunnel, true);
         Timeline.KeyUp += OnSeekKeyUp;
+        Timeline.PropertyChanged += OnTimelinePropertyChanged;
+        UpdateSeekTimes();
     }
 
     /// <summary>Binds the window accelerators to the shared shortcut catalog and keeps them in sync.</summary>
@@ -367,9 +369,11 @@ public partial class MainWindow : Window
 
     private void OnSeekStarted(object? sender, PointerPressedEventArgs args)
     {
-        if (DataContext is not MainViewModel { Playback.CanSeek: true } shell) return;
+        if (!args.GetCurrentPoint(Timeline).Properties.IsLeftButtonPressed ||
+            DataContext is not MainViewModel { Playback.CanSeek: true } shell) return;
         var vm = shell.Playback;
         _seeking = true;
+        SetScrubbing(true);
         vm.IsSeeking = true;
     }
 
@@ -377,24 +381,43 @@ public partial class MainWindow : Window
     {
         if (!_seeking) return;
         _seeking = false;
+        SetScrubbing(false);
         await CommitSeekAsync();
     }
 
-    private async void OnThumbDragCompleted(object? sender, VectorEventArgs args)
+    private void SetScrubbing(bool value)
     {
-        _seeking = false;
-        await CommitSeekAsync();
+        NowPlaying.Classes.Set("scrubbing", value);
+        Timeline.Classes.Set("scrubbing", value);
+    }
+
+    private void OnTimelinePropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs args)
+    {
+        if (args.Property == RangeBase.ValueProperty || args.Property == RangeBase.MaximumProperty)
+            UpdateSeekTimes();
+    }
+
+    private void UpdateSeekTimes()
+    {
+        SeekElapsed.Text = TrackRow.FormatTime(TimeSpan.FromSeconds(Timeline.Value));
+        var remaining = TimeSpan.FromSeconds(Math.Max(0, Timeline.Maximum - Timeline.Value));
+        SeekRemaining.Text = $"-{TrackRow.FormatTime(remaining)}";
     }
 
     private void OnSeekKeyDown(object? sender, KeyEventArgs args)
     {
         if (IsSeekKey(args.Key) && DataContext is MainViewModel { Playback.CanSeek: true } vm)
+        {
+            SetScrubbing(true);
             vm.Playback.IsSeeking = true;
+        }
     }
 
     private async void OnSeekKeyUp(object? sender, KeyEventArgs args)
     {
-        if (IsSeekKey(args.Key)) await CommitSeekAsync();
+        if (!IsSeekKey(args.Key)) return;
+        SetScrubbing(false);
+        await CommitSeekAsync();
     }
 
     private static bool IsSeekKey(Key key)

@@ -9,7 +9,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <UserControl.Styles>
         <Style Selector="ListBox.categoryMenu ListBoxItem:selected TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource Brush.AccentText}" />
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
     </UserControl.Styles>
