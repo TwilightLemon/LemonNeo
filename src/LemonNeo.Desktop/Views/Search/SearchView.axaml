@@ -5,120 +5,138 @@
     xmlns:i18n="using:LemonNeo.Desktop.Services"
     xmlns:searchVm="using:LemonNeo.Desktop.ViewModels.Search"
     xmlns:sharedControls="using:LemonNeo.Desktop.Controls.Shared"
+    xmlns:sharedVm="using:LemonNeo.Desktop.ViewModels.Shared"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Grid RowDefinitions="Auto,Auto,*">
-        <sharedControls:PageHeader Summary="{Binding PageSummary}" Title="{Binding PageTitle}">
+    <Grid ClipToBounds="True" RowDefinitions="Auto,Auto,*">
+        <TextBlock Classes="compactListTitle" Name="CompactTitle" Text="{Binding PageTitle}" />
+        <sharedControls:PageHeader
+            Classes="collapsible"
+            Name="SearchHeader"
+            Summary="{Binding PageSummary}"
+            Title="{Binding PageTitle}"
+            VerticalAlignment="Top"
+            ZIndex="1">
             <sharedControls:PageHeader.Actions>
-                <StackPanel
-                    IsVisible="{Binding IsBusy}"
-                    Orientation="Horizontal"
-                    Spacing="10"
-                    ToolTip.Tip="{Binding Status}">
-                    <ProgressBar
-                        AutomationProperties.Name="{Binding Status}"
-                        Height="3"
-                        IsIndeterminate="True"
-                        VerticalAlignment="Center"
-                        Width="60" />
-                    <Button
-                        Classes="ghost"
-                        Command="{Binding CancelOperationCommand}"
-                        Content="{Translate {x:Static i18n:LanguageManager+Keys.CancelOperation}}" />
-                </StackPanel>
+                <Button
+                    Classes="primary"
+                    Command="{Binding PlaySelectedCommand}"
+                    IsEnabled="{Binding CanInspectTrack}"
+                    IsVisible="{Binding IsTrackSearch}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Path Classes="icon small" Data="{StaticResource Icon.PlayOutline}" />
+                        <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.Play}}" />
+                    </StackPanel>
+                </Button>
             </sharedControls:PageHeader.Actions>
         </sharedControls:PageHeader>
-        <Border
-            Background="{DynamicResource Brush.DangerSoft}"
-            CornerRadius="10"
-            Grid.Row="1"
-            IsVisible="{Binding HasError}"
-            Margin="0,0,0,12"
-            Padding="14">
-            <Grid ColumnDefinitions="*,Auto">
-                <TextBlock
-                    Foreground="{DynamicResource Brush.Danger}"
-                    MaxHeight="90"
-                    Text="{Binding Error}"
-                    TextWrapping="Wrap" />
+        <StackPanel Grid.Row="1" Name="SearchTools" ZIndex="2">
+            <StackPanel
+                HorizontalAlignment="Right"
+                IsVisible="{Binding IsBusy}"
+                Margin="0,0,0,12"
+                Orientation="Horizontal"
+                Spacing="10"
+                ToolTip.Tip="{Binding Status}">
+                <ProgressBar
+                    AutomationProperties.Name="{Binding Status}"
+                    Height="3"
+                    IsIndeterminate="True"
+                    VerticalAlignment="Center"
+                    Width="60" />
                 <Button
-                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}"
-                    Classes="ghost icon"
-                    Command="{Binding DismissErrorCommand}"
-                    Grid.Column="1">
-                    <Path Classes="icon" Data="{StaticResource Icon.Close}" />
-                </Button>
-            </Grid>
-        </Border>
+                    Classes="ghost"
+                    Command="{Binding CancelOperationCommand}"
+                    Content="{Translate {x:Static i18n:LanguageManager+Keys.CancelOperation}}" />
+            </StackPanel>
+            <sharedControls:TrackListToolbar ShowTrackActions="{Binding IsTrackSearch}">
+                <sharedControls:TrackListToolbar.LeadingContent>
+                    <Grid ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="8" IsEnabled="{Binding CanInteract}">
+                        <ComboBox
+                            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.SearchType}}"
+                            ItemsSource="{Binding Kinds}"
+                            SelectedItem="{Binding SelectedKind}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="searchVm:SearchKindOption">
+                                    <TextBlock Text="{Binding Name}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <ComboBox
+                            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.SearchSources}}"
+                            Grid.Column="1"
+                            ItemsSource="{Binding Sources}"
+                            MaxWidth="340"
+                            HorizontalAlignment="Left"
+                            SelectedItem="{Binding SelectedSource}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="searchVm:SearchSourceOption">
+                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <Button
+                            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Search}}"
+                            Classes="ghost icon"
+                            Command="{Binding SearchCommand}"
+                            Grid.Column="2"
+                            IsEnabled="{Binding CanSearch}"
+                            ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Search}}">
+                            <Path Classes="icon" Data="{StaticResource Icon.Search}" />
+                        </Button>
+                    </Grid>
+                </sharedControls:TrackListToolbar.LeadingContent>
+            </sharedControls:TrackListToolbar>
+        </StackPanel>
         <Grid Grid.Row="2">
-            <Grid RowDefinitions="Auto,*">
-                <WrapPanel IsEnabled="{Binding CanInteract}" Margin="0,0,0,12">
-                    <Button
-                        Classes="primary"
-                        Command="{Binding PlaySelectedCommand}"
-                        Content="{Translate {x:Static i18n:LanguageManager+Keys.Play}}"
-                        IsEnabled="{Binding CanInspectTrack}"
-                        Margin="0,0,8,8" />
-                    <Button
-                        Command="{Binding InspectTrackCommand}"
-                        Content="{Translate {x:Static i18n:LanguageManager+Keys.TrackDetails}}"
-                        IsEnabled="{Binding CanInspectTrack}"
-                        Margin="0,0,8,8" />
-                    <sharedControls:AddToPlaylistButton Margin="0,0,8,8" />
-                    <Button
-                        Command="{Binding ToggleSelectionCommand}"
-                        Content="{Translate {x:Static i18n:LanguageManager+Keys.MultiSelect}}"
-                        IsVisible="{Binding !IsSelectionMode}"
-                        Margin="0,0,8,8" />
-                    <StackPanel
-                        IsVisible="{Binding IsSelectionMode}"
-                        Margin="0,0,8,8"
-                        Orientation="Horizontal"
-                        Spacing="8">
-                        <TextBlock Text="{Binding SelectionSummary}" VerticalAlignment="Center" />
+            <ListBox
+                AutoScrollToSelectedItem="False"
+                Classes="trackList"
+                Classes.managing="{Binding IsSelectionMode}"
+                Grid.IsSharedSizeScope="True"
+                IsEnabled="{Binding CanInteract}"
+                IsVisible="{Binding IsTrackSearch}"
+                ItemTemplate="{StaticResource TrackRowTemplate}"
+                ItemsSource="{Binding Tracks}"
+                Name="TrackList"
+                ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                SelectedItem="{Binding SelectedTrack}" />
+            <ListBox
+                IsEnabled="{Binding CanInteract}"
+                IsVisible="{Binding IsCatalogSearch}"
+                ItemsSource="{Binding CatalogResults}"
+                Name="CatalogList"
+                Padding="0"
+                ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="sharedVm:CatalogItem">
                         <Button
                             Classes="ghost"
-                            Command="{Binding SelectAllCommand}"
-                            Content="{Translate {x:Static i18n:LanguageManager+Keys.SelectAllTracks}}" />
-                        <Button
-                            Classes="ghost"
-                            Command="{Binding ClearSelectionCommand}"
-                            Content="{Translate {x:Static i18n:LanguageManager+Keys.ClearTrackSelection}}" />
-                        <Button Command="{Binding ToggleSelectionCommand}" Content="{Translate {x:Static i18n:LanguageManager+Keys.FinishSelection}}" />
-                    </StackPanel>
-                </WrapPanel>
-                <ListBox
-                    Classes="trackList"
-                    Classes.managing="{Binding IsSelectionMode}"
-                    DoubleTapped="OnTrackDoubleTapped"
-                    Grid.IsSharedSizeScope="True"
-                    Grid.Row="1"
-                    IsEnabled="{Binding CanInteract}"
-                    IsVisible="{Binding HasTracks}"
-                    ItemTemplate="{StaticResource TrackRowTemplate}"
-                    ItemsSource="{Binding Tracks}"
-                    KeyDown="OnTrackKeyDown"
-                    Name="TrackList"
-                    ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                    SelectedItem="{Binding SelectedTrack}" />
-                <StackPanel
-                    Grid.Row="1"
-                    HorizontalAlignment="Center"
-                    IsVisible="{Binding !HasTracks}"
-                    MaxWidth="400"
-                    Spacing="8"
-                    VerticalAlignment="Center">
-                    <TextBlock
-                        FontSize="20"
-                        Text="{Translate {x:Static i18n:LanguageManager+Keys.NoResults}}"
-                        TextAlignment="Center"
-                        TextWrapping="Wrap" />
-                    <TextBlock
-                        Classes="caption"
-                        Text="{Translate {x:Static i18n:LanguageManager+Keys.NoResultsDescription}}"
-                        TextAlignment="Center"
-                        TextWrapping="Wrap" />
-                </StackPanel>
-            </Grid>
+                            Command="{Binding $parent[ListBox].((searchVm:SearchViewModel)DataContext).OpenResultCommand}"
+                            CommandParameter="{Binding}"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Stretch">
+                            <Grid ColumnDefinitions="56,*" MinHeight="48">
+                                <sharedControls:Artwork
+                                    CornerRadius="8"
+                                    Height="44"
+                                    Loader="{Binding ArtworkLoader}"
+                                    SourceUri="{Binding ArtworkUri}"
+                                    Width="44" />
+                                <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                                    <TextBlock FontWeight="SemiBold" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Classes="caption" Text="{Binding Subtitle}" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+            <sharedControls:EmptyState
+                Description="{Translate {x:Static i18n:LanguageManager+Keys.NoResultsDescription}}"
+                Icon="{StaticResource Icon.Search}"
+                IsVisible="{Binding !HasResults}"
+                Name="SearchEmptyState"
+                Title="{Translate {x:Static i18n:LanguageManager+Keys.OnlineSearchNoResults}}" />
         </Grid>
     </Grid>
 </UserControl>

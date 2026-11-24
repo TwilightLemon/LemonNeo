@@ -1,0 +1,160 @@
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using LemonNeo.Abstractions.Playback;
+using LemonNeo.Desktop.Services;
+
+namespace LemonNeo.Desktop.ViewModels.Tools;
+
+public sealed partial class AudioOutputViewModel : ObservableObject
+{
+    private readonly IAudioOutputConfigurable _provider;
+    private readonly LocalizationService _text;
+    private readonly DesktopNotificationService _notifications;
+
+    [ObservableProperty] private BackendOption _selectedBackend;
+    [ObservableProperty] private IReadOnlyList<DeviceOption> _devices = [];
+    [ObservableProperty] private DeviceOption? _selectedDevice;
+    [ObservableProperty] private bool _exclusive;
+    [ObservableProperty] private bool _automaticRate;
+    [ObservableProperty] private decimal? _sampleRate;
+    [ObservableProperty] private string? _deviceStatus;
+    [ObservableProperty] private bool _canRestoreSelection;
+    private bool _loading;
+
+    public AudioOutputViewModel(string playerName, IAudioOutputConfigurable provider, DesktopContext context)
+    {
+        _provider = provider;
+        _text = context.Text;
+        _notifications = context.Notifications;
+        Title = _text.Format(LanguageManager.Keys.AudioOutputTitle, playerName);
+        Backends = provider.OutputBackends.Select(backend => new BackendOption(backend, backend switch
+        {
+            AudioOutputBackend.Wasapi => "WASAPI",
+            AudioOutputBackend.Asio => "ASIO",
+            _ => _text[LanguageManager.Keys.AudioOutputDefaultBackend]
+        })).ToArray();
+
+        _loading = true;
+        var configuration = provider.OutputConfiguration;
+        _selectedBackend = Backends.FirstOrDefault(option => option.Backend == configuration.Backend) ?? Backends[0];
+        _exclusive = configuration.Exclusive;
+        _automaticRate = configuration.SampleRate is null;
+        _sampleRate = configuration.SampleRate ?? 48000;
+        LoadDevices(configuration.DeviceId);
+        _loading = false;
+    }
+
+    public string Title { get; }
+    public IReadOnlyList<BackendOption> Backends { get; }
+    public bool IsWasapi => SelectedBackend.Backend == AudioOutputBackend.Wasapi;
+    public string RateDescription => _text[SelectedBackend.Backend switch
+    {
+        AudioOutputBackend.Asio => LanguageManager.Keys.AudioOutputAsioRate,
+        AudioOutputBackend.Wasapi => LanguageManager.Keys.AudioOutputWasapiRate,
+        _ => LanguageManager.Keys.AudioOutputDefaultRate
+    }];
+
+    partial void OnSelectedBackendChanged(BackendOption value)
+    {
+        if (value is null || _loading) return;
+        _loading = true;
+        try { LoadDevices(null); }
+        finally { _loading = false; }
+        OnPropertyChanged(nameof(IsWasapi));
+        OnPropertyChanged(nameof(RateDescription));
+        Apply();
+    }
+
+    partial void OnSelectedDeviceChanged(DeviceOption? value) => Apply();
+    partial void OnAutomaticRateChanged(bool value) => Apply();
+    partial void OnExclusiveChanged(bool value) => Apply();
+    partial void OnSampleRateChanged(decimal? value) => Apply();
+
+    [RelayCommand]
+    private void RefreshDevices()
+    {
+        _loading = true;
+        try { LoadDevices(SelectedDevice?.Id); }
+        finally { _loading = false; }
+    }
+
+    private void Apply()
+    {
+        if (_loading || SelectedBackend is null || SelectedDevice is not { Available: true } ||
+            !AutomaticRate && (SampleRate is null or < 1 or > int.MaxValue || SampleRate != decimal.Truncate(SampleRate.Value)))
+            return;
+        try
+        {
+            _provider.SetOutputConfiguration(new AudioOutputConfiguration(SelectedBackend.Backend, SelectedDevice.Id,
+                AutomaticRate ? null : (int)SampleRate!.Value, IsWasapi && Exclusive));
+            CanRestoreSelection = false;
+        }
+        catch (Exception exception)
+        {
+            // Keep the attempted backend editable even when its default device cannot open.
+            CanRestoreSelection = true;
+            _notifications.Show(_text.Format(LanguageManager.Keys.OperationFailed, exception.GetBaseException().Message),
+                NotificationLevel.Error);
+        }
+    }
+
+    [RelayCommand]
+    private void RestoreSelection()
+    {
+        _loading = true;
+        try
+        {
+            var saved = _provider.OutputConfiguration;
+            SelectedBackend = Backends.First(option => option.Backend == saved.Backend);
+            AutomaticRate = saved.SampleRate is null;
+            SampleRate = saved.SampleRate ?? 48000;
+            Exclusive = saved.Exclusive;
+            LoadDevices(saved.DeviceId);
+            OnPropertyChanged(nameof(IsWasapi));
+            OnPropertyChanged(nameof(RateDescription));
+            CanRestoreSelection = false;
+        }
+        finally { _loading = false; }
+    }
+
+    private void LoadDevices(string? selectedId)
+    {
+        var backend = SelectedBackend.Backend;
+        var asio = backend == AudioOutputBackend.Asio;
+        var defaultDevice = new DeviceOption(null,
+            _text[asio ? LanguageManager.Keys.AudioOutputFirstAsio : LanguageManager.Keys.AudioOutputDefaultDevice]);
+        List<DeviceOption> options = [defaultDevice];
+        DeviceStatus = null;
+        try
+        {
+            var devices = _provider.GetOutputDevices(backend);
+            options.AddRange(devices.Select(device => new DeviceOption(device.Id, device.Name)));
+            if (devices.Count == 0)
+                DeviceStatus = _text[asio ? LanguageManager.Keys.AudioOutputNoAsio : LanguageManager.Keys.AudioOutputNoDevices];
+        }
+        catch (Exception exception)
+        {
+            DeviceStatus = $"{_text[LanguageManager.Keys.AudioOutputUnavailable]} {exception.GetBaseException().Message}";
+            options[0] = defaultDevice with { Available = false };
+        }
+
+        var selected = options.FirstOrDefault(option => string.Equals(option.Id, selectedId, StringComparison.OrdinalIgnoreCase));
+        if (selected is null)
+        {
+            selected = new DeviceOption(selectedId, _text[LanguageManager.Keys.AudioOutputDeviceMissing], false);
+            options.Add(selected);
+        }
+        Devices = options;
+        SelectedDevice = selected;
+    }
+
+    public sealed record BackendOption(AudioOutputBackend Backend, string Label)
+    {
+        public override string ToString() => Label;
+    }
+
+    public sealed record DeviceOption(string? Id, string Label, bool Available = true)
+    {
+        public override string ToString() => Label;
+    }
+}

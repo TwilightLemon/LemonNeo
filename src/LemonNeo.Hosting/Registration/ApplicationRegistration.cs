@@ -36,6 +36,11 @@ internal static class ApplicationRegistration
         services.AddSingleton(provider => new PlaybackAudioCache(() => storage.CacheDirectory,
             provider.GetRequiredService<ILogger<PlaybackAudioCache>>()));
         services.AddSingleton<PlaybackSourceDiscoveryService>();
+        services.AddSingleton(provider => new TrackExportService(
+            provider.GetRequiredService<PlaybackSourceDiscoveryService>(),
+            provider.GetRequiredService<LyricsService>(),
+            provider.GetRequiredService<ImageCache>(),
+            provider.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(TrackExportService))));
         services.AddSingleton<PlaybackResolver>();
         services.AddSingleton<PlaybackSessionService>();
         services.AddSingleton<PlaybackLyricsService>();

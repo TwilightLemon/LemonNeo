@@ -6,6 +6,7 @@ using LemonNeo.Core.Library;
 using LemonNeo.Desktop.Config;
 using LemonNeo.Desktop.Services;
 using LemonNeo.Desktop.ViewModels.Shared;
+using LemonNeo.Desktop.ViewModels.Tools;
 
 namespace LemonNeo.Desktop;
 
@@ -14,12 +15,15 @@ public sealed class DesktopContext(DesktopHost host, LocalizationService text, A
     : ObservableObject
 {
     private bool _initialized;
+    private DecoderControlsViewModel? _decoderControls;
+    public DecoderControlsViewModel DecoderControls => _decoderControls ??= new(this);
     private PlaylistSynchronizationViewModel? _synchronization;
     public PlaylistSynchronizationViewModel Synchronization => _synchronization ??= new(this);
     public DesktopHost Host { get; } = host;
     public LocalizationService Text { get; } = text;
     public ISettingsScope Settings { get; } = host.Settings.ForPackage(PackageNames.Desktop);
     public AppearanceService Appearance { get; } = appearance;
+    public DesktopNotificationService Notifications { get; } = new();
     public UpdateViewModel Updates { get; } = new(host.Get<GitHubReleaseClient>(),
         host.Settings.ForPackage(PackageNames.Desktop), text);
 

@@ -2,6 +2,10 @@ using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Irihi.Lingua;
+using LemonNeo.Application.Library;
+using LemonNeo.Core.Library;
+using LemonNeo.Core.Music;
+using LemonNeo.Desktop.Config;
 using LemonNeo.Desktop.Services;
 
 namespace LemonNeo.Desktop.ViewModels.Shared;
@@ -11,15 +15,11 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
     protected readonly DesktopContext Context;
     private readonly CancellationTokenSource _lifetime = new();
     private bool _closing;
-    private object?[] _errorArguments = [];
-    private string? _errorDetails;
-    private LinguaKey? _errorKey;
     private bool _isBusy;
     private bool _isNavigationActive = true;
     private bool _localizationDirty;
     private Task _operation = Task.CompletedTask;
     private CancellationTokenSource? _operationCancellation;
-    private object?[] _statusArguments = [];
     private LinguaKey? _statusKey;
 
     protected PageViewModel(DesktopContext context, string route)
@@ -28,7 +28,6 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
         Route = route;
         CancelOperationCommand =
             new RelayCommand(() => _operationCancellation?.Cancel(), () => _operationCancellation is not null);
-        DismissErrorCommand = new RelayCommand(() => SetError(null));
         Context.PropertyChanged += OnContextChanged;
         _text.Changed += OnLanguageChanged;
     }
@@ -41,6 +40,8 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
     public virtual string PageTitle => _text[Route];
     public virtual string PageDescription => _text[$"{Route}Description"];
     public virtual string? PageSummary => null;
+    public IReadOnlyList<Playlist> EditablePlaylists => Context.Playlists.Where(playlist =>
+        !_host.Get<PlaylistService>().IsReadOnly(playlist.Id)).ToArray();
 
     public bool IsBusy
     {
@@ -49,15 +50,7 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
     }
 
     public virtual bool CanInteract => _operationCancellation is null && Context.IsInitialized && !_closing;
-    public bool HasStatus => _statusKey is not null;
-    public string Status => _statusKey is { } key ? _text.Format(key, _statusArguments) : "";
-
-    public string? Error => _errorKey is null
-        ? null
-        : _text.Format(_errorKey, _errorArguments) +
-          (_errorDetails is null ? "" : Environment.NewLine + _errorDetails);
-
-    public bool HasError => _errorKey is not null;
+    public string Status => _statusKey is { } key ? _text[key] : "";
     protected bool IsNavigationActive => _isNavigationActive;
     internal void SetNavigationActive(bool active)
     {
@@ -71,7 +64,6 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
     internal virtual object? CaptureNavigationState() => null;
     internal virtual void RestoreNavigationState(object? state) { }
     public RelayCommand CancelOperationCommand { get; }
-    public RelayCommand DismissErrorCommand { get; }
 
     public virtual async ValueTask DisposeAsync()
     {
@@ -93,6 +85,37 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
         return RunOperationAsync(action);
     }
 
+    public Task AddTrackAsync(Guid playlistId, Track track) => AddTracksToPlaylistAsync(playlistId, [track]);
+
+    protected async Task<bool> AddTracksToPlaylistAsync(Guid playlistId, Track[] tracks)
+    {
+        if (!CanInteract || Context.Playlists.FirstOrDefault(p => p.Id == playlistId) is not { } target)
+            return false;
+        var insertAtStart = Context.Settings.Get<LibraryPreferences>().InsertAtStart;
+        var succeeded = false;
+        await ExecuteAsync(async ct =>
+        {
+            await _host.Settings.SaveAsync(ct);
+            var playlists = _host.Get<PlaylistService>();
+            var added = playlists.AddRange(target.Id, tracks, insertAtStart);
+            try
+            {
+                await _host.Get<LibraryService>().SaveAsync(ct);
+            }
+            catch
+            {
+                foreach (var item in added) playlists.Remove(target.Id, item.Id);
+                Context.RefreshLibrary();
+                throw;
+            }
+
+            Context.RefreshLibrary();
+            Notify(NotificationLevel.Success, LanguageManager.Keys.TracksAdded, added.Count, target.Name);
+            succeeded = true;
+        });
+        return succeeded;
+    }
+
     protected Task RunOperationAsync(Func<CancellationToken, Task> action, LinguaKey? status = null,
         bool showBusy = true, TimeSpan? busyDelay = null)
     {
@@ -112,27 +135,24 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
         using var progressCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
         var progress = showBusy ? ShowBusyAsync(busyDelay, progressCancellation.Token) : Task.CompletedTask;
         RaiseInteractionProperties();
-        SetError(null);
         if (showBusy) SetStatus(status);
         try
         {
             await action(cancellation.Token);
-            if (showBusy && _statusKey == status) SetStatus(null);
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {
-            if (showBusy) SetStatus(LanguageManager.Keys.Cancelled);
         }
         catch (Exception exception)
         {
-            SetError(LanguageManager.Keys.OperationFailed, [exception.Message]);
-            if (showBusy) SetStatus(null);
+            Notify(NotificationLevel.Error, LanguageManager.Keys.OperationFailed, exception.Message);
         }
         finally
         {
             progressCancellation.Cancel();
             await progress;
             IsBusy = false;
+            if (showBusy) SetStatus(null);
             _operationCancellation = null;
             cancellation.Dispose();
             RaiseInteractionProperties();
@@ -153,21 +173,15 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
-    protected void SetStatus(LinguaKey? key, params object?[] arguments)
+    protected void SetStatus(LinguaKey? key)
     {
         _statusKey = key;
-        _statusArguments = arguments;
         OnPropertyChanged(nameof(Status));
-        OnPropertyChanged(nameof(HasStatus));
     }
 
-    protected void SetError(LinguaKey? key, object?[]? arguments = null, string? details = null)
+    protected void Notify(NotificationLevel level, LinguaKey key, params object?[] arguments)
     {
-        _errorKey = key;
-        _errorArguments = arguments ?? [];
-        _errorDetails = details;
-        OnPropertyChanged(nameof(Error));
-        OnPropertyChanged(nameof(HasError));
+        if (!_closing) Context.Notifications.Show(_text.Format(key, arguments), level);
     }
 
     protected virtual void RaiseInteractionProperties()
@@ -182,7 +196,6 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
         OnPropertyChanged(nameof(PageDescription));
         OnPropertyChanged(nameof(PageSummary));
         OnPropertyChanged(nameof(Status));
-        OnPropertyChanged(nameof(Error));
     }
 
     private void OnLanguageChanged(object? sender, EventArgs args)

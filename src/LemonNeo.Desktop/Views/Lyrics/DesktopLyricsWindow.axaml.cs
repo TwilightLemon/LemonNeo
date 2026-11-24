@@ -33,7 +33,11 @@ public partial class DesktopLyricsWindow : Window
         AddHandler(PointerMovedEvent, OnResizeMoved, RoutingStrategies.Tunnel);
         AddHandler(PointerReleasedEvent, OnResizeReleased, RoutingStrategies.Tunnel);
         PointerCaptureLost += (_, _) => _resizingEdge = null;
-        Opened += (_, _) => DesktopLyricsPlatform.OnOpened(this);
+        Opened += (_, _) =>
+        {
+            DesktopLyricsPlatform.OnOpened(this);
+            _viewModel?.SetDesktopWindowOpen(true);
+        };
         LayoutUpdated += (_, _) => KeepOnScreen();
         Screens.Changed += OnScreensChanged;
         // Save while the native window is still alive: by the time Closed fires, PlatformImpl is gone and
@@ -49,7 +53,11 @@ public partial class DesktopLyricsWindow : Window
         Closed += (_, _) =>
         {
             Screens.Changed -= OnScreensChanged;
-            if (_viewModel is { } viewModel) viewModel.PropertyChanged -= OnLyricsPreferenceChanged;
+            if (_viewModel is { } viewModel)
+            {
+                viewModel.SetDesktopWindowOpen(false);
+                viewModel.PropertyChanged -= OnLyricsPreferenceChanged;
+            }
             _horizontalResize.Dispose();
             _verticalResize.Dispose();
             _diagonalResize.Dispose();
@@ -84,11 +92,9 @@ public partial class DesktopLyricsWindow : Window
         MinWidth = vertical ? 110 : 320;
         MinHeight = vertical ? 320 : 110;
         DesktopLayout.ColumnDefinitions = new ColumnDefinitions(vertical ? "40,*" : "*");
-        DesktopLayout.RowDefinitions = new RowDefinitions(vertical ? "*,Auto" : "40,*,Auto");
+        DesktopLayout.RowDefinitions = new RowDefinitions(vertical ? "*" : "40,*");
         Grid.SetColumn(DesktopLyricsTimeline, vertical ? 1 : 0);
         Grid.SetRow(DesktopLyricsTimeline, vertical ? 0 : 1);
-        Grid.SetColumn(DesktopLyricsError, vertical ? 1 : 0);
-        Grid.SetRow(DesktopLyricsError, vertical ? 1 : 2);
         ToolbarLayout.ColumnDefinitions = new ColumnDefinitions(vertical ? "*" : "*,Auto,*");
         ToolbarLayout.RowDefinitions = new RowDefinitions(vertical ? "Auto,Auto,Auto" : "*");
         ToolbarDragHandle.HorizontalAlignment = vertical ? HorizontalAlignment.Center : HorizontalAlignment.Left;
@@ -156,8 +162,7 @@ public partial class DesktopLyricsWindow : Window
         }
         else
         {
-            var minimumHeight = Math.Ceiling(DesktopLyricsTimeline.CompactContentHeight + 72
-                + (DesktopLyricsError.IsVisible ? DesktopLyricsError.DesiredSize.Height : 0));
+            var minimumHeight = Math.Ceiling(DesktopLyricsTimeline.CompactContentHeight + 72);
             if (double.IsFinite(minimumHeight) && Math.Abs(MinHeight - Math.Max(110, minimumHeight)) > .5)
                 MinHeight = Math.Max(110, minimumHeight);
         }

@@ -1,5 +1,6 @@
 using Avalonia.Input;
 using LemonNeo.Abstractions.Settings;
+using LemonNeo.Application.Library;
 
 namespace LemonNeo.Desktop.Config;
 
@@ -8,6 +9,14 @@ public static class DesktopPreferences
 {
     public static void Register(ISettingsScope settings)
     {
+        settings.Register(nameof(SearchPreferences), new SearchPreferences());
+        settings.Register(nameof(TrackExportPreferences), new TrackExportPreferences(), value => value with
+        {
+            Directory = NormalizeOptionalPath(value.Directory),
+            FileNameFormat = string.IsNullOrWhiteSpace(value.FileNameFormat)
+                ? TrackExportService.DefaultFileNameFormat
+                : value.FileNameFormat.Trim()
+        });
         settings.Register(nameof(UpdatePreferences), new UpdatePreferences());
         settings.Register(nameof(DesktopStoragePreferences), new DesktopStoragePreferences(), value => value with
         {

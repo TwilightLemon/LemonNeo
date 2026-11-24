@@ -1,0 +1,55 @@
+<Styles
+    xmlns="https://github.com/avaloniaui"
+    xmlns:platform="using:LemonNeo.Desktop.Platform"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Style Selector="PopupRoot">
+        <Setter Property="TransparencyLevelHint" Value="Transparent" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <LayoutTransformControl LayoutTransform="{TemplateBinding Transform}">
+                    <Panel Margin="10">
+                        <Border
+                            Background="Transparent"
+                            BoxShadow="0 2 8 0 #40000000"
+                            CornerRadius="{DynamicResource OverlayCornerRadius}"
+                            IsHitTestVisible="False" />
+                        <VisualLayerManager Name="PART_VisualLayerManager">
+                            <ContentPresenter
+                                Background="{TemplateBinding Background}"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                MinWidth="{TemplateBinding MinWidth}"
+                                Name="PART_ContentPresenter"
+                                Padding="{TemplateBinding Padding}" />
+                        </VisualLayerManager>
+                    </Panel>
+                </LayoutTransformControl>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    <Style Selector="FlyoutPresenter, MenuFlyoutPresenter, ContextMenu, ToolTip">
+        <Setter Property="Background" Value="{DynamicResource Brush.SurfaceRaised}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />
+        <Setter Property="CornerRadius" Value="{DynamicResource OverlayCornerRadius}" />
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
+    </Style>
+    <Style Selector="ContextMenu MenuItem, MenuFlyoutPresenter MenuItem">
+        <Setter Property="Margin" Value="4,0" />
+        <Setter Property="CornerRadius" Value="5" />
+    </Style>
+    <Style Selector="Window.acrylicDialog">
+        <Setter Property="Background" Value="{DynamicResource Brush.DialogTint}" />
+        <Setter Property="TransparencyLevelHint" Value="AcrylicBlur, Blur, None" />
+        <Setter Property="TransparencyBackgroundFallback" Value="{DynamicResource Brush.SurfaceRaised}" />
+        <Setter Property="ExtendClientAreaToDecorationsHint" Value="{x:Static platform:DialogChrome.ExtendClientArea}" />
+        <Setter Property="ExtendClientAreaTitleBarHeightHint" Value="{x:Static platform:DialogChrome.TitleBarHeight}" />
+        <Setter Property="Padding" Value="{x:Static platform:DialogChrome.ContentPadding}" />
+        <Setter Property="WindowDecorationsTheme" Value="{StaticResource LemonWindowDecorations}" />
+    </Style>
+    <Style Selector="Border.popupCard">
+        <Setter Property="Background" Value="{DynamicResource Brush.SurfaceRaised}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{DynamicResource OverlayCornerRadius}" />
+    </Style>
+</Styles>

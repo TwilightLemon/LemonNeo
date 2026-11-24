@@ -11,7 +11,6 @@ public sealed class MetadataMatchRow(
     RelayCommand<MetadataMatchRow> replaceMetadataCommand,
     RelayCommand<MetadataMatchRow> addExternalIdsCommand) : ObservableObject
 {
-    private string? _actionStatusKey;
     public MetadataMatch Match { get; } = match;
     public LocalizationService Text { get; } = text;
     public RelayCommand<MetadataMatchRow> ReplaceMetadataCommand { get; } = replaceMetadataCommand;
@@ -28,28 +27,8 @@ public sealed class MetadataMatchRow(
     public string ExternalIds => string.Join(Environment.NewLine,
         Match.Track.ExternalIds.Select(i => $"{i.Namespace}:{i.Kind ?? "-"} = {i.Value}"));
 
-    public bool HasActionStatus => _actionStatusKey is not null;
-    public string ActionStatus => _actionStatusKey is null ? "" : Text[_actionStatusKey];
-
-    public void MarkMetadataReplaced()
-    {
-        SetActionStatus("MetadataReplacedConfirmation");
-    }
-
-    public void MarkExternalIdsAdded()
-    {
-        SetActionStatus("MetadataIdsAddedConfirmation");
-    }
-
     internal void RefreshLocalizedProperties()
     {
-        OnPropertyChanged(nameof(ActionStatus));
-    }
-
-    private void SetActionStatus(string key)
-    {
-        _actionStatusKey = key;
-        OnPropertyChanged(nameof(ActionStatus));
-        OnPropertyChanged(nameof(HasActionStatus));
+        OnPropertyChanged(nameof(Confidence));
     }
 }

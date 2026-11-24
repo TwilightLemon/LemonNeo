@@ -51,6 +51,46 @@
             <Setter Property="BorderBrush" Value="{DynamicResource Brush.Focus}" />
         </Style>
     </ControlTheme>
+    <ControlTheme BasedOn="{StaticResource LemonButton}" TargetType="Button" x:Key="LemonGlassFloatingButton">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Panel>
+                    <Border
+                        BackdropEffectCache="Retained"
+                        Background="{DynamicResource Brush.PlaybackSurface}"
+                        ClipToBounds="True"
+                        CornerRadius="{TemplateBinding CornerRadius}"
+                        IsHitTestVisible="False">
+                        <Border.BackdropEffect>
+                            <BlurEffect Radius="2" />
+                        </Border.BackdropEffect>
+                        <sharedControls:LiquidGlassRim CornerRadius="{TemplateBinding CornerRadius}" />
+                    </Border>
+                    <Border
+                        Background="{DynamicResource Brush.Accent}"
+                        CornerRadius="{TemplateBinding CornerRadius}"
+                        IsHitTestVisible="False"
+                        Opacity="0.12" />
+                    <ContentPresenter
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        Content="{TemplateBinding Content}"
+                        ContentTemplate="{TemplateBinding ContentTemplate}"
+                        CornerRadius="{TemplateBinding CornerRadius}"
+                        HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                        Name="PART_ContentPresenter"
+                        Padding="{TemplateBinding Padding}"
+                        RecognizesAccessKey="True"
+                        VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                </Panel>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover">
+            <Setter Property="Background" Value="{DynamicResource Brush.NeutralHover}" />
+        </Style>
+    </ControlTheme>
     <ControlTheme TargetType="ListBoxItem" x:Key="ServiceTabTheme">
         <Setter Property="BorderThickness" Value="0,0,0,2" />
         <Setter Property="BorderBrush" Value="Transparent" />
@@ -73,44 +113,47 @@
             </ControlTemplate>
         </Setter>
         <Style Selector="^:selected">
-            <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentText}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.TextSecondary}" />
         </Style>
         <Style Selector="^:focus-visible">
             <Setter Property="BorderBrush" Value="{DynamicResource Brush.Focus}" />
         </Style>
     </ControlTheme>
+    <ControlTheme TargetType="Border" x:Key="PlaybackRail">
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="Height" Value="8" />
+        <Setter Property="RenderTransform" Value="scaleY(0.25)" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <TransformOperationsTransition Duration="{DynamicResource Motion.Fast}" Property="RenderTransform" />
+            </Transitions>
+        </Setter>
+    </ControlTheme>
     <ControlTheme TargetType="RepeatButton" x:Key="PlaybackTrackButton">
         <Setter Property="Template">
             <ControlTemplate>
-                <Grid Background="Transparent">
-                    <Border
-                        Background="{TemplateBinding Background}"
-                        Height="2"
-                        VerticalAlignment="Center" />
-                </Grid>
-            </ControlTemplate>
-        </Setter>
-    </ControlTheme>
-    <ControlTheme TargetType="Thumb" x:Key="PlaybackThumb">
-        <Setter Property="Template">
-            <ControlTemplate>
-                <Ellipse Fill="{TemplateBinding Background}" />
+                <ContentPresenter
+                    Background="Transparent"
+                    Content="{TemplateBinding Content}"
+                    HorizontalContentAlignment="Stretch"
+                    Name="PART_ContentPresenter"
+                    VerticalContentAlignment="Stretch" />
             </ControlTemplate>
         </Setter>
     </ControlTheme>
     <ControlTheme TargetType="Slider" x:Key="PlaybackTimeline">
-        <Setter Property="Height" Value="20" />
-        <Setter Property="MinHeight" Value="20" />
+        <Setter Property="Height" Value="16" />
+        <Setter Property="MinHeight" Value="16" />
         <Setter Property="Padding" Value="0" />
         <Setter Property="Background" Value="{DynamicResource Brush.Border}" />
-        <Setter Property="Foreground" Value="{DynamicResource Brush.AccentText}" />
         <Setter Property="Template">
             <ControlTemplate>
                 <Grid Background="Transparent">
                     <Border
                         Background="{TemplateBinding Background}"
-                        Height="2"
-                        VerticalAlignment="Center" />
+                        Classes="playbackRail"
+                        Theme="{StaticResource PlaybackRail}" />
                     <Track
                         IsDirectionReversed="{TemplateBinding IsDirectionReversed}"
                         Maximum="{TemplateBinding Maximum}"
@@ -121,55 +164,46 @@
                                                 Mode=TwoWay}">
                         <Track.DecreaseButton>
                             <RepeatButton
-                                Background="{TemplateBinding Foreground}"
                                 Focusable="False"
-                                Margin="0,0,-6,0"
                                 Name="PART_DecreaseButton"
-                                Theme="{StaticResource PlaybackTrackButton}" />
+                                Theme="{StaticResource PlaybackTrackButton}">
+                                <Border
+                                    Background="{TemplateBinding Foreground}"
+                                    Classes="playbackRail"
+                                    Theme="{StaticResource PlaybackRail}" />
+                            </RepeatButton>
                         </Track.DecreaseButton>
                         <Track.IncreaseButton>
                             <RepeatButton
-                                Background="{TemplateBinding Background}"
+                                Background="Transparent"
                                 Focusable="False"
-                                Margin="-6,0,0,0"
                                 Name="PART_IncreaseButton"
                                 Theme="{StaticResource PlaybackTrackButton}" />
                         </Track.IncreaseButton>
-                        <Thumb
-                            Background="{TemplateBinding Foreground}"
-                            Height="12"
-                            Name="PlaybackSliderThumb"
-                            Theme="{StaticResource PlaybackThumb}"
-                            VerticalAlignment="Center"
-                            Width="12" />
                     </Track>
                 </Grid>
             </ControlTemplate>
         </Setter>
-        <Style Selector="^ /template/ Thumb#PlaybackSliderThumb">
-            <Setter Property="Opacity" Value="0" />
-        </Style>
-        <Style Selector="^:pointerover /template/ Thumb#PlaybackSliderThumb, ^:focus-visible /template/ Thumb#PlaybackSliderThumb, ^:pressed /template/ Thumb#PlaybackSliderThumb">
-            <Setter Property="Opacity" Value="1" />
-        </Style>
-        <Style Selector="^:disabled /template/ Thumb#PlaybackSliderThumb">
-            <Setter Property="Opacity" Value="0" />
+        <Style Selector="^:pointerover /template/ Border.playbackRail, ^:focus-visible /template/ Border.playbackRail, ^.scrubbing /template/ Border.playbackRail">
+            <Setter Property="RenderTransform" Value="scaleY(1)" />
         </Style>
     </ControlTheme>
     <ControlTheme TargetType="sharedControls:PageHeader" x:Key="{x:Type sharedControls:PageHeader}">
         <Setter Property="Template">
             <ControlTemplate>
-                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,28">
+                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
                     <StackPanel Spacing="8">
                         <TextBlock
                             FontSize="{DynamicResource Font.Title}"
                             FontWeight="SemiBold"
+                            Name="HeaderTitle"
                             Text="{TemplateBinding Title}"
                             TextWrapping="Wrap" />
                         <TextBlock
                             Foreground="{DynamicResource Brush.TextSecondary}"
                             IsVisible="{Binding Description, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}"
                             MaxLines="1"
+                            Name="HeaderDescription"
                             Text="{TemplateBinding Description}"
                             TextTrimming="CharacterEllipsis"
                             TextWrapping="NoWrap" />
@@ -177,6 +211,7 @@
                             Classes="caption"
                             IsVisible="{Binding Summary, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}"
                             MaxLines="1"
+                            Name="HeaderSummary"
                             Text="{TemplateBinding Summary}"
                             TextTrimming="CharacterEllipsis"
                             TextWrapping="NoWrap" />
@@ -185,6 +220,7 @@
                         Content="{TemplateBinding Actions}"
                         Grid.Column="1"
                         Margin="16,0,0,0"
+                        Name="HeaderActions"
                         VerticalAlignment="Center" />
                 </Grid>
             </ControlTemplate>
@@ -204,12 +240,7 @@
                         Height="80"
                         HorizontalAlignment="Center"
                         Width="80">
-                        <Path
-                            Data="{TemplateBinding Icon}"
-                            Fill="{DynamicResource Brush.AccentText}"
-                            Height="28"
-                            Stretch="Uniform"
-                            Width="28" />
+                        <Path Classes="icon extraLarge accent" Data="{TemplateBinding Icon}" />
                     </Border>
                     <TextBlock
                         FontSize="22"
@@ -260,12 +291,7 @@
                                     Fill="{DynamicResource Brush.Accent}"
                                     Height="44"
                                     Width="44" />
-                                <Path
-                                    Data="{StaticResource Icon.Music}"
-                                    Fill="{DynamicResource Brush.OnAccent}"
-                                    Height="20"
-                                    Stretch="Uniform"
-                                    Width="20" />
+                                <Path Classes="icon large onAccent" Data="{StaticResource Icon.MusicNote}" />
                             </Grid>
                         </Viewbox>
                         <Image

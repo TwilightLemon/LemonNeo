@@ -13,6 +13,9 @@ public partial class AddToPlaylistButton : UserControl
     public static readonly StyledProperty<bool> IsCompactProperty =
         AvaloniaProperty.Register<AddToPlaylistButton, bool>(nameof(IsCompact));
 
+    public static readonly StyledProperty<bool> IsIconOnlyProperty =
+        AvaloniaProperty.Register<AddToPlaylistButton, bool>(nameof(IsIconOnly));
+
     public AddToPlaylistButton()
     {
         InitializeComponent();
@@ -28,6 +31,12 @@ public partial class AddToPlaylistButton : UserControl
     {
         get => GetValue(IsCompactProperty);
         set => SetValue(IsCompactProperty, value);
+    }
+
+    public bool IsIconOnly
+    {
+        get => GetValue(IsIconOnlyProperty);
+        set => SetValue(IsIconOnlyProperty, value);
     }
 
     private async void OnAdd(object? sender, RoutedEventArgs args)

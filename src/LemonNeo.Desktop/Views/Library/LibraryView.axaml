@@ -6,214 +6,145 @@
     xmlns:libraryVm="using:LemonNeo.Desktop.ViewModels.Library"
     xmlns:sharedControls="using:LemonNeo.Desktop.Controls.Shared"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Grid RowDefinitions="Auto,Auto,*">
+    <Grid ClipToBounds="True" RowDefinitions="Auto,Auto,*">
+        <TextBlock
+            Classes="compactListTitle"
+            IsVisible="{Binding IsLibrary}"
+            Name="CompactTitle"
+            Text="{Binding PageTitle}" />
         <sharedControls:PageHeader
+            Classes.collapsible="{Binding IsLibrary}"
             Description="{Binding PageDescription}"
+            Name="LibraryHeader"
             Summary="{Binding PageSummary}"
-            Title="{Binding PageTitle}">
+            Title="{Binding PageTitle}"
+            VerticalAlignment="Top"
+            ZIndex="1">
             <sharedControls:PageHeader.Actions>
-                <StackPanel Spacing="8">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button
-                            Classes="primary"
-                            Command="{Binding PlayAllCommand}"
-                            IsEnabled="{Binding CanPlay}">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <Path
-                                    Classes="icon"
-                                    Data="{StaticResource Icon.Play}"
-                                    Height="14"
-                                    Width="14" />
-                                <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.PlayAll}}" />
-                            </StackPanel>
-                        </Button>
-                        <Button
-                            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistMore}}"
-                            Classes="ghost icon"
-                            IsEnabled="{Binding CanInteract}"
-                            IsVisible="{Binding HasSelectedPlaylist}"
-                            Name="PlaylistActionsButton"
-                            ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistMore}}">
-                            <Path
-                                Classes="icon"
-                                Data="{StaticResource Icon.More}"
-                                VerticalAlignment="Center" />
-                            <Button.Flyout>
-                                <MenuFlyout>
-                                    <MenuItem Command="{Binding NewTrackCommand}" IsEnabled="{Binding CanEditPlaylist}" Header="{Translate {x:Static i18n:LanguageManager+Keys.NewTrack}}" />
-                                    <MenuItem Command="{Binding MatchPlaylistCommand}" IsEnabled="{Binding CanMatchPlaylist}" Header="{Translate {x:Static i18n:LanguageManager+Keys.MatchPlaylist}}" />
-                                    <MenuItem Click="OnEditPlaylist" IsEnabled="{Binding CanEditPlaylist}" Header="{Translate {x:Static i18n:LanguageManager+Keys.EditPlaylist}}" />
-                                    <Separator IsVisible="{Binding IsMirrored}" />
-                                    <MenuItem Command="{Binding SyncPlaylistCommand}" IsVisible="{Binding IsMirrored}" IsEnabled="{Binding Synchronization.CanSync}" Header="{Translate {x:Static i18n:LanguageManager+Keys.SyncPlaylistNow}}" />
-                                    <MenuItem Command="{Binding ToggleSyncPauseCommand}" IsVisible="{Binding IsMirrored}" Header="{Binding SyncPauseLabel}" />
-                                    <MenuItem Command="{Binding CopyPlaylistCommand}" Header="{Translate {x:Static i18n:LanguageManager+Keys.CreateEditablePlaylistCopy}}" />
-                                    <MenuItem Command="{Binding DetachPlaylistCommand}" IsVisible="{Binding IsMirrored}" Header="{Translate {x:Static i18n:LanguageManager+Keys.DetachPlaylistSync}}" />
-                                    <Separator />
-                                    <MenuItem Click="OnDeletePlaylist" Header="{Translate {x:Static i18n:LanguageManager+Keys.DeletePlaylist}}" />
-                                </MenuFlyout>
-                            </Button.Flyout>
-                        </Button>
-                    </StackPanel>
-                    <StackPanel
-                        IsVisible="{Binding IsBusy}"
-                        Orientation="Horizontal"
-                        Spacing="10"
-                        ToolTip.Tip="{Binding Status}">
-                        <ProgressBar
-                            AutomationProperties.Name="{Binding Status}"
-                            Height="3"
-                            IsIndeterminate="True"
-                            VerticalAlignment="Center"
-                            Width="60" />
-                        <Button
-                            Classes="ghost"
-                            Command="{Binding CancelOperationCommand}"
-                            Content="{Translate {x:Static i18n:LanguageManager+Keys.CancelOperation}}" />
-                    </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button
+                        Classes="primary"
+                        Command="{Binding PlayAllCommand}"
+                        IsEnabled="{Binding CanPlay}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Path Classes="icon small" Data="{StaticResource Icon.PlayOutline}" />
+                            <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.PlayAll}}" />
+                        </StackPanel>
+                    </Button>
+                    <Button
+                        AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistMore}}"
+                        Classes="ghost icon"
+                        IsEnabled="{Binding CanInteract}"
+                        IsVisible="{Binding HasSelectedPlaylist}"
+                        Name="PlaylistActionsButton"
+                        ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistMore}}">
+                        <Path Classes="icon" Data="{StaticResource Icon.More}" />
+                        <Button.Flyout>
+                            <MenuFlyout Placement="Bottom" VerticalOffset="-2">
+                                <MenuItem Command="{Binding NewTrackCommand}" IsEnabled="{Binding CanEditPlaylist}" Header="{Translate {x:Static i18n:LanguageManager+Keys.NewTrack}}" />
+                                <MenuItem Command="{Binding MatchPlaylistCommand}" IsEnabled="{Binding CanMatchPlaylist}" Header="{Translate {x:Static i18n:LanguageManager+Keys.MatchPlaylist}}" />
+                                <MenuItem Click="OnEditPlaylist" IsEnabled="{Binding CanEditPlaylist}" Header="{Translate {x:Static i18n:LanguageManager+Keys.EditPlaylist}}" />
+                                <Separator IsVisible="{Binding IsMirrored}" />
+                                <MenuItem Command="{Binding SyncPlaylistCommand}" IsVisible="{Binding IsMirrored}" IsEnabled="{Binding Synchronization.CanSync}" Header="{Translate {x:Static i18n:LanguageManager+Keys.SyncPlaylistNow}}" />
+                                <MenuItem Command="{Binding ToggleSyncPauseCommand}" IsVisible="{Binding IsMirrored}" Header="{Binding SyncPauseLabel}" />
+                                <MenuItem Command="{Binding CopyPlaylistCommand}" Header="{Translate {x:Static i18n:LanguageManager+Keys.CreateEditablePlaylistCopy}}" />
+                                <MenuItem Command="{Binding DetachPlaylistCommand}" IsVisible="{Binding IsMirrored}" Header="{Translate {x:Static i18n:LanguageManager+Keys.DetachPlaylistSync}}" />
+                                <Separator />
+                                <MenuItem Click="OnDeletePlaylist" Header="{Translate {x:Static i18n:LanguageManager+Keys.DeletePlaylist}}" />
+                            </MenuFlyout>
+                        </Button.Flyout>
+                    </Button>
                 </StackPanel>
             </sharedControls:PageHeader.Actions>
         </sharedControls:PageHeader>
-        <Border
-            Background="{DynamicResource Brush.DangerSoft}"
-            CornerRadius="10"
+        <StackPanel
             Grid.Row="1"
-            IsVisible="{Binding HasError}"
-            Margin="0,0,0,12"
-            Padding="14">
-            <Grid ColumnDefinitions="*,Auto">
-                <TextBlock
-                    Foreground="{DynamicResource Brush.Danger}"
-                    MaxHeight="90"
-                    Text="{Binding Error}"
-                    TextWrapping="Wrap" />
+            Name="LibraryTools"
+            ZIndex="2">
+            <TextBlock
+                Classes="caption"
+                IsVisible="{Binding IsMirrored}"
+                Margin="0,0,0,8"
+                Text="{Binding SyncDescription}"
+                TextTrimming="CharacterEllipsis"
+                ToolTip.Tip="{Binding SyncDetails}" />
+            <StackPanel
+                HorizontalAlignment="Right"
+                IsVisible="{Binding IsBusy}"
+                Margin="0,0,0,12"
+                Orientation="Horizontal"
+                Spacing="10"
+                ToolTip.Tip="{Binding Status}">
+                <ProgressBar
+                    AutomationProperties.Name="{Binding Status}"
+                    Height="3"
+                    IsIndeterminate="True"
+                    VerticalAlignment="Center"
+                    Width="60" />
                 <Button
-                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}"
-                    Classes="ghost icon"
-                    Command="{Binding DismissErrorCommand}"
-                    Grid.Column="1">
-                    <Path Classes="icon" Data="{StaticResource Icon.Close}" />
-                </Button>
-            </Grid>
-        </Border>
+                    Classes="ghost"
+                    Command="{Binding CancelOperationCommand}"
+                    Content="{Translate {x:Static i18n:LanguageManager+Keys.CancelOperation}}" />
+            </StackPanel>
+            <sharedControls:TrackListToolbar>
+                <sharedControls:TrackListToolbar.SelectionActions>
+                    <WrapPanel>
+                        <Button
+                            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.RemoveSelectedTracks}}"
+                            Classes="danger icon compact ghost"
+                            Command="{Binding RemoveTrackCommand}"
+                            IsEnabled="{Binding CanRemoveTracks}"
+                            IsVisible="{Binding HasSelectedPlaylist}"
+                            Margin="0,1,6,1"
+                            ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.RemoveSelectedTracks}}">
+                            <Path Classes="icon" Data="{StaticResource Icon.Trash}" />
+                        </Button>
+                    </WrapPanel>
+                </sharedControls:TrackListToolbar.SelectionActions>
+                <sharedControls:TrackListToolbar.SelectionHint>
+                    <TextBlock
+                        Classes="caption"
+                        IsVisible="{Binding CanReorderTracks}"
+                        Margin="6,0,0,0"
+                        Text="{Translate {x:Static i18n:LanguageManager+Keys.DragTracksToReorder}}"
+                        VerticalAlignment="Center" />
+                </sharedControls:TrackListToolbar.SelectionHint>
+            </sharedControls:TrackListToolbar>
+        </StackPanel>
         <Grid Grid.Row="2">
-            <Grid RowDefinitions="Auto,*">
-                <StackPanel
-                    Margin="0,0,0,14"
-                    Name="LibraryToolbar"
-                    Spacing="12">
-                    <TextBlock Classes="caption" IsVisible="{Binding IsMirrored}"
-                               Text="{Binding SyncDescription}" TextTrimming="CharacterEllipsis"
-                               ToolTip.Tip="{Binding SyncDetails}" />
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                        <TextBox
-                            AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.SearchPlaceholder}}"
-                            Name="LibraryFilter"
-                            PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.SearchPlaceholder}}"
-                            Text="{Binding Filter}" />
-                        <StackPanel
-                            Grid.Column="1"
-                            Orientation="Horizontal"
-                            Spacing="8"
-                            VerticalAlignment="Center">
-                            <StackPanel
-                                IsVisible="{Binding !IsSelectionMode}"
-                                Orientation="Horizontal"
-                                Spacing="8">
-                                <sharedControls:AddToPlaylistButton />
-                                <Button
-                                    Command="{Binding InspectTrackCommand}"
-                                    Content="{Translate {x:Static i18n:LanguageManager+Keys.TrackDetails}}"
-                                    IsEnabled="{Binding CanInspectTrack}"
-                                    Name="TrackDetailsButton" />
-                            </StackPanel>
-                            <Button
-                                Command="{Binding ToggleSelectionCommand}"
-                                Content="{Binding SelectionModeLabel}"
-                                IsEnabled="{Binding CanInteract}"
-                                Name="ManageTracksButton" />
-                        </StackPanel>
-                    </Grid>
-                    <Border
-                        Background="{DynamicResource Brush.AccentSoft}"
-                        CornerRadius="10"
-                        IsVisible="{Binding IsSelectionMode}"
-                        Padding="10,6">
-                        <WrapPanel>
-                            <TextBlock
-                                Margin="4,0,14,0"
-                                Text="{Binding SelectionSummary}"
-                                VerticalAlignment="Center" />
-                            <Button
-                                Classes="ghost compact"
-                                Command="{Binding SelectAllCommand}"
-                                Content="{Translate {x:Static i18n:LanguageManager+Keys.SelectAllTracks}}"
-                                Margin="0,2,8,2" />
-                            <Button
-                                Classes="ghost compact"
-                                Command="{Binding ClearSelectionCommand}"
-                                Content="{Translate {x:Static i18n:LanguageManager+Keys.ClearTrackSelection}}"
-                                Margin="0,2,8,2" />
-                            <sharedControls:AddToPlaylistButton
-                                IsCompact="True"
-                                IsGhost="True"
-                                Margin="0,2,8,2" />
-                            <Button
-                                Classes="danger compact"
-                                Command="{Binding RemoveTrackCommand}"
-                                Content="{Translate {x:Static i18n:LanguageManager+Keys.RemoveSelectedTracks}}"
-                                IsEnabled="{Binding CanRemoveTracks}"
-                                IsVisible="{Binding HasSelectedPlaylist}"
-                                Margin="0,2,8,2" />
-                            <TextBlock
-                                Classes="caption"
-                                IsVisible="{Binding CanReorderTracks}"
-                                Margin="6,0,0,0"
-                                Text="{Translate {x:Static i18n:LanguageManager+Keys.DragTracksToReorder}}"
-                                VerticalAlignment="Center" />
-                        </WrapPanel>
-                    </Border>
-                </StackPanel>
-                <ListBox
-                    Classes="trackList"
-                    Classes.managing="{Binding IsSelectionMode}"
-                    DoubleTapped="OnTrackDoubleTapped"
-                    Grid.IsSharedSizeScope="True"
-                    Grid.Row="1"
-                    IsEnabled="{Binding CanInteract}"
-                    IsVisible="{Binding HasTracks}"
-                    ItemTemplate="{StaticResource TrackRowTemplate}"
-                    ItemsSource="{Binding Tracks}"
-                    KeyDown="OnTrackKeyDown"
-                    Name="TrackList"
-                    ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                    SelectedItem="{Binding SelectedTrack}" />
-                <Border
-                    Classes="floatingAction"
-                    Grid.Row="1"
-                    HorizontalAlignment="Right"
-                    IsVisible="{Binding HasPlayingTrack}"
-                    Margin="{DynamicResource Space.PlaybackFloatingInset}"
-                    VerticalAlignment="Bottom">
-                    <Button
-                        AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.LocatePlayingTrack}}"
-                        Classes="primary floating"
-                        Click="OnLocatePlaying"
-                        Name="LocatePlayingButton"
-                        ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.LocatePlayingTrack}}">
-                        <Path
-                            Classes="icon"
-                            Data="{StaticResource Icon.Locate}"
-                            Height="22"
-                            Width="22" />
-                    </Button>
-                </Border>
-                <sharedControls:EmptyState
-                    Description="{Binding EmptyDescription}"
-                    Grid.Row="1"
-                    Icon="{StaticResource Icon.Music}"
-                    IsVisible="{Binding !HasTracks}"
-                    Title="{Binding EmptyTitle}" />
-            </Grid>
+            <ListBox
+                AutoScrollToSelectedItem="False"
+                Classes="trackList"
+                Classes.managing="{Binding IsSelectionMode}"
+                Grid.IsSharedSizeScope="True"
+                IsEnabled="{Binding CanInteract}"
+                IsVisible="{Binding HasTracks}"
+                ItemTemplate="{StaticResource TrackRowTemplate}"
+                ItemsSource="{Binding Tracks}"
+                Name="TrackList"
+                ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                SelectedItem="{Binding SelectedTrack}" />
+            <Border
+                Classes="floatingAction"
+                HorizontalAlignment="Right"
+                IsVisible="{Binding HasPlayingTrack}"
+                Margin="{DynamicResource Space.PlaybackFloatingInset}"
+                VerticalAlignment="Bottom">
+                <Button
+                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.LocatePlayingTrack}}"
+                    Classes="floating"
+                    Click="OnLocatePlaying"
+                    Name="LocatePlayingButton"
+                    ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.LocatePlayingTrack}}">
+                    <Path Classes="icon filled" Data="{StaticResource Icon.Locate}" />
+                </Button>
+            </Border>
+            <sharedControls:EmptyState
+                Description="{Binding EmptyDescription}"
+                Icon="{StaticResource Icon.MusicNote}"
+                IsVisible="{Binding !HasTracks}"
+                Name="LibraryEmptyState"
+                Title="{Binding EmptyTitle}" />
         </Grid>
     </Grid>
 </UserControl>

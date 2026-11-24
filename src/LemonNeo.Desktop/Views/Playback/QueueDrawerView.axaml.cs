@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using LemonNeo.Desktop.Controls.Shared;
 using LemonNeo.Desktop.ViewModels.Playback;
 
 namespace LemonNeo.Desktop.Views.Playback;
@@ -27,6 +28,16 @@ public partial class QueueDrawerView : UserControl
     {
         if (DataContext is PlaybackQueueViewModel vm && args.Source is Control { DataContext: QueueTrackViewModel row })
             await vm.PlayTrackAsync(row);
+    }
+
+    private void OnTrackContextRequested(object? sender, ContextRequestedEventArgs args)
+    {
+        if (DataContext is not PlaybackQueueViewModel { CanInteract: true } vm ||
+            TrackContextMenu.GetTarget<QueueTrackViewModel>(QueueTracks, args) is not { } target) return;
+
+        TrackContextMenu.Open(target.Container, args, target.Row.Row, vm.EditablePlaylists,
+            id => vm.AddTrackAsync(id, target.Row.Row.Track), () => vm.InspectTrackAsync(target.Row),
+            () => vm.RemoveTrackAsync(target.Row));
     }
 
     private async void OnTrackKeyDown(object? sender, KeyEventArgs args)

@@ -45,15 +45,13 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
         {
             if (!CanUseMetadataMatch(row) || string.IsNullOrWhiteSpace(row!.Match.Track.Title)) return;
             Editor!.ApplyMetadata(row!.Match.Track);
-            row.MarkMetadataReplaced();
-            SetStatus(LanguageManager.Keys.MetadataApplied);
+            Notify(NotificationLevel.Success, LanguageManager.Keys.MetadataApplied);
         }, row => CanUseMetadataMatch(row) && !string.IsNullOrWhiteSpace(row!.Match.Track.Title));
         AddMatchExternalIdsCommand = new RelayCommand<MetadataMatchRow>(row =>
         {
             if (!CanUseMetadataMatch(row)) return;
             var added = Editor!.AddExternalIds(row!.Match.Track.ExternalIds);
-            row.MarkExternalIdsAdded();
-            SetStatus(LanguageManager.Keys.MetadataIdsAdded, added);
+            Notify(NotificationLevel.Success, LanguageManager.Keys.MetadataIdsAdded, added);
         }, row => CanUseMetadataMatch(row) && row!.Match.Track.ExternalIds.Count > 0);
         MetadataSources = MetadataSourceOption.Create(_host.Get<IProviderRegistry>(),
             _host.Get<IPlaybackSourceProviderRegistry>());
@@ -63,17 +61,20 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
         SourcesCommand = new AsyncRelayCommand(InspectSourcesAsync);
         PlaySourceCommand = new AsyncRelayCommand(() => SelectedSource is { } source && _sourceTrack is { } track
             ? playback.ExecutePlaybackAsync(ct =>
-                _host.Get<PlaybackSessionService>().PlayTrackAsync(track, new PlaybackRequest(
+                _host.Get<PlaybackSessionService>().PlayItemsAsync([new PlaybackQueueItem
+                {
+                    Track = track,
+                    PlaylistEntry = Editor is { PlaylistId: { } list, ItemId: { } item }
+                        ? new PlaylistEntryId(list, item) : row?.PlaybackEntry
+                }], request: new PlaybackRequest(
                     source.Candidate.Source.Quality ?? AudioQuality.Automatic,
-                    source.Candidate.IsCached ? null : source.Provider, source.Candidate.SourceId), ct))
+                    source.Candidate.IsCached ? null : source.Provider, source.Candidate.SourceId), cancellationToken: ct))
             : Task.CompletedTask);
         Context.LibraryChanged += OnLibraryChanged;
     }
 
     public TrackEditorViewModel? Editor { get; }
     public ObservableCollection<Playlist> Playlists => Context.Playlists;
-    public IReadOnlyList<Playlist> EditablePlaylists => Playlists.Where(playlist =>
-        !_host.Get<PlaylistService>().IsReadOnly(playlist.Id)).ToArray();
     public bool IsSourceReadOnly => Editor?.PlaylistId is { } id && _host.Get<PlaylistService>().IsReadOnly(id);
     public bool CanEditDetails => CanInteract && !IsSourceReadOnly;
 
@@ -128,7 +129,7 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
             // Stay in the editor on validation or persistence failure.
             Context.RefreshLibrary();
             if (ReferenceEquals(Navigation.Current, this)) await Navigation.GoBackAsync();
-            SetStatus(LanguageManager.Keys.LibrarySaved);
+            Notify(NotificationLevel.Success, LanguageManager.Keys.LibrarySaved);
         });
     }
 
@@ -199,7 +200,9 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
                         { ArtworkLoader = _host.Get<ArtworkService>() });
             RefreshMetadataCommands();
             InspectionMessages = FormatErrors(result.SourceErrors);
-            SetStatus(LanguageManager.Keys.MetadataCompleted, result.Matches.Count);
+            Notify(result.SourceErrors.Count > 0 ? NotificationLevel.Warning : NotificationLevel.Information,
+                result.SourceErrors.Count > 0 ? LanguageManager.Keys.MetadataCompletedWithErrors : LanguageManager.Keys.MetadataCompleted,
+                result.Matches.Count);
         });
     }
 
@@ -214,6 +217,8 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
                 ? FormatLyricsDetails(lyrics, result.ProviderId)
                 : _text[LanguageManager.Keys.NoLyrics];
             InspectionMessages = FormatErrors(result.ProviderErrors);
+            if (result.ProviderErrors.Count > 0)
+                Notify(NotificationLevel.Warning, LanguageManager.Keys.InspectionSourcesFailed);
         });
     }
 
@@ -230,7 +235,9 @@ public sealed partial class TrackEditorPageViewModel : PageViewModel
             _sourceTrack = track;
             SelectedSource = DiscoveredSources.FirstOrDefault();
             InspectionMessages = FormatErrors(result.ProviderErrors);
-            SetStatus(LanguageManager.Keys.SourcesCompleted, result.Candidates.Count);
+            Notify(result.ProviderErrors.Count > 0 ? NotificationLevel.Warning : NotificationLevel.Information,
+                result.ProviderErrors.Count > 0 ? LanguageManager.Keys.SourcesCompletedWithErrors : LanguageManager.Keys.SourcesCompleted,
+                result.Candidates.Count);
         });
     }
 

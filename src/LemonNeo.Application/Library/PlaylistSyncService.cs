@@ -240,6 +240,7 @@ public sealed class PlaylistSyncService(
                         {
                             Id = previous?.Id ?? Guid.NewGuid(),
                             AddedAt = previous?.AddedAt ?? DateTimeOffset.UtcNow,
+                            DecodeProfile = previous?.DecodeProfile,
                             HasMetadataOverride = previous?.HasMetadataOverride ?? false,
                             ExternalIdOverrides = previous?.ExternalIdOverrides ?? [],
                             SortKey = ((index + 1) * 1000m).ToString(CultureInfo.InvariantCulture),

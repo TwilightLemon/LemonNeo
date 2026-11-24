@@ -333,8 +333,12 @@ public sealed class PlaylistService(
         using var mutation = library.BeginMutation();
         var source = GetRequired(playlistId);
         var copy = Create(source.Name, source.Description);
-        AddRange(copy.Id, source.Items.OrderBy(item => FractionalPlaylistOrderingService.Parse(item.SortKey))
-            .ThenBy(item => item.Id).Select(item => item.Track));
+        copy.DecodeProfile = source.DecodeProfile;
+        var sourceItems = source.Items.OrderBy(item => FractionalPlaylistOrderingService.Parse(item.SortKey))
+            .ThenBy(item => item.Id).ToArray();
+        var copyItems = AddRange(copy.Id, sourceItems.Select(item => item.Track));
+        for (var index = 0; index < copyItems.Count; index++)
+            copyItems[index].DecodeProfile = sourceItems[index].DecodeProfile;
         return copy;
     }
 }

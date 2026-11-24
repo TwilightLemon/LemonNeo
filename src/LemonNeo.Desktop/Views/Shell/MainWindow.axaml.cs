@@ -7,19 +7,26 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Styling;
+using LemonNeo.Abstractions.Settings;
+using LemonNeo.Application.Library;
+using LemonNeo.Application.Playback;
 using LemonNeo.Desktop.Config;
 using LemonNeo.Desktop.Controls.Shared;
 using LemonNeo.Desktop.Services;
 using LemonNeo.Desktop.ViewModels.Library;
+using LemonNeo.Desktop.ViewModels.Shared;
 using LemonNeo.Desktop.ViewModels.Shell;
 using LemonNeo.Desktop.Views.Library;
 using LemonNeo.Desktop.Views.Lyrics;
 using LemonNeo.Desktop.Views.Shared;
+using MusicTrack = LemonNeo.Core.Music.Track;
 
 namespace LemonNeo.Desktop.Views.Shell;
 
 public partial class MainWindow : Window
 {
+    private const double NotificationMaxWidth = 440;
+
     public static readonly StyledProperty<bool> IsDesktopLyricsOpenProperty =
         AvaloniaProperty.Register<MainWindow, bool>(nameof(IsDesktopLyricsOpen));
 
@@ -27,11 +34,89 @@ public partial class MainWindow : Window
     private bool _preserveDesktopLyricsPreference;
     private CancellationTokenSource? _queueAnimation;
     private bool _seeking;
+    private bool _exportingTracks;
     private ShortcutService? _shortcuts;
+
+    internal async Task ExportTracksAsync(IReadOnlyList<MusicTrack> tracks)
+    {
+        if (_exportingTracks || tracks.Count == 0 ||
+            DataContext is not MainViewModel { SharedContext.IsInitialized: true } vm) return;
+        var context = vm.SharedContext;
+        var text = context.Text;
+        var title = text[LanguageManager.Keys.ExportTracks];
+        _exportingTracks = true;
+        using var cancellation = new CancellationTokenSource();
+        void CancelExport(object? sender, EventArgs args) => cancellation.Cancel();
+        Closed += CancelExport;
+        try
+        {
+            var dialog = new TrackExportDialog(context.Settings.Get<TrackExportPreferences>());
+            var options = await dialog.ShowDialog<TrackExportPreferences?>(this);
+            if (options?.Directory is not { } directory) return;
+            context.Settings.Apply<TrackExportPreferences>(_ => options);
+            var quality = context.Host.Settings.ForPackage(PackageNames.Application).Get<PlaybackPreferences>().Quality;
+            var exporter = context.Host.Get<TrackExportService>();
+            var failures = new List<string>();
+            var missingLyrics = 0;
+            var unsupportedTags = 0;
+            var missingArtwork = 0;
+            context.Notifications.Show(text.Format(LanguageManager.Keys.ExportTracksStarted, tracks.Count));
+            for (var index = 0; index < tracks.Count; index++)
+            {
+                cancellation.Token.ThrowIfCancellationRequested();
+                var track = tracks[index];
+                int? sequenceNumber = tracks.Count > 1 ? index + 1 : null;
+                try
+                {
+                    var result = await Task.Run(() => exporter.ExportAsync(track, directory, quality,
+                        options.WriteLyrics, options.WriteTags, cancellation.Token, options.FileNameFormat,
+                        sequenceNumber), cancellation.Token);
+                    if (result.LyricsMissing) missingLyrics++;
+                    if (result.TagsUnsupported) unsupportedTags++;
+                    if (result.ArtworkMissing) missingArtwork++;
+                }
+                catch (Exception exception) when (!cancellation.IsCancellationRequested)
+                {
+                    failures.Add($"{track.Title} — {exception.Message}");
+                }
+            }
+
+            var summary = text.Format(LanguageManager.Keys.ExportTracksFinished, tracks.Count - failures.Count,
+                tracks.Count);
+            if (failures.Count == 0 && missingLyrics == 0 && unsupportedTags == 0 && missingArtwork == 0)
+            {
+                context.Notifications.Show(summary, NotificationLevel.Success);
+                return;
+            }
+
+            var details = new List<string> { summary };
+            if (missingLyrics > 0) details.Add(text.Format(LanguageManager.Keys.ExportLyricsMissing, missingLyrics));
+            if (unsupportedTags > 0) details.Add(text.Format(LanguageManager.Keys.ExportTagsUnsupported, unsupportedTags));
+            if (missingArtwork > 0) details.Add(text.Format(LanguageManager.Keys.ExportArtworkMissing, missingArtwork));
+            details.AddRange(failures.Take(4));
+            if (failures.Count > 4) details.Add(text.Format(LanguageManager.Keys.ExportAdditionalFailures, failures.Count - 4));
+            if (!cancellation.IsCancellationRequested)
+                await new MessageDialog(title, string.Join(Environment.NewLine, details), text[LanguageManager.Keys.OK])
+                    .ShowDialog(this);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception) when (!cancellation.IsCancellationRequested)
+        {
+            context.Notifications.Show(exception.Message, NotificationLevel.Error);
+        }
+        finally
+        {
+            Closed -= CancelExport;
+            _exportingTracks = false;
+        }
+    }
 
     public MainWindow()
     {
         InitializeComponent();
+        MainNotifications.MaxWidth = NotificationMaxWidth;
         _ = new ListReorderBehavior(PlaylistList, () => DataContext is MainViewModel { CanInteract: true },
             (source, target, after) => DataContext is MainViewModel vm &&
                                        source is PlaylistMenuItemViewModel playlist &&
@@ -55,9 +140,10 @@ public partial class MainWindow : Window
         MacCaptionDragArea.IsVisible = OperatingSystem.IsMacOS();
         Timeline.AddHandler(PointerPressedEvent, OnSeekStarted, RoutingStrategies.Tunnel, true);
         Timeline.AddHandler(PointerReleasedEvent, OnSeekFinished, RoutingStrategies.Bubble, true);
-        Timeline.AddHandler(Thumb.DragCompletedEvent, OnThumbDragCompleted, handledEventsToo: true);
         Timeline.AddHandler(KeyDownEvent, OnSeekKeyDown, RoutingStrategies.Tunnel, true);
         Timeline.KeyUp += OnSeekKeyUp;
+        Timeline.PropertyChanged += OnTimelinePropertyChanged;
+        UpdateSeekTimes();
     }
 
     /// <summary>Binds the window accelerators to the shared shortcut catalog and keeps them in sync.</summary>
@@ -205,19 +291,12 @@ public partial class MainWindow : Window
         Resources["Space.PlaybackFloatingInset"] = new Thickness(0, 0, 16, inset);
     }
 
-    private void OnPageContentSizeChanged(object? sender, SizeChangedEventArgs args)
-    {
-        // A fixed fade distance keeps the transition consistent when the window is resized.
-        var height = args.NewSize.Height;
-        if (height <= 0 || PageContent.OpacityMask is not LinearGradientBrush fade) return;
-        fade.StartPoint = new RelativePoint(0, Math.Max(0, height - 64), RelativeUnit.Absolute);
-        fade.EndPoint = new RelativePoint(0, height, RelativeUnit.Absolute);
-    }
-
     private async void OnQueueOpened(object? sender, EventArgs args)
     {
         VolumePopup.IsOpen = false;
         SourceDetailsPopup.IsOpen = false;
+        PlaybackNotifications.LayoutUpdated += OnQueueNotificationLayoutUpdated;
+        OnQueueNotificationLayoutUpdated(null, EventArgs.Empty);
         _queueAnimation?.Cancel();
         QueueCard.Focus();
         if (DataContext is not MainViewModel vm || vm.SharedContext.Appearance.Current.ReduceMotion) return;
@@ -259,8 +338,17 @@ public partial class MainWindow : Window
 
     private void OnQueueClosed(object? sender, EventArgs args)
     {
+        PlaybackNotifications.LayoutUpdated -= OnQueueNotificationLayoutUpdated;
+        MainNotifications.MaxWidth = NotificationMaxWidth;
         _queueAnimation?.Cancel();
         QueueButton.Focus();
+    }
+
+    private void OnQueueNotificationLayoutUpdated(object? sender, EventArgs args)
+    {
+        if (PlaybackNotifications.TranslatePoint(default, ShellRoot) is not { } origin) return;
+        var available = ShellRoot.Bounds.Width - QueueCard.Width - origin.X - MainNotifications.Margin.Left - 8;
+        MainNotifications.MaxWidth = Math.Clamp(available, 0, NotificationMaxWidth);
     }
 
     private void OnQueueKeyDown(object? sender, KeyEventArgs args)
@@ -281,9 +369,11 @@ public partial class MainWindow : Window
 
     private void OnSeekStarted(object? sender, PointerPressedEventArgs args)
     {
-        if (DataContext is not MainViewModel { Playback.CanSeek: true } shell) return;
+        if (!args.GetCurrentPoint(Timeline).Properties.IsLeftButtonPressed ||
+            DataContext is not MainViewModel { Playback.CanSeek: true } shell) return;
         var vm = shell.Playback;
         _seeking = true;
+        SetScrubbing(true);
         vm.IsSeeking = true;
     }
 
@@ -291,24 +381,43 @@ public partial class MainWindow : Window
     {
         if (!_seeking) return;
         _seeking = false;
+        SetScrubbing(false);
         await CommitSeekAsync();
     }
 
-    private async void OnThumbDragCompleted(object? sender, VectorEventArgs args)
+    private void SetScrubbing(bool value)
     {
-        _seeking = false;
-        await CommitSeekAsync();
+        NowPlaying.Classes.Set("scrubbing", value);
+        Timeline.Classes.Set("scrubbing", value);
+    }
+
+    private void OnTimelinePropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs args)
+    {
+        if (args.Property == RangeBase.ValueProperty || args.Property == RangeBase.MaximumProperty)
+            UpdateSeekTimes();
+    }
+
+    private void UpdateSeekTimes()
+    {
+        SeekElapsed.Text = TrackRow.FormatTime(TimeSpan.FromSeconds(Timeline.Value));
+        var remaining = TimeSpan.FromSeconds(Math.Max(0, Timeline.Maximum - Timeline.Value));
+        SeekRemaining.Text = $"-{TrackRow.FormatTime(remaining)}";
     }
 
     private void OnSeekKeyDown(object? sender, KeyEventArgs args)
     {
         if (IsSeekKey(args.Key) && DataContext is MainViewModel { Playback.CanSeek: true } vm)
+        {
+            SetScrubbing(true);
             vm.Playback.IsSeeking = true;
+        }
     }
 
     private async void OnSeekKeyUp(object? sender, KeyEventArgs args)
     {
-        if (IsSeekKey(args.Key)) await CommitSeekAsync();
+        if (!IsSeekKey(args.Key)) return;
+        SetScrubbing(false);
+        await CommitSeekAsync();
     }
 
     private static bool IsSeekKey(Key key)

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -6,6 +7,7 @@ using LemonNeo.Abstractions.Plugins;
 using LemonNeo.Abstractions.Providers;
 using LemonNeo.Desktop.Services;
 using LemonNeo.Desktop.ViewModels.Shared;
+using LemonNeo.Desktop.Views.Accounts;
 
 namespace LemonNeo.Desktop.ViewModels.Accounts;
 
@@ -22,15 +24,17 @@ public sealed partial class AccountsViewModel : PageViewModel
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(CanLogin))]
     private string _cookie = "";
 
-    [ObservableProperty] private bool _isCookieEditorOpen = true;
+    [ObservableProperty] private bool _isCookieEditorOpen;
     private ProviderOption? _selectedService;
 
     public AccountsViewModel(DesktopContext context) : base(context, DesktopRoutes.Accounts)
     {
         _artwork = _host.Get<ArtworkService>();
         LoginCommand = new AsyncRelayCommand(LoginAsync);
+        WebLoginCommand = new AsyncRelayCommand(WebLoginAsync);
         LogoutCommand = new AsyncRelayCommand(LogoutAsync);
         RefreshServices();
+        IsCookieEditorOpen = !CanUseWebLogin;
     }
 
     public ProviderOption? SelectedService
@@ -43,9 +47,7 @@ public sealed partial class AccountsViewModel : PageViewModel
             if (changedService)
             {
                 Cookie = "";
-                IsCookieEditorOpen = !IsAuthenticated;
-                SetError(null);
-                SetStatus(null);
+                IsCookieEditorOpen = !CanUseWebLogin && !IsAuthenticated;
             }
 
             RaiseAccountProperties();
@@ -83,14 +85,44 @@ public sealed partial class AccountsViewModel : PageViewModel
     public Bitmap? AccountAvatar => _accountAvatar?.Bitmap;
     public bool HasAccountAvatar => AccountAvatar is not null;
     public bool CanLogin => CanInteract && Provider is not null && !string.IsNullOrWhiteSpace(Cookie);
+    public bool CanUseWebLogin => WebLoginWindow.IsSupported && Provider is IWebAuthenticationProvider;
+    public bool ShowWebLogin => CanUseWebLogin && !IsAuthenticated;
     public bool CanLogout => CanInteract && IsAuthenticated;
     public AsyncRelayCommand LoginCommand { get; }
+    public AsyncRelayCommand WebLoginCommand { get; }
     public AsyncRelayCommand LogoutCommand { get; }
 
     [RelayCommand]
     private void ToggleCookieEditor()
     {
         IsCookieEditorOpen = !IsCookieEditorOpen;
+    }
+
+    private Task WebLoginAsync()
+    {
+        return ExecuteAsync(async ct =>
+        {
+            if (Provider is not IWebAuthenticationProvider provider || SelectedService is not { Id: { } id } service ||
+                Avalonia.Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime { MainWindow: { } owner })
+                throw new ArgumentException(_text[LanguageManager.Keys.WebLoginUnavailable]);
+            var previousState = provider.State;
+            var completed = false;
+            try
+            {
+                var window = new WebLoginWindow(provider, _text, service.Name,
+                    Path.Combine(_host.StorageLocations.CacheDirectory, "WebView2"));
+                if (await window.SignInAsync(owner, ct) is not { IsAuthenticated: true }) return;
+                completed = true;
+                IsCookieEditorOpen = false;
+                Notify(NotificationLevel.Success, LanguageManager.Keys.LoginCompleted);
+            }
+            finally
+            {
+                if (completed || provider.State != previousState)
+                    Context.NotifyAuthenticationChanged(id);
+                RaiseAccountProperties();
+            }
+        });
     }
 
     public Task LoginAsync()
@@ -113,12 +145,12 @@ public sealed partial class AccountsViewModel : PageViewModel
                         new AuthenticationRequest(AuthMethod.Cookie,
                             new Dictionary<string, string> { ["cookie"] = cookie }), ct), ct);
                 completed = true;
-                SetStatus(LanguageManager.Keys.LoginCompleted);
+                Notify(NotificationLevel.Success, LanguageManager.Keys.LoginCompleted);
             }
             finally
             {
                 Cookie = "";
-                IsCookieEditorOpen = !IsAuthenticated;
+                IsCookieEditorOpen = !IsAuthenticated && !CanUseWebLogin;
                 if (providerId is not null && (completed || provider?.State != previousState))
                     Context.NotifyAuthenticationChanged(providerId);
                 RaiseAccountProperties();
@@ -138,12 +170,12 @@ public sealed partial class AccountsViewModel : PageViewModel
             {
                 await Task.Run(() => provider.SignOutAsync(ct), ct);
                 completed = true;
-                SetStatus(LanguageManager.Keys.LogoutCompleted);
+                Notify(NotificationLevel.Success, LanguageManager.Keys.LogoutCompleted);
             }
             finally
             {
                 Cookie = "";
-                IsCookieEditorOpen = !IsAuthenticated;
+                IsCookieEditorOpen = !IsAuthenticated && !CanUseWebLogin;
                 if (providerId is not null && (completed || provider.State != previousState))
                     Context.NotifyAuthenticationChanged(providerId);
                 RaiseAccountProperties();
@@ -176,7 +208,7 @@ public sealed partial class AccountsViewModel : PageViewModel
                  {
                      nameof(HasPluginAttribution), nameof(PluginAttribution), nameof(IsAuthenticated),
                      nameof(AuthenticationStatus), nameof(AccountName), nameof(AccountId), nameof(CanLogin),
-                     nameof(CanLogout)
+                     nameof(CanLogout), nameof(CanUseWebLogin), nameof(ShowWebLogin)
                  })
             OnPropertyChanged(name);
     }

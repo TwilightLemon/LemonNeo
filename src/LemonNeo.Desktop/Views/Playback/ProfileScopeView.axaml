@@ -1,0 +1,24 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:LemonNeo.Desktop.ViewModels.Tools"
+    xmlns:i18n="using:LemonNeo.Desktop.Services"
+    x:Class="LemonNeo.Desktop.Views.Playback.ProfileScopeView" x:DataType="vm:ProfileEditorViewModel">
+    <StackPanel Spacing="8">
+        <TextBlock FontWeight="SemiBold" Text="{Binding PlaybackProfileStatus}" TextWrapping="Wrap" />
+        <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.ProfileScope}}" />
+        <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Scopes}" SelectedIndex="{Binding ScopeIndex}"
+                  AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.ProfileScope}}" />
+        <ComboBox HorizontalAlignment="Stretch" IsVisible="{Binding ShowPlaylist}" ItemsSource="{Binding Playlists}"
+                  SelectedItem="{Binding SelectedPlaylist}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.ProfilePlaylist}}" />
+        <ComboBox HorizontalAlignment="Stretch" IsVisible="{Binding ShowSong}" ItemsSource="{Binding Songs}"
+                  SelectedItem="{Binding SelectedSong}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.ProfileSong}}" />
+        <TextBlock IsVisible="{Binding ShowQuickTarget}" Classes="caption" Text="{Binding TargetName}" TextWrapping="Wrap" />
+        <TextBlock Classes="caption" IsVisible="{Binding ScopeHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                   Text="{Binding ScopeHint}" TextWrapping="Wrap" />
+        <TextBlock Classes="caption" IsVisible="{Binding EditImpactHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                   Text="{Binding EditImpactHint}" TextWrapping="Wrap" />
+        <Button HorizontalAlignment="Left" IsVisible="{Binding CanCreateOverride}" Content="{Translate {x:Static i18n:LanguageManager+Keys.ProfileCreate}}" Command="{Binding CreateOverrideCommand}" />
+        <Button HorizontalAlignment="Left" IsVisible="{Binding HasOverride}" Content="{Translate {x:Static i18n:LanguageManager+Keys.ProfileInherit}}" Command="{Binding InheritCommand}" />
+        <Button HorizontalAlignment="Left" IsVisible="{Binding CanFollowPlayback}" Content="{Translate {x:Static i18n:LanguageManager+Keys.ProfileFollow}}" Command="{Binding FollowPlaybackCommand}" />
+    </StackPanel>
+</UserControl>

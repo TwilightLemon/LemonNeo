@@ -15,6 +15,7 @@ public sealed class LibraryOverviewViewModel(
     LocalizationService text,
     Func<Guid, bool, Task> setPaused) : ObservableObject
 {
+    private readonly TrackCollection<PlaylistSyncRowViewModel> _syncedPlaylists = [];
     private IReadOnlyList<LibraryStatistic> _statistics = [];
     private MusicLibrary? _rowLibrary;
     public IReadOnlyList<LibraryStatistic> Statistics
@@ -22,7 +23,7 @@ public sealed class LibraryOverviewViewModel(
         get => _statistics;
         private set => SetProperty(ref _statistics, value);
     }
-    public ObservableCollection<PlaylistSyncRowViewModel> SyncedPlaylists { get; } = [];
+    public ObservableCollection<PlaylistSyncRowViewModel> SyncedPlaylists => _syncedPlaylists;
     public bool HasSyncedPlaylists => SyncedPlaylists.Count > 0;
     public string SyncedPlaylistCount => SyncedPlaylists.Count.ToString("N0", text.Culture);
 
@@ -63,7 +64,7 @@ public sealed class LibraryOverviewViewModel(
                 row.Update(playlist, mirror, source, library.IsPlaylistSyncPaused);
                 return row;
             }).ToArray();
-        CollectionSynchronizer.Update(SyncedPlaylists, rows);
+        _syncedPlaylists.Update(rows, replaceResults: false);
         OnPropertyChanged(nameof(HasSyncedPlaylists));
         OnPropertyChanged(nameof(SyncedPlaylistCount));
     }

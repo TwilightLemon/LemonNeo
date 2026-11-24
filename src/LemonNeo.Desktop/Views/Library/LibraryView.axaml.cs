@@ -1,5 +1,4 @@
 using Avalonia.Controls;
-using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -15,12 +14,16 @@ public partial class LibraryView : UserControl
     public LibraryView()
     {
         InitializeComponent();
+        // Composite the faded list before the floating button samples its backdrop.
+        //PageBottomFade.Attach(TrackList);
+        CollapsibleListHeader.Attach(LibraryHeader, CompactTitle, LibraryTools, LibraryEmptyState, TrackList);
         _ = new ListReorderBehavior(TrackList, () => DataContext is LibraryViewModel { CanReorderTracks: true },
             (source, target, after) => DataContext is LibraryViewModel vm && source is TrackRow row &&
                                        target is TrackRow destination
                 ? vm.ReorderTracksAsync(row, destination, after)
                 : Task.CompletedTask);
-        TrackSelectionBehavior.Attach(TrackList);
+        TrackListInteraction.Attach(TrackList, row =>
+            DataContext is LibraryViewModel vm && vm.CanRemoveTrack(row) ? () => vm.RemoveTrackAsync(row) : null);
     }
 
     private void OnLocatePlaying(object? sender, RoutedEventArgs args)
@@ -49,23 +52,5 @@ public partial class LibraryView : UserControl
     {
         if (this.GetVisualAncestors().OfType<MainWindow>().FirstOrDefault() is { } window)
             await window.MoveTrackAsync();
-    }
-
-    private async void OnTrackDoubleTapped(object? sender, TappedEventArgs args)
-    {
-        if (DataContext is LibraryViewModel { IsSelectionMode: false, SelectedTrack: { } track } vm)
-            await vm.PlayAsync(track);
-    }
-
-    private async void OnTrackKeyDown(object? sender, KeyEventArgs args)
-    {
-        if (args.Key == Key.Enter && DataContext is LibraryViewModel
-            {
-                IsSelectionMode: false, SelectedTrack: { } track
-            } vm)
-        {
-            args.Handled = true;
-            await vm.PlayAsync(track);
-        }
     }
 }

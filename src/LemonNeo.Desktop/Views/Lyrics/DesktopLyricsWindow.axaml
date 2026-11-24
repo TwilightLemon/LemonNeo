@@ -44,10 +44,10 @@
             <Setter Property="Width" Value="34" />
             <Setter Property="Height" Value="34" />
             <Setter Property="MinHeight" Value="34" />
-            <Setter Property="Padding" Value="8" />
+            <Setter Property="Padding" Value="7" />
         </Style>
-        <Style Selector="Button.desktopControl Path.icon">
-            <Setter Property="Fill" Value="White" />
+        <Style Selector="Button.desktopControl.transport">
+            <Setter Property="Padding" Value="0" />
         </Style>
         <Style Selector="Button.lineMode.active">
             <Setter Property="Background" Value="{DynamicResource Brush.AccentSoft}" />
@@ -61,16 +61,16 @@
         Name="HoverCard"
         Padding="16,6,16,14"
         PointerPressed="OnDragWindow">
-        <Grid Name="DesktopLayout" RowDefinitions="40,*,Auto">
+        <Grid Name="DesktopLayout" RowDefinitions="40,*">
             <Border Name="Toolbar" VerticalAlignment="Center">
                 <Grid Name="ToolbarLayout" ColumnDefinitions="*,Auto,*">
-                    <TextBlock
+                    <Path
+                        Classes="icon onDark"
+                        Data="{StaticResource Icon.DragHandle}"
+                        HorizontalAlignment="Left"
                         Name="ToolbarDragHandle"
-                        FontSize="20"
-                        Foreground="#BFFFFFFF"
-                        Text="⋮⋮"
-                        ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.DragDesktopLyrics}}"
-                        VerticalAlignment="Center" />
+                        Opacity="0.75"
+                        ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.DragDesktopLyrics}}" />
                     <StackPanel
                         Grid.Column="1"
                         Name="ToolbarButtons"
@@ -78,39 +78,39 @@
                         Spacing="8">
                         <Button
                             AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Previous}}"
-                            Classes="ghost desktopControl"
+                            Classes="ghost icon desktopControl transport"
                             Command="{Binding Playback.PreviousCommand}"
                             IsEnabled="{Binding Playback.CanPrevious}"
                             Name="DesktopPreviousButton"
                             ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Previous}}">
-                            <Path Classes="icon" Data="{StaticResource Icon.Previous}" />
+                            <Path Classes="icon transport" Data="{StaticResource Icon.Playback.Previous}" />
                         </Button>
                         <Button
                             AutomationProperties.Name="{Binding Playback.PlayLabel}"
-                            Classes="ghost desktopControl"
+                            Classes="ghost icon desktopControl transport playPause"
                             Command="{Binding Playback.TogglePlaybackCommand}"
                             IsEnabled="{Binding Playback.CanTogglePlayback}"
                             Name="DesktopPlayPauseButton"
                             ToolTip.Tip="{Binding Playback.PlayLabel}">
                             <Grid>
                                 <Path
-                                    Classes="icon"
-                                    Data="{StaticResource Icon.Play}"
+                                    Classes="icon transport"
+                                    Data="{StaticResource Icon.Playback.Play}"
                                     IsVisible="{Binding !Playback.IsPlaying}" />
                                 <Path
-                                    Classes="icon"
-                                    Data="{StaticResource Icon.Pause}"
+                                    Classes="icon transport"
+                                    Data="{StaticResource Icon.Playback.Pause}"
                                     IsVisible="{Binding Playback.IsPlaying}" />
                             </Grid>
                         </Button>
                         <Button
                             AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Next}}"
-                            Classes="ghost desktopControl"
+                            Classes="ghost icon desktopControl transport"
                             Command="{Binding Playback.NextCommand}"
                             IsEnabled="{Binding Playback.CanNext}"
                             Name="DesktopNextButton"
                             ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.Next}}">
-                            <Path Classes="icon" Data="{StaticResource Icon.Next}" />
+                            <Path Classes="icon transport" Data="{StaticResource Icon.Playback.Next}" />
                         </Button>
                     </StackPanel>
                     <StackPanel
@@ -121,7 +121,7 @@
                         Spacing="4">
                         <Button
                             AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.LyricsDisplaySettings}}"
-                            Classes="ghost desktopControl"
+                            Classes="ghost icon desktopControl"
                             Name="DesktopLyricsSettingsButton"
                             ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.LyricsDisplaySettings}}">
                             <Path Classes="icon" Data="{StaticResource Icon.Settings}" />
@@ -129,7 +129,8 @@
                                 <Flyout
                                     Closed="OnSettingsClosed"
                                     Opened="OnSettingsOpened"
-                                    Placement="TopEdgeAlignedRight">
+                                    Placement="Top"
+                                    VerticalOffset="2">
                                     <StackPanel
                                         Margin="8"
                                         Spacing="16"
@@ -190,15 +191,11 @@
                         </Button>
                         <Button
                             AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.CloseDesktopLyrics}}"
-                            Classes="ghost desktopControl"
+                            Classes="ghost icon desktopControl"
                             Click="OnCloseWindow"
                             Name="DesktopLyricsCloseButton"
                             ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.CloseDesktopLyrics}}">
-                            <Path
-                                Classes="icon"
-                                Data="{StaticResource Icon.Close}"
-                                Height="14"
-                                Width="14" />
+                            <Path Classes="icon small" Data="{StaticResource Icon.Close}" />
                         </Button>
                     </StackPanel>
                 </Grid>
@@ -217,6 +214,7 @@
                 IsStopped="{Binding IsStopped}"
                 MinHeight="40"
                 Name="DesktopLyricsTimeline"
+                PlaybackSpeed="{Binding PlaybackSpeed}"
                 PositionMilliseconds="{Binding PositionMilliseconds}"
                 ReachedBrush="{DynamicResource Brush.Accent}"
                 ReduceMotion="{Binding ReduceMotion}"
@@ -234,14 +232,14 @@
                         Opacity="1" />
                 </lyricsControls:LyricsPresenter.Effect>
             </lyricsControls:LyricsPresenter>
-            <TextBlock
-                Foreground="#FFFFB4AB"
-                Grid.Row="2"
-                IsVisible="{Binding HasError}"
-                Margin="0,8,0,0"
-                Name="DesktopLyricsError"
-                Text="{Binding Error}"
-                TextWrapping="Wrap" />
+            <sharedControls:NotificationHost
+                Grid.ColumnSpan="2"
+                Grid.RowSpan="2"
+                HorizontalAlignment="Center"
+                MaxWidth="440"
+                Source="{Binding DesktopNotifications}"
+                VerticalAlignment="Bottom"
+                ZIndex="1" />
         </Grid>
     </Border>
 </Window>

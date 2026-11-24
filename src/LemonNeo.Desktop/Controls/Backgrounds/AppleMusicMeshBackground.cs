@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Metadata;
 using Avalonia.Media;
 using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
@@ -15,6 +16,7 @@ namespace LemonNeo.Desktop.Controls.Backgrounds;
 /// Avalonia/Skia port of Lyricify Backgrounds' modern Apple Music inspired
 /// material. Artwork and optional low-frequency response are host supplied.
 /// </summary>
+[PseudoClasses(":transparent")]
 public sealed class AppleMusicMeshBackground : Control
 {
     private const float PausedPulseReleaseHalfLifeSeconds = .12f;
@@ -188,6 +190,9 @@ public sealed class AppleMusicMeshBackground : Control
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
+        if (change.Property == OpacityProperty)
+            PseudoClasses.Set(":transparent", Opacity <= 0);
+
         if (change.Property == ArtworkSourceProperty)
         {
             RefreshArtworkSourceSubscription();

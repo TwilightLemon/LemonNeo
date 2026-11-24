@@ -73,6 +73,7 @@ public sealed class MacNowPlayingPlugin : InteractivePluginBase
             artwork = snapshot.Track?.ArtworkUri is { IsAbsoluteUri: true } artwork ? artwork.AbsoluteUri : null,
             state = snapshot.State switch { PlaybackState.Playing => 1, PlaybackState.Paused => 2, _ => 0 },
             position = snapshot.Position.TotalSeconds,
+            speed = snapshot.PlaybackSpeed,
             duration = snapshot.Duration?.TotalSeconds,
             controls = (int)snapshot.Controls
         });

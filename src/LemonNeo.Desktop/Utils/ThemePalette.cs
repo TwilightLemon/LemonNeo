@@ -51,59 +51,59 @@ public static class ThemePalette
 
     public static IReadOnlyDictionary<string, Color> Create(ThemeColorDefinition definition, bool dark)
     {
-        var seed = definition.Accent;
-        var hsl = seed.ToHsl();
-        // Background tint is deliberately subtle, even for bright reference colors.
+        var hsl = definition.Accent.ToHsl();
+        var darkBase = definition.DarkBase.ToHsl();
+        var lightBase = definition.LightBase.ToHsl();
+        // Compress source lightness into a light range while retaining differences between presets.
+        var lightTint = HslColor.ToRgb(lightBase.H, Math.Min(lightBase.S, .32), .81 + .10 * lightBase.L);
         var background = dark
-            ? HslColor.ToRgb(definition.DarkBase.ToHsl().H, Math.Min(definition.DarkBase.ToHsl().S, .28), .095)
-            : Mix(definition.LightBase, Colors.White, .90);
-        var sidebar = dark ? Mix(background, Colors.Black, .16) : Mix(definition.LightBase, Colors.White, .80);
-        var surface = dark ? Mix(background, Colors.White, .035) : Mix(background, Colors.White, .75);
-        var raised = dark ? Mix(background, Colors.White, .075) : Mix(definition.LightBase, Colors.White, .86);
-        var accent = HslColor.ToRgb(hsl.H, Math.Min(hsl.S, .65),
+            ? HslColor.ToRgb(darkBase.H, Math.Min(darkBase.S, .28), .095)
+            : Mix(lightTint, Colors.White, .68);
+        var sidebar = dark ? Mix(background, Colors.Black, .16) : Mix(lightTint, Colors.White, .25);
+        var surface = dark ? Mix(background, Colors.White, .035) : Mix(lightTint, Colors.White, .92);
+        var raised = dark ? Mix(background, Colors.White, .075) : Mix(lightTint, Colors.White, .45);
+        var accentBase = HslColor.ToRgb(hsl.H, Math.Min(hsl.S, .65),
             dark ? Math.Clamp(hsl.L, .65, .76) : Math.Clamp(hsl.L, .57, .73));
-        var soft = Mix(raised, seed, dark ? .13 : .16);
-        var hover = Mix(raised, seed, dark ? .07 : .08);
+        var onAccent = Color.Parse("#172027");
+        // Blue/purple can be dark at the same HSL lightness as yellow. Lift the fill itself
+        // so button labels retain a stable dark foreground throughout palette transitions.
+        var accent = EnsureContrast(accentBase, [onAccent], 5.5, true);
+        var tintAccent = dark ? definition.Accent : accent;
+        var tintHsl = tintAccent.ToHsl();
+        var soft = Mix(raised, tintAccent, dark ? .13 : .22);
+        var hover = Mix(raised, tintAccent, dark ? .07 : .08);
+        var neutralHover = Color.Parse(dark ? "#1AFFFFFF" : "#12000000");
+        var selection = Color.Parse(dark ? "#26FFFFFF" : "#1F000000");
+        var selectionHover = Color.Parse(dark ? "#31FFFFFF" : "#29000000");
 
-        if (definition.Id == ThemeColorPreset.Classic && !definition.IsArtwork)
-        {
-            // Keep the existing default's recognizable lime and olive surfaces.
-            background = Color.Parse(dark ? "#171A15" : "#FBFBFB");
-            sidebar = Color.Parse(dark ? "#12150F" : "#EDEFE7");
-            surface = Color.Parse(dark ? "#20241D" : "#FFFFFF");
-            raised = Color.Parse(dark ? "#2A3024" : "#F0F2EA");
-            accent = Color.Parse(dark ? "#DCEC7E" : "#DAE96D");
-            soft = Color.Parse(dark ? "#333D20" : "#E5ECCB");
-            hover = Color.Parse(dark ? "#30372A" : "#E7EBDD");
-        }
-
-        var backgrounds = new[] { background, sidebar, surface, raised, soft, hover };
+        var neutral = dark ? Colors.White : Colors.Black;
+        var backgrounds = new[] { background, sidebar, surface, raised, soft, hover,
+            Mix(sidebar, neutral, selectionHover.A / 255d), Mix(raised, neutral, selectionHover.A / 255d) };
         var text = EnsureContrast(dark ? Color.Parse("#EEF1F4") : Color.Parse("#20252C"), backgrounds, 7, dark);
         // Leave headroom for the intermediate colors and hover opacity during transitions.
         var secondary = Color.Parse(dark ? "#C0FEFEFE" : "#C0000000");
-        var accentText = EnsureContrast(dark ? accent : HslColor.ToRgb(hsl.H, Math.Min(hsl.S, .60), .32), backgrounds,
-            5.5, dark);
-        var onAccent = Color.Parse("#172027");
-        var lyricHighlighter = dark? HslColor.ToRgb(hsl.H, hsl.S, .94) : Color.Parse("#0f0e0e");
+        var accentText = EnsureContrast(dark ? accentBase : HslColor.ToRgb(tintHsl.H, Math.Min(tintHsl.S, .60), .32),
+            backgrounds, 5.5, dark);
+        var lyricHighlighter = dark
+            ? HslColor.ToRgb(hsl.H, hsl.S, .94)
+            : EnsureContrast(HslColor.ToRgb(tintHsl.H, Math.Min(tintHsl.S, .35), .12), backgrounds, 7, false);
         var lyricText = Color.Parse(dark ? "#90FEFEFE" : "#90000000");
-        var playbackSurface = Color.Parse(dark ? "#4E000000" : "#4EEFEFEF");
-        var border=Color.Parse(dark ? "#2EFFFFFF" : "#2E000000");
-        // Blue/purple can be dark at the same HSL lightness as yellow. Lift the fill itself
-        // so button labels retain a stable dark foreground throughout palette transitions.
-        accent = EnsureContrast(accent, [onAccent], 5.5, true);
+        var playbackSurface = Color.Parse(dark ? "#9E000000" : "#9EEFEFEF");
+        var border = Color.Parse(dark ? "#2EFFFFFF" : "#2E000000");
         var dangerSoft = Color.Parse(dark ? "#442B28" : "#FAE9E8");
         var danger = EnsureContrast(Color.Parse(dark ? "#FFAB9F" : "#B33232"), [.. backgrounds, dangerSoft], 4.5, dark);
         return new Dictionary<string, Color>
         {
             ["Canvas"] = background, ["Sidebar"] = sidebar, ["SidebarTranslucent"] = sidebar,
-            ["Surface"] = surface, ["SurfaceRaised"] = raised, ["Text"] = text,
+            ["Surface"] = surface, ["SurfaceRaised"] = raised, ["DialogTint"] = raised, ["Text"] = text,
             ["TextSecondary"] = secondary, ["Border"] = border,
             ["Accent"] = accent, ["OnAccent"] = onAccent, ["AccentText"] = accentText,
             ["LyricText"] = lyricText, ["LyricHighlight"] = lyricHighlighter,
-            ["AccentSoft"] = soft, ["Hover"] = hover, ["Danger"] = danger,
+            ["AccentSoft"] = soft, ["Hover"] = hover, ["NeutralHover"] = neutralHover,
+            ["Selection"] = selection, ["SelectionHover"] = selectionHover, ["Danger"] = danger,
             ["DangerSoft"] = dangerSoft, ["Focus"] = accentText,
             ["PlaybackSurface"] = playbackSurface,
-            ["Artwork"] = Mix(raised, seed, .20)
+            ["Artwork"] = Mix(raised, tintAccent, .20)
         };
     }
 

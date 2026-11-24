@@ -4,6 +4,7 @@
     xmlns="https://github.com/avaloniaui"
     xmlns:i18n="using:LemonNeo.Desktop.Services"
     xmlns:sharedControls="using:LemonNeo.Desktop.Controls.Shared"
+    xmlns:playbackViews="using:LemonNeo.Desktop.Views.Playback"
     xmlns:toolsVm="using:LemonNeo.Desktop.ViewModels.Tools"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <UserControl.Resources>
@@ -68,13 +69,7 @@
                         Tag="{Binding Website}">
                         <StackPanel Orientation="Horizontal" Spacing="7">
                             <TextBlock Text="{Binding Website}" TextWrapping="Wrap" />
-                            <Path
-                                Classes="icon"
-                                Data="{StaticResource Icon.ExternalLink}"
-                                Height="14"
-                                Stretch="Uniform"
-                                VerticalAlignment="Center"
-                                Width="14" />
+                            <Path Classes="icon small accent" Data="{StaticResource Icon.ExternalLink}" />
                         </StackPanel>
                     </Button>
                 </Grid>
@@ -116,11 +111,8 @@
             <Setter Property="Padding" Value="0,7,8,0" />
             <Setter Property="Foreground" Value="{DynamicResource Brush.AccentText}" />
         </Style>
-        <Style Selector="Button.dependencyLink Path.icon">
-            <Setter Property="Fill" Value="{DynamicResource Brush.AccentText}" />
-        </Style>
     </UserControl.Styles>
-    <Grid RowDefinitions="Auto,Auto,*">
+    <Grid RowDefinitions="Auto,*">
         <sharedControls:PageHeader Summary="{Binding PageSummary}" Title="{Binding PageTitle}">
             <sharedControls:PageHeader.Actions>
                 <StackPanel
@@ -141,29 +133,7 @@
                 </StackPanel>
             </sharedControls:PageHeader.Actions>
         </sharedControls:PageHeader>
-        <Border
-            Background="{DynamicResource Brush.DangerSoft}"
-            CornerRadius="10"
-            Grid.Row="1"
-            IsVisible="{Binding HasError}"
-            Margin="0,0,0,12"
-            Padding="14">
-            <Grid ColumnDefinitions="*,Auto">
-                <TextBlock
-                    Foreground="{DynamicResource Brush.Danger}"
-                    MaxHeight="90"
-                    Text="{Binding Error}"
-                    TextWrapping="Wrap" />
-                <Button
-                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}"
-                    Classes="ghost icon"
-                    Command="{Binding DismissErrorCommand}"
-                    Grid.Column="1">
-                    <Path Classes="icon" Data="{StaticResource Icon.Close}" />
-                </Button>
-            </Grid>
-        </Border>
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="1">
             <TabControl>
                 <TabItem Header="{Translate {x:Static i18n:LanguageManager+Keys.Plugins}}">
                     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
@@ -334,6 +304,24 @@
                                 IsVisible="{Binding !HasDecoders}"
                                 Text="{Translate {x:Static i18n:LanguageManager+Keys.NoDecoders}}"
                                 TextWrapping="Wrap" />
+                            <ItemsControl ItemsSource="{Binding Controls.OutputsList}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="toolsVm:AudioOutputViewModel">
+                                        <Border Classes="card" Margin="0,0,0,12">
+                                            <StackPanel Spacing="10">
+                                                <TextBlock Classes="section" Text="{Binding Title}" />
+                                                <playbackViews:AudioOutputView />
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Border Classes="card">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Classes="section" Text="{Translate {x:Static i18n:LanguageManager+Keys.ProfileEffects}}" />
+                                    <playbackViews:DecodeProfileView DataContext="{Binding Controls.EditorProfile}" />
+                                </StackPanel>
+                            </Border>
                             <ItemsControl ItemsSource="{Binding Decoders}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="toolsVm:DecoderInformation">
@@ -487,12 +475,7 @@
                                             Command="{Binding OpenRepositoryCommand}"
                                             HorizontalAlignment="Center">
                                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <Path
-                                                    Classes="icon"
-                                                    Data="{StaticResource Icon.ExternalLink}"
-                                                    Height="16"
-                                                    Stretch="Uniform"
-                                                    Width="16" />
+                                                <Path Classes="icon small" Data="{StaticResource Icon.ExternalLink}" />
                                                 <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.SourceCode}}" />
                                             </StackPanel>
                                         </Button>

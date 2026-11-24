@@ -3,6 +3,7 @@ using LemonNeo.Application.Library;
 using LemonNeo.Application.Playback;
 using LemonNeo.Core.Library;
 using LemonNeo.Core.Music;
+using LemonNeo.Core.Playback;
 using LemonNeo.Desktop.Services;
 using LemonNeo.Desktop.ViewModels.Playback;
 using LemonNeo.Desktop.ViewModels.Shared;
@@ -80,6 +81,7 @@ public sealed class LibraryViewModel : TrackListViewModel
     public bool CanEditPlaylist => CanInteract && IsLibrary && SelectedPlaylist is not null && !IsMirrored;
     public bool CanMatchPlaylist => CanInteract && HasSelectedPlaylist && SelectedPlaylist!.Items.Count > 0;
     public bool HasSelectedPlaylist => IsLibrary && SelectedPlaylist is not null;
+    protected override bool HasPlayableTracks => HasSelectedPlaylist ? UnfilteredTracks.Count > 0 : base.HasPlayableTracks;
 
     public bool CanEditTrack => CanInspectTrack && SelectedTrack!.PlaylistId is not null &&
                                 SelectedTrack.PlaylistItemId is not null &&
@@ -119,7 +121,7 @@ public sealed class LibraryViewModel : TrackListViewModel
     {
         return IsQueue
             ? _host.Get<PlaybackSessionService>().Queue.Items
-                .Select((i, index) => new TrackRow(i.Track, index + 1, _text, i.Id))
+                .Select((i, index) => new TrackRow(i.Track, index + 1, _text, i.Id, playbackEntry: i.PlaylistEntry))
             : SelectedPlaylist is { } playlist
                 ? playlist.Items.OrderBy(i => FractionalPlaylistOrderingService.Parse(i.SortKey)).ThenBy(i => i.Id)
                     .Select((i, index) =>
@@ -140,9 +142,15 @@ public sealed class LibraryViewModel : TrackListViewModel
                 return;
             }
 
-            var tracks = Tracks.Select(t => t.Track).ToArray();
-            var index = selected is null ? 0 : Tracks.IndexOf(selected);
-            if (tracks.Length > 0 && index >= 0) await session.PlayPlaylistAsync(tracks, index, cancellationToken: ct);
+            var rows = HasSelectedPlaylist ? UnfilteredTracks : Tracks;
+            var index = selected is null ? 0 : rows.IndexOf(selected);
+            if (rows.Count == 0 || index < 0) return;
+            var tracks = rows.Select(row => new PlaybackQueueItem
+            {
+                Track = row.Track,
+                PlaylistEntry = row.PlaybackEntry
+            }).ToArray();
+            await session.PlayItemsAsync(tracks, index, cancellationToken: ct);
         });
     }
 
@@ -189,8 +197,9 @@ public sealed class LibraryViewModel : TrackListViewModel
             Context.RefreshLibrary();
             if (ReferenceEquals(Navigation.Current, this))
                 await Navigation.NavigateAsync(DesktopRoutes.Library, playlist.Id);
-            if (import is null) SetStatus(LanguageManager.Keys.PlaylistCreated, playlist.Name);
-            else SetStatus(LanguageManager.Keys.Imported, import.ImportedTracks, import.SkippedFiles.Count);
+            if (import is null) Notify(NotificationLevel.Success, LanguageManager.Keys.PlaylistCreated, playlist.Name);
+            else Notify(import.SkippedFiles.Count > 0 ? NotificationLevel.Warning : NotificationLevel.Success,
+                LanguageManager.Keys.Imported, import.ImportedTracks, import.SkippedFiles.Count);
         });
     }
 
@@ -201,7 +210,7 @@ public sealed class LibraryViewModel : TrackListViewModel
             _host.Get<PlaylistService>().Update(id, name, description);
             await _host.Get<LibraryService>().SaveAsync(ct);
             Context.RefreshLibrary();
-            SetStatus(LanguageManager.Keys.LibrarySaved);
+            Notify(NotificationLevel.Success, LanguageManager.Keys.LibrarySaved);
         });
     }
 
@@ -214,7 +223,7 @@ public sealed class LibraryViewModel : TrackListViewModel
             if (ReferenceEquals(Navigation.Current, this) && SelectedPlaylist?.Id == id)
                 await Navigation.NavigateAsync(DesktopRoutes.Library);
             Context.RefreshLibrary();
-            SetStatus(LanguageManager.Keys.LibrarySaved);
+            Notify(NotificationLevel.Success, LanguageManager.Keys.LibrarySaved);
         });
     }
 
@@ -227,12 +236,30 @@ public sealed class LibraryViewModel : TrackListViewModel
     {
         if (!CanRemoveTracks || SelectedPlaylist is not { } playlist) return Task.CompletedTask;
         var ids = ActionTracks.Select(t => t.PlaylistItemId).OfType<Guid>().ToArray();
+        return RemovePlaylistTracksAsync(playlist.Id, ids);
+    }
+
+    internal bool CanRemoveTrack(TrackRow row) => CanInteract &&
+        (IsQueue && row.QueueItemId is not null ||
+         CanEditPlaylist && row.PlaylistItemId is not null && row.PlaylistId == SelectedPlaylist?.Id);
+
+    internal Task RemoveTrackAsync(TrackRow row)
+    {
+        if (!CanRemoveTrack(row) || !Tracks.Contains(row)) return Task.CompletedTask;
+        if (IsQueue && row.QueueItemId is { } queueId)
+            return Playback.ExecutePlaybackAsync(ct => _host.Get<PlaybackSessionService>().RemoveQueueItemAsync(queueId, ct));
+        return RemovePlaylistTracksAsync(row.PlaylistId!.Value, [row.PlaylistItemId!.Value]);
+    }
+
+    private Task RemovePlaylistTracksAsync(Guid playlistId, IReadOnlyList<Guid> ids)
+    {
         return ExecuteAsync(async ct =>
         {
-            foreach (var id in ids) _host.Get<PlaylistService>().Remove(playlist.Id, id);
+            var playlists = _host.Get<PlaylistService>();
+            foreach (var id in ids) playlists.Remove(playlistId, id);
             await _host.Get<LibraryService>().SaveAsync(ct);
             Context.RefreshLibrary();
-            SetStatus(LanguageManager.Keys.LibrarySaved);
+            Notify(NotificationLevel.Success, LanguageManager.Keys.LibrarySaved);
         });
     }
 
@@ -249,7 +276,7 @@ public sealed class LibraryViewModel : TrackListViewModel
             _host.Get<PlaylistService>().Reorder(playlist.Id, ids, targetId, after);
             await _host.Get<LibraryService>().SaveAsync(ct);
             Context.RefreshLibrary();
-            SetStatus(LanguageManager.Keys.LibrarySaved);
+            Notify(NotificationLevel.Success, LanguageManager.Keys.LibrarySaved);
         });
     }
 
@@ -268,7 +295,7 @@ public sealed class LibraryViewModel : TrackListViewModel
             _host.Get<PlaylistService>().Move(playlistId, itemId, position);
             await _host.Get<LibraryService>().SaveAsync(ct);
             Context.RefreshLibrary();
-            SetStatus(LanguageManager.Keys.LibrarySaved);
+            Notify(NotificationLevel.Success, LanguageManager.Keys.LibrarySaved);
         });
     }
 

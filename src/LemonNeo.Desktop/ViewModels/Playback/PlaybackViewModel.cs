@@ -29,6 +29,7 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
     private readonly LowFrequencyPulseAnalyzer _pulseAnalyzer = new();
     private CancellationTokenSource? _artworkCancellation;
     private BackgroundArtworkFrame? _backgroundArtwork;
+    private (long RequestId, string Error)? _notifiedPlaybackFailure;
     private Uri? _artworkUri;
     private bool _closing;
     private bool _isSourceDetailsOpen;
@@ -104,6 +105,10 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
     public string NowArtist => Snapshot.CurrentTrack is { } track
         ? track.Artists.Count > 0 ? string.Join(" / ", track.Artists.Select(a => a.Name)) : _text[LanguageManager.Keys.UnknownArtist]
         : _text[LanguageManager.Keys.NoTrackDescription];
+
+    public string NowSubtitle => Snapshot.CurrentTrack?.Album?.Title is { Length: > 0 } album
+        ? $"{NowArtist} · {album}"
+        : NowArtist;
 
     public bool HasCurrentTrack => Snapshot.CurrentTrack is not null;
     public Bitmap? NowArtwork => _nowArtwork?.Bitmap;
@@ -256,8 +261,6 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
         : "";
 
     public string SourcePlayer => Snapshot.PlayerId ?? _text[LanguageManager.Keys.PlaybackSourceUnknown];
-    public string TimeLabel => $"{PositionText} / {DurationText}";
-
     public string PlaybackDetails => _text.Format(LanguageManager.Keys.PlaybackDetailsFormat, Snapshot.CurrentTrack?.Id.ToString() ?? "—",
         Snapshot.CurrentIndex + 1, Snapshot.QueueCount, Snapshot.PlayerId ?? "—",
         Snapshot.RequiredSourceProviderId ?? _text[LanguageManager.Keys.Automatic]);
@@ -298,7 +301,12 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
         catch (OperationCanceledException) { }
         catch (Exception exception)
         {
-            if (!_closing) SetError(LanguageManager.Keys.OperationFailed, [exception.Message]);
+            if (_closing) return;
+            var snapshot = _session.Snapshot;
+            if (snapshot.Error == exception.Message)
+                ReportSnapshotFailure(snapshot);
+            else
+                Notify(NotificationLevel.Error, LanguageManager.Keys.OperationFailed, exception.Message);
         }
     }
 
@@ -330,8 +338,7 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
         if ((changes & PlaybackUpdateKind.State) != 0)
         {
             IsBusy = IsLoading;
-            if (Snapshot.Error is { } error) SetError(LanguageManager.Keys.OperationFailed, [error]);
-            else SetError(null);
+            ReportSnapshotFailure(Snapshot);
             RaiseStateProperties();
             StateChanged?.Invoke(this, EventArgs.Empty);
         }
@@ -347,6 +354,21 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
         }
         if ((changes & PlaybackUpdateKind.Volume) != 0 && !_isUpdatingVolume)
             SetDisplayedVolume(Snapshot.Volume * 100);
+    }
+
+    private void ReportSnapshotFailure(PlaybackSessionSnapshot snapshot)
+    {
+        if (snapshot.Error is not { } error)
+        {
+            _notifiedPlaybackFailure = null;
+            return;
+        }
+
+        // A command can throw the same failure that the playback session publishes.
+        var failure = (snapshot.RequestId, error);
+        if (_notifiedPlaybackFailure == failure) return;
+        _notifiedPlaybackFailure = failure;
+        Notify(NotificationLevel.Error, LanguageManager.Keys.OperationFailed, error);
     }
 
     public Task RefreshVolumeAsync()
@@ -368,14 +390,13 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
         }
         catch (Exception exception)
         {
-            SetError(LanguageManager.Keys.OperationFailed, [exception.Message]);
+            if (!_closing) Notify(NotificationLevel.Error, LanguageManager.Keys.OperationFailed, exception.Message);
         }
     }
 
     private async Task ApplyVolumeAsync()
     {
         _isUpdatingVolume = true;
-        SetError(null);
         try
         {
             // Coalesce slider input while an asynchronous decoder call is still processing it.
@@ -390,7 +411,7 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
                 }
                 catch (Exception exception)
                 {
-                    SetError(LanguageManager.Keys.OperationFailed, [exception.Message]);
+                    if (!_closing) Notify(NotificationLevel.Error, LanguageManager.Keys.OperationFailed, exception.Message);
                 }
             }
         }
@@ -508,7 +529,8 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
                      nameof(SourcePlayer),
                      nameof(BitrateOrigin), nameof(SourceCodec), nameof(SourceSampleRate), nameof(SourceBitDepth),
                      nameof(SourceChannels), nameof(AudioFormatLabel), nameof(QualityLabel), nameof(NowTitle),
-                     nameof(NowArtist), nameof(HasCurrentTrack), nameof(CanAnimateBackground), nameof(CanTogglePlayback)
+                     nameof(NowArtist), nameof(NowSubtitle), nameof(HasCurrentTrack), nameof(CanAnimateBackground),
+                     nameof(CanTogglePlayback)
                  })
             OnPropertyChanged(name);
     }
@@ -535,7 +557,6 @@ public sealed class PlaybackViewModel : PageViewModel, IAudioVisualizerSource,
         foreach (var name in new[] { nameof(DurationSeconds), nameof(PositionText), nameof(DurationText), nameof(CanSeek) })
             OnPropertyChanged(name);
         if (!IsSeeking) OnPropertyChanged(nameof(PositionSeconds));
-        OnPropertyChanged(nameof(TimeLabel));
     }
 
     private void RaisePlaybackProperties()

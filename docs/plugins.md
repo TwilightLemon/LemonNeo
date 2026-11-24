@@ -190,6 +190,17 @@ Notes for plugin authors:
   player's lock. `Activate(volume)` must be brief and perform no network I/O. Disposing a
   preparation must release only its own stream, including after activation. Decoder plugins
   built against the previous player contract must be rebuilt and implement preparation.
+- A prepared stream can implement `IProfiledPlayback` to receive speed and EQ settings before
+  activation and during playback. The host resolves one complete `DecodeProfile`, checking
+  the playlist entry, then its playlist, then global preferences. Speed ranges from 0.5× to 2×
+  with the original pitch. Gains are in dB, in the order of `DecodeProfile.BandFrequencies`.
+  The EQ curve is the combined response of overlapping peaking filters. Use
+  `EqualizerResponse.QualityFactor` and omit centers at or above half the stream sample rate.
+  `EqualizerResponse.GainAt` provides the reference response in dB for previews and tests.
+  Report positions and duration in source time at every speed.
+- A decoder provider can implement `IAudioOutputConfigurable` to expose supported output backends
+  and devices. The Desktop controls use the provider's device IDs and pass changes directly to it.
+  The BASS plugin provides live switching on Windows and uses its default output on macOS and Linux.
 - Interactive plugins subscribe to `MetadataChanged`, `StateChanged`, `TimelineChanged`,
   `QueueChanged`, and `VolumeChanged` as needed. A selected track is published in `Loading`
   before source discovery; `Playing` is published only after activation succeeds.

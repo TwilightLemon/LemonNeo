@@ -1,8 +1,10 @@
 <ResourceDictionary
     xmlns="https://github.com/avaloniaui"
+    xmlns:converters="using:Avalonia.Data.Converters"
     xmlns:core="using:LemonNeo.Core.Library"
     xmlns:i18n="using:LemonNeo.Desktop.Services"
     xmlns:metadataVm="using:LemonNeo.Desktop.ViewModels.Metadata"
+    xmlns:playbackControls="using:LemonNeo.Desktop.Controls.Playback"
     xmlns:sharedControls="using:LemonNeo.Desktop.Controls.Shared"
     xmlns:sharedVm="using:LemonNeo.Desktop.ViewModels.Shared"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
@@ -20,7 +22,7 @@
             CornerRadius="8">
             <Grid MinHeight="44" ToolTip.Tip="{Binding Identity}">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="38" />
+                    <ColumnDefinition Width="50" />
                     <ColumnDefinition Width="56" />
                     <ColumnDefinition Width="3*" />
                     <ColumnDefinition Width="2*" />
@@ -28,15 +30,27 @@
                 </Grid.ColumnDefinitions>
                 <TextBlock
                     Classes="caption"
-                    IsVisible="{Binding !IsSelectionMode}"
                     Text="{Binding Number}"
-                    VerticalAlignment="Center" />
+                    VerticalAlignment="Center">
+                    <TextBlock.IsVisible>
+                        <MultiBinding Converter="{x:Static converters:BoolConverters.And}">
+                            <Binding Path="!IsSelectionMode" />
+                            <Binding Path="!IsCurrent" />
+                        </MultiBinding>
+                    </TextBlock.IsVisible>
+                </TextBlock>
                 <CheckBox
                     AutomationProperties.Name="{Binding Title}"
+                    HorizontalAlignment="Left"
                     IsChecked="{Binding IsMarked}"
                     IsVisible="{Binding IsSelectionMode}"
                     MinWidth="0"
                     VerticalAlignment="Center" />
+                <playbackControls:NowPlayingIndicator
+                    Classes.managing="{Binding IsSelectionMode}"
+                    Classes.playing="{Binding $parent[ListBox].((sharedVm:TrackListViewModel)DataContext).Playback.IsPlaying}"
+                    Classes.reduceMotion="{Binding $parent[ListBox].((sharedVm:TrackListViewModel)DataContext).Playback.ReduceMotion}"
+                    IsVisible="{Binding IsCurrent}" />
                 <sharedControls:Artwork
                     CornerRadius="8"
                     Grid.Column="1"
@@ -52,21 +66,56 @@
                     Margin="0,0,16,0"
                     Spacing="5">
                     <TextBlock
+                        Classes="trackTitle"
                         FontWeight="Medium"
                         Text="{Binding Title}"
                         TextTrimming="CharacterEllipsis" />
                     <TextBlock
                         Classes="caption"
+                        IsVisible="{Binding !HasArtistLinks}"
                         Text="{Binding Artists}"
                         TextTrimming="CharacterEllipsis" />
+                    <ItemsControl ClipToBounds="True" IsVisible="{Binding HasArtistLinks}" ItemsSource="{Binding ArtistLinks}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="8" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="sharedVm:ArtistLink">
+                                <Panel>
+                                    <TextBlock Classes="caption" IsVisible="{Binding !CanOpen}" Text="{Binding Name}" />
+                                    <Button
+                                        Classes="catalogLink"
+                                        Command="{Binding $parent[ListBox].((sharedVm:TrackListViewModel)DataContext).OpenCatalogItemCommand}"
+                                        CommandParameter="{Binding Item}"
+                                        IsVisible="{Binding CanOpen}">
+                                        <TextBlock Classes="caption" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                    </Button>
+                                </Panel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </StackPanel>
                 <TextBlock
                     Classes="muted"
                     Grid.Column="3"
+                    IsVisible="{Binding !HasAlbumLink}"
                     Margin="0,0,12,0"
                     Text="{Binding Album}"
                     TextTrimming="CharacterEllipsis"
                     VerticalAlignment="Center" />
+                <Button
+                    Classes="catalogLink"
+                    Command="{Binding $parent[ListBox].((sharedVm:TrackListViewModel)DataContext).OpenCatalogItemCommand}"
+                    CommandParameter="{Binding AlbumLink}"
+                    Grid.Column="3"
+                    HorizontalAlignment="Left"
+                    IsVisible="{Binding HasAlbumLink}"
+                    Margin="0,0,12,0"
+                    VerticalAlignment="Center">
+                    <TextBlock Classes="muted" Text="{Binding Album}" TextTrimming="CharacterEllipsis" />
+                </Button>
                 <TextBlock
                     Classes="caption"
                     Grid.Column="4"
@@ -134,13 +183,6 @@
                         Content="{Translate {x:Static i18n:LanguageManager+Keys.AddMatchExternalIds}}"
                         Margin="0,0,10,8"
                         Name="AddMatchExternalIdsButton" />
-                    <TextBlock
-                        FontWeight="SemiBold"
-                        Foreground="{DynamicResource Brush.AccentText}"
-                        IsVisible="{Binding HasActionStatus}"
-                        Margin="2,0,0,8"
-                        Text="{Binding ActionStatus}"
-                        VerticalAlignment="Center" />
                 </WrapPanel>
             </StackPanel>
         </Border>

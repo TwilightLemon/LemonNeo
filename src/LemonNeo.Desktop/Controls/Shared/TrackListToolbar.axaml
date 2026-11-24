@@ -1,0 +1,86 @@
+<UserControl
+    Name="Root"
+    x:Class="LemonNeo.Desktop.Controls.Shared.TrackListToolbar"
+    x:DataType="vm:TrackListViewModel"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:converters="using:Avalonia.Data.Converters"
+    xmlns:i18n="using:LemonNeo.Desktop.Services"
+    xmlns:shared="using:LemonNeo.Desktop.Controls.Shared"
+    xmlns:vm="using:LemonNeo.Desktop.ViewModels.Shared"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel Margin="0,0,0,10" Spacing="8">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <TextBox
+                AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.SearchPlaceholder}}"
+                Classes="toolbarSearch"
+                HorizontalAlignment="Left"
+                IsVisible="{Binding LeadingContent, ElementName=Root, Converter={x:Static converters:ObjectConverters.IsNull}}"
+                PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.SearchPlaceholder}}"
+                Text="{Binding Filter}"
+                Width="400" />
+            <ContentPresenter Content="{Binding LeadingContent, ElementName=Root}" VerticalAlignment="Center" />
+            <StackPanel
+                Grid.Column="1"
+                IsVisible="{Binding ShowTrackActions, ElementName=Root}"
+                Margin="0,0,20,0"
+                Orientation="Horizontal"
+                Spacing="6"
+                VerticalAlignment="Center">
+                <StackPanel IsVisible="{Binding !IsSelectionMode}" Orientation="Horizontal" Spacing="6">
+                    <shared:AddToPlaylistButton IsGhost="True" IsIconOnly="True" />
+                    <Button
+                        AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.TrackDetails}}"
+                        Classes="icon ghost"
+                        Command="{Binding InspectTrackCommand}"
+                        IsEnabled="{Binding CanInspectTrack}"
+                        ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.TrackDetails}}">
+                        <Path Classes="icon" Data="{StaticResource Icon.TrackDetails}" />
+                    </Button>
+                </StackPanel>
+                <Button
+                    AutomationProperties.Name="{Binding SelectionModeLabel}"
+                    Classes="icon ghost"
+                    Classes.active="{Binding IsSelectionMode}"
+                    Command="{Binding ToggleSelectionCommand}"
+                    IsEnabled="{Binding CanInteract}"
+                    ToolTip.Tip="{Binding SelectionModeLabel}">
+                    <Panel>
+                        <Path Classes="icon" Data="{StaticResource Icon.ManageTracks}" IsVisible="{Binding !IsSelectionMode}" />
+                        <Path Classes="icon" Data="{StaticResource Icon.Done}" IsVisible="{Binding IsSelectionMode}" />
+                    </Panel>
+                </Button>
+            </StackPanel>
+        </Grid>
+        <Border
+            Background="{DynamicResource Brush.AccentSoft}"
+            CornerRadius="10"
+            IsVisible="{Binding IsSelectionMode}"
+            Padding="8,4">
+            <WrapPanel>
+                <TextBlock Margin="4,0,10,0" Text="{Binding SelectionSummary}" VerticalAlignment="Center" />
+                <Button
+                    Classes="ghost compact"
+                    Command="{Binding SelectAllCommand}"
+                    Content="{Translate {x:Static i18n:LanguageManager+Keys.SelectAllTracks}}"
+                    Margin="0,1,6,1" />
+                <Button
+                    Classes="ghost compact"
+                    Command="{Binding ClearSelectionCommand}"
+                    Content="{Translate {x:Static i18n:LanguageManager+Keys.ClearTrackSelection}}"
+                    Margin="0,1,6,1" />
+                <shared:AddToPlaylistButton IsCompact="True" IsGhost="True" IsIconOnly="True" Margin="0,1,6,1" />
+                <ContentPresenter Content="{Binding SelectionActions, ElementName=Root}" VerticalAlignment="Center" />
+                <Button
+                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.ExportTracks}}"
+                    Classes="icon ghost compact"
+                    Click="OnExportTracks"
+                    IsEnabled="{Binding HasActionTracks}"
+                    Margin="0,1,6,1"
+                    ToolTip.Tip="{Translate {x:Static i18n:LanguageManager+Keys.ExportTracks}}">
+                    <Path Classes="icon" Data="{StaticResource Icon.Download}" />
+                </Button>
+                <ContentPresenter Content="{Binding SelectionHint, ElementName=Root}" VerticalAlignment="Center" />
+            </WrapPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

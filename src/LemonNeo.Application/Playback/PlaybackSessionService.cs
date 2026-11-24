@@ -1,6 +1,8 @@
 using System.Threading.Channels;
 using LemonNeo.Abstractions.Playback;
 using LemonNeo.Abstractions.Settings;
+using LemonNeo.Application.Library;
+using LemonNeo.Core.Library;
 using LemonNeo.Core.Exceptions;
 using LemonNeo.Core.Music;
 using LemonNeo.Core.Playback;
@@ -33,6 +35,10 @@ public sealed record PlaybackSessionSnapshot(
     double Volume = 1,
     string? Error = null)
 {
+    public ResolvedDecodeProfile? AppliedProfile { get; init; }
+    public PlaylistEntryId? CurrentPlaylistEntry => (uint)CurrentIndex < QueueItems.Count
+        ? QueueItems[CurrentIndex].PlaylistEntry : null;
+    public double PlaybackSpeed { get; init; } = 1;
     public IReadOnlyList<PlaybackQueueItem> QueueItems { get; init; } = [];
 }
 
@@ -44,6 +50,7 @@ public sealed class PlaybackSessionChangedEventArgs(PlaybackSessionSnapshot snap
 /// <summary>One authority for selection, request replacement, player activation and notifications.</summary>
 public sealed class PlaybackSessionService : IAsyncDisposable
 {
+    private readonly LibraryService _library;
     private readonly PlaybackResolver _resolver;
     private readonly IPlaybackQueue _queue;
     private readonly ISettingsScope _settings;
@@ -70,9 +77,10 @@ public sealed class PlaybackSessionService : IAsyncDisposable
     private PlaybackSessionSnapshot _snapshot = new(PlaybackState.Stopped, null,
         new PlaybackTimelineInfo(TimeSpan.Zero, null), PlaybackMode.Sequential, -1, 0, null, null);
 
-    public PlaybackSessionService(PlaybackResolver resolver, IPlaybackQueue queue, IAppSettingsService settings,
+    public PlaybackSessionService(LibraryService library, PlaybackResolver resolver, IPlaybackQueue queue, IAppSettingsService settings,
         ILogger<PlaybackSessionService> logger)
     {
+        _library = library;
         _resolver = resolver;
         _queue = queue;
         _settings = settings.ForPackage(PackageNames.Application);
@@ -88,6 +96,76 @@ public sealed class PlaybackSessionService : IAsyncDisposable
     public bool CanReadFftData => FftBinCount > 1;
     public int FftBinCount { get { lock (_gate) return (_active?.Player.Player as IFftPlayer)?.FftBinCount ?? 0; } }
 
+    private Playlist? FindPlaylist(Guid? id) => id is null ? null :
+        _library.Current.Playlists.FirstOrDefault(list => list.Id == id);
+
+    private ResolvedDecodeProfile EffectiveProfile(PlaylistEntryId? entry, DecodeProfile? global = null)
+    {
+        var playlist = FindPlaylist(entry?.PlaylistId);
+        var item = playlist?.Items.FirstOrDefault(item => item.Id == entry?.ItemId);
+        if (item?.DecodeProfile is { } song) return new(song.Normalize(), playlist!.Id, item.Id);
+        if (playlist?.DecodeProfile is { } list) return new(list.Normalize(), playlist.Id);
+        return new((global ?? _settings.Get<DecodePreferences>().Global).Normalize());
+    }
+
+    public bool CurrentSupportsProfiles { get { lock (_gate) return _active?.SupportsProfiles ?? true; } }
+
+    public void RefreshActiveProfile()
+    {
+        lock (_gate)
+        {
+            if (_active is not null) ApplyActiveProfile(EffectiveProfile(_queue.CurrentItem?.PlaylistEntry));
+        }
+    }
+
+    /// <summary>Omitting the item targets its playlist. Omitting both IDs targets global preferences.</summary>
+    public Task SetProfileAsync(Guid? playlistId, Guid? itemId, DecodeProfile? profile)
+    {
+        lock (_gate)
+        {
+            EnsureReady();
+            var value = profile?.Normalize();
+            var playlist = FindPlaylist(playlistId);
+            var item = playlist?.Items.FirstOrDefault(candidate => candidate.Id == itemId);
+            if (playlistId.HasValue && playlist is null || itemId.HasValue && item is null)
+                throw new InvalidOperationException("The selected playlist or entry no longer exists.");
+
+            var current = _queue.CurrentItem?.PlaylistEntry;
+            if (playlist is null)
+            {
+                var global = value ?? new();
+                ApplyActiveProfile(EffectiveProfile(current, global));
+                _settings.Apply<DecodePreferences>(settings => settings with { Global = global });
+                return Task.CompletedTask;
+            }
+
+            var previous = item is null ? playlist.DecodeProfile : item.DecodeProfile;
+            if (item is null) playlist.DecodeProfile = value;
+            else item.DecodeProfile = value;
+            try
+            {
+                if (current is not null && current.PlaylistId == playlistId && (item is null || current.ItemId == item.Id))
+                    ApplyActiveProfile(EffectiveProfile(current));
+            }
+            catch
+            {
+                if (item is null) playlist.DecodeProfile = previous;
+                else item.DecodeProfile = previous;
+                throw;
+            }
+            playlist.UpdatedAt = DateTimeOffset.UtcNow;
+            _library.Touch(playlist.Id);
+        }
+        return _library.SaveAsync();
+    }
+
+    private void ApplyActiveProfile(ResolvedDecodeProfile profile)
+    {
+        if (_active is null) return;
+        _active.ApplyResolvedProfile(profile);
+        if (_active.AppliedProfile != _snapshot.AppliedProfile) PublishLocked(SampleLocked());
+    }
+
     public bool TryGetFftData(Span<float> destination)
     {
         lock (_gate)
@@ -95,6 +173,7 @@ public sealed class PlaybackSessionService : IAsyncDisposable
     }
 
     public event EventHandler<PlaybackSessionChangedEventArgs>? MetadataChanged;
+    public event EventHandler<PlaybackSessionChangedEventArgs>? ProfileChanged;
     public event EventHandler<PlaybackSessionChangedEventArgs>? TimelineChanged;
     public event EventHandler<PlaybackSessionChangedEventArgs>? StateChanged;
     public event EventHandler<PlaybackSessionChangedEventArgs>? VolumeChanged;
@@ -124,6 +203,9 @@ public sealed class PlaybackSessionService : IAsyncDisposable
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
+        await _settings.RegisterAsync(nameof(DecodePreferences), new DecodePreferences(),
+            value => value with { Global = (value.Global ?? new()).Normalize(), Presets = value.Presets.IsDefault ? [] : value.Presets },
+            cancellationToken);
         await _settings.RegisterAsync(nameof(PlaybackQueueState), new PlaybackQueueState(),
             cancellationToken: cancellationToken);
         await _settings.RegisterAsync(nameof(PlaybackResumeState), new PlaybackResumeState(), value => value with
@@ -178,13 +260,19 @@ public sealed class PlaybackSessionService : IAsyncDisposable
     public Task PlayPlaylistAsync(IEnumerable<Track> tracks, int startIndex = 0, PlaybackRequest? request = null,
         CancellationToken cancellationToken = default)
     {
-        var values = tracks.ToArray();
+        return PlayItemsAsync(tracks.Select(track => new PlaybackQueueItem { Track = track }), startIndex, request, cancellationToken);
+    }
+
+    public Task PlayItemsAsync(IEnumerable<PlaybackQueueItem> items, int startIndex = 0, PlaybackRequest? request = null,
+        CancellationToken cancellationToken = default)
+    {
+        var values = items.ToArray();
         if (values.Length == 0) throw new InvalidOperationException("Cannot play an empty playlist.");
         lock (_gate)
         {
             EnsureReady();
             cancellationToken.ThrowIfCancellationRequested();
-            _queue.Replace(values, startIndex);
+            _queue.ReplaceItems(values, startIndex);
             _queue.SetRequest(request ?? new PlaybackRequest(UseQualityPreference: true));
             return BeginLocked([_queue.CurrentItem!], PlayOrigin.User, cancellationToken);
         }
@@ -278,6 +366,7 @@ public sealed class PlaybackSessionService : IAsyncDisposable
                 lock (_gate)
                 {
                     if (!Owns(operation)) return null;
+                    prepared.ApplyResolvedProfile(EffectiveProfile(candidate.PlaylistEntry));
                     prepared.Activate(_snapshot.Volume);
                     _active = prepared;
                 }
@@ -482,6 +571,28 @@ public sealed class PlaybackSessionService : IAsyncDisposable
         lock (_gate) { EnsureReady(); return StopLocked(true, cancellationToken); }
     }
 
+    public Task RemoveQueueItemAsync(Guid itemId, CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            EnsureReady();
+            cancellationToken.ThrowIfCancellationRequested();
+            var wasCurrent = _queue.CurrentItem?.Id == itemId;
+            if (!_queue.Remove(itemId)) return Task.CompletedTask;
+
+            if (wasCurrent)
+            {
+                if (_snapshot.State is PlaybackState.Playing or PlaybackState.Loading && _queue.CurrentItem is { } next)
+                    return BeginLocked([next], PlayOrigin.User, CancellationToken.None);
+                return StopLocked(false, CancellationToken.None);
+            }
+
+            PublishLocked(WithQueue(_snapshot));
+            UpdateSettingsLocked();
+            return Task.CompletedTask;
+        }
+    }
+
     public Task CaptureStateAsync(CancellationToken cancellationToken = default)
     {
         lock (_gate) { EnsureReady(); cancellationToken.ThrowIfCancellationRequested(); UpdateSettingsLocked(); }
@@ -551,6 +662,8 @@ public sealed class PlaybackSessionService : IAsyncDisposable
 
     private void PublishLocked(PlaybackSessionSnapshot snapshot)
     {
+        var applied = snapshot.State is PlaybackState.Playing or PlaybackState.Paused ? _active?.AppliedProfile : null;
+        snapshot = snapshot with { AppliedProfile = applied, PlaybackSpeed = applied?.Profile.Speed ?? 1 };
         var previous = _snapshot;
         if (snapshot == previous && previous.QueueItems.SequenceEqual(snapshot.QueueItems)) return;
         // Queue arrays are snapshots; compare their contents rather than their allocation identity.
@@ -572,7 +685,9 @@ public sealed class PlaybackSessionService : IAsyncDisposable
             if (previous.Mode != current.Mode || previous.CurrentQueueItemId != current.CurrentQueueItemId ||
                 !previous.QueueItems.SequenceEqual(current.QueueItems)) Raise(QueueChanged, args);
             if (previous.State != current.State || previous.Error != current.Error) Raise(StateChanged, args);
-            if (previous.RequestId != current.RequestId || previous.Timeline != current.Timeline) Raise(TimelineChanged, args);
+            if (previous.RequestId != current.RequestId || previous.Timeline != current.Timeline || previous.PlaybackSpeed != current.PlaybackSpeed)
+                Raise(TimelineChanged, args);
+            if (previous.AppliedProfile != current.AppliedProfile) Raise(ProfileChanged, args);
             if (previous.Volume != current.Volume) Raise(VolumeChanged, args);
         }
     }
@@ -589,6 +704,7 @@ public sealed class PlaybackSessionService : IAsyncDisposable
     {
         var request = _queue.Request;
         var preferences = _settings.Get<PlaybackPreferences>();
+        request = request with { PreferCachedResources = request.PreferCachedResources || preferences.PreferCachedResources };
         return request.UseQualityPreference ? request with
         {
             Quality = preferences.Quality, PreferredPlayerId = preferences.PreferredPlayerId, UseQualityPreference = false

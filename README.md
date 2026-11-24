@@ -98,7 +98,7 @@ Metadata is not tied to whichever service a track came from:
 - **Appearance** — light, dark, or system; accent palettes or colors derived from the track's artwork; the mesh background and visualizer tuned with presets or turned off; a reduced-motion option.
 - **Lyrics** — font size, bold, alignment, translation and romanization toggles, one or two lines, and a floating desktop lyrics window you can place anywhere.
 - **Playback** — preferred audio quality and decoder, playback modes, and source choice when several plugins can play the same track.
-- **Library** — drag-and-drop playlists, folder import with embedded covers and tags, remote playlist import, and moving your library or cache without restarting. Optional [one-way source sync](docs/playlist-sync.md) supports manual sync and automatic-sync pauses for one or all playlists. Metadata matching and external ID edits remain available in synced playlists; create an editable copy or convert to a local playlist to change membership.
+- **Library** — drag-and-drop playlists, folder import with embedded covers and tags, remote playlist import and export, and moving your library or cache without restarting. Optional [one-way source sync](docs/playlist-sync.md) supports manual sync and automatic-sync pauses for one or all playlists. Metadata matching and external ID edits remain available in synced playlists. Create an editable copy or convert to a local playlist to change membership.
 
 ---
 

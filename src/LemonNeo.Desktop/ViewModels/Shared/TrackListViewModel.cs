@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
+using LemonNeo.Abstractions.Providers;
 using LemonNeo.Application.Library;
 using LemonNeo.Core.Library;
 using LemonNeo.Core.Music;
@@ -14,11 +15,12 @@ namespace LemonNeo.Desktop.ViewModels.Shared;
 public abstract class TrackListViewModel : PageViewModel
 {
     protected readonly DesktopNavigation Navigation;
-    protected readonly PlaybackViewModel Playback;
     private readonly IDisposable _preferencesSubscription;
     private readonly DispatcherTimer _filterTimer;
+    private readonly TrackCollection<TrackRow> _tracks = [];
     private TrackRow[] _rows = [];
     private string _filter = "";
+    private string _appliedFilter = "";
     private bool _hasPlayingTrack;
     private bool _isSelectionMode;
     private bool _needsRefresh;
@@ -38,8 +40,11 @@ public abstract class TrackListViewModel : PageViewModel
             AsyncRelayCommandOptions.AllowConcurrentExecutions);
         InspectTrackCommand = new RelayCommand(() =>
         {
-            if (CanInspectTrack && SelectedTrack is { } row) _ = Navigation.OpenEditorAsync(row);
+            if (CanInspectTrack && SelectedTrack is { } row) _ = InspectTrackAsync(row);
         });
+        OpenCatalogItemCommand = new AsyncRelayCommand<CatalogItem>(item =>
+            CanInteract && !IsSelectionMode && item is not null
+                ? Navigation.OpenCatalogItemAsync(item) : Task.CompletedTask);
         AddToPlaylistCommand = new AsyncRelayCommand(async () => await AddSelectedTracksAsync());
         ToggleSelectionCommand = new RelayCommand(() => IsSelectionMode = !IsSelectionMode);
         SelectAllCommand = new RelayCommand(() => SetSelection(true));
@@ -52,10 +57,10 @@ public abstract class TrackListViewModel : PageViewModel
         _targetPlaylist = EditablePlaylists.FirstOrDefault();
     }
 
+    public PlaybackViewModel Playback { get; }
     public ObservableCollection<Playlist> Playlists => Context.Playlists;
-    public IReadOnlyList<Playlist> EditablePlaylists => Playlists.Where(playlist =>
-        !_host.Get<PlaylistService>().IsReadOnly(playlist.Id)).ToArray();
-    public ObservableCollection<TrackRow> Tracks { get; } = [];
+    public ObservableCollection<TrackRow> Tracks => _tracks;
+    protected IList<TrackRow> UnfilteredTracks => _rows;
 
     public TrackRow? SelectedTrack
     {
@@ -90,7 +95,9 @@ public abstract class TrackListViewModel : PageViewModel
     }
 
     public bool HasTracks => Tracks.Count > 0;
-    public bool CanPlay => CanInteract && Playback.CanInteract && HasTracks;
+    internal bool ReduceMotion => Context.Appearance.Current.ReduceMotion;
+    public bool CanPlay => CanInteract && Playback.CanInteract && HasPlayableTracks;
+    protected virtual bool HasPlayableTracks => HasTracks;
     public bool CanInspectTrack => CanInteract && SelectedTrack is not null && !IsSelectionMode;
 
     public IReadOnlyList<TrackRow> ActionTracks => IsSelectionMode ? Tracks.Where(t => t.IsMarked).ToArray()
@@ -143,6 +150,7 @@ public abstract class TrackListViewModel : PageViewModel
     public AsyncRelayCommand PlayAllCommand { get; }
     public AsyncRelayCommand PlaySelectedCommand { get; }
     public RelayCommand InspectTrackCommand { get; }
+    public AsyncRelayCommand<CatalogItem> OpenCatalogItemCommand { get; }
     public AsyncRelayCommand AddToPlaylistCommand { get; }
     public RelayCommand ToggleSelectionCommand { get; }
     public RelayCommand SelectAllCommand { get; }
@@ -156,6 +164,10 @@ public abstract class TrackListViewModel : PageViewModel
     }
 
     public abstract Task PlayAsync(TrackRow? selected = null);
+    internal Task InspectTrackAsync(TrackRow row) => CanInteract && Tracks.Contains(row)
+        ? Navigation.OpenEditorAsync(row)
+        : Task.CompletedTask;
+
     protected abstract IEnumerable<TrackRow> GetTracks();
 
     internal override object CaptureNavigationState() => new TrackListNavigationState(Filter,
@@ -184,6 +196,7 @@ public abstract class TrackListViewModel : PageViewModel
         _filterTimer.Stop();
         var existing = _rows.ToDictionary(RowKey);
         var artwork = _host.Get<ArtworkService>();
+        var providers = _host.Get<IProviderRegistry>();
         _rows = GetTracks().Select(row =>
         {
             if (existing.Remove(RowKey(row), out var previous))
@@ -192,12 +205,27 @@ public abstract class TrackListViewModel : PageViewModel
                 return previous;
             }
             row.ArtworkLoader = artwork;
+            row.CanBrowseCatalog = id => providers.Get(id.ProviderId) is ICatalogProvider;
+            row.FindCatalogTrack = FindCatalogTrack;
             row.IsSelectionMode = IsSelectionMode;
             row.PropertyChanged += OnRowChanged;
             return row;
         }).ToArray();
         foreach (var removed in existing.Values) removed.PropertyChanged -= OnRowChanged;
         ApplyFilter();
+    }
+
+    private MusicItemId? FindCatalogTrack(Track track)
+    {
+        var registry = _host.Get<IProviderRegistry>();
+        if (registry.Get(track.Id.ProviderId) is ICatalogProvider and ITrackLookupProvider) return track.Id;
+        foreach (var id in track.ExternalIds.OrderBy(id => id.Kind == "song-mid" ? 0 : 1))
+        {
+            if (id.Kind is not ("song-mid" or "song-id")) continue;
+            var provider = registry.Get(id.Namespace);
+            if (provider is ICatalogProvider and ITrackLookupProvider) return new MusicItemId(provider.Id, id.Value);
+        }
+        return null;
     }
 
     private void OnFilterTick(object? sender, EventArgs args)
@@ -214,7 +242,9 @@ public abstract class TrackListViewModel : PageViewModel
         var rows = filter.Length == 0 ? _rows : _rows.Where(t =>
             $"{t.Track.Title} {string.Join(' ', t.Track.Artists.Select(a => a.Name))} {t.Track.Album?.Title}"
                 .Contains(filter, StringComparison.CurrentCultureIgnoreCase)).ToArray();
-        CollectionSynchronizer.Update(Tracks, rows);
+        var replaceResults = !string.Equals(_appliedFilter, filter, StringComparison.Ordinal);
+        _appliedFilter = filter;
+        _tracks.Update(rows, replaceResults);
         SelectedTrack = selected is not null && Tracks.Contains(selected) ? selected : null;
         OnPropertyChanged(nameof(HasTracks));
         OnPropertyChanged(nameof(TrackSummary));
@@ -260,50 +290,19 @@ public abstract class TrackListViewModel : PageViewModel
         foreach (var row in _rows)
             row.IsCurrent = row.QueueItemId is { } queueId
                 ? queueId == snapshot.CurrentQueueItemId
-                : PlayingTrackMatcher.Matches(row.Track, snapshot.CurrentTrack, snapshot.SourceDetails?.SourceId);
+                : row.PlaybackEntry is { } entry && snapshot.CurrentPlaylistEntry is { } playingEntry
+                    ? entry == playingEntry
+                    : PlayingTrackMatcher.Matches(row.Track, snapshot.CurrentTrack, snapshot.SourceDetails?.SourceId);
         SetProperty(ref _hasPlayingTrack,
             _rows.Any(row => row.IsCurrent),
             nameof(HasPlayingTrack));
     }
 
-    public async Task<bool> AddSelectedTracksAsync()
+    public Task<bool> AddSelectedTracksAsync()
     {
-        if (!CanAddToPlaylist || TargetPlaylist is not { } target) return false;
-        var tracks = ActionTracks.Select(row => row.Track).ToArray();
-        var insertAtStart = InsertAtStart;
-        var succeeded = false;
-        await ExecuteAsync(async ct =>
-        {
-            await _host.Settings.SaveAsync(ct);
-            var playlists = _host.Get<PlaylistService>();
-            var added = playlists.AddRange(target.Id, tracks, insertAtStart);
-            try
-            {
-                await _host.Get<LibraryService>().SaveAsync(ct);
-            }
-            catch
-            {
-                foreach (var item in added) playlists.Remove(target.Id, item.Id);
-                Context.RefreshLibrary();
-                throw;
-            }
-
-            Context.RefreshLibrary();
-            SetStatus(LanguageManager.Keys.TracksAdded, tracks.Length, target.Name);
-            succeeded = true;
-        });
-        return succeeded;
-    }
-
-    public Task AddTrackAsync(Guid playlistId, Track track)
-    {
-        return ExecuteAsync(async ct =>
-        {
-            _host.Get<PlaylistService>().AddRange(playlistId, [track], InsertAtStart);
-            await _host.Get<LibraryService>().SaveAsync(ct);
-            Context.RefreshLibrary();
-            SetStatus(LanguageManager.Keys.TrackAdded);
-        });
+        return CanAddToPlaylist && TargetPlaylist is { } target
+            ? AddTracksToPlaylistAsync(target.Id, ActionTracks.Select(row => row.Track).ToArray())
+            : Task.FromResult(false);
     }
 
     private void OnLibraryChanged(object? sender, EventArgs args)

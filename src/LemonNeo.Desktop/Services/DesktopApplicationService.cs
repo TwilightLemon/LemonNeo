@@ -166,7 +166,7 @@ public sealed class DesktopApplicationService : IDesktopStorageService, IAsyncDi
             catch (Exception exception)
             {
                 Trace.WriteLine($"Desktop initialization failed: {exception}");
-                viewModel.ReportStartupFailure(exception.Message);
+                viewModel.FinishStartup();
                 await ShowErrorAsync(Text[LanguageManager.Keys.DesktopStartupFailedTitle], exception.Message);
                 return false;
             }

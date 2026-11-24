@@ -86,7 +86,10 @@ public sealed record PlaybackRequest(
     ExternalMusicId? RequiredSourceId = null,
     // Host-only: resolve saved playback preferences at each queue playback; explicit Auto still means highest.
     bool UseQualityPreference = false,
-    string? PreferredPlayerId = null);
+    string? PreferredPlayerId = null)
+{
+    public bool PreferCachedResources { get; init; }
+}
 
 public enum PlaybackMode
 {
@@ -95,8 +98,11 @@ public enum PlaybackMode
     Shuffle
 }
 
+public sealed record PlaylistEntryId(Guid PlaylistId, Guid ItemId);
+
 public sealed record PlaybackQueueItem
 {
+    public PlaylistEntryId? PlaylistEntry { get; init; }
     public Guid Id { get; init; } = Guid.NewGuid();
     public required Track Track { get; init; }
     public DateTimeOffset AddedAt { get; init; } = DateTimeOffset.UtcNow;

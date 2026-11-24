@@ -33,7 +33,11 @@ public sealed class SettingsViewModel : PageViewModel
         _storage.Changed += OnStorageChanged;
         _playbackSettings = _host.Settings.ForPackage(PackageNames.Application);
         _playbackSubscription =
-            _playbackSettings.Subscribe<PlaybackPreferences>(_ => OnPropertyChanged(nameof(SelectedAudioQuality)));
+            _playbackSettings.Subscribe<PlaybackPreferences>(_ =>
+            {
+                OnPropertyChanged(nameof(SelectedAudioQuality));
+                OnPropertyChanged(nameof(PreferCachedResources));
+            });
         _networkSettings = _host.Settings.ForPackage(PackageNames.Application);
         _networkSubscription = _networkSettings.Subscribe<NetworkPreferences>(_ => RefreshNetworkProperties());
         ProxyModeCommand = new RelayCommand<string>(value =>
@@ -80,6 +84,16 @@ public sealed class SettingsViewModel : PageViewModel
         {
             if (!_closing && Enum.IsDefined((AudioQuality)value))
                 _playbackSettings.Apply<PlaybackPreferences>(current => current with { Quality = (AudioQuality)value });
+        }
+    }
+
+    public bool PreferCachedResources
+    {
+        get => _playbackSettings.Get<PlaybackPreferences>().PreferCachedResources;
+        set
+        {
+            if (!_closing)
+                _playbackSettings.Apply<PlaybackPreferences>(current => current with { PreferCachedResources = value });
         }
     }
 

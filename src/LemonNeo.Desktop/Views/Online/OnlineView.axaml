@@ -9,11 +9,11 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <UserControl.Styles>
         <Style Selector="ListBox.categoryMenu ListBoxItem:selected TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource Brush.AccentText}" />
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
     </UserControl.Styles>
-    <Grid RowDefinitions="Auto,Auto,Auto,*">
+    <Grid RowDefinitions="Auto,Auto,*">
         <sharedControls:PageHeader Title="{Binding PageTitle}">
             <sharedControls:PageHeader.Actions>
                 <StackPanel
@@ -35,35 +35,9 @@
             </sharedControls:PageHeader.Actions>
         </sharedControls:PageHeader>
         <Border
-            Background="{DynamicResource Brush.DangerSoft}"
-            Grid.Row="1"
-            IsVisible="{Binding HasError}"
-            Margin="0,0,0,12"
-            Padding="14">
-            <Grid ColumnDefinitions="*,Auto">
-                <TextBlock
-                    Foreground="{DynamicResource Brush.Danger}"
-                    Margin="0,0,12,0"
-                    MaxHeight="90"
-                    Text="{Binding Error}"
-                    TextWrapping="Wrap" />
-                <Button
-                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}"
-                    Classes="ghost compact"
-                    Command="{Binding DismissErrorCommand}"
-                    Grid.Column="1">
-                    <Path
-                        Classes="icon"
-                        Data="{StaticResource Icon.Close}"
-                        Height="14"
-                        Width="14" />
-                </Button>
-            </Grid>
-        </Border>
-        <Border
             BorderBrush="{DynamicResource Brush.Border}"
             BorderThickness="0,0,0,1"
-            Grid.Row="2"
+            Grid.Row="1"
             IsVisible="{Binding HasServices}">
             <ListBox
                 AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.Online}}"
@@ -90,7 +64,7 @@
 
         <Grid
             ColumnDefinitions="Auto,*"
-            Grid.Row="3"
+            Grid.Row="2"
             Margin="0,20,0,0"
             Name="PlaylistSection">
             <Border
@@ -162,14 +136,13 @@
                                         CornerRadius="8"
                                         Height="44"
                                         Loader="{Binding ArtworkLoader}"
-                                        Margin="0,0,18,0"
                                         SourceUri="{Binding ArtworkUri}"
                                         VerticalAlignment="Center"
                                         Width="44" />
                                     <TextBlock
                                         FontWeight="SemiBold"
                                         Grid.Column="1"
-                                        Margin="0,0,16,0"
+                                        Margin="18,0,16,0"
                                         Text="{Binding Name}"
                                         TextTrimming="CharacterEllipsis"
                                         VerticalAlignment="Center" />

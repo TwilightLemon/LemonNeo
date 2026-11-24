@@ -1,0 +1,19 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:views="using:LemonNeo.Desktop.Views.Playback"
+    xmlns:vm="using:LemonNeo.Desktop.ViewModels.Tools"
+    xmlns:i18n="using:LemonNeo.Desktop.Services"
+    x:Class="LemonNeo.Desktop.Views.Playback.DecodeProfileView" x:DataType="vm:ProfileEditorViewModel" x:Name="Panel">
+    <StackPanel Spacing="8">
+        <views:ProfileScopeView />
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" IsEnabled="{Binding CanEditProfile}">
+            <StackPanel Spacing="4">
+                <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.PlaybackSpeed}}" />
+                <NumericUpDown Minimum="0.5" Maximum="2" Increment="0.05" FormatString="0.00"
+                               Value="{Binding Speed}" AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.PlaybackSpeed}}" />
+            </StackPanel>
+            <Button Name="EqualizerButton" Grid.Column="1" VerticalAlignment="Bottom" Content="{Translate {x:Static i18n:LanguageManager+Keys.Equalizer}}" Click="OnEqualizer" />
+        </Grid>
+        <TextBlock Classes="caption" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" Text="{Binding Error}" TextWrapping="Wrap" />
+    </StackPanel>
+</UserControl>

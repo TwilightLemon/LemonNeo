@@ -20,6 +20,8 @@ public sealed class PlaylistSyncServiceTests
         var a = Song("a");
         var playlist = fixture.Import(Snapshot(a, Song("b"), a));
         var ids = playlist.Items.Select(item => item.Id).ToArray();
+        playlist.DecodeProfile = new() { Speed = 1.1 };
+        playlist.Items[0].DecodeProfile = new() { Speed = 1.25 };
         fixture.Playlists.EnrichExternalIds(playlist.Id, ids[0], [new("isrc", "enriched")]);
         fixture.Provider.Remote = Snapshot(a with { Title = "Updated" }, a, Song("c")) with { Name = "Renamed" };
 
@@ -30,12 +32,19 @@ public sealed class PlaylistSyncServiceTests
         Assert.Equal("Renamed", playlist.Name);
         Assert.Equal(["a", "a", "c"], playlist.Items.Select(item => item.Track.Id.RemoteId));
         Assert.Equal([ids[0], ids[2]], playlist.Items.Take(2).Select(item => item.Id));
+        Assert.Equal(1.1, playlist.DecodeProfile?.Speed);
+        Assert.Equal(1.25, playlist.Items[0].DecodeProfile?.Speed);
+        Assert.Null(playlist.Items[1].DecodeProfile);
         Assert.Equal("Updated", playlist.Items[0].Track.Title);
         Assert.Contains(new ExternalMusicId("isrc", "enriched"), playlist.Items[0].Track.ExternalIds);
         Assert.Equal(3, playlist.Items.Select(item => item.Id).Distinct().Count());
         var same = await fixture.Sync.SynchronizeAsync(playlist.Id);
         Assert.True(same.Succeeded);
         Assert.False(same.Changed);
+
+        var copy = fixture.Playlists.CreateEditableCopy(playlist.Id);
+        Assert.Equal(playlist.DecodeProfile, copy.DecodeProfile);
+        Assert.Equal(playlist.Items[0].DecodeProfile, copy.Items[0].DecodeProfile);
     }
 
     [Theory]
@@ -352,7 +361,16 @@ public sealed class PlaylistSyncServiceTests
         };
         library.Replace(new MusicLibrary
         {
-            Playlists = [new() { Id = mirror.PlaylistId, Name = "Persisted" }],
+            Playlists =
+            [
+                new()
+                {
+                    Id = mirror.PlaylistId,
+                    Name = "Persisted",
+                    DecodeProfile = new() { Speed = 1.1 },
+                    Items = [new() { Track = Song("a"), SortKey = "1000", DecodeProfile = new() { Speed = 1.25 } }]
+                }
+            ],
             Mirrors = [mirror],
             IsPlaylistSyncPaused = true
         });
@@ -360,7 +378,10 @@ public sealed class PlaylistSyncServiceTests
         var loaded = await new LibraryService(repository).LoadAsync();
         Assert.True(loaded.IsPlaylistSyncPaused);
         Assert.Equal(mirror, Assert.Single(loaded.Mirrors));
-        Assert.Equal("Persisted", Assert.Single(loaded.Playlists).Name);
+        var playlist = Assert.Single(loaded.Playlists);
+        Assert.Equal("Persisted", playlist.Name);
+        Assert.Equal(1.1, playlist.DecodeProfile?.Speed);
+        Assert.Equal(1.25, Assert.Single(playlist.Items).DecodeProfile?.Speed);
         // Flags are index-only changes and must persist without touching playlist files.
         library.Current.IsPlaylistSyncPaused = false;
         library.TouchIndex();

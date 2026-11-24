@@ -14,7 +14,7 @@ internal sealed record QqMusicProfile(
     Uri? AvatarUri,
     IReadOnlyList<RemotePlaylistSummary> CreatedPlaylists);
 
-internal sealed class QqMusicApiClient(HttpClient httpClient)
+internal sealed partial class QqMusicApiClient(HttpClient httpClient)
 {
     private const string ProviderId = "qqmusic";
 
@@ -30,7 +30,7 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
         using var document = await GetJsonAsync(
             $"https://c.y.qq.com/rsc/fcgi-bin/fcg_get_profile_homepage.fcg?" +
             $"loginUin={userId}&hostUin=0&format=json&inCharset=utf8&outCharset=utf-8&" +
-            $"notice=0&platform=yqq&needNewCode=0&cid=205360838&ct=20&userid={userId}&" +
+            $"notice=0&platform=yqq&needNewCode=0&cid=205360838&ct=20&userid={userId}&g_tk={authentication.Gtk}&" +
             "reqfrom=1&reqtype=0",
             authentication.Cookie,
             cancellationToken);
@@ -352,6 +352,7 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
 
     private static Track? TryMapTrack(JsonElement value)
     {
+        if (value.ValueKind != JsonValueKind.Object) return null;
         var songMid = ReadFirstString(value, "songmid", "mid");
         var songId = ReadFirstString(value, "songid", "id");
         var remoteId = !string.IsNullOrWhiteSpace(songMid) ? songMid : songId;
@@ -420,6 +421,8 @@ internal sealed class QqMusicApiClient(HttpClient httpClient)
 
     private static void EnsureApiSuccess(JsonElement root, string operation)
     {
+        if (ReadInt64(root, "code") is 1000 or 104400 or 104401)
+            throw new QqSessionExpiredException();
         if (ReadInt64(root, "code") is { } code && code != 0)
             throw new ProviderException($"QQ Music {operation} API returned code {code}.");
     }

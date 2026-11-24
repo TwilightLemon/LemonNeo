@@ -8,6 +8,8 @@ using Avalonia.VisualTree;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LemonNeo.Desktop.Controls.Navigation;
+using LemonNeo.Desktop.Controls.Shared;
+using LemonNeo.Desktop.ViewModels.Catalog;
 using LemonNeo.Desktop.ViewModels.Accounts;
 using LemonNeo.Desktop.ViewModels.Library;
 using LemonNeo.Desktop.ViewModels.Lyrics;
@@ -19,6 +21,7 @@ using LemonNeo.Desktop.ViewModels.Settings;
 using LemonNeo.Desktop.ViewModels.Shared;
 using LemonNeo.Desktop.ViewModels.Tools;
 using LemonNeo.Desktop.Views.Accounts;
+using LemonNeo.Desktop.Views.Catalog;
 using LemonNeo.Desktop.Views.Library;
 using LemonNeo.Desktop.Views.Lyrics;
 using LemonNeo.Desktop.Views.Metadata;
@@ -51,6 +54,7 @@ public sealed class DesktopNavigation : ObservableObject, IAsyncDisposable
     private HistoryEntry _currentEntry = null!;
     private bool _disposed;
     private bool _isNavigating;
+    private bool _isLyricsPageTarget;
 
     public DesktopNavigation(Func<string, Guid?, PageViewModel> factory, DesktopContext context,
         PlaybackViewModel playback)
@@ -94,6 +98,13 @@ public sealed class DesktopNavigation : ObservableObject, IAsyncDisposable
     public bool IsOnline => Current.Route == DesktopRoutes.Online;
     public bool IsQueue => Current.Route == DesktopRoutes.Queue;
     public bool IsLyrics => Current.Route == DesktopRoutes.Lyrics;
+    /// <summary>The lyrics state of the page being presented, including during its transition.</summary>
+    public bool IsLyricsPageTarget
+    {
+        get => _isLyricsPageTarget;
+        private set => SetProperty(ref _isLyricsPageTarget, value);
+    }
+
     public bool IsTools => Current.Route == DesktopRoutes.Tools;
     public bool IsSettings => Current.Route == DesktopRoutes.Settings;
     public AsyncRelayCommand<string> NavigateCommand { get; }
@@ -158,6 +169,25 @@ public sealed class DesktopNavigation : ObservableObject, IAsyncDisposable
                 RetireIfUnreferenced(entry);
                 throw;
             }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task OpenCatalogItemAsync(CatalogItem item)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            if (_disposed || Current is CatalogDetailViewModel current && current.Item.Id == item.Id &&
+                current.Item.Kind == item.Kind && current.Item.ResolveFromTrack == item.ResolveFromTrack &&
+                (!item.ResolveFromTrack || current.Item.Name == item.Name)) return;
+            var page = new CatalogDetailViewModel(_context, this, _playback, item);
+            page.SetNavigationActive(false);
+            Own(page);
+            await NavigateToNewEntryAsync(new HistoryEntry(page.Route, null) { TransientPage = page });
         }
         finally
         {
@@ -270,7 +300,7 @@ public sealed class DesktopNavigation : ObservableObject, IAsyncDisposable
         var previous = Host.NavigationStack.LastOrDefault() as ContentPage;
         try
         {
-            await Host.ReplaceAsync(next, Transition());
+            await Host.ReplaceAsync(next, Transition(pageModel.Route));
             if (!ReferenceEquals(Host.NavigationStack.LastOrDefault(), next)) return false;
             Current.SetNavigationActive(false);
             // Releasing the content after the transition severs every history reference to its controls.
@@ -290,6 +320,7 @@ public sealed class DesktopNavigation : ObservableObject, IAsyncDisposable
         }
         finally
         {
+            IsLyricsPageTarget = IsLyrics;
             if (!ReferenceEquals(Host.NavigationStack.LastOrDefault(), next))
             {
                 next.Content = null;
@@ -314,8 +345,9 @@ public sealed class DesktopNavigation : ObservableObject, IAsyncDisposable
     {
         if (page.Content is not Control view) return null;
         var trackList = view.GetVisualDescendants().OfType<ListBox>()
-            .FirstOrDefault(control => control.Name == "TrackList");
-        return (trackList ?? view).GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+            .FirstOrDefault(control => control.IsEffectivelyVisible && control.Name is "TrackList" or "CatalogList");
+        return (trackList ?? view).GetVisualDescendants().OfType<ScrollViewer>()
+            .FirstOrDefault(control => control.IsEffectivelyVisible);
     }
 
     private PageViewModel GetCachedPage(string route, Guid? playlist)
@@ -458,8 +490,9 @@ public sealed class DesktopNavigation : ObservableObject, IAsyncDisposable
         OnPropertyChanged(nameof(HistoryEntryCount));
     }
 
-    private SlideFadeTransition Transition() => new()
+    private SlideFadeTransition Transition(string route) => new()
     {
+        OnStarting = () => IsLyricsPageTarget = route == DesktopRoutes.Lyrics,
         Duration = _appearance.Current.ReduceMotion || TopLevel.GetTopLevel(Host) is null
             ? TimeSpan.Zero
             : TimeSpan.FromMilliseconds(220)
@@ -472,6 +505,7 @@ public sealed class DesktopNavigation : ObservableObject, IAsyncDisposable
             LibraryViewModel => new LibraryView(), SearchViewModel => new SearchView(),
             OnlineViewModel => new OnlineView(),
             AccountsViewModel => new AccountsView(),
+            CatalogDetailViewModel => new CatalogDetailView(),
             LyricsViewModel => new LyricsView(), TrackEditorPageViewModel => new TrackEditorView(),
             ToolsViewModel => new ToolsView(),
             MatchPlaylistPageViewModel => new MatchPlaylistView(),
@@ -484,6 +518,7 @@ public sealed class DesktopNavigation : ObservableObject, IAsyncDisposable
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
             VerticalContentAlignment = VerticalAlignment.Stretch
         };
+        if (view is not LibraryView) PageBottomFade.Attach(page);
         NavigationPage.SetHasNavigationBar(page, false);
         return page;
     }

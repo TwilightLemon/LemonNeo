@@ -38,7 +38,7 @@ public sealed class MainViewModel : PageViewModel
         ToggleQueueCommand = new RelayCommand(ToggleQueue);
         CloseQueueCommand = new RelayCommand(() => IsQueueOpen = false, () => IsQueueOpen);
         _visualEffectsSubscription =
-            Context.Settings.Subscribe<VisualEffectsPreferences>(_ => RefreshVisualEffectsProperties());
+            Context.Settings.Subscribe<VisualEffectsPreferences>(_ => OnPropertyChanged(nameof(VisualEffects)));
         Navigation.PropertyChanged += OnNavigationChanged;
         Navigation.Initialize();
         Context.LibraryChanged += OnLibraryChanged;
@@ -49,9 +49,6 @@ public sealed class MainViewModel : PageViewModel
     public DesktopNavigation Navigation { get; }
     public ObservableCollection<PlaylistMenuItemViewModel> Playlists { get; } = [];
     public VisualEffectsPreferences VisualEffects => Context.Settings.Get<VisualEffectsPreferences>();
-
-    public bool IsAppleMusicMeshBackgroundVisible => VisualEffects.AppleMusicMeshEnabled &&
-                                                      (!VisualEffects.AppleMusicMeshLyricsOnly || Navigation.IsLyrics);
 
     public PlaylistMenuItemViewModel? SelectedPlaylist
     {
@@ -82,6 +79,7 @@ public sealed class MainViewModel : PageViewModel
         set
         {
             if (!SetProperty(ref _searchQuery, value)) return;
+            if (_searchPage is { } search && ReferenceEquals(Navigation.Current, search)) search.SearchQuery = value;
             OnPropertyChanged(nameof(CanSearch));
             SearchCommand.NotifyCanExecuteChanged();
         }
@@ -128,7 +126,7 @@ public sealed class MainViewModel : PageViewModel
     {
         if (!IsQueueOpen)
         {
-            QueueDrawer ??= new PlaybackQueueViewModel(Context, Playback);
+            QueueDrawer ??= new PlaybackQueueViewModel(Context, Playback, Navigation);
             _ = QueueDrawer.ActivateAsync();
         }
 
@@ -197,7 +195,6 @@ public sealed class MainViewModel : PageViewModel
         if (!Navigation.IsLyrics) IsLyricsExpanded = false;
         IsQueueOpen = false;
         ToggleLyricsExpandedCommand.NotifyCanExecuteChanged();
-        OnPropertyChanged(nameof(IsAppleMusicMeshBackgroundVisible));
         SyncPlaylistSelection();
         if (Navigation.Current is SearchViewModel search) SearchQuery = search.SearchQuery;
     }
@@ -234,12 +231,6 @@ public sealed class MainViewModel : PageViewModel
         SyncPlaylistSelection();
     }
 
-    private void RefreshVisualEffectsProperties()
-    {
-        OnPropertyChanged(nameof(VisualEffects));
-        OnPropertyChanged(nameof(IsAppleMusicMeshBackgroundVisible));
-    }
-
     public Task ReorderPlaylistsAsync(PlaylistMenuItemViewModel source, PlaylistMenuItemViewModel target, bool after)
     {
         if (!CanInteract || source.Id == target.Id) return Task.CompletedTask;
@@ -252,12 +243,12 @@ public sealed class MainViewModel : PageViewModel
                 preferences with { PlaylistOrder = ids.ToArray() });
             await _host.Settings.SaveAsync(ct);
             Context.RefreshLibrary();
+            Notify(NotificationLevel.Success, LanguageManager.Keys.Saved);
         });
     }
 
     internal void BeginStartup()
     {
-        SetError(null);
         SetStatus(LanguageManager.Keys.Loading);
         IsBusy = true;
         RaiseInteractionProperties();
@@ -266,23 +257,20 @@ public sealed class MainViewModel : PageViewModel
     internal async Task CompleteStartupAsync()
     {
         Context.IsInitialized = true;
+        Context.DecoderControls.Initialize();
         Context.RefreshLibrary();
         var report = _host.Plugins.LastReport;
         if (report.Failures.Count > 0)
-            SetError(LanguageManager.Keys.PluginFailures, [report.Failures.Count],
-                string.Join(Environment.NewLine, report.Failures.Select(f => f.Error)));
+            Notify(NotificationLevel.Warning, LanguageManager.Keys.PluginFailures, report.Failures.Count);
         Playback.UpdateSnapshot();
         await Navigation.Current.ActivateAsync();
-        SetStatus(null);
-        IsBusy = false;
-        RaiseInteractionProperties();
+        FinishStartup();
         Context.Updates.CheckAtStartup();
         Context.Synchronization.Start();
     }
 
-    internal void ReportStartupFailure(string message)
+    internal void FinishStartup()
     {
-        SetError(LanguageManager.Keys.StartupFailed, [message]);
         SetStatus(null);
         IsBusy = false;
         RaiseInteractionProperties();
@@ -294,6 +282,7 @@ public sealed class MainViewModel : PageViewModel
         Context.LibraryChanged -= OnLibraryChanged;
         Navigation.PropertyChanged -= OnNavigationChanged;
         _visualEffectsSubscription.Dispose();
+        Context.DecoderControls.Dispose();
         if (_searchPage is not null) _searchPage.PropertyChanged -= OnSearchChanged;
         await base.DisposeAsync();
         await Context.Updates.DisposeAsync();

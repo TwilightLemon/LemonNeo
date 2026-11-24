@@ -14,6 +14,9 @@
                 <ResourceInclude Source="/Resources/Themes/Controls.axaml" />
                 <ResourceInclude Source="/Resources/Themes/Templates.axaml" />
             </ResourceDictionary.MergedDictionaries>
+            <CornerRadius x:Key="OverlayCornerRadius">12</CornerRadius>
+            <!-- Account for the transparent shadow margin when attaching a submenu to its parent. -->
+            <x:Double x:Key="MenuFlyoutSubItemPopupHorizontalOffset">-14</x:Double>
         </ResourceDictionary>
     </Application.Resources>
     <!--  The caption theme derives from Fluent's official drawn decorations.  -->
@@ -26,5 +29,6 @@
         </FluentTheme>
         <StyleInclude Source="/Resources/Themes/WindowChrome.axaml" />
         <StyleInclude Source="/Resources/Themes/Styles.axaml" />
+        <StyleInclude Source="/Resources/Themes/Popups.axaml" />
     </Application.Styles>
 </Application>

@@ -138,8 +138,16 @@ public sealed class QqMusicApiClientTests
     [Fact]
     public async Task ReportsFollowedAlbumApiFailure()
     {
-        using var http = CreateClient(_ => Json("""{"code":1000}"""));
+        using var http = CreateClient(_ => Json("""{"code":500}"""));
         await Assert.ThrowsAsync<ProviderException>(() =>
+            new QqMusicApiClient(http).GetFollowedAlbumsAsync(Authentication, default));
+    }
+
+    [Fact]
+    public async Task ReportsExpiredSessionWhenListingFollowedAlbums()
+    {
+        using var http = CreateClient(_ => Json("""{"code":1000}"""));
+        await Assert.ThrowsAsync<QqSessionExpiredException>(() =>
             new QqMusicApiClient(http).GetFollowedAlbumsAsync(Authentication, default));
     }
 

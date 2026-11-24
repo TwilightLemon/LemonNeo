@@ -21,6 +21,8 @@ public sealed class LyricsViewModel : PageViewModel
     private readonly IDisposable _lyricsSubscription;
     private readonly PlaybackLyricsService _lyrics;
     private IReadOnlyList<LyricsLine> _lyricLines = [];
+    private bool _desktopWindowOpen;
+    private long? _notifiedLyricsFailure;
     private string _lyricsStatusKey = "NoLyrics";
     private PlaybackSessionSnapshot _snapshot;
 
@@ -46,14 +48,17 @@ public sealed class LyricsViewModel : PageViewModel
         Playback.StateChanged += OnPlaybackChanged;
         Playback.TimelineChanged += OnPlaybackTimeline;
         _lyrics.Changed += OnLyricsChanged;
-        UpdateSnapshot();
+        UpdateDocument();
+        UpdateLyricsPosition();
     }
 
     private LyricsPreferences _lyricsPreferences => Context.Settings.Get<LyricsPreferences>();
     private DesktopLyricsPreferences _desktopPreferences => Context.Settings.Get<DesktopLyricsPreferences>();
     public PlaybackViewModel Playback { get; }
+    public DesktopNotificationService DesktopNotifications { get; } = new();
     public CoreLyrics? Document { get; private set; }
 
+    public double PlaybackSpeed => _snapshot.PlaybackSpeed;
     public double PositionMilliseconds => _snapshot.Timeline.Position.TotalMilliseconds;
     public double DurationMilliseconds => _snapshot.Timeline.Duration?.TotalMilliseconds ?? 0;
     public bool IsStopped => _snapshot.State is not (PlaybackState.Playing or PlaybackState.Paused);
@@ -220,12 +225,20 @@ public sealed class LyricsViewModel : PageViewModel
 
     private void ApplyLyricsPreferences(Func<LyricsPreferences, LyricsPreferences> update)
     {
-        if (!_lifetime.IsCancellationRequested) Context.Settings.Apply(update);
+        if (_lifetime.IsCancellationRequested) return;
+        try { Context.Settings.Apply(update); }
+        catch (Exception exception) { Notify(NotificationLevel.Error, LanguageManager.Keys.OperationFailed, exception.Message); }
     }
 
     private void ApplyDesktopPreferences(Func<DesktopLyricsPreferences, DesktopLyricsPreferences> update)
     {
-        if (!_lifetime.IsCancellationRequested) Context.Settings.Apply(update);
+        if (_lifetime.IsCancellationRequested) return;
+        try { Context.Settings.Apply(update); }
+        catch (Exception exception)
+        {
+            DesktopNotifications.Show(_text.Format(LanguageManager.Keys.OperationFailed, exception.Message),
+                NotificationLevel.Error);
+        }
     }
 
     private void RefreshLyricsPreferenceProperties()
@@ -260,6 +273,32 @@ public sealed class LyricsViewModel : PageViewModel
         SeekLyricCommand.NotifyCanExecuteChanged();
         UpdateDocument();
         UpdateLyricsPosition();
+        ReportLyricsFailure();
+    }
+
+    public override Task ActivateAsync()
+    {
+        UpdateSnapshot();
+        return Task.CompletedTask;
+    }
+
+    internal void SetDesktopWindowOpen(bool value)
+    {
+        _desktopWindowOpen = value;
+        if (value) ReportLyricsFailure();
+    }
+
+    private void ReportLyricsFailure()
+    {
+        if (!_desktopWindowOpen && !IsNavigationActive) return;
+        var lyrics = _lyrics.Snapshot;
+        if (lyrics.RequestId != _snapshot.RequestId || lyrics.RequestId == _notifiedLyricsFailure) return;
+        if (lyrics.Status != PlaybackLyricsStatus.Failed &&
+            lyrics.Result is not { Lyrics: null, ProviderErrors.Count: > 0 }) return;
+
+        _notifiedLyricsFailure = lyrics.RequestId;
+        var notifications = _desktopWindowOpen ? DesktopNotifications : Context.Notifications;
+        notifications.Show(_text[LanguageManager.Keys.LyricsError], NotificationLevel.Error);
     }
 
     private void OnPlaybackTimeline(object? sender, EventArgs args)
@@ -281,7 +320,6 @@ public sealed class LyricsViewModel : PageViewModel
         _lyricsStatusKey = current ? snapshot.Status switch
         {
             PlaybackLyricsStatus.Loading => "LyricsLoading",
-            PlaybackLyricsStatus.Failed => "LyricsError",
             _ => "NoLyrics"
         } : "NoLyrics";
         if (!ReferenceEquals(Document, document))
@@ -294,6 +332,7 @@ public sealed class LyricsViewModel : PageViewModel
 
     private void UpdateLyricsPosition()
     {
+        OnPropertyChanged(nameof(PlaybackSpeed));
         OnPropertyChanged(nameof(PositionMilliseconds));
         OnPropertyChanged(nameof(DurationMilliseconds));
         OnPropertyChanged(nameof(IsStopped));

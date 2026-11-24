@@ -19,6 +19,21 @@ public sealed class PreparedPlayback(
     public IPlayerProvider Player { get; } = player;
     public Track Track { get; } = track;
     public PlaybackSourceDetails SourceDetails { get; } = sourceDetails;
+    public ResolvedDecodeProfile? AppliedProfile { get; private set; }
+    public double PlaybackSpeed => AppliedProfile?.Profile.Speed ?? 1;
+    public bool SupportsProfiles => stream is IProfiledPlayback;
+
+    public void ApplyProfile(DecodeProfile profile) => ApplyResolvedProfile(new(profile));
+
+    internal void ApplyResolvedProfile(ResolvedDecodeProfile profile)
+    {
+        if (stream is not IProfiledPlayback configurable || profile == AppliedProfile) return;
+        var previous = AppliedProfile?.Profile;
+        if (previous is null || previous.Speed != profile.Profile.Speed || !previous.Gains.AsSpan().SequenceEqual(profile.Profile.Gains.AsSpan()))
+            configurable.ApplyProfile(profile.Profile);
+        AppliedProfile = profile;
+    }
+
     public void Activate(double volume) => stream.Activate(volume);
 
     public void Dispose()

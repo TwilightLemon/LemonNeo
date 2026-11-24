@@ -7,7 +7,7 @@
     xmlns:sharedControls="using:LemonNeo.Desktop.Controls.Shared"
     xmlns:sharedVm="using:LemonNeo.Desktop.ViewModels.Shared"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Grid RowDefinitions="Auto,Auto,Auto,*">
+    <Grid RowDefinitions="Auto,Auto,*">
         <sharedControls:PageHeader Title="{Binding PageTitle}">
             <sharedControls:PageHeader.Actions>
                 <StackPanel
@@ -29,35 +29,9 @@
             </sharedControls:PageHeader.Actions>
         </sharedControls:PageHeader>
         <Border
-            Background="{DynamicResource Brush.DangerSoft}"
-            Grid.Row="1"
-            IsVisible="{Binding HasError}"
-            Margin="0,0,0,12"
-            Padding="14">
-            <Grid ColumnDefinitions="*,Auto">
-                <TextBlock
-                    Foreground="{DynamicResource Brush.Danger}"
-                    Margin="0,0,12,0"
-                    MaxHeight="90"
-                    Text="{Binding Error}"
-                    TextWrapping="Wrap" />
-                <Button
-                    AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.DismissError}}"
-                    Classes="ghost compact"
-                    Command="{Binding DismissErrorCommand}"
-                    Grid.Column="1">
-                    <Path
-                        Classes="icon"
-                        Data="{StaticResource Icon.Close}"
-                        Height="14"
-                        Width="14" />
-                </Button>
-            </Grid>
-        </Border>
-        <Border
             BorderBrush="{DynamicResource Brush.Border}"
             BorderThickness="0,0,0,1"
-            Grid.Row="2"
+            Grid.Row="1"
             IsVisible="{Binding HasServices}">
             <ListBox
                 AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.AuthenticationProvider}}"
@@ -81,7 +55,7 @@
                 </ListBox.ItemTemplate>
             </ListBox>
         </Border>
-        <Grid Grid.Row="3" Margin="0,24,0,0">
+        <Grid Grid.Row="2" Margin="0,24,0,0">
             <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasServices}">
                 <StackPanel IsEnabled="{Binding CanInteract}" Spacing="20">
                     <TextBlock
@@ -105,13 +79,10 @@
                             Width="56">
                             <Grid>
                                 <Path
+                                    Classes="icon extraLarge"
                                     Data="{StaticResource Icon.Account}"
-                                    Fill="{DynamicResource Brush.TextSecondary}"
-                                    Height="28"
                                     IsVisible="{Binding !HasAccountAvatar}"
-                                    Name="AccountAvatarPlaceholder"
-                                    Stretch="Uniform"
-                                    Width="28" />
+                                    Name="AccountAvatarPlaceholder" />
                                 <Image
                                     Name="AccountAvatarImage"
                                     Source="{Binding AccountAvatar}"
@@ -147,8 +118,9 @@
                                 VerticalAlignment="Center" />
                             <Button
                                 Classes="ghost"
-                                Command="{Binding ToggleCookieEditorCommand}"
+                                Command="{Binding WebLoginCommand}"
                                 Content="{Translate {x:Static i18n:LanguageManager+Keys.UpdateSignIn}}"
+                                IsVisible="{Binding CanUseWebLogin}"
                                 MinHeight="32"
                                 Name="CookieLoginToggle"
                                 Padding="10,6" />
@@ -162,6 +134,17 @@
                                 Padding="10,6" />
                         </StackPanel>
                     </Grid>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button
+                            Classes="primary"
+                            Command="{Binding WebLoginCommand}"
+                            Content="{Translate {x:Static i18n:LanguageManager+Keys.WebLogin}}"
+                            IsVisible="{Binding ShowWebLogin}" />
+                        <Button
+                            Classes="ghost"
+                            Command="{Binding ToggleCookieEditorCommand}"
+                            Content="{Translate {x:Static i18n:LanguageManager+Keys.CookieLogin}}" />
+                    </StackPanel>
                     <StackPanel
                         HorizontalAlignment="Left"
                         IsVisible="{Binding IsCookieEditorOpen}"

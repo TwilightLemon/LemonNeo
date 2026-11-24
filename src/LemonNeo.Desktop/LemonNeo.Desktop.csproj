@@ -2,15 +2,20 @@
     <PropertyGroup>
         <OutputType>WinExe</OutputType>
         <ApplicationIcon>Resources/Icons/App.ico</ApplicationIcon>
+        <ApplicationManifest>Properties/app.manifest</ApplicationManifest>
         <Version>0.1.4</Version>
         <IsLemonNeoHost>true</IsLemonNeoHost>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+        <!-- BackdropEffect is available in the official 12.2 nightly builds. -->
+        <AvaloniaVersion>12.2.999-cibuild0101511-alpha</AvaloniaVersion>
+        <RestoreAdditionalProjectSources>$(RestoreAdditionalProjectSources);https://nuget-feed-nightly.avaloniaui.net/v3/index.json</RestoreAdditionalProjectSources>
     </PropertyGroup>
     <ItemGroup>
         <AvaloniaResource Include="Resources/Icons/App.ico" />
-        <PackageReference Include="Avalonia.Desktop" Version="12.1.3" />
-        <PackageReference Include="Avalonia.Skia" Version="12.1.3" />
-        <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.3" />
+        <PackageReference Include="Avalonia.Controls.WebView" Version="12.1.2" />
+        <PackageReference Include="Avalonia.Desktop" Version="$(AvaloniaVersion)" />
+        <PackageReference Include="Avalonia.Skia" Version="$(AvaloniaVersion)" />
+        <PackageReference Include="Avalonia.Themes.Fluent" Version="$(AvaloniaVersion)" />
         <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
         <PackageReference Include="Irihi.Lingua" Version="1.0.0" />
         <AdditionalFiles Include="Resources/Languages/*.json" />

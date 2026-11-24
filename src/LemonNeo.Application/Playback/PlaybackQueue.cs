@@ -15,6 +15,7 @@ public interface IPlaybackQueue
     void Restore(PlaybackQueueState state);
     PlaybackQueueState Snapshot();
     void Replace(IEnumerable<Track> tracks, int startIndex = 0);
+    void ReplaceItems(IEnumerable<PlaybackQueueItem> items, int startIndex = 0);
     PlaybackQueueItem Enqueue(Track track);
     bool UpdateTrack(Guid itemId, Track track);
     bool Remove(Guid itemId);
@@ -141,10 +142,15 @@ public sealed class PlaybackQueue : IPlaybackQueue
 
     public void Replace(IEnumerable<Track> tracks, int startIndex = 0)
     {
-        ArgumentNullException.ThrowIfNull(tracks);
+        ReplaceItems(tracks.Select(track => new PlaybackQueueItem { Track = track }), startIndex);
+    }
+
+    public void ReplaceItems(IEnumerable<PlaybackQueueItem> items, int startIndex = 0)
+    {
         lock (_gate)
         {
-            var replacements = tracks.Select(track => new PlaybackQueueItem { Track = track }).ToList();
+            var seen = new HashSet<Guid>();
+            var replacements = items.Select(item => seen.Add(item.Id) ? item : item with { Id = Guid.NewGuid() }).ToList();
             if (replacements.Count == 0)
             {
                 ClearCore();

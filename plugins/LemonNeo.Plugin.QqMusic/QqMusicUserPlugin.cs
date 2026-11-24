@@ -12,13 +12,16 @@ namespace LemonNeo.Plugin.QqMusic;
 
 public sealed record AccountSettings(string? UserId = null, string? Nickname = null, string? AvatarUri = null);
 
-public sealed class QqMusicUserPlugin :
+public sealed partial class QqMusicUserPlugin :
     ILemonPlugin,
     IMusicProvider,
     ITrackLookupProvider,
     IPlaylistProvider,
     IPlaylistCollectionProvider,
-    IAuthenticationProvider
+    IWebAuthenticationProvider,
+    ISearchProvider,
+    ISearchNamespaceProvider,
+    ICatalogProvider
 {
     private const string ProviderId = "qqmusic";
     private const string CookieKey = "y-qq-cookie";
@@ -37,7 +40,7 @@ public sealed class QqMusicUserPlugin :
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult<IReadOnlyList<AuthMethod>>([AuthMethod.Cookie]);
+        return Task.FromResult<IReadOnlyList<AuthMethod>>([AuthMethod.Browser, AuthMethod.Cookie]);
     }
 
     public async Task<AuthenticationState> AuthenticateAsync(
@@ -49,38 +52,27 @@ public sealed class QqMusicUserPlugin :
             throw new ProviderException("QQ Music login requires a complete y.qq.com cookie string.");
 
         var parsed = ParseCookie(rawCookie);
-        var authentication = new QqMusicCredentials(parsed.Cookie, parsed.UserId, parsed.Gtk);
-        var profile = await Required(_api).GetProfileAsync(authentication, cancellationToken);
-
-        var credentials = Required(_credentials);
-        var configuration = Required(_settings);
-        await credentials.SetSecretAsync(CookieKey, authentication.Cookie, cancellationToken);
-        await credentials.SetSecretAsync(
-            GtkKey,
-            authentication.Gtk.ToString(CultureInfo.InvariantCulture),
+        return await SaveLoginAsync(new QqMusicCredentials(parsed.Cookie, parsed.UserId, parsed.Gtk),
             cancellationToken);
-        configuration.Apply<AccountSettings>(_ =>
-            new AccountSettings(profile.UserId, profile.Nickname, profile.AvatarUri?.AbsoluteUri));
-
-        _authentication = authentication;
-        State = new AuthenticationState(
-            true,
-            profile.Nickname,
-            profile.UserId,
-            profile.AvatarUri);
-        _logger?.LogInformation("Authenticated QQ Music user {UserId}.", profile.UserId);
-        return State;
     }
 
     public async Task SignOutAsync(CancellationToken cancellationToken = default)
     {
-        var credentials = Required(_credentials);
-        var configuration = Required(_settings);
-        await credentials.DeleteSecretAsync(CookieKey, cancellationToken);
-        await credentials.DeleteSecretAsync(GtkKey, cancellationToken);
-        configuration.Apply<AccountSettings>(_ => new AccountSettings());
-        _authentication = null;
-        State = new AuthenticationState(false);
+        await _sessionGate.WaitAsync(cancellationToken);
+        try
+        {
+            var credentials = Required(_credentials);
+            await credentials.DeleteSecretAsync(CookieKey, cancellationToken);
+            await credentials.DeleteSecretAsync(GtkKey, cancellationToken);
+            await credentials.DeleteSecretAsync(SessionKey, cancellationToken);
+            Required(_settings).Apply<AccountSettings>(_ => new AccountSettings());
+            _authentication = null;
+            State = new AuthenticationState(false);
+        }
+        finally
+        {
+            _sessionGate.Release();
+        }
     }
 
     public PluginDescriptor Descriptor { get; } = new(
@@ -94,32 +86,19 @@ public sealed class QqMusicUserPlugin :
         await _settings.RegisterAsync(nameof(AccountSettings), new AccountSettings(),
             cancellationToken: cancellationToken);
         _credentials = context.Credentials;
-        _api = new QqMusicApiClient(context.HttpClientFactory.CreateClient(Descriptor.Id));
+        _http = new HttpClient(new SocketsHttpHandler { UseCookies = false, AllowAutoRedirect = false })
+        {
+            Timeout = TimeSpan.FromSeconds(15)
+        };
+        _api = new QqMusicApiClient(_http);
         _logger = context.LoggerFactory.CreateLogger<QqMusicUserPlugin>();
 
-        var cookie = await _credentials.GetSecretAsync(CookieKey, cancellationToken);
-        var gtkValue = await _credentials.GetSecretAsync(GtkKey, cancellationToken);
-        var account = _settings.Get<AccountSettings>();
-        var userId = account.UserId;
-        var nickname = account.Nickname;
-        var avatarValue = account.AvatarUri;
-        if (!string.IsNullOrWhiteSpace(cookie) &&
-            long.TryParse(gtkValue, NumberStyles.None, CultureInfo.InvariantCulture, out var gtk) &&
-            !string.IsNullOrWhiteSpace(userId))
-        {
-            _authentication = new QqMusicCredentials(cookie, userId, gtk);
-            State = new AuthenticationState(
-                true,
-                nickname ?? userId,
-                userId,
-                TryCreateUri(avatarValue));
-        }
-
+        await RestoreSessionAsync(cancellationToken);
         var playbackClient = context.HttpClientFactory.CreateClient("LemonNeo.Plugin.QqMusic.Playback");
         playbackClient.Timeout = TimeSpan.FromSeconds(20);
         _playbackProvider = new QqMusicPlaybackProvider(
             playbackClient,
-            () => _authentication,
+            EnsureSessionAsync,
             context.LoggerFactory.CreateLogger<QqMusicPlaybackProvider>());
         context.RegisterProvider(this);
         context.RegisterProvider(_playbackProvider);
@@ -131,6 +110,8 @@ public sealed class QqMusicUserPlugin :
         _authentication = null;
         State = new AuthenticationState(false);
         _api = null;
+        _http?.Dispose();
+        _http = null;
         _playbackProvider = null;
         _settings = null;
         _credentials = null;
@@ -147,27 +128,26 @@ public sealed class QqMusicUserPlugin :
     public async IAsyncEnumerable<RemotePlaylistCollection> GetUserPlaylistCollectionsAsync(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var authentication = RequiredAuthentication();
         var api = Required(_api);
-        var profile = await api.GetProfileAsync(authentication, cancellationToken);
+        var profile = await WithSessionAsync(api.GetProfileAsync, cancellationToken);
         yield return new RemotePlaylistCollection(
             "created",
             "我创建的歌单",
             profile.CreatedPlaylists);
 
-        var followed = await api.GetFollowedPlaylistsAsync(authentication, cancellationToken);
+        var followed = await WithSessionAsync(api.GetFollowedPlaylistsAsync, cancellationToken);
         yield return new RemotePlaylistCollection(
             "followed",
             "我收藏的歌单",
             followed);
 
-        var followedAlbums = await api.GetFollowedAlbumsAsync(authentication, cancellationToken);
+        var followedAlbums = await WithSessionAsync(api.GetFollowedAlbumsAsync, cancellationToken);
         yield return new RemotePlaylistCollection(
             "followed-albums",
             "我收藏的专辑",
             followedAlbums);
 
-        var purchased = await api.GetPurchasedAlbumsAsync(authentication, cancellationToken);
+        var purchased = await WithSessionAsync(api.GetPurchasedAlbumsAsync, cancellationToken);
         yield return new RemotePlaylistCollection(
             "purchased-albums",
             "我购买的专辑",
@@ -190,12 +170,11 @@ public sealed class QqMusicUserPlugin :
         CancellationToken cancellationToken = default)
     {
         var (kind, remoteId) = ParseRemotePlaylistId(playlistId);
-        var authentication = RequiredAuthentication();
         var api = Required(_api);
         return kind switch
         {
-            "playlist" => api.GetPlaylistAsync(authentication, remoteId, cancellationToken),
-            "album" => api.GetAlbumAsync(authentication, remoteId, cancellationToken),
+            "playlist" => WithSessionAsync((session, ct) => api.GetPlaylistAsync(session, remoteId, ct), cancellationToken),
+            "album" => WithSessionAsync((session, ct) => api.GetAlbumAsync(session, remoteId, ct), cancellationToken),
             _ => throw new ProviderException($"Unsupported QQ Music collection type '{kind}'.")
         };
     }
@@ -228,16 +207,7 @@ public sealed class QqMusicUserPlugin :
         if (cookie.Length == 0 || cookie.Length > 65536 || cookie.IndexOfAny(['\r', '\n']) >= 0)
             throw new ProviderException("The QQ Music cookie is empty or malformed.");
 
-        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var segment in cookie.Split(';', StringSplitOptions.RemoveEmptyEntries))
-        {
-            var separator = segment.IndexOf('=');
-            if (separator <= 0) continue;
-
-            var name = segment[..separator].Trim();
-            var cookieValue = segment[(separator + 1)..].Trim().Trim('"');
-            if (name.Length > 0) values[name] = cookieValue;
-        }
+        var values = ReadCookies(cookie);
 
         if (!values.TryGetValue("qqmusic_key", out var qqmusicKey) ||
             string.IsNullOrWhiteSpace(qqmusicKey))
@@ -294,12 +264,7 @@ public sealed class QqMusicUserPlugin :
         return (kind, remoteId);
     }
 
-    private QqMusicCredentials RequiredAuthentication()
-    {
-        return State.IsAuthenticated && _authentication is not null
-            ? _authentication
-            : throw new ProviderException("QQ Music is not authenticated. Run 'login qqmusic' first.");
-    }
+
 
     private static Uri? TryCreateUri(string? value)
     {
