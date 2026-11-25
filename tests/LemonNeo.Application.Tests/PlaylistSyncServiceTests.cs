@@ -350,6 +350,41 @@ public sealed class PlaylistSyncServiceTests
     }
 
     [Fact]
+    public async Task PlaybackEnrichmentPersistsNewIdsAcrossPlaylistsAndRespectsLocalEdits()
+    {
+        using var fixture = new Fixture();
+        var original = Song("a") with { ExternalIds = [new("native", "queue-id", "song-id")] };
+        var removed = new ExternalMusicId("isrc", "old");
+        var discovered = new ExternalMusicId("alternative", "new", "song-id");
+        var existing = new ExternalMusicId("ALTERNATIVE", "new", "SONG-ID");
+        var mirror = fixture.Import(Snapshot(original with { ExternalIds = [removed] }, original));
+        fixture.Playlists.RemoveExternalId(mirror.Id, mirror.Items[0].Id, removed.Namespace, removed.Kind);
+        var local = fixture.Playlists.Create("Local");
+        fixture.Playlists.Add(local.Id, original with { ExternalIds = [existing] });
+        fixture.Playlists.Add(local.Id, original with { ExternalIds = [] });
+        fixture.Playlists.Add(local.Id, Song("b"));
+        await fixture.Library.SaveAsync();
+
+        var updated = original with
+        {
+            ExternalIds = [new("NATIVE", "queue-id", "SONG-ID"), discovered, removed]
+        };
+        Assert.True(fixture.Playlists.EnrichExternalIds(original, updated));
+        await fixture.Library.SaveAsync();
+
+        var saved = fixture.Repository.LastSave!.ChangedPlaylists;
+        var savedMirror = saved.Single(playlist => playlist.Id == mirror.Id);
+        Assert.Equal([discovered], savedMirror.Items[0].Track.ExternalIds);
+        Assert.Equal([original.ExternalIds[0], discovered, removed], savedMirror.Items[1].Track.ExternalIds);
+        Assert.All(savedMirror.Items, item => Assert.False(item.HasMetadataOverride));
+        var savedLocal = saved.Single(playlist => playlist.Id == local.Id);
+        Assert.Equal([existing, removed], savedLocal.Items[0].Track.ExternalIds);
+        Assert.Equal([discovered, removed], savedLocal.Items[1].Track.ExternalIds);
+        Assert.Empty(savedLocal.Items[2].Track.ExternalIds);
+        Assert.False(fixture.Playlists.EnrichExternalIds(original, updated));
+    }
+
+    [Fact]
     public async Task ExternalIdOnlyEditsDoNotFreezeSourceMetadataOrLoseChangesDuringSync()
     {
         using var fixture = new Fixture();
@@ -498,10 +533,15 @@ public sealed class PlaylistSyncServiceTests
     private sealed class MemoryRepository : ILibraryRepository
     {
         public bool FailSave { get; set; }
+        public LibrarySaveSnapshot? LastSave { get; private set; }
         public Task EnsureCreatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<MusicLibrary> LoadAsync(CancellationToken cancellationToken = default) => Task.FromResult(new MusicLibrary());
-        public Task SaveAsync(LibrarySaveSnapshot snapshot, CancellationToken cancellationToken = default) =>
-            FailSave ? Task.FromException(new IOException("Disk unavailable")) : Task.CompletedTask;
+        public Task SaveAsync(LibrarySaveSnapshot snapshot, CancellationToken cancellationToken = default)
+        {
+            if (FailSave) return Task.FromException(new IOException("Disk unavailable"));
+            LastSave = snapshot;
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class ProviderRegistry(TestProvider provider) : IProviderRegistry

@@ -51,6 +51,7 @@ public sealed class PlaybackSessionChangedEventArgs(PlaybackSessionSnapshot snap
 public sealed class PlaybackSessionService : IAsyncDisposable
 {
     private readonly LibraryService _library;
+    private readonly PlaylistService _playlists;
     private readonly PlaybackResolver _resolver;
     private readonly IPlaybackQueue _queue;
     private readonly ISettingsScope _settings;
@@ -77,10 +78,11 @@ public sealed class PlaybackSessionService : IAsyncDisposable
     private PlaybackSessionSnapshot _snapshot = new(PlaybackState.Stopped, null,
         new PlaybackTimelineInfo(TimeSpan.Zero, null), PlaybackMode.Sequential, -1, 0, null, null);
 
-    public PlaybackSessionService(LibraryService library, PlaybackResolver resolver, IPlaybackQueue queue, IAppSettingsService settings,
-        ILogger<PlaybackSessionService> logger)
+    public PlaybackSessionService(LibraryService library, PlaylistService playlists, PlaybackResolver resolver,
+        IPlaybackQueue queue, IAppSettingsService settings, ILogger<PlaybackSessionService> logger)
     {
         _library = library;
+        _playlists = playlists;
         _resolver = resolver;
         _queue = queue;
         _settings = settings.ForPackage(PackageNames.Application);
@@ -372,6 +374,7 @@ public sealed class PlaybackSessionService : IAsyncDisposable
                 }
                 if (operation.ResumePosition > TimeSpan.Zero && skipped == 0)
                     await prepared.Player.Player.SeekAsync(operation.ResumePosition, operation.Token);
+                var playlistsChanged = false;
                 lock (_gate)
                 {
                     if (!Owns(operation)) return null;
@@ -380,6 +383,9 @@ public sealed class PlaybackSessionService : IAsyncDisposable
                     var ids = MusicCacheIdentity.GetIdentifiers(current.Track.ExternalIds.Concat(prepared.Track.ExternalIds));
                     if (!current.Track.ExternalIds.SequenceEqual(ids))
                         _queue.UpdateTrack(current.Id, current.Track with { ExternalIds = ids });
+                    // Library views read their track snapshots when they receive playback metadata changes.
+                    try { playlistsChanged = _playlists.EnrichExternalIds(original, prepared.Track); }
+                    catch (Exception exception) { _logger.LogWarning(exception, "Could not merge discovered music IDs."); }
                     PublishLocked(WithQueue(_snapshot with
                     {
                         State = PlaybackState.Playing, Error = null,
@@ -393,9 +399,12 @@ public sealed class PlaybackSessionService : IAsyncDisposable
                 }
                 var updated = prepared.Track;
                 prepared = null; // The session now owns the activated stream.
-                try { await _resolver.SaveDiscoveredIdsAsync(original, updated, _lifetime.Token); }
-                catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
-                catch (Exception exception) { _logger.LogWarning(exception, "Could not save discovered music IDs."); }
+                if (playlistsChanged)
+                {
+                    try { await _library.SaveAsync(_lifetime.Token); }
+                    catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+                    catch (Exception exception) { _logger.LogWarning(exception, "Could not save discovered music IDs."); }
+                }
                 return updated;
             }
             catch (OperationCanceledException) when (operation.Token.IsCancellationRequested)

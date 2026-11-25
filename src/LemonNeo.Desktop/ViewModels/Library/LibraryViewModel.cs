@@ -359,7 +359,7 @@ public sealed class LibraryViewModel : TrackListViewModel
             if (IsQueue) MarkTracksDirty();
             return;
         }
-        // Resolution can enrich the stored snapshots with the chosen source ID.
+        // Resolution can enrich the stored snapshots with newly discovered IDs.
         // Refresh only when metadata changes, not on every playback timeline tick.
         if (!ReferenceEquals(_lastPlaybackTrack, Playback.Snapshot.CurrentTrack))
         {
@@ -367,7 +367,7 @@ public sealed class LibraryViewModel : TrackListViewModel
             var latest = GetTracks()
                 .ToDictionary(row => row.PlaylistItemId?.ToString() ?? row.QueueItemId?.ToString() ?? row.Identity,
                     row => row.Track);
-            if (Tracks.Any(row =>
+            if (UnfilteredTracks.Any(row =>
                     latest.TryGetValue(row.PlaylistItemId?.ToString() ?? row.QueueItemId?.ToString() ?? row.Identity,
                         out var track) && !ReferenceEquals(row.Track, track)))
                 RefreshTracks();

@@ -1,6 +1,5 @@
 using LemonNeo.Abstractions.Playback;
 using LemonNeo.Abstractions.Providers;
-using LemonNeo.Application.Library;
 using LemonNeo.Core.Exceptions;
 using LemonNeo.Core.Music;
 using LemonNeo.Core.Playback;
@@ -50,9 +49,7 @@ public sealed class PlaybackResolver(
     IPlaybackSourceProviderRegistry playbackSources,
     IPlayerRegistry players,
     PlaybackSourceDiscoveryService sourceDiscovery,
-    PlaybackAudioCache audioCache,
-    LibraryService library,
-    PlaylistService playlists)
+    PlaybackAudioCache audioCache)
 {
     public bool CanAdjustVolume => players.Players.Count > 0;
 
@@ -125,25 +122,5 @@ public sealed class PlaybackResolver(
                 throw new PlaybackResolutionException($"Could not prepare the audio player for '{queueTrack.Title}'.", exception);
             throw new PlaybackSourceUnavailableException($"Could not open audio for '{queueTrack.Title}'.", exception);
         }
-    }
-
-    public async Task SaveDiscoveredIdsAsync(Track original, Track updated,
-        CancellationToken cancellationToken = default)
-    {
-        if (original.ExternalIds.SequenceEqual(updated.ExternalIds)) return;
-        var changed = false;
-        using (library.BeginMutation())
-        {
-            foreach (var playlist in library.Current.Playlists.ToArray())
-                foreach (var item in playlist.Items.Where(item => item.Track.Id == original.Id).ToArray())
-                {
-                    var ids = item.Track.ExternalIds.Concat(updated.ExternalIds).DistinctBy(MusicCacheIdentity.GetKey)
-                        .ToArray();
-                    if (item.Track.ExternalIds.SequenceEqual(ids)) continue;
-                    playlists.EnrichExternalIds(playlist.Id, item.Id, ids);
-                    changed = true;
-                }
-        }
-        if (changed) await library.SaveAsync(cancellationToken);
     }
 }

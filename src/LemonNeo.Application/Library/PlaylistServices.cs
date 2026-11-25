@@ -311,15 +311,40 @@ public sealed class PlaylistService(
     public bool IsReadOnly(Guid playlistId) => library.Current.Mirrors.Any(mirror => mirror.PlaylistId == playlistId);
 
     /// <summary>Playback may enrich IDs without editing source-owned metadata or membership.</summary>
+    public bool EnrichExternalIds(Track original, Track updated)
+    {
+        if (ReferenceEquals(original.ExternalIds, updated.ExternalIds)) return false;
+        var discovered = updated.ExternalIds
+            .ExceptBy(original.ExternalIds.Select(MusicCacheIdentity.Normalize), MusicCacheIdentity.Normalize)
+            .ToArray();
+        if (discovered.Length == 0) return false;
+
+        using var mutation = library.BeginMutation();
+        var changed = false;
+        foreach (var playlist in library.Current.Playlists)
+        foreach (var item in playlist.Items.Where(item => item.Track.Id == original.Id))
+            changed |= EnrichExternalIds(playlist, item, discovered);
+
+        return changed;
+    }
+
     public void EnrichExternalIds(Guid playlistId, Guid itemId, IReadOnlyList<ExternalMusicId> ids)
     {
         using var mutation = library.BeginMutation();
         var item = GetItemRequired(playlistId, itemId);
-        var merged = item.Track.ExternalIds.Concat(ids.Where(id =>
-            !item.ExternalIdOverrides.Any(scheme => scheme.Accepts(id)))).Distinct().ToArray();
-        if (item.Track.ExternalIds.SequenceEqual(merged)) return;
-        item.Track = item.Track with { ExternalIds = merged };
-        Touch(GetRequired(playlistId));
+        EnrichExternalIds(GetRequired(playlistId), item, ids);
+    }
+
+    private bool EnrichExternalIds(Playlist playlist, PlaylistItem item, IReadOnlyList<ExternalMusicId> ids)
+    {
+        var known = item.Track.ExternalIds.Select(MusicCacheIdentity.Normalize).ToHashSet();
+        var added = ids.Where(id => !item.ExternalIdOverrides.Any(scheme => scheme.Accepts(id)) &&
+                                    known.Add(MusicCacheIdentity.Normalize(id))).ToArray();
+        if (added.Length == 0) return false;
+
+        item.Track = item.Track with { ExternalIds = [.. item.Track.ExternalIds, .. added] };
+        Touch(playlist);
+        return true;
     }
 
     public bool IsArtworkReadOnly(Guid playlistId) => library.Current.Mirrors.Any(mirror =>
