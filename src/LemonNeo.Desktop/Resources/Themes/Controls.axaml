@@ -163,8 +163,13 @@
     <ControlTheme TargetType="sharedControls:PageHeader" x:Key="{x:Type sharedControls:PageHeader}">
         <Setter Property="Template">
             <ControlTemplate>
-                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
-                    <StackPanel Spacing="8">
+                <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,8">
+                    <ContentPresenter
+                        Content="{TemplateBinding Leading}"
+                        IsVisible="{Binding Leading, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static converters:ObjectConverters.IsNotNull}}"
+                        Name="HeaderLeading"
+                        VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Center">
                         <TextBlock
                             FontSize="{DynamicResource Font.Title}"
                             FontWeight="SemiBold"
@@ -187,10 +192,18 @@
                             Text="{TemplateBinding Summary}"
                             TextTrimming="CharacterEllipsis"
                             TextWrapping="NoWrap" />
+                        <TextBlock
+                            Classes="caption"
+                            IsVisible="{Binding Detail, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}"
+                            MaxLines="1"
+                            Name="HeaderDetail"
+                            Text="{TemplateBinding Detail}"
+                            TextTrimming="CharacterEllipsis"
+                            ToolTip.Tip="{TemplateBinding DetailToolTip}" />
                     </StackPanel>
                     <ContentPresenter
                         Content="{TemplateBinding Actions}"
-                        Grid.Column="1"
+                        Grid.Column="2"
                         Margin="16,0,0,0"
                         Name="HeaderActions"
                         VerticalAlignment="Center" />
@@ -240,6 +253,8 @@
             <ControlTemplate>
                 <Border
                     Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
                     ClipToBounds="True"
                     CornerRadius="{TemplateBinding CornerRadius}">
                     <Grid>

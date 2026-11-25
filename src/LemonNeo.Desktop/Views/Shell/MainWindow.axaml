@@ -281,16 +281,24 @@
                         SelectedItem="{Binding SelectedPlaylist}">
                         <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="shellVm:PlaylistMenuItemViewModel">
-                                <Grid ColumnDefinitions="*,Auto">
-
+                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                                    <sharedControls:Artwork
+                                        BorderBrush="{DynamicResource Brush.Border}"
+                                        BorderThickness="1"
+                                        CornerRadius="4"
+                                        Height="30"
+                                        Loader="{Binding ArtworkLoader}"
+                                        SourceUri="{Binding ArtworkUri}"
+                                        VerticalAlignment="Center"
+                                        Width="30" />
                                     <TextBlock
+                                        Grid.Column="1"
                                         Text="{Binding Name}"
                                         TextTrimming="CharacterEllipsis"
                                         VerticalAlignment="Center" />
                                     <TextBlock
                                         Classes="caption"
-                                        Grid.Column="1"
-                                        Margin="8,0,0,0"
+                                        Grid.Column="2"
                                         Text="{Binding TrackCount}"
                                         VerticalAlignment="Center" />
                                 </Grid>

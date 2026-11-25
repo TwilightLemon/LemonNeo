@@ -15,11 +15,23 @@
         <sharedControls:PageHeader
             Classes.collapsible="{Binding IsLibrary}"
             Description="{Binding PageDescription}"
+            Detail="{Binding SyncDescription}"
+            DetailToolTip="{Binding SyncDetails}"
             Name="LibraryHeader"
             Summary="{Binding PageSummary}"
             Title="{Binding PageTitle}"
             VerticalAlignment="Top"
             ZIndex="1">
+            <sharedControls:PageHeader.Leading>
+                <sharedControls:Artwork
+                    CornerRadius="8"
+                    Height="92"
+                    IsVisible="{Binding HasSelectedPlaylist}"
+                    Loader="{Binding ArtworkLoader}"
+                    Margin="0,0,16,0"
+                    SourceUri="{Binding PlaylistArtworkUri}"
+                    Width="92" />
+            </sharedControls:PageHeader.Leading>
             <sharedControls:PageHeader.Actions>
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <Button
@@ -43,7 +55,7 @@
                             <MenuFlyout Placement="Bottom" VerticalOffset="-2">
                                 <MenuItem Command="{Binding NewTrackCommand}" IsEnabled="{Binding CanEditPlaylist}" Header="{Translate {x:Static i18n:LanguageManager+Keys.NewTrack}}" />
                                 <MenuItem Command="{Binding MatchPlaylistCommand}" IsEnabled="{Binding CanMatchPlaylist}" Header="{Translate {x:Static i18n:LanguageManager+Keys.MatchPlaylist}}" />
-                                <MenuItem Click="OnEditPlaylist" IsEnabled="{Binding CanEditPlaylist}" Header="{Translate {x:Static i18n:LanguageManager+Keys.EditPlaylist}}" />
+                                <MenuItem Click="OnEditPlaylist" IsEnabled="{Binding CanEditPlaylistArtwork}" Header="{Translate {x:Static i18n:LanguageManager+Keys.EditPlaylist}}" />
                                 <Separator IsVisible="{Binding IsMirrored}" />
                                 <MenuItem Command="{Binding SyncPlaylistCommand}" IsVisible="{Binding IsMirrored}" IsEnabled="{Binding Synchronization.CanSync}" Header="{Translate {x:Static i18n:LanguageManager+Keys.SyncPlaylistNow}}" />
                                 <MenuItem Command="{Binding ToggleSyncPauseCommand}" IsVisible="{Binding IsMirrored}" Header="{Binding SyncPauseLabel}" />
@@ -61,13 +73,6 @@
             Grid.Row="1"
             Name="LibraryTools"
             ZIndex="2">
-            <TextBlock
-                Classes="caption"
-                IsVisible="{Binding IsMirrored}"
-                Margin="0,0,0,8"
-                Text="{Binding SyncDescription}"
-                TextTrimming="CharacterEllipsis"
-                ToolTip.Tip="{Binding SyncDetails}" />
             <StackPanel
                 HorizontalAlignment="Right"
                 IsVisible="{Binding IsBusy}"

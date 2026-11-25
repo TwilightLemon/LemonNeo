@@ -8,6 +8,7 @@ public sealed class Playlist
     public Guid Id { get; init; } = Guid.NewGuid();
     public required string Name { get; set; }
     public string? Description { get; set; }
+    public Uri? ArtworkUri { get; set; }
     public DecodeProfile? DecodeProfile { get; set; }
     public List<PlaylistItem> Items { get; init; } = [];
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;

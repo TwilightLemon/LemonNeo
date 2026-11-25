@@ -456,10 +456,12 @@ public partial class MainWindow : Window
     {
         if (DataContext is not MainViewModel
             {
-                Navigation.Current: LibraryViewModel { CanEditPlaylist: true, SelectedPlaylist: { } playlist } vm
+                Navigation.Current: LibraryViewModel { CanEditPlaylistArtwork: true, SelectedPlaylist: { } playlist } vm
             }) return;
-        var result = await new PlaylistDialog(playlist).ShowDialog<PlaylistEditResult?>(this);
-        if (result is not null) await vm.UpdatePlaylistAsync(playlist.Id, result.Name, result.Description);
+        var result = await new PlaylistDialog(playlist, artworkLoader: vm.ArtworkLoader, artworkUri: vm.PlaylistArtworkUri,
+            canEditDetails: vm.CanEditPlaylist).ShowDialog<PlaylistEditResult?>(this);
+        if (result is not null)
+            await vm.UpdatePlaylistAsync(playlist, result.Name, result.Description, result.ArtworkChanged, result.ArtworkFile);
     }
 
     public async Task DeletePlaylistAsync()

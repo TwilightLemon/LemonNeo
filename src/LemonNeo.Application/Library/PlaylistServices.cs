@@ -52,11 +52,11 @@ public sealed class PlaylistService(
     LibraryService library,
     IPlaylistOrderingService ordering)
 {
-    public Playlist Create(string name, string? description = null)
+    public Playlist Create(string name, string? description = null, Uri? artworkUri = null)
     {
         using var mutation = library.BeginMutation();
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        var playlist = new Playlist { Name = name.Trim(), Description = description };
+        var playlist = new Playlist { Name = name.Trim(), Description = description, ArtworkUri = artworkUri };
         library.Current.Playlists.Add(playlist);
         library.Touch(playlist.Id);
         return playlist;
@@ -322,6 +322,21 @@ public sealed class PlaylistService(
         Touch(GetRequired(playlistId));
     }
 
+    public bool IsArtworkReadOnly(Guid playlistId) => library.Current.Mirrors.Any(mirror =>
+        mirror.PlaylistId == playlistId && mirror.SourceKind == PlaylistSourceKind.Provider);
+
+    public void UpdateArtwork(Guid playlistId, Uri? artworkUri)
+    {
+        using var mutation = library.BeginMutation();
+        if (IsArtworkReadOnly(playlistId))
+            throw new InvalidOperationException("This playlist's artwork follows its remote source.");
+
+        var playlist = GetRequired(playlistId);
+        if (Equals(playlist.ArtworkUri, artworkUri)) return;
+        playlist.ArtworkUri = artworkUri;
+        Touch(playlist);
+    }
+
     public void EnsureEditable(Guid playlistId)
     {
         if (IsReadOnly(playlistId))
@@ -332,7 +347,7 @@ public sealed class PlaylistService(
     {
         using var mutation = library.BeginMutation();
         var source = GetRequired(playlistId);
-        var copy = Create(source.Name, source.Description);
+        var copy = Create(source.Name, source.Description, source.ArtworkUri);
         copy.DecodeProfile = source.DecodeProfile;
         var sourceItems = source.Items.OrderBy(item => FractionalPlaylistOrderingService.Parse(item.SortKey))
             .ThenBy(item => item.Id).ToArray();
@@ -385,7 +400,7 @@ public sealed class ImportService(
 
     public Playlist ImportRemote(RemotePlaylist remote)
     {
-        var local = playlists.Create(remote.Name, remote.Description);
+        var local = playlists.Create(remote.Name, remote.Description, remote.ArtworkUri);
         foreach (var track in remote.Tracks) playlists.Add(local.Id, track);
 
         return local;

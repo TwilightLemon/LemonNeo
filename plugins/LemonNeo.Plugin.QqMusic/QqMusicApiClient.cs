@@ -240,6 +240,7 @@ internal sealed partial class QqMusicApiClient(HttpClient httpClient)
             ProviderId = ProviderId,
             Name = ReadString(playlist, "dissname") ?? playlistId,
             Description = ReadString(playlist, "desc"),
+            ArtworkUri = ParseHttpsUri(ReadString(playlist, "logo") ?? ReadString(playlist, "picurl")),
             IsComplete = IsCompleteTrackArray(playlist, "songlist", tracks.Count),
             Tracks = tracks
         };
@@ -268,6 +269,7 @@ internal sealed partial class QqMusicApiClient(HttpClient httpClient)
             ProviderId = ProviderId,
             Name = ReadString(album, "name") ?? albumMid,
             Description = ReadString(album, "desc"),
+            ArtworkUri = ParseHttpsUri(ReadString(album, "pic")) ?? GetAlbumArtworkUri(albumMid),
             IsComplete = IsCompleteTrackArray(album, "list", tracks.Count),
             Tracks = tracks
         };

@@ -217,6 +217,7 @@ public sealed class PlaylistSyncService(
             var changed = fingerprint != mirror.ContentFingerprint;
             string previousName;
             string? previousDescription;
+            Uri? previousArtwork;
             DateTimeOffset previousUpdatedAt;
             PlaylistItem[] previousItems;
             using (library.BeginMutation())
@@ -224,6 +225,7 @@ public sealed class PlaylistSyncService(
                 if (!StillCurrent()) return new(playlistId, false, Skipped: true);
                 previousName = playlist.Name;
                 previousDescription = playlist.Description;
+                previousArtwork = playlist.ArtworkUri;
                 previousUpdatedAt = playlist.UpdatedAt;
                 previousItems = playlist.Items.ToArray();
                 if (changed)
@@ -249,6 +251,7 @@ public sealed class PlaylistSyncService(
                     }).ToArray();
                     playlist.Name = remote.Name;
                     playlist.Description = remote.Description;
+                    playlist.ArtworkUri = remote.ArtworkUri ?? playlist.ArtworkUri;
                     playlist.Items.Clear();
                     playlist.Items.AddRange(next);
                     playlist.UpdatedAt = DateTimeOffset.UtcNow;
@@ -272,6 +275,7 @@ public sealed class PlaylistSyncService(
                     {
                         playlist.Name = previousName;
                         playlist.Description = previousDescription;
+                        if (mirror.SourceKind == PlaylistSourceKind.Provider) playlist.ArtworkUri = previousArtwork;
                         playlist.UpdatedAt = previousUpdatedAt;
                         playlist.Items.Clear();
                         playlist.Items.AddRange(previousItems);
@@ -331,7 +335,7 @@ public sealed class PlaylistSyncService(
     }
 
     private static string Fingerprint(RemotePlaylist remote) => Convert.ToHexStringLower(SHA256.HashData(
-        JsonSerializer.SerializeToUtf8Bytes(new { remote.Name, remote.Description, remote.Tracks })));
+        JsonSerializer.SerializeToUtf8Bytes(new { remote.Name, remote.Description, remote.ArtworkUri, remote.Tracks })));
 
     private static Track Merge(Track source, PlaylistItem item)
     {

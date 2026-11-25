@@ -28,6 +28,7 @@ public sealed record RemotePlaylist
     public required string ProviderId { get; init; }
     public required string Name { get; init; }
     public string? Description { get; init; }
+    public Uri? ArtworkUri { get; init; }
     public IReadOnlyList<Track> Tracks { get; init; } = [];
     /// <summary>True only when membership, order and track details were fully retrieved. Required for synchronization.</summary>
     public bool IsComplete { get; init; }

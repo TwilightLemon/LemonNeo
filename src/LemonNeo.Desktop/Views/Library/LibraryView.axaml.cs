@@ -11,9 +11,19 @@ namespace LemonNeo.Desktop.Views.Library;
 
 public partial class LibraryView : UserControl
 {
+    private readonly DispatcherTimer _syncTimeTimer = new() { Interval = TimeSpan.FromSeconds(30) };
+
     public LibraryView()
     {
         InitializeComponent();
+        _syncTimeTimer.Tick += (_, _) => (DataContext as LibraryViewModel)?.RefreshSyncTime();
+        Loaded += (_, _) =>
+        {
+            if (DataContext is not LibraryViewModel { HasSelectedPlaylist: true } vm) return;
+            vm.RefreshSyncTime();
+            _syncTimeTimer.Start();
+        };
+        Unloaded += (_, _) => _syncTimeTimer.Stop();
         // Composite the faded list before the floating button samples its backdrop.
         //PageBottomFade.Attach(TrackList);
         CollapsibleListHeader.Attach(LibraryHeader, CompactTitle, LibraryTools, LibraryEmptyState, TrackList);

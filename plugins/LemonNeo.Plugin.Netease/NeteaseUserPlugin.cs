@@ -261,6 +261,7 @@ public sealed partial class NeteaseUserPlugin :
             ProviderId = ProviderId,
             Name = ReadString(playlist, "name") ?? playlistId,
             Description = ReadString(playlist, "description"),
+            ArtworkUri = TryCreateAvatarUri(ReadString(playlist, "coverImgUrl")),
             IsComplete = isComplete,
             Tracks = tracks
         };

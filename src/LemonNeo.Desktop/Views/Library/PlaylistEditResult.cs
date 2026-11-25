@@ -1,4 +1,4 @@
 namespace LemonNeo.Desktop.Views.Library;
 
 public sealed record PlaylistEditResult(string Name, string? Description, string? FolderPath = null,
-    bool Synchronize = false);
+    bool Synchronize = false, bool ArtworkChanged = false, Uri? ArtworkFile = null);

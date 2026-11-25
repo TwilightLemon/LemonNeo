@@ -209,6 +209,35 @@ public sealed class PlaylistSyncServiceTests
     }
 
     [Fact]
+    public async Task FollowsRemoteArtworkAndKeepsTheKnownCoverWhenTheSourceOmitsIt()
+    {
+        using var fixture = new Fixture();
+        var source = Snapshot(Song("a")) with { ArtworkUri = new Uri("https://example.com/first.png") };
+        var playlist = fixture.Import(source);
+        Assert.Equal(source.ArtworkUri, playlist.ArtworkUri);
+        Assert.Throws<InvalidOperationException>(() => fixture.Playlists.UpdateArtwork(playlist.Id, null));
+
+        var replacement = new Uri("https://example.com/second.png");
+        fixture.Provider.Remote = source with { ArtworkUri = replacement };
+        fixture.Repository.FailSave = true;
+        Assert.False((await fixture.Sync.SynchronizeAsync(playlist.Id)).Succeeded);
+        Assert.Equal(source.ArtworkUri, playlist.ArtworkUri);
+
+        fixture.Repository.FailSave = false;
+        Assert.True((await fixture.Sync.SynchronizeAsync(playlist.Id)).Changed);
+        Assert.Equal(replacement, playlist.ArtworkUri);
+        fixture.Provider.Remote = source with { ArtworkUri = null };
+        Assert.True((await fixture.Sync.SynchronizeAsync(playlist.Id)).Succeeded);
+        Assert.Equal(replacement, playlist.ArtworkUri);
+
+        var copy = fixture.Playlists.CreateEditableCopy(playlist.Id);
+        Assert.Equal(replacement, copy.ArtworkUri);
+        fixture.Playlists.UpdateArtwork(copy.Id, null);
+        Assert.Null(copy.ArtworkUri);
+        Assert.Equal(replacement, playlist.ArtworkUri);
+    }
+
+    [Fact]
     public async Task ReadOnlyGuardCoversEditingWhileCopyAndDetachAllowLocalChanges()
     {
         using var fixture = new Fixture();
@@ -348,6 +377,7 @@ public sealed class PlaylistSyncServiceTests
         using var fixture = new Fixture();
         var repository = new JsonLibraryRepository(() => fixture.Root);
         var library = new LibraryService(repository);
+        var artwork = new Uri("covers/test.img", UriKind.Relative);
         var mirror = new PlaylistMirror
         {
             PlaylistId = Guid.NewGuid(),
@@ -367,6 +397,7 @@ public sealed class PlaylistSyncServiceTests
                 {
                     Id = mirror.PlaylistId,
                     Name = "Persisted",
+                    ArtworkUri = artwork,
                     DecodeProfile = new() { Speed = 1.1 },
                     Items = [new() { Track = Song("a"), SortKey = "1000", DecodeProfile = new() { Speed = 1.25 } }]
                 }
@@ -380,6 +411,7 @@ public sealed class PlaylistSyncServiceTests
         Assert.Equal(mirror, Assert.Single(loaded.Mirrors));
         var playlist = Assert.Single(loaded.Playlists);
         Assert.Equal("Persisted", playlist.Name);
+        Assert.Equal(artwork, playlist.ArtworkUri);
         Assert.Equal(1.1, playlist.DecodeProfile?.Speed);
         Assert.Equal(1.25, Assert.Single(playlist.Items).DecodeProfile?.Speed);
         // Flags are index-only changes and must persist without touching playlist files.
@@ -401,6 +433,8 @@ public sealed class PlaylistSyncServiceTests
         await File.WriteAllBytesAsync(second, []);
         var scan = await fixture.Folders.ScanAsync(music, recursive: false);
         var playlist = fixture.Sync.ImportFolder(scan, "Folder", null);
+        var artwork = new Uri("covers/local.img", UriKind.Relative);
+        fixture.Playlists.UpdateArtwork(playlist.Id, artwork);
         var survivor = playlist.Items[1].Id;
         File.Delete(first);
         var third = Path.Combine(music, "c.wav");
@@ -408,6 +442,7 @@ public sealed class PlaylistSyncServiceTests
         Assert.True((await fixture.Sync.SynchronizeAsync(playlist.Id)).Succeeded);
         Assert.Equal(2, playlist.Items.Count);
         Assert.Equal(survivor, playlist.Items[0].Id);
+        Assert.Equal(artwork, playlist.ArtworkUri);
         Assert.True(File.Exists(second));
         Assert.True(File.Exists(third));
         Directory.Move(music, Path.Combine(fixture.Root, "disconnected"));

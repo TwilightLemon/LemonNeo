@@ -8,8 +8,10 @@
     x:Class="LemonNeo.Desktop.Views.Library.PlaylistDialog"
     x:DataType="libraryVm:PlaylistDialogViewModel"
     xmlns="https://github.com/avaloniaui"
+    xmlns:converters="using:Avalonia.Data.Converters"
     xmlns:i18n="using:LemonNeo.Desktop.Services"
     xmlns:libraryVm="using:LemonNeo.Desktop.ViewModels.Library"
+    xmlns:sharedControls="using:LemonNeo.Desktop.Controls.Shared"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <StackPanel Margin="28" Spacing="20">
         <TextBlock
@@ -35,18 +37,51 @@
         </StackPanel>
         <TextBox
             AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistName}}"
+            IsReadOnly="{Binding !CanEditDetails}"
             Name="PlaylistName"
             PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistName}}"
             Text="{Binding Name}" />
         <TextBox
             AcceptsReturn="True"
             AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistDescriptionLabel}}"
+            IsReadOnly="{Binding !CanEditDetails}"
             MaxHeight="150"
             MinHeight="70"
             Name="PlaylistDescription"
             PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistDescriptionLabel}}"
             Text="{Binding Description}"
             TextWrapping="Wrap" />
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14" IsVisible="{Binding !IsNew}">
+            <sharedControls:Artwork
+                CornerRadius="8"
+                Height="72"
+                Loader="{Binding ArtworkLoader}"
+                SourceUri="{Binding ArtworkUri}"
+                VerticalAlignment="Top"
+                Width="72" />
+            <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
+                <TextBlock
+                    Classes="caption"
+                    Text="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistCover}}" />
+                <WrapPanel>
+                    <Button
+                        Click="OnChooseArtwork"
+                        Content="{Translate {x:Static i18n:LanguageManager+Keys.ChoosePlaylistCover}}"
+                        Margin="0,0,6,0"
+                        Name="ChooseArtworkButton" />
+                    <Button
+                        Classes="ghost"
+                        Click="OnRemoveArtwork"
+                        Content="{Translate {x:Static i18n:LanguageManager+Keys.RemovePlaylistCover}}"
+                        IsEnabled="{Binding HasArtwork}" />
+                </WrapPanel>
+                <TextBlock
+                    Foreground="{DynamicResource Brush.Danger}"
+                    IsVisible="{Binding ArtworkError, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}"
+                    Text="{Binding ArtworkError}"
+                    TextWrapping="Wrap" />
+            </StackPanel>
+        </Grid>
         <StackPanel
             HorizontalAlignment="Right"
             Orientation="Horizontal"

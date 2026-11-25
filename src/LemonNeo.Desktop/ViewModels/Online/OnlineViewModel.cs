@@ -34,7 +34,7 @@ public sealed partial class OnlineViewModel : PageViewModel
         RemotePlaylistsCommand = new AsyncRelayCommand(LoadRemotePlaylistsAsync);
         ImportRemoteCommand = new AsyncRelayCommand(() =>
             CanImportRemote && SelectedRemotePlaylist is { Id: { } id } row
-                ? ImportRemoteAsync(row.ProviderId, id)
+                ? ImportRemoteAsync(row.ProviderId, id, row.ArtworkUri)
                 : Task.CompletedTask);
         RemotePlaylists.CollectionChanged += (_, _) => RaiseRemotePlaylistProperties();
         PlaylistCategories.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasCategoryMenu));
@@ -195,7 +195,7 @@ public sealed partial class OnlineViewModel : PageViewModel
         });
     }
 
-    private Task ImportRemoteAsync(string providerId, string id)
+    private Task ImportRemoteAsync(string providerId, string id, Uri? artworkUri)
     {
         return ExecuteAsync(async ct =>
         {
@@ -206,6 +206,7 @@ public sealed partial class OnlineViewModel : PageViewModel
             var accountId = synchronize ? sync.GetAccountId(providerId) : null;
             var remote = await Task.Run(() => importer.GetRemotePlaylistAsync(providerId, id.Trim(), ct), ct);
             ct.ThrowIfCancellationRequested();
+            remote = remote with { ArtworkUri = remote.ArtworkUri ?? artworkUri };
             var playlist = synchronize ? sync.ImportRemote(remote, accountId) : importer.ImportRemote(remote);
             await _host.Get<LibraryService>().SaveAsync(ct);
             Context.RefreshLibrary();

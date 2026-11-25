@@ -100,6 +100,7 @@ public sealed partial class CatalogDetailViewModel : TrackListViewModel
             ProviderId = album.Album.Id.ProviderId,
             Name = album.Album.Title,
             Description = album.Description,
+            ArtworkUri = album.Album.ArtworkUri ?? Item.ArtworkUri,
             Tracks = album.Tracks
         });
         try
