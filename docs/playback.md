@@ -80,8 +80,7 @@ result for that ID. The optional cached provider ID records provenance and does 
 platform-ID cache format 1 is supported directly. The intermediate provider-scoped format 2
 is treated as a miss.
 
-The Lyricify main provider combines search, metadata matching and lyrics, accepting lyric ID
-schemes from eight platforms.
+Lyricify accepts lyric ID schemes from eight platforms.
 QQ lyrics accepts `qqmusic:song-id`, not `song-mid`. Kugou resolves download credentials by
 the known audio hash. Protocol requests, decryption and parsing remain in the plugin; matching
 and selection are owned by the host.

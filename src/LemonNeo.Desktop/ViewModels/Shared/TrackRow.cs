@@ -54,7 +54,7 @@ public sealed class TrackRow(
     public Uri? ArtworkUri => Track.ArtworkUri;
     public ArtworkService? ArtworkLoader { get; set; }
     internal Func<MusicItemId, bool>? CanBrowseCatalog { get; set; }
-    internal Func<Track, MusicItemId?>? FindCatalogTrack { get; set; }
+    internal Func<Track, IReadOnlyList<MusicItemId>>? FindCatalogTracks { get; set; }
     public string Title => Track.Title;
     public string Identity => Track.Id.ToString();
 
@@ -76,8 +76,8 @@ public sealed class TrackRow(
     {
         if (string.IsNullOrWhiteSpace(name)) return null;
         if (direct is { } id && CanBrowseCatalog?.Invoke(id) == true) return new CatalogItem(kind, id, name, artwork);
-        return FindCatalogTrack?.Invoke(Track) is { } track
-            ? new CatalogItem(kind, track, name, artwork, ResolveFromTrack: true)
+        return FindCatalogTracks?.Invoke(Track) is { Count: > 0 } tracks
+            ? new CatalogItem(kind, null, name, artwork) { SourceTrackIds = tracks }
             : null;
     }
 

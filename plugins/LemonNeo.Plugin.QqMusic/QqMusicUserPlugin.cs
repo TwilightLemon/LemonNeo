@@ -20,7 +20,6 @@ public sealed partial class QqMusicUserPlugin :
     IPlaylistCollectionProvider,
     IWebAuthenticationProvider,
     ISearchProvider,
-    ISearchNamespaceProvider,
     ICatalogProvider
 {
     private const string ProviderId = "qqmusic";

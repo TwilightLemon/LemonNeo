@@ -1,8 +1,8 @@
 using System.Text;
 using LemonNeo.Abstractions.Providers;
 using LemonNeo.Application.Library;
+using LemonNeo.Application.Providers;
 using LemonNeo.Core.Library;
-using LemonNeo.Core.Music;
 
 namespace LemonNeo.ConsoleApp;
 
@@ -31,20 +31,6 @@ internal sealed class CommandCompletionService(
     IPlaybackSourceProviderRegistry playbackSources,
     LibraryService library)
 {
-    private static readonly string[] MetadataNamespaces =
-    [
-        MusicIdNamespaces.NeteaseMusic,
-        MusicIdNamespaces.QQMusic,
-        MusicIdNamespaces.KugouMusic,
-        MusicIdNamespaces.AppleMusic,
-        MusicIdNamespaces.Spotify,
-        MusicIdNamespaces.Musixmatch,
-        MusicIdNamespaces.SodaMusic,
-        MusicIdNamespaces.LrcLib,
-        MusicIdNamespaces.Isrc,
-        MusicIdNamespaces.File
-    ];
-
     public CommandCompletion Complete(string input, int cursor)
     {
         var target = CompletionTarget.Parse(input, cursor);
@@ -106,7 +92,7 @@ internal sealed class CommandCompletionService(
         if (IsSearchSourceArgument(commandName, target))
         {
             var searchNamespaces = providers.Providers
-                .OfType<ISearchNamespaceProvider>()
+                .OfType<ISearchProvider>()
                 .SelectMany(provider => provider.SearchNamespaces)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Order(StringComparer.OrdinalIgnoreCase)
@@ -136,7 +122,9 @@ internal sealed class CommandCompletionService(
                 target,
                 hint,
                 "Metadata namespaces",
-                MetadataNamespaces.Select(value => (value, "Metadata source namespace")).ToArray());
+                providers.Providers.SelectMany(MetadataService.GetSourceNamespaces)
+                    .Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase)
+                    .Select(value => (value, "Metadata source namespace")).ToArray());
 
         if (IsSourceOptionPosition(commandName, target))
             return CompleteValues(target, hint, "Options", ("--source", "Require a playback source provider"));

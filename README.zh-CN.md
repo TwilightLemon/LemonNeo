@@ -112,7 +112,7 @@ dotnet run --project src/LemonNeo.Console
 | `LemonNeo.Plugin.Netease` | 网易云音乐用户音乐库 | 全部 |
 | `LemonNeo.Plugin.QqMusic` | QQ 音乐用户音乐库 | 全部 |
 | `LemonNeo.Plugin.GdStudioNetease` | 备用的网易云音乐播放音源 | 全部 |
-| `LemonNeo.Plugin.Lyricify` | 歌词与元数据匹配 | 全部 |
+| `LemonNeo.Plugin.Lyricify` | 歌词 | 全部 |
 | `LemonNeo.Plugin.MockMusic` | 面向插件开发者的示例实现 | 全部 |
 
 

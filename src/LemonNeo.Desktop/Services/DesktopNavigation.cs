@@ -182,8 +182,8 @@ public sealed class DesktopNavigation : ObservableObject, IAsyncDisposable
         try
         {
             if (_disposed || Current is CatalogDetailViewModel current && current.Item.Id == item.Id &&
-                current.Item.Kind == item.Kind && current.Item.ResolveFromTrack == item.ResolveFromTrack &&
-                (!item.ResolveFromTrack || current.Item.Name == item.Name)) return;
+                current.Item.Kind == item.Kind && (item.Id is not null ||
+                    current.Item.Name == item.Name && current.Item.SourceTrackIds.SequenceEqual(item.SourceTrackIds))) return;
             var page = new CatalogDetailViewModel(_context, this, _playback, item);
             page.SetNavigationActive(false);
             Own(page);

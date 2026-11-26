@@ -127,6 +127,7 @@ public sealed class MockMusicPlugin :
     }
 
     public string Id => "mock";
+    public IReadOnlyCollection<string> SearchNamespaces { get; } = ["mock"];
 
     ProviderDescriptor IMusicProvider.Descriptor { get; } = new(
         "Mock Music",
@@ -167,6 +168,9 @@ public sealed class MockMusicPlugin :
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (request.SourceNamespace is { } source &&
+            !SearchNamespaces.Contains(source, StringComparer.OrdinalIgnoreCase))
+            return Task.FromResult(new SearchResult(Id, []));
         var matches = Tracks
             .Where(track => string.IsNullOrWhiteSpace(request.Keyword) ||
                             track.Title.Contains(request.Keyword, StringComparison.OrdinalIgnoreCase) ||

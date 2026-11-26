@@ -206,7 +206,7 @@ public abstract class TrackListViewModel : PageViewModel
             }
             row.ArtworkLoader = artwork;
             row.CanBrowseCatalog = id => providers.Get(id.ProviderId) is ICatalogProvider;
-            row.FindCatalogTrack = FindCatalogTrack;
+            row.FindCatalogTracks = FindCatalogTracks;
             row.IsSelectionMode = IsSelectionMode;
             row.PropertyChanged += OnRowChanged;
             return row;
@@ -215,17 +215,18 @@ public abstract class TrackListViewModel : PageViewModel
         ApplyFilter();
     }
 
-    private MusicItemId? FindCatalogTrack(Track track)
+    private IReadOnlyList<MusicItemId> FindCatalogTracks(Track track)
     {
         var registry = _host.Get<IProviderRegistry>();
-        if (registry.Get(track.Id.ProviderId) is ICatalogProvider and ITrackLookupProvider) return track.Id;
+        var candidates = new List<MusicItemId>();
+        if (registry.Get(track.Id.ProviderId) is ICatalogProvider and ITrackLookupProvider) candidates.Add(track.Id);
         foreach (var id in track.ExternalIds.OrderBy(id => id.Kind == "song-mid" ? 0 : 1))
         {
             if (id.Kind is not ("song-mid" or "song-id")) continue;
             var provider = registry.Get(id.Namespace);
-            if (provider is ICatalogProvider and ITrackLookupProvider) return new MusicItemId(provider.Id, id.Value);
+            if (provider is ICatalogProvider and ITrackLookupProvider) candidates.Add(new MusicItemId(provider.Id, id.Value));
         }
-        return null;
+        return candidates.Distinct().ToArray();
     }
 
     private void OnFilterTick(object? sender, EventArgs args)

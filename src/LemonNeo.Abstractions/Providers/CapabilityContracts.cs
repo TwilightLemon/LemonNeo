@@ -34,31 +34,6 @@ public sealed record RemotePlaylist
     public bool IsComplete { get; init; }
 }
 
-public sealed record MetadataLookupRequest
-{
-    public required Track Track { get; init; }
-
-    /// <summary>Optional search text; candidate confidence is still measured against Track.</summary>
-    public string? SearchKeyword { get; init; }
-
-    public IReadOnlyList<string> TargetNamespaces { get; init; } = [];
-    public int LimitPerSource { get; init; } = 3;
-    public double MinimumConfidence { get; init; } = 0.7;
-}
-
-public sealed record MetadataMatch
-{
-    public required string MetadataProviderId { get; init; }
-    public required string SourceNamespace { get; init; }
-    public required Track Track { get; init; }
-    public required double Confidence { get; init; }
-    public required string MatchLevel { get; init; }
-}
-
-public sealed record MetadataLookupResult(
-    IReadOnlyList<MetadataMatch> Matches,
-    IReadOnlyDictionary<string, string> SourceErrors);
-
 public enum AuthMethod
 {
     Cookie,
@@ -80,18 +55,12 @@ public sealed record AuthenticationRequest(
 
 public interface ISearchProvider
 {
+    /// <summary>Catalog namespaces that can be selected through SearchRequest.SourceNamespace.</summary>
+    IReadOnlyCollection<string> SearchNamespaces { get; }
+
     Task<SearchResult> SearchAsync(
         SearchRequest request,
         CancellationToken cancellationToken = default);
-}
-
-/// <summary>
-///     Advertises the source namespaces accepted by a search provider when it
-///     supports narrowing a search to one source.
-/// </summary>
-public interface ISearchNamespaceProvider
-{
-    IReadOnlyCollection<string> SearchNamespaces { get; }
 }
 
 /// <summary>
@@ -158,15 +127,6 @@ public interface ILyricsProvider
     /// <summary>Fetches one known platform ID without searching for other recordings or sources.</summary>
     Task<Lyrics?> GetLyricsAsync(
         ExternalMusicId musicId,
-        CancellationToken cancellationToken = default);
-}
-
-public interface IMetadataProvider
-{
-    IReadOnlyCollection<string> MetadataNamespaces { get; }
-
-    Task<MetadataLookupResult> LookupMetadataAsync(
-        MetadataLookupRequest request,
         CancellationToken cancellationToken = default);
 }
 

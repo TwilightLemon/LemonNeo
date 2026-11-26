@@ -112,7 +112,7 @@ Metadata is not tied to whichever service a track came from:
 | `LemonNeo.Plugin.Netease` | Netease Cloud Music user library | all |
 | `LemonNeo.Plugin.QqMusic` | QQ Music user library | all |
 | `LemonNeo.Plugin.GdStudioNetease` | Alternative Netease playback source | all |
-| `LemonNeo.Plugin.Lyricify` | Lyrics and metadata matching | all |
+| `LemonNeo.Plugin.Lyricify` | Lyrics | all |
 | `LemonNeo.Plugin.MockMusic` | Reference implementation for plugin authors | all |
 
 

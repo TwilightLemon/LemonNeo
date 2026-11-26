@@ -21,7 +21,6 @@ public sealed partial class NeteaseUserPlugin :
     IPlaylistProvider,
     IWebAuthenticationProvider,
     ISearchProvider,
-    ISearchNamespaceProvider,
     ICatalogProvider
 {
     private const string ProviderId = "netease";

@@ -349,7 +349,7 @@ internal sealed partial class CommandProcessor(
         if (provider is IPlaylistProvider) capabilities.Add("Playlist");
         if (provider is IPlaylistCollectionProvider) capabilities.Add("Playlist Collections");
         if (provider is IPlaybackProvider) capabilities.Add("Playback");
-        if (provider is IMetadataProvider) capabilities.Add("Metadata");
+        if (MetadataService.GetSourceNamespaces(provider).Count > 0) capabilities.Add("Metadata");
         if (provider is ILyricsProvider) capabilities.Add("Lyrics");
         if (provider is IAuthenticationProvider) capabilities.Add("Authentication");
         return capabilities;
@@ -400,11 +400,12 @@ internal sealed partial class CommandProcessor(
                 _output.WriteLine($"  Provider: {provider.Id} | {provider.Descriptor.Name}");
                 _output.WriteLine($"    {provider.Descriptor.Description}");
                 _output.WriteLine($"    Capabilities: {string.Join(", ", GetCapabilities(provider))}");
-                if (provider is ISearchNamespaceProvider searchProvider)
+                if (provider is ISearchProvider searchProvider)
                     _output.WriteLine($"    Search namespaces: {string.Join(", ", searchProvider.SearchNamespaces)}");
-                if (provider is IMetadataProvider metadataProvider)
+                var metadataNamespaces = MetadataService.GetSourceNamespaces(provider);
+                if (metadataNamespaces.Count > 0)
                     _output.WriteLine(
-                        $"    Metadata namespaces: {string.Join(", ", metadataProvider.MetadataNamespaces)}");
+                        $"    Metadata namespaces: {string.Join(", ", metadataNamespaces)}");
                 if (provider is IPlaybackProvider sourceProvider && sourceProvider.AcceptedIdSchemes.Count > 0)
                     _output.WriteLine(
                         $"    Accepted IDs: {string.Join(", ", sourceProvider.AcceptedIdSchemes.Select(scheme => $"{scheme.Namespace}:{scheme.Kind ?? "-"}"))}");
