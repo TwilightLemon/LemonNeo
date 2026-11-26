@@ -9,35 +9,97 @@ internal static partial class TrackMatchScorer
     public static (double Confidence, string Level) Compare(Track original, Track candidate)
     {
         if (original.Id == candidate.Id || SharesSongId(original, candidate)) return (1, "Same ID");
-        if (HasConflictingSongId(original, candidate)) return (0, "No match");
 
-        var title = Normalize(original.Title);
-        if (title.Length == 0 || title != Normalize(candidate.Title)) return (0, "No match");
-
+        // Like Lyricify's CompareHelper, compare each field independently and redistribute
+        // the weight of optional fields when one side has no value.
+        var title = CompareTitle(original.Title, candidate.Title);
         var artists = NormalizeArtists(original);
         var candidateArtists = NormalizeArtists(candidate);
-        if (!artists.Overlaps(candidateArtists)) return (0, "No match");
-        if (!artists.SetEquals(candidateArtists)) return (0.7, "Partial artist match");
+        var artist = artists.Count > 0 && candidateArtists.Count > 0
+            ? (double)artists.Count(candidateArtists.Contains) / Math.Max(artists.Count, candidateArtists.Count)
+            : (double?)null;
+        var album = CompareAlbum(original.Album?.Title, candidate.Album?.Title);
+        var duration = CompareDuration(original.Duration, candidate.Duration);
+        var confidence = title * 0.48;
+        var weight = 0.48;
+        Add(artist, 0.42);
+        Add(duration, 0.25);
+        Add(album, 0.08);
+        confidence /= weight;
 
-        var album = original.Album?.Title;
-        var candidateAlbum = candidate.Album?.Title;
-        if (!Editions(original).SetEquals(Editions(candidate))) return (0.65, "Different edition");
+        if (title < 0.82) confidence = Math.Min(confidence, 0.69);
+        if (artist is null or < 1) confidence = Math.Min(confidence, 0.79);
+        if (HasConflictingSongId(original, candidate)) return (Math.Min(confidence, 0.74), "Different song ID");
 
-        var confidence = 0.88;
-        if (original.Duration is { TotalSeconds: > 0 } duration &&
-            candidate.Duration is { TotalSeconds: > 0 } candidateDuration)
+        var editions = Editions(original);
+        if (!editions.SetEquals(Editions(candidate)) ||
+            editions.Count > 0 && title < 0.95)
+            return (Math.Min(confidence, 0.74), "Different edition");
+        if (duration is 0) return (Math.Min(confidence, 0.74), "Different duration");
+
+        return (Math.Min(confidence, 0.99), confidence switch
         {
-            var difference = Math.Abs((duration - candidateDuration).TotalSeconds);
-            // A few seconds can be encoder padding or silence, but a substantially different
-            // duration is evidence against reusing the same recording's ID.
-            if (difference > Math.Max(8, Math.Min(duration.TotalSeconds, candidateDuration.TotalSeconds) * 0.04))
-                return (0.65, "Different duration");
-            confidence += difference switch { <= 2 => 0.06, <= 5 => 0.03, _ => -0.10 };
-        }
+            >= 0.90 => "High",
+            >= 0.85 => "Likely",
+            > 0 => "Possible",
+            _ => "No match"
+        });
 
-        if (Normalize(album) is { Length: > 0 } albumTitle && albumTitle == Normalize(candidateAlbum))
-            confidence += 0.02;
-        return (confidence, confidence >= 0.90 ? "High" : confidence >= 0.85 ? "Likely" : "Possible");
+        void Add(double? value, double fieldWeight)
+        {
+            if (value is not { } score) return;
+            confidence += score * fieldWeight;
+            weight += fieldWeight;
+        }
+    }
+
+    private static double CompareTitle(string left, string right)
+    {
+        var fullLeft = Normalize(left);
+        var fullRight = Normalize(right);
+        if (fullLeft.Length == 0 || fullRight.Length == 0) return 0;
+        if (fullLeft == fullRight) return 1;
+
+        var baseLeft = Normalize(TitleSuffix().Replace(left.Normalize(NormalizationForm.FormKC), ""));
+        var baseRight = Normalize(TitleSuffix().Replace(right.Normalize(NormalizationForm.FormKC), ""));
+        if (baseLeft.Length > 0 && baseLeft == baseRight) return 0.88;
+        return Similarity(fullLeft, fullRight);
+    }
+
+    private static double? CompareAlbum(string? left, string? right) =>
+        !string.IsNullOrWhiteSpace(left) && !string.IsNullOrWhiteSpace(right) ? CompareTitle(left, right) : null;
+
+    private static double? CompareDuration(TimeSpan? left, TimeSpan? right)
+    {
+        if (left is not { TotalSeconds: > 0 } actual || right is not { TotalSeconds: > 0 } candidate) return null;
+        var difference = Math.Abs((actual - candidate).TotalSeconds);
+        return difference switch
+        {
+            <= 0.7 => 1,
+            <= 2 => 0.96,
+            <= 5 => 0.85,
+            <= 8 => 0.5,
+            _ => 0
+        };
+    }
+
+    private static double Similarity(string left, string right)
+    {
+        var length = Math.Max(left.Length, right.Length);
+        if (length is < 4 or > 256 || Math.Abs(left.Length - right.Length) > length / 2) return 0;
+        var row = new int[right.Length + 1];
+        for (var j = 0; j < row.Length; j++) row[j] = j;
+        for (var i = 0; i < left.Length; i++)
+        {
+            var diagonal = row[0]++;
+            for (var j = 0; j < right.Length; j++)
+            {
+                var above = row[j + 1];
+                row[j + 1] = Math.Min(Math.Min(above, row[j]) + 1, diagonal + (left[i] == right[j] ? 0 : 1));
+                diagonal = above;
+            }
+        }
+        return 1d - (double)row[^1] / length;
     }
 
     private static bool SharesSongId(Track original, Track candidate) =>
@@ -58,7 +120,8 @@ internal static partial class TrackMatchScorer
         string.Equals(id.Kind, other.Kind, StringComparison.OrdinalIgnoreCase);
 
     private static HashSet<string> NormalizeArtists(Track track) =>
-        track.Artists.Select(artist => Normalize(artist.Name)).Where(name => name.Length > 0).ToHashSet();
+        track.Artists.SelectMany(artist => ArtistSeparator().Split(artist.Name))
+            .Select(Normalize).Where(name => name.Length > 0).ToHashSet();
 
     private static string Normalize(string? value)
     {
@@ -75,11 +138,18 @@ internal static partial class TrackMatchScorer
             "现场" or "現場" or "演唱会" or "演唱會" => "LIVE",
             "混音" => "REMIX",
             "伴奏" => "INSTRUMENTAL",
+            "翻唱版" => "COVER",
             "REMASTERED" => "REMASTER",
             var edition => edition
         }).ToHashSet();
 
-    [GeneratedRegex(@"\b(?:live|remix|acoustic|instrumental|karaoke|demo|remaster(?:ed)?|radio edit)\b|现场|現場|演唱会|演唱會|混音|伴奏",
+    [GeneratedRegex(@"\b(?:live|remix|acoustic|instrumental|karaoke|demo|cover|remaster(?:ed)?|radio edit)\b|现场|現場|演唱会|演唱會|混音|伴奏|翻唱版",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex EditionPattern();
+
+    [GeneratedRegex(@"(?:\s*(?:\([^()]+\)|\[[^\[\]]+\]|【[^【】]+】)|\s+[-–—]\s+.+)+\s*$")]
+    private static partial Regex TitleSuffix();
+
+    [GeneratedRegex(@"\s+(?:/|&|＆|／)\s+|[;；、]")]
+    private static partial Regex ArtistSeparator();
 }

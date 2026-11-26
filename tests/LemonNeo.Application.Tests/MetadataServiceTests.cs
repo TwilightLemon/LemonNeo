@@ -38,6 +38,23 @@ public sealed class MetadataServiceTests
     }
 
     [Fact]
+    public async Task BracketedTitleAndMatchingArtistOutrankTheOriginalPerformersVersion()
+    {
+        var match = Song("netease", "537637239", "カトラリー（翻自 初音ミク）", "Sawako碎花", 200);
+        var other = Song("netease", "1899686964", "カトラリー", "神山羊 / 初音ミク", 200);
+        var provider = new Provider("Record") { Candidates = [other, match] };
+        var registry = new Registry(provider);
+        var service = new MetadataService(registry, new TrackLookupService(registry));
+        var original = Song("local", "file", "カトラリー", "Sawako碎花", 200);
+
+        var result = await service.LookupAsync(original, ["netease"], minimumConfidence: 0);
+
+        Assert.Equal(match.Id, result.Matches[0].Track.Id);
+        Assert.InRange(result.Matches[0].Confidence, 0.9, 0.99);
+        Assert.InRange(result.Matches[1].Confidence, 0.01, 0.79);
+    }
+
+    [Fact]
     public async Task BatchMatchScoresAllCandidatesBeforeSelectingOne()
     {
         var studio = Song("netease", "studio", "Song", "Artist", 180) with
