@@ -51,6 +51,12 @@ dotnet run --project src/LemonNeo.Console
 
 Plugins are deployed into the host's `plugins/` directory automatically; pass `-p:SkipHostPlugins=true` to build a host without them. The console host accepts `--plugins <dir>`, `--library <dir>`, and `--startup <file>`.
 
+## Updates
+
+The desktop app checks this repository's latest stable GitHub Release in the background after startup. When a newer version is available, a dismissible banner opens its release page for download. Install the ZIP or DMG package manually. Settings → General → Updates shows the current version, supports manual checks, and lets you disable startup checks. Checks use the app's network/proxy settings; network failures do not interrupt startup or playback. Prereleases are not offered; a prerelease build can update to the stable release with the same version number.
+
+Release packages get their application version from the `v*` tag through the existing packaging workflow; keep `<Version>` in `LemonNeo.Desktop.csproj` current for local builds.
+
 ## Features
 
 ### Cross-platform
@@ -92,7 +98,7 @@ Metadata is not tied to whichever service a track came from:
 - **Appearance** — light, dark, or system; accent palettes or colors derived from the track's artwork; the mesh background and visualizer tuned with presets or turned off; a reduced-motion option.
 - **Lyrics** — font size, bold, alignment, translation and romanization toggles, one or two lines, and a floating desktop lyrics window you can place anywhere.
 - **Playback** — preferred audio quality and decoder, playback modes, and source choice when several plugins can play the same track.
-- **Library** — drag-and-drop playlists, folder import that picks up embedded covers and tags, remote playlist import and export, and moving your library or cache anywhere without restarting.
+- **Library** — drag-and-drop playlists, folder import with embedded covers and tags, remote playlist import and export, and moving your library or cache without restarting. Optional [one-way source sync](docs/playlist-sync.md) supports manual sync and automatic-sync pauses for one or all playlists. Metadata matching and external ID edits remain available in synced playlists. Create an editable copy or convert to a local playlist to change membership.
 
 ---
 
@@ -106,7 +112,7 @@ Metadata is not tied to whichever service a track came from:
 | `LemonNeo.Plugin.Netease` | Netease Cloud Music user library | all |
 | `LemonNeo.Plugin.QqMusic` | QQ Music user library | all |
 | `LemonNeo.Plugin.GdStudioNetease` | Alternative Netease playback source | all |
-| `LemonNeo.Plugin.Lyricify` | Lyrics and metadata matching | all |
+| `LemonNeo.Plugin.Lyricify` | Lyrics | all |
 | `LemonNeo.Plugin.MockMusic` | Reference implementation for plugin authors | all |
 
 

@@ -126,7 +126,7 @@ public sealed partial class SearchViewModel : TrackListViewModel
                  .OrderBy(provider => provider.Descriptor.Name, StringComparer.CurrentCultureIgnoreCase))
         {
             sources.Add(new SearchSourceOption(new SearchScope(provider.Id), provider.Descriptor.Name));
-            if (provider is ISearchNamespaceProvider { SearchNamespaces.Count: > 1 } scoped)
+            if (provider is ISearchProvider { SearchNamespaces.Count: > 1 } scoped)
                 sources.AddRange(scoped.SearchNamespaces.Order(StringComparer.OrdinalIgnoreCase)
                     .Select(ns => new SearchSourceOption(new SearchScope(provider.Id, ns), $"{provider.Descriptor.Name} / {ns}")));
         }

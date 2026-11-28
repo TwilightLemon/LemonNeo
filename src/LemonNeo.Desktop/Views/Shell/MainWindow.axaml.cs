@@ -448,24 +448,27 @@ public partial class MainWindow : Window
         if (DataContext is not MainViewModel { SharedContext.IsInitialized: true } shell) return;
         var vm = shell.Library;
         var result = await new PlaylistDialog(null, importFolder).ShowDialog<PlaylistEditResult?>(this);
-        if (result is not null) await vm.CreatePlaylistAsync(result.Name, result.Description, result.FolderPath);
+        if (result is not null) await vm.CreatePlaylistAsync(result.Name, result.Description, result.FolderPath,
+            result.Synchronize);
     }
 
     public async Task EditPlaylistAsync()
     {
         if (DataContext is not MainViewModel
             {
-                Navigation.Current: LibraryViewModel { CanEditPlaylist: true, SelectedPlaylist: { } playlist } vm
+                Navigation.Current: LibraryViewModel { CanEditPlaylistArtwork: true, SelectedPlaylist: { } playlist } vm
             }) return;
-        var result = await new PlaylistDialog(playlist).ShowDialog<PlaylistEditResult?>(this);
-        if (result is not null) await vm.UpdatePlaylistAsync(playlist.Id, result.Name, result.Description);
+        var result = await new PlaylistDialog(playlist, artworkLoader: vm.ArtworkLoader, artworkUri: vm.PlaylistArtworkUri,
+            canEditDetails: vm.CanEditPlaylist).ShowDialog<PlaylistEditResult?>(this);
+        if (result is not null)
+            await vm.UpdatePlaylistAsync(playlist, result.Name, result.Description, result.ArtworkChanged, result.ArtworkFile);
     }
 
     public async Task DeletePlaylistAsync()
     {
         if (DataContext is not MainViewModel
             {
-                Navigation.Current: LibraryViewModel { CanEditPlaylist: true, SelectedPlaylist: { } playlist } vm
+                Navigation.Current: LibraryViewModel { CanInteract: true, SelectedPlaylist: { } playlist } vm
             }) return;
         if (await new ConfirmationDialog(vm.GetDeletePlaylistPrompt(playlist.Name)).ShowDialog<bool>(this))
             await vm.DeletePlaylistAsync(playlist.Id);

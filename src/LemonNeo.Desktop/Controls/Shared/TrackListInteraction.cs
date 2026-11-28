@@ -16,7 +16,7 @@ internal static class TrackListInteraction
             if (list.DataContext is not TrackListViewModel { CanInteract: true } vm ||
                 TrackContextMenu.GetTarget<TrackRow>(list, args) is not { } target) return;
 
-            TrackContextMenu.Open(target.Container, args, target.Row, vm.Playlists,
+            TrackContextMenu.Open(target.Container, args, target.Row, vm.EditablePlaylists,
                 id => vm.AddTrackAsync(id, target.Row.Track), () => vm.InspectTrackAsync(target.Row),
                 getRemove?.Invoke(target.Row));
         };

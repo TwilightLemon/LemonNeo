@@ -13,6 +13,18 @@ public sealed class LibraryService(ILibraryRepository repository)
     private long _indexVersion;
 
     public MusicLibrary Current { get; private set; } = new();
+    internal object SyncRoot => _changesGate;
+
+    internal IDisposable BeginMutation()
+    {
+        Monitor.Enter(_changesGate);
+        return new MutationScope(_changesGate);
+    }
+
+    private sealed class MutationScope(object gate) : IDisposable
+    {
+        public void Dispose() => Monitor.Exit(gate);
+    }
 
     public Task EnsureCreatedAsync(CancellationToken cancellationToken = default)
     {
@@ -63,6 +75,7 @@ public sealed class LibraryService(ILibraryRepository repository)
                     UpdatedAt = Current.UpdatedAt,
                     PlaylistIds = Current.Playlists.Select(playlist => playlist.Id).Order().ToArray(),
                     Mirrors = Current.Mirrors.OrderBy(mirror => mirror.PlaylistId).ToArray(),
+                    IsPlaylistSyncPaused = Current.IsPlaylistSyncPaused,
                     ChangedPlaylists = Current.Playlists
                         .Where(playlist => changedIds.Contains(playlist.Id))
                         .OrderBy(playlist => playlist.Id)
@@ -120,6 +133,15 @@ public sealed class LibraryService(ILibraryRepository repository)
         }
     }
 
+    public void TouchIndex()
+    {
+        lock (_changesGate)
+        {
+            Current.UpdatedAt = DateTimeOffset.UtcNow;
+            _indexVersion = ++_changeVersion;
+        }
+    }
+
     public void TouchDeleted(Guid playlistId)
     {
         lock (_changesGate)
@@ -151,6 +173,7 @@ public sealed class LibraryService(ILibraryRepository repository)
             Id = playlist.Id,
             Name = playlist.Name,
             Description = playlist.Description,
+            ArtworkUri = playlist.ArtworkUri,
             DecodeProfile = playlist.DecodeProfile,
             CreatedAt = playlist.CreatedAt,
             UpdatedAt = playlist.UpdatedAt,
@@ -160,6 +183,8 @@ public sealed class LibraryService(ILibraryRepository repository)
                 SortKey = item.SortKey,
                 AddedAt = item.AddedAt,
                 DecodeProfile = item.DecodeProfile,
+                HasMetadataOverride = item.HasMetadataOverride,
+                ExternalIdOverrides = item.ExternalIdOverrides.ToArray(),
                 Track = item.Track with
                 {
                     Artists = item.Track.Artists.ToArray(),

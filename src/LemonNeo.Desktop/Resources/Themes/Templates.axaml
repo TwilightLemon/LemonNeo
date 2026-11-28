@@ -11,6 +11,11 @@
     <DataTemplate x:DataType="sharedVm:ProviderOption" x:Key="ProviderOptionTemplate">
         <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
     </DataTemplate>
+    <DataTemplate x:DataType="sharedVm:ProviderOption" x:Key="ProviderTabHeaderTemplate">
+        <TextBlock
+            Foreground="{Binding Foreground, RelativeSource={RelativeSource FindAncestor, AncestorType=ContentPresenter, Tree=Visual}}"
+            Text="{Binding Name}" />
+    </DataTemplate>
     <DataTemplate x:DataType="core:Playlist" x:Key="PlaylistOptionTemplate">
         <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
     </DataTemplate>

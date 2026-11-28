@@ -20,7 +20,6 @@ public sealed partial class QqMusicUserPlugin :
     IPlaylistCollectionProvider,
     IWebAuthenticationProvider,
     ISearchProvider,
-    ISearchNamespaceProvider,
     ICatalogProvider
 {
     private const string ProviderId = "qqmusic";
@@ -123,7 +122,7 @@ public sealed partial class QqMusicUserPlugin :
 
     ProviderDescriptor IMusicProvider.Descriptor { get; } = new(
         "QQ Music",
-        "Imports the authenticated user's created, followed, and purchased QQ Music collections.");
+        "Imports the authenticated user's created and followed playlists, followed albums, and purchased QQ Music albums.");
 
     public async IAsyncEnumerable<RemotePlaylistCollection> GetUserPlaylistCollectionsAsync(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -140,6 +139,12 @@ public sealed partial class QqMusicUserPlugin :
             "followed",
             "我收藏的歌单",
             followed);
+
+        var followedAlbums = await WithSessionAsync(api.GetFollowedAlbumsAsync, cancellationToken);
+        yield return new RemotePlaylistCollection(
+            "followed-albums",
+            "我收藏的专辑",
+            followedAlbums);
 
         var purchased = await WithSessionAsync(api.GetPurchasedAlbumsAsync, cancellationToken);
         yield return new RemotePlaylistCollection(

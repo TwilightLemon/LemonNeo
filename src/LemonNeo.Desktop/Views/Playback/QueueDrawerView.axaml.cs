@@ -35,7 +35,7 @@ public partial class QueueDrawerView : UserControl
         if (DataContext is not PlaybackQueueViewModel { CanInteract: true } vm ||
             TrackContextMenu.GetTarget<QueueTrackViewModel>(QueueTracks, args) is not { } target) return;
 
-        TrackContextMenu.Open(target.Container, args, target.Row.Row, vm.Playlists,
+        TrackContextMenu.Open(target.Container, args, target.Row.Row, vm.EditablePlaylists,
             id => vm.AddTrackAsync(id, target.Row.Row.Track), () => vm.InspectTrackAsync(target.Row),
             () => vm.RemoveTrackAsync(target.Row));
     }

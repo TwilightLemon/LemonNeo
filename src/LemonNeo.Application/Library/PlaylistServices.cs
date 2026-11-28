@@ -52,10 +52,11 @@ public sealed class PlaylistService(
     LibraryService library,
     IPlaylistOrderingService ordering)
 {
-    public Playlist Create(string name, string? description = null)
+    public Playlist Create(string name, string? description = null, Uri? artworkUri = null)
     {
+        using var mutation = library.BeginMutation();
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        var playlist = new Playlist { Name = name.Trim(), Description = description };
+        var playlist = new Playlist { Name = name.Trim(), Description = description, ArtworkUri = artworkUri };
         library.Current.Playlists.Add(playlist);
         library.Touch(playlist.Id);
         return playlist;
@@ -63,6 +64,8 @@ public sealed class PlaylistService(
 
     public PlaylistItem Add(Guid playlistId, Track track)
     {
+        using var mutation = library.BeginMutation();
+        EnsureEditable(playlistId);
         ValidateTrack(track);
         var playlist = GetRequired(playlistId);
         var item = new PlaylistItem
@@ -78,6 +81,8 @@ public sealed class PlaylistService(
 
     public bool Remove(Guid playlistId, Guid itemId)
     {
+        using var mutation = library.BeginMutation();
+        EnsureEditable(playlistId);
         var playlist = GetRequired(playlistId);
         var removed = playlist.Items.RemoveAll(item => item.Id == itemId) > 0;
         if (removed)
@@ -91,6 +96,8 @@ public sealed class PlaylistService(
 
     public IReadOnlyList<PlaylistItem> AddRange(Guid playlistId, IEnumerable<Track> tracks, bool insertAtStart = false)
     {
+        using var mutation = library.BeginMutation();
+        EnsureEditable(playlistId);
         var values = tracks.ToArray();
         foreach (var track in values) ValidateTrack(track);
         var playlist = GetRequired(playlistId);
@@ -105,6 +112,8 @@ public sealed class PlaylistService(
 
     public void Reorder(Guid playlistId, IReadOnlyCollection<Guid> itemIds, Guid targetId, bool after)
     {
+        using var mutation = library.BeginMutation();
+        EnsureEditable(playlistId);
         var playlist = GetRequired(playlistId);
         var items = playlist.Items.OrderBy(item => FractionalPlaylistOrderingService.Parse(item.SortKey))
             .ThenBy(item => item.Id).ToList();
@@ -127,6 +136,8 @@ public sealed class PlaylistService(
 
     public Playlist Update(Guid playlistId, string name, string? description)
     {
+        using var mutation = library.BeginMutation();
+        EnsureEditable(playlistId);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         var playlist = GetRequired(playlistId);
         playlist.Name = name.Trim();
@@ -137,6 +148,7 @@ public sealed class PlaylistService(
 
     public bool Delete(Guid playlistId)
     {
+        using var mutation = library.BeginMutation();
         if (library.Current.Playlists.RemoveAll(playlist => playlist.Id == playlistId) == 0) return false;
 
         library.Current.Mirrors.RemoveAll(mirror => mirror.PlaylistId == playlistId);
@@ -152,6 +164,8 @@ public sealed class PlaylistService(
 
     public PlaylistItem UpdateTrack(Guid playlistId, Guid itemId, Track track)
     {
+        using var mutation = library.BeginMutation();
+        EnsureEditable(playlistId);
         ValidateTrack(track);
         var playlist = GetRequired(playlistId);
         var item = GetItemRequired(playlistId, itemId);
@@ -160,8 +174,46 @@ public sealed class PlaylistService(
         return item;
     }
 
+    /// <summary>Matching can update local metadata while preserving source identity and playlist membership.</summary>
+    public PlaylistItem UpdateMetadata(Guid playlistId, Guid itemId, Track track)
+    {
+        using var mutation = library.BeginMutation();
+        ValidateTrack(track);
+        var item = GetItemRequired(playlistId, itemId);
+        if (track.Id != item.Track.Id)
+            throw new ArgumentException("Metadata matching cannot change the source track identity.");
+        UpdateExternalIds(playlistId, itemId, track.ExternalIds);
+        item.Track = track;
+        if (IsReadOnly(playlistId)) item.HasMetadataOverride = true;
+        Touch(GetRequired(playlistId));
+        return item;
+    }
+
+    public void UpdateExternalIds(Guid playlistId, Guid itemId, IReadOnlyList<ExternalMusicId> ids)
+    {
+        using var mutation = library.BeginMutation();
+        foreach (var id in ids) ValidateExternalId(id);
+        var item = GetItemRequired(playlistId, itemId);
+        if (IsReadOnly(playlistId))
+        {
+            var schemes = item.Track.ExternalIds.Concat(ids)
+                .Select(id => new MusicIdScheme(id.Namespace, id.Kind))
+                .DistinctBy(SchemeKey);
+            var changed = schemes.Where(scheme =>
+                !item.Track.ExternalIds.Where(scheme.Accepts).SequenceEqual(ids.Where(scheme.Accepts)));
+            item.ExternalIdOverrides = item.ExternalIdOverrides.Concat(changed).DistinctBy(SchemeKey).ToArray();
+        }
+        item.Track = item.Track with { ExternalIds = ids.ToArray() };
+        Touch(GetRequired(playlistId));
+    }
+
+    private static (string, string?) SchemeKey(MusicIdScheme scheme) =>
+        (scheme.Namespace.ToUpperInvariant(), scheme.Kind?.ToUpperInvariant());
+
     public void Move(Guid playlistId, Guid itemId, int position)
     {
+        using var mutation = library.BeginMutation();
+        EnsureEditable(playlistId);
         var playlist = GetRequired(playlistId);
         var item = GetItemRequired(playlistId, itemId);
         if (position < 1 || position > playlist.Items.Count)
@@ -187,37 +239,38 @@ public sealed class PlaylistService(
 
     public void AddExternalId(Guid playlistId, Guid itemId, ExternalMusicId id)
     {
+        using var mutation = library.BeginMutation();
         ValidateExternalId(id);
         var item = GetItemRequired(playlistId, itemId);
         if (item.Track.ExternalIds.Any(value => SameScheme(value, id)))
             throw new ArgumentException(
                 $"External ID scheme '{id.Namespace}:{id.Kind ?? "-"}' already exists. Use update.");
 
-        UpdateTrack(playlistId, itemId, item.Track with { ExternalIds = [.. item.Track.ExternalIds, id] });
+        UpdateExternalIds(playlistId, itemId, [.. item.Track.ExternalIds, id]);
     }
 
     public void UpdateExternalId(Guid playlistId, Guid itemId, ExternalMusicId id)
     {
+        using var mutation = library.BeginMutation();
         ValidateExternalId(id);
         var item = GetItemRequired(playlistId, itemId);
         if (!item.Track.ExternalIds.Any(value => SameScheme(value, id)))
             throw new ArgumentException($"External ID scheme '{id.Namespace}:{id.Kind ?? "-"}' was not found.");
 
-        UpdateTrack(playlistId, itemId, item.Track with
-        {
-            ExternalIds = item.Track.ExternalIds.Select(value => SameScheme(value, id) ? id : value).ToArray()
-        });
+        UpdateExternalIds(playlistId, itemId,
+            item.Track.ExternalIds.Select(value => SameScheme(value, id) ? id : value).ToArray());
     }
 
     public bool RemoveExternalId(Guid playlistId, Guid itemId, string namespaceName, string? kind)
     {
+        using var mutation = library.BeginMutation();
         ArgumentException.ThrowIfNullOrWhiteSpace(namespaceName);
         var item = GetItemRequired(playlistId, itemId);
         var scheme = new MusicIdScheme(namespaceName, kind);
         var ids = item.Track.ExternalIds.Where(id => !scheme.Accepts(id)).ToArray();
         if (ids.Length == item.Track.ExternalIds.Count) return false;
 
-        UpdateTrack(playlistId, itemId, item.Track with { ExternalIds = ids });
+        UpdateExternalIds(playlistId, itemId, ids);
         return true;
     }
 
@@ -253,6 +306,80 @@ public sealed class PlaylistService(
     {
         return library.Current.Playlists.FirstOrDefault(playlist => playlist.Id == playlistId)
                ?? throw new ArgumentException($"Playlist '{playlistId}' was not found.");
+    }
+
+    public bool IsReadOnly(Guid playlistId) => library.Current.Mirrors.Any(mirror => mirror.PlaylistId == playlistId);
+
+    /// <summary>Playback may enrich IDs without editing source-owned metadata or membership.</summary>
+    public bool EnrichExternalIds(Track original, Track updated)
+    {
+        if (ReferenceEquals(original.ExternalIds, updated.ExternalIds)) return false;
+        var discovered = updated.ExternalIds
+            .ExceptBy(original.ExternalIds.Select(MusicCacheIdentity.Normalize), MusicCacheIdentity.Normalize)
+            .ToArray();
+        if (discovered.Length == 0) return false;
+
+        using var mutation = library.BeginMutation();
+        var changed = false;
+        foreach (var playlist in library.Current.Playlists)
+        foreach (var item in playlist.Items.Where(item => item.Track.Id == original.Id))
+            changed |= EnrichExternalIds(playlist, item, discovered);
+
+        return changed;
+    }
+
+    public void EnrichExternalIds(Guid playlistId, Guid itemId, IReadOnlyList<ExternalMusicId> ids)
+    {
+        using var mutation = library.BeginMutation();
+        var item = GetItemRequired(playlistId, itemId);
+        EnrichExternalIds(GetRequired(playlistId), item, ids);
+    }
+
+    private bool EnrichExternalIds(Playlist playlist, PlaylistItem item, IReadOnlyList<ExternalMusicId> ids)
+    {
+        var known = item.Track.ExternalIds.Select(MusicCacheIdentity.Normalize).ToHashSet();
+        var added = ids.Where(id => !item.ExternalIdOverrides.Any(scheme => scheme.Accepts(id)) &&
+                                    known.Add(MusicCacheIdentity.Normalize(id))).ToArray();
+        if (added.Length == 0) return false;
+
+        item.Track = item.Track with { ExternalIds = [.. item.Track.ExternalIds, .. added] };
+        Touch(playlist);
+        return true;
+    }
+
+    public bool IsArtworkReadOnly(Guid playlistId) => library.Current.Mirrors.Any(mirror =>
+        mirror.PlaylistId == playlistId && mirror.SourceKind == PlaylistSourceKind.Provider);
+
+    public void UpdateArtwork(Guid playlistId, Uri? artworkUri)
+    {
+        using var mutation = library.BeginMutation();
+        if (IsArtworkReadOnly(playlistId))
+            throw new InvalidOperationException("This playlist's artwork follows its remote source.");
+
+        var playlist = GetRequired(playlistId);
+        if (Equals(playlist.ArtworkUri, artworkUri)) return;
+        playlist.ArtworkUri = artworkUri;
+        Touch(playlist);
+    }
+
+    public void EnsureEditable(Guid playlistId)
+    {
+        if (IsReadOnly(playlistId))
+            throw new InvalidOperationException("This playlist follows its source. Create an editable copy or detach it first.");
+    }
+
+    public Playlist CreateEditableCopy(Guid playlistId)
+    {
+        using var mutation = library.BeginMutation();
+        var source = GetRequired(playlistId);
+        var copy = Create(source.Name, source.Description, source.ArtworkUri);
+        copy.DecodeProfile = source.DecodeProfile;
+        var sourceItems = source.Items.OrderBy(item => FractionalPlaylistOrderingService.Parse(item.SortKey))
+            .ThenBy(item => item.Id).ToArray();
+        var copyItems = AddRange(copy.Id, sourceItems.Select(item => item.Track));
+        for (var index = 0; index < copyItems.Count; index++)
+            copyItems[index].DecodeProfile = sourceItems[index].DecodeProfile;
+        return copy;
     }
 }
 
@@ -298,7 +425,7 @@ public sealed class ImportService(
 
     public Playlist ImportRemote(RemotePlaylist remote)
     {
-        var local = playlists.Create(remote.Name, remote.Description);
+        var local = playlists.Create(remote.Name, remote.Description, remote.ArtworkUri);
         foreach (var track in remote.Tracks) playlists.Add(local.Id, track);
 
         return local;

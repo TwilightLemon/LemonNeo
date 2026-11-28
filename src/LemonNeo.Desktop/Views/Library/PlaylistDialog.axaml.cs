@@ -13,10 +13,11 @@ public partial class PlaylistDialog : Window
     {
     }
 
-    public PlaylistDialog(Playlist? playlist, bool importFolderOnOpen = false)
+    public PlaylistDialog(Playlist? playlist, bool importFolderOnOpen = false, ArtworkService? artworkLoader = null,
+        Uri? artworkUri = null, bool canEditDetails = true)
     {
         InitializeComponent();
-        DataContext = new PlaylistDialogViewModel(playlist);
+        DataContext = new PlaylistDialogViewModel(playlist, artworkLoader, artworkUri, canEditDetails);
         if (playlist is not null)
         {
             Bind(TitleProperty, LanguageManager.Instance.EditPlaylist);
@@ -27,6 +28,7 @@ public partial class PlaylistDialog : Window
         Opened += async (_, _) =>
         {
             ImportFolderButton.IsEnabled = StorageProvider.CanPickFolder;
+            ChooseArtworkButton.IsEnabled = StorageProvider.CanOpen;
             PlaylistName.Focus();
             if (playlist is null && importFolderOnOpen) await SelectFolderAsync();
         };
@@ -54,11 +56,59 @@ public partial class PlaylistDialog : Window
         PlaylistName.Focus();
     }
 
+    private async void OnChooseArtwork(object? sender, RoutedEventArgs args)
+    {
+        if (DataContext is not PlaylistDialogViewModel
+            { IsNew: false, IsChoosingArtwork: false, ArtworkLoader: { } loader } model || !StorageProvider.CanOpen)
+            return;
+
+        model.IsChoosingArtwork = true;
+        model.ArtworkError = null;
+        try
+        {
+            var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = LanguageManager.GetCurrentValue(LanguageManager.Keys.ChoosePlaylistCover),
+                AllowMultiple = false,
+                FileTypeFilter = [FilePickerFileTypes.ImageAll]
+            });
+            using var file = files.FirstOrDefault();
+            if (file is null) return;
+            if (file.TryGetLocalPath() is { } path)
+            {
+                var uri = new Uri(path);
+                using var image = await loader.LoadWithDataAsync(uri);
+                if (image is not null)
+                {
+                    model.SetArtwork(uri);
+                    return;
+                }
+            }
+            model.ArtworkError = LanguageManager.GetCurrentValue(LanguageManager.Keys.PlaylistCoverUnavailable);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            model.ArtworkError = LanguageManager.GetCurrentValue(LanguageManager.Keys.PlaylistCoverUnavailable);
+        }
+        finally
+        {
+            model.IsChoosingArtwork = false;
+        }
+    }
+
+    private void OnRemoveArtwork(object? sender, RoutedEventArgs args)
+    {
+        if (DataContext is PlaylistDialogViewModel { IsNew: false, IsChoosingArtwork: false } model)
+            model.SetArtwork(null);
+    }
+
     private void OnCreate(object? sender, RoutedEventArgs args)
     {
         if (DataContext is PlaylistDialogViewModel { CanSave: true } model)
             Close(new PlaylistEditResult(model.Name.Trim(),
-                string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(), model.FolderPath));
+                string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(), model.FolderPath,
+                model.HasFolder && model.Synchronize, model.ArtworkChanged,
+                model.ArtworkChanged ? model.ArtworkUri : null));
     }
 
     private void OnCancel(object? sender, RoutedEventArgs args)

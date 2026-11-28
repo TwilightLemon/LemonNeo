@@ -1,6 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using LemonNeo.Abstractions.Providers;
+using LemonNeo.Application.Providers;
 using LemonNeo.Desktop.Services;
 
 namespace LemonNeo.Desktop.ViewModels.Metadata;

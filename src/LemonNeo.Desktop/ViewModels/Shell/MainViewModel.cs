@@ -215,14 +215,16 @@ public sealed class MainViewModel : PageViewModel
                 Playlists.RemoveAt(i);
         for (var i = 0; i < values.Count; i++)
         {
-            var existing = Playlists.FirstOrDefault(p => p.Id == values[i].Id);
+            var playlist = values[i];
+            var artworkUri = PlaylistArtworkFiles.Resolve(_host.StorageLocations.LibraryDirectory, playlist.ArtworkUri);
+            var existing = Playlists.FirstOrDefault(p => p.Id == playlist.Id);
             if (existing is null)
             {
-                Playlists.Insert(i, new PlaylistMenuItemViewModel(values[i]));
+                Playlists.Insert(i, new PlaylistMenuItemViewModel(playlist, artworkUri, _host.Get<ArtworkService>()));
             }
             else
             {
-                existing.Update(values[i]);
+                existing.Update(playlist, artworkUri);
                 var index = Playlists.IndexOf(existing);
                 if (index != i) Playlists.Move(index, i);
             }
@@ -265,6 +267,8 @@ public sealed class MainViewModel : PageViewModel
         Playback.UpdateSnapshot();
         await Navigation.Current.ActivateAsync();
         FinishStartup();
+        Context.Updates.CheckAtStartup();
+        Context.Synchronization.Start();
     }
 
     internal void FinishStartup()
@@ -276,12 +280,14 @@ public sealed class MainViewModel : PageViewModel
 
     public override async ValueTask DisposeAsync()
     {
+        await Context.Synchronization.DisposeAsync();
         Context.LibraryChanged -= OnLibraryChanged;
         Navigation.PropertyChanged -= OnNavigationChanged;
         _visualEffectsSubscription.Dispose();
         Context.DecoderControls.Dispose();
         if (_searchPage is not null) _searchPage.PropertyChanged -= OnSearchChanged;
         await base.DisposeAsync();
+        await Context.Updates.DisposeAsync();
         IsQueueOpen = false;
         if (QueueDrawer is not null) await QueueDrawer.DisposeAsync();
         await Navigation.DisposeAsync();

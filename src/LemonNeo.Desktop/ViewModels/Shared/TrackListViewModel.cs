@@ -54,7 +54,7 @@ public abstract class TrackListViewModel : PageViewModel
         Playback.MetadataChanged += OnPlaybackChanged;
         _preferencesSubscription =
             Context.Settings.Subscribe<LibraryPreferences>(_ => OnPropertyChanged(nameof(InsertAtStart)));
-        _targetPlaylist = Playlists.FirstOrDefault();
+        _targetPlaylist = EditablePlaylists.FirstOrDefault();
     }
 
     public PlaybackViewModel Playback { get; }
@@ -104,7 +104,8 @@ public abstract class TrackListViewModel : PageViewModel
         : SelectedTrack is { } row ? [row] : [];
 
     public bool HasActionTracks => CanInteract && ActionTracks.Count > 0;
-    public bool CanAddToPlaylist => HasActionTracks && TargetPlaylist is not null;
+    public bool CanAddToPlaylist => HasActionTracks && TargetPlaylist is not null &&
+                                    !_host.Get<PlaylistService>().IsReadOnly(TargetPlaylist.Id);
 
     public bool IsSelectionMode
     {
@@ -205,7 +206,7 @@ public abstract class TrackListViewModel : PageViewModel
             }
             row.ArtworkLoader = artwork;
             row.CanBrowseCatalog = id => providers.Get(id.ProviderId) is ICatalogProvider;
-            row.FindCatalogTrack = FindCatalogTrack;
+            row.FindCatalogTracks = FindCatalogTracks;
             row.IsSelectionMode = IsSelectionMode;
             row.PropertyChanged += OnRowChanged;
             return row;
@@ -214,17 +215,18 @@ public abstract class TrackListViewModel : PageViewModel
         ApplyFilter();
     }
 
-    private MusicItemId? FindCatalogTrack(Track track)
+    private IReadOnlyList<MusicItemId> FindCatalogTracks(Track track)
     {
         var registry = _host.Get<IProviderRegistry>();
-        if (registry.Get(track.Id.ProviderId) is ICatalogProvider and ITrackLookupProvider) return track.Id;
+        var candidates = new List<MusicItemId>();
+        if (registry.Get(track.Id.ProviderId) is ICatalogProvider and ITrackLookupProvider) candidates.Add(track.Id);
         foreach (var id in track.ExternalIds.OrderBy(id => id.Kind == "song-mid" ? 0 : 1))
         {
             if (id.Kind is not ("song-mid" or "song-id")) continue;
             var provider = registry.Get(id.Namespace);
-            if (provider is ICatalogProvider and ITrackLookupProvider) return new MusicItemId(provider.Id, id.Value);
+            if (provider is ICatalogProvider and ITrackLookupProvider) candidates.Add(new MusicItemId(provider.Id, id.Value));
         }
-        return null;
+        return candidates.Distinct().ToArray();
     }
 
     private void OnFilterTick(object? sender, EventArgs args)
@@ -306,12 +308,13 @@ public abstract class TrackListViewModel : PageViewModel
 
     private void OnLibraryChanged(object? sender, EventArgs args)
     {
+        OnPropertyChanged(nameof(EditablePlaylists));
         if (!IsNavigationActive)
         {
             MarkTracksDirty();
             return;
         }
-        TargetPlaylist = Playlists.FirstOrDefault(p => p.Id == TargetPlaylist?.Id) ?? Playlists.FirstOrDefault();
+        TargetPlaylist = EditablePlaylists.FirstOrDefault(p => p.Id == TargetPlaylist?.Id) ?? EditablePlaylists.FirstOrDefault();
         RefreshTracks();
         base.RefreshLocalizedProperties();
     }
@@ -324,7 +327,7 @@ public abstract class TrackListViewModel : PageViewModel
 
     public override Task ActivateAsync()
     {
-        TargetPlaylist = Playlists.FirstOrDefault(p => p.Id == TargetPlaylist?.Id) ?? Playlists.FirstOrDefault();
+        TargetPlaylist = EditablePlaylists.FirstOrDefault(p => p.Id == TargetPlaylist?.Id) ?? EditablePlaylists.FirstOrDefault();
         if (_needsRefresh) RefreshTracks();
         else RefreshPlayingTracks();
         return Task.CompletedTask;

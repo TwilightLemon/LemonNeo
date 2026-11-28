@@ -68,6 +68,7 @@ public sealed class MockMusicPlugin :
             ["favorites"] = new()
             {
                 Id = "favorites",
+                IsComplete = true,
                 ProviderId = "mock",
                 Name = "Mock Favorites",
                 Description = "A small remote playlist exposed by the mock provider.",
@@ -76,6 +77,7 @@ public sealed class MockMusicPlugin :
             ["coding"] = new()
             {
                 Id = "coding",
+                IsComplete = true,
                 ProviderId = "mock",
                 Name = "Coding Mix",
                 Description = "Music for compiling ideas.",
@@ -84,6 +86,7 @@ public sealed class MockMusicPlugin :
             ["weeknd"] = new()
             {
                 Id = "weeknd",
+                IsComplete = true,
                 ProviderId = "mock",
                 Name = "The Weeknd Essentials",
                 Description = "Popular The Weeknd tracks with metadata only and no mock playback source.",
@@ -124,6 +127,7 @@ public sealed class MockMusicPlugin :
     }
 
     public string Id => "mock";
+    public IReadOnlyCollection<string> SearchNamespaces { get; } = ["mock"];
 
     ProviderDescriptor IMusicProvider.Descriptor { get; } = new(
         "Mock Music",
@@ -164,6 +168,9 @@ public sealed class MockMusicPlugin :
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (request.SourceNamespace is { } source &&
+            !SearchNamespaces.Contains(source, StringComparer.OrdinalIgnoreCase))
+            return Task.FromResult(new SearchResult(Id, []));
         var matches = Tracks
             .Where(track => string.IsNullOrWhiteSpace(request.Keyword) ||
                             track.Title.Contains(request.Keyword, StringComparison.OrdinalIgnoreCase) ||

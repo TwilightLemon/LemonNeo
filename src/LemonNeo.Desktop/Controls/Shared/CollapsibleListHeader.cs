@@ -19,6 +19,7 @@ internal sealed class CollapsibleListHeader(
     private readonly TranslateTransform _toolsPosition = new();
     private readonly TranslateTransform _detailsPosition = new();
     private readonly ScaleTransform _titleScale = new();
+    private readonly TranslateTransform _titlePosition = new();
     private readonly LinearGradientBrush _wrappedTitleFade = new()
     {
         StartPoint = RelativePoint.TopLeft,
@@ -27,6 +28,7 @@ internal sealed class CollapsibleListHeader(
     };
     private Control[] _headerDetails = [];
     private TextBlock? _headerTitle;
+    private Control? _headerLeading;
     private ListBox? _activeList;
     private ScrollViewer? _trackScroll;
     private ScrollContentPresenter? _trackPresenter;
@@ -76,13 +78,16 @@ internal sealed class CollapsibleListHeader(
         if (_headerTitle is not null)
         {
             _headerTitle.RenderTransformOrigin = RelativePoint.TopLeft;
-            _headerTitle.RenderTransform = _titleScale;
+            _headerTitle.RenderTransform = new TransformGroup { Children = [_titleScale, _titlePosition] };
         }
 
+        _headerLeading = args.NameScope.Find<Control>("HeaderLeading");
         _headerDetails = new[]
         {
+            _headerLeading,
             args.NameScope.Find<Control>("HeaderDescription"),
             args.NameScope.Find<Control>("HeaderSummary"),
+            args.NameScope.Find<Control>("HeaderDetail"),
             args.NameScope.Find<Control>("HeaderActions")
         }.OfType<Control>().ToArray();
         foreach (var detail in _headerDetails) detail.RenderTransform = _detailsPosition;
@@ -234,6 +239,7 @@ internal sealed class CollapsibleListHeader(
         {
             var scale = 1 + (compactTitle.FontSize / title.FontSize - 1) * Fade(progress / .85);
             _titleScale.ScaleX = _titleScale.ScaleY = scale;
+            _titlePosition.X = -(_headerLeading?.Bounds.Width ?? 0) * Fade(progress / .85);
             title.Opacity = 1 - compactOpacity;
 
             // Fade the lower lines of a wrapped title before they reach the moving toolbar.

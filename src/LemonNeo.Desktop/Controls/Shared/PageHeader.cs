@@ -14,6 +14,15 @@ public sealed class PageHeader : TemplatedControl
     public static readonly StyledProperty<string?> SummaryProperty =
         AvaloniaProperty.Register<PageHeader, string?>(nameof(Summary));
 
+    public static readonly StyledProperty<string?> DetailProperty =
+        AvaloniaProperty.Register<PageHeader, string?>(nameof(Detail));
+
+    public static readonly StyledProperty<string?> DetailToolTipProperty =
+        AvaloniaProperty.Register<PageHeader, string?>(nameof(DetailToolTip));
+
+    public static readonly StyledProperty<object?> LeadingProperty =
+        AvaloniaProperty.Register<PageHeader, object?>(nameof(Leading));
+
     public static readonly StyledProperty<object?> ActionsProperty =
         AvaloniaProperty.Register<PageHeader, object?>(nameof(Actions));
 
@@ -33,6 +42,24 @@ public sealed class PageHeader : TemplatedControl
     {
         get => GetValue(SummaryProperty);
         set => SetValue(SummaryProperty, value);
+    }
+
+    public string? Detail
+    {
+        get => GetValue(DetailProperty);
+        set => SetValue(DetailProperty, value);
+    }
+
+    public string? DetailToolTip
+    {
+        get => GetValue(DetailToolTipProperty);
+        set => SetValue(DetailToolTipProperty, value);
+    }
+
+    public object? Leading
+    {
+        get => GetValue(LeadingProperty);
+        set => SetValue(LeadingProperty, value);
     }
 
     public object? Actions

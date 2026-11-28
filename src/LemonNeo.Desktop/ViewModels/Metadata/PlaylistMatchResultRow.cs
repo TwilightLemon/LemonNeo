@@ -1,5 +1,5 @@
 using CommunityToolkit.Mvvm.Input;
-using LemonNeo.Abstractions.Providers;
+using LemonNeo.Application.Providers;
 using LemonNeo.Core.Music;
 using LemonNeo.Desktop.Services;
 using LemonNeo.Desktop.ViewModels.Shared;

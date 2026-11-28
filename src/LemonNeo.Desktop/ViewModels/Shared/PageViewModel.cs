@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Irihi.Lingua;
 using LemonNeo.Application.Library;
+using LemonNeo.Core.Library;
 using LemonNeo.Core.Music;
 using LemonNeo.Desktop.Config;
 using LemonNeo.Desktop.Services;
@@ -39,6 +40,8 @@ public abstract class PageViewModel : ObservableObject, IAsyncDisposable
     public virtual string PageTitle => _text[Route];
     public virtual string PageDescription => _text[$"{Route}Description"];
     public virtual string? PageSummary => null;
+    public IReadOnlyList<Playlist> EditablePlaylists => Context.Playlists.Where(playlist =>
+        !_host.Get<PlaylistService>().IsReadOnly(playlist.Id)).ToArray();
 
     public bool IsBusy
     {

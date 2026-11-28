@@ -61,7 +61,8 @@ internal sealed class JsonLibraryRepository(Func<string> getLibraryDirectory) : 
                 FormatVersion = index.FormatVersion,
                 UpdatedAt = index.UpdatedAt,
                 Playlists = playlists.OrderBy(playlist => playlist.Id).ToList(),
-                Mirrors = index.Mirrors.OrderBy(mirror => mirror.PlaylistId).ToList()
+                Mirrors = index.Mirrors.OrderBy(mirror => mirror.PlaylistId).ToList(),
+                IsPlaylistSyncPaused = index.IsPlaylistSyncPaused
             };
         }
         catch (LibraryException)
@@ -100,7 +101,8 @@ internal sealed class JsonLibraryRepository(Func<string> getLibraryDirectory) : 
                     UpdatedAt = snapshot.UpdatedAt,
                     PlaylistFiles = snapshot.PlaylistIds.Order()
                         .Select(id => $"playlists/{id:N}.json").ToArray(),
-                    Mirrors = snapshot.Mirrors.OrderBy(mirror => mirror.PlaylistId).ToArray()
+                    Mirrors = snapshot.Mirrors.OrderBy(mirror => mirror.PlaylistId).ToArray(),
+                    IsPlaylistSyncPaused = snapshot.IsPlaylistSyncPaused
                 };
                 await WriteAtomicAsync(Path.Combine(root, IndexFileName), index, cancellationToken);
             }
@@ -126,6 +128,7 @@ internal sealed class JsonLibraryRepository(Func<string> getLibraryDirectory) : 
             Id = playlist.Id,
             Name = playlist.Name,
             Description = playlist.Description,
+            ArtworkUri = playlist.ArtworkUri,
             DecodeProfile = playlist.DecodeProfile,
             CreatedAt = playlist.CreatedAt,
             UpdatedAt = playlist.UpdatedAt,
@@ -187,5 +190,6 @@ internal sealed class JsonLibraryRepository(Func<string> getLibraryDirectory) : 
         public DateTimeOffset UpdatedAt { get; init; }
         public IReadOnlyList<string> PlaylistFiles { get; init; } = [];
         public IReadOnlyList<PlaylistMirror> Mirrors { get; init; } = [];
+        public bool IsPlaylistSyncPaused { get; init; }
     }
 }

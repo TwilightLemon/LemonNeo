@@ -34,11 +34,13 @@ public sealed partial class TrackEditorViewModel : ObservableObject
     public Guid? ItemId { get; private set; }
     public bool IsNew { get; }
     public bool CanUpdate => PlaylistId is not null && ItemId is not null;
+    public bool HasMatchedMetadata { get; private set; }
     public string ItemIdentity => ItemId?.ToString() ?? "—";
     public ObservableCollection<ExternalIdEditor> ExternalIds { get; } = [];
 
     public void Apply(Track track)
     {
+        HasMatchedMetadata = false;
         _snapshot = track;
         Title = track.Title;
         Artists = string.Join("; ", track.Artists.Select(a => a.Name));
@@ -54,6 +56,7 @@ public sealed partial class TrackEditorViewModel : ObservableObject
 
     public void ApplyMetadata(Track track)
     {
+        HasMatchedMetadata = true;
         _snapshot = _snapshot with { Artists = track.Artists, Album = track.Album };
         Title = track.Title;
         Artists = string.Join("; ", track.Artists.Select(artist => artist.Name));

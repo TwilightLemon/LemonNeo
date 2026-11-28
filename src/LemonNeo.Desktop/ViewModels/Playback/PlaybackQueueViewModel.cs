@@ -3,7 +3,6 @@ using System.ComponentModel;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using LemonNeo.Application.Playback;
-using LemonNeo.Core.Library;
 using LemonNeo.Desktop.Services;
 using LemonNeo.Desktop.ViewModels.Shared;
 
@@ -38,7 +37,6 @@ public sealed class PlaybackQueueViewModel : PageViewModel
     }
 
     public PlaybackViewModel Playback { get; }
-    internal IEnumerable<Playlist> Playlists => Context.Playlists;
     public ObservableCollection<QueueTrackViewModel> Tracks => _tracks;
 
     public QueueTrackViewModel? SelectedTrack

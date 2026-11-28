@@ -86,7 +86,7 @@
             <Setter Property="Grid.RowSpan" Value="2" />
             <Setter Property="Margin" Value="32,48,32,0" />
         </Style>
-        <Style Selector="ContentControl#PageContent ListBox:not(.serviceTabs):not(.playlistPicker) /template/ ItemsPresenter#PART_ItemsPresenter">
+        <Style Selector="ContentControl#PageContent ListBox:not(.playlistPicker) /template/ ItemsPresenter#PART_ItemsPresenter">
             <Setter Property="Margin" Value="{DynamicResource Space.PlaybackInset}" />
         </Style>
         <Style Selector="ContentControl#PageContent ScrollViewer:not(#PART_ScrollViewer):not(#LyricsScrollViewer)">
@@ -281,16 +281,24 @@
                         SelectedItem="{Binding SelectedPlaylist}">
                         <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="shellVm:PlaylistMenuItemViewModel">
-                                <Grid ColumnDefinitions="*,Auto">
-
+                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                                    <sharedControls:Artwork
+                                        BorderBrush="{DynamicResource Brush.Border}"
+                                        BorderThickness="1"
+                                        CornerRadius="4"
+                                        Height="24"
+                                        Loader="{Binding ArtworkLoader}"
+                                        SourceUri="{Binding ArtworkUri}"
+                                        VerticalAlignment="Center"
+                                        Width="24" />
                                     <TextBlock
+                                        Grid.Column="1"
                                         Text="{Binding Name}"
                                         TextTrimming="CharacterEllipsis"
                                         VerticalAlignment="Center" />
                                     <TextBlock
                                         Classes="caption"
-                                        Grid.Column="1"
-                                        Margin="8,0,0,0"
+                                        Grid.Column="2"
                                         Text="{Binding TrackCount}"
                                         VerticalAlignment="Center" />
                                 </Grid>
@@ -408,13 +416,43 @@
                     Width="40" />
             </Grid>
         </Border>
-        <Grid Classes.lyricsExpanded="{Binding IsLyricsExpanded}" Name="PageArea">
+        <Grid Classes.lyricsExpanded="{Binding IsLyricsExpanded}" Name="PageArea" RowDefinitions="Auto,*">
+            <Border
+                Background="{DynamicResource Brush.AccentSoft}"
+                CornerRadius="10"
+                IsVisible="{Binding SharedContext.Updates.ShowNotification}"
+                Margin="0,0,0,12"
+                Padding="14">
+                <Grid ColumnDefinitions="*,Auto,Auto">
+                    <TextBlock
+                        Foreground="{DynamicResource Brush.AccentText}"
+                        Margin="0,0,12,0"
+                        Text="{Binding SharedContext.Updates.AvailableVersionText}"
+                        TextWrapping="Wrap"
+                        VerticalAlignment="Center" />
+                    <Button
+                        Classes="ghost"
+                        Command="{Binding SharedContext.Updates.OpenReleaseCommand}"
+                        Content="{Translate {x:Static i18n:LanguageManager+Keys.UpdateViewRelease}}"
+                        Grid.Column="1" />
+                    <Button
+                        AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.UpdateDismiss}}"
+                        Classes="ghost icon"
+                        Command="{Binding SharedContext.Updates.DismissCommand}"
+                        Grid.Column="2"
+                        Margin="8,0,0,0">
+                        <Path Classes="icon" Data="{StaticResource Icon.Close}" />
+                    </Button>
+                </Grid>
+            </Border>
             <ContentControl
                 Content="{Binding Navigation.Host}"
+                Grid.Row="1"
                 HorizontalContentAlignment="Stretch"
                 Name="PageContent"
                 VerticalContentAlignment="Stretch" />
             <Grid
+                Grid.Row="1"
                 HorizontalAlignment="Left"
                 IsVisible="{Binding Navigation.IsLyrics}"
                 VerticalAlignment="Top"

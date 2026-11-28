@@ -23,8 +23,7 @@ public sealed class SearchService(IProviderRegistry registry, IPlaybackSourcePro
         var providers = registry.Providers.Where(provider =>
             (providerId is null || string.Equals(provider.Id, providerId, StringComparison.OrdinalIgnoreCase)) &&
             (kind == SearchKind.Track ? provider is ISearchProvider : provider is ICatalogProvider) &&
-            (sourceNamespace is null || provider is ISearchNamespaceProvider namespaces &&
-                namespaces.SearchNamespaces.Contains(sourceNamespace, StringComparer.OrdinalIgnoreCase)));
+            (sourceNamespace is null || provider is ISearchProvider search && SupportsNamespace(search, sourceNamespace)));
         var batches = await Task.WhenAll(providers.Select(async provider =>
         {
             try
@@ -63,7 +62,8 @@ public sealed class SearchService(IProviderRegistry registry, IPlaybackSourcePro
         cancellationToken.ThrowIfCancellationRequested();
         var sources = playbackSources.Sources.ToArray();
         if (sources.Length == 0) return [];
-        var namespaces = sources.SelectMany(source => source.AcceptedIdSchemes.Select(scheme => scheme.Namespace))
+        var namespaces = sources.SelectMany(source =>
+                source.AcceptedIdSchemes.Select(scheme => scheme.Namespace).Append(source.ProviderId))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         bool Supported(Track track)
@@ -74,13 +74,12 @@ public sealed class SearchService(IProviderRegistry registry, IPlaybackSourcePro
         }
 
         var results = new List<SearchResult>();
-        foreach (var provider in registry.Providers.Where(provider => provider is ISearchProvider))
+        foreach (var search in registry.Providers.OfType<ISearchProvider>())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var scopes = provider is ISearchNamespaceProvider scoped
-                ? scoped.SearchNamespaces.Where(namespaces.Contains).Distinct(StringComparer.OrdinalIgnoreCase)
-                    .Order(StringComparer.OrdinalIgnoreCase).Cast<string?>().ToArray()
-                : [null];
+            var provider = (IMusicProvider)search;
+            var scopes = search.SearchNamespaces.Where(namespaces.Contains).Distinct(StringComparer.OrdinalIgnoreCase)
+                .Order(StringComparer.OrdinalIgnoreCase).ToArray();
             if (scopes.Length == 0) continue;
             var found = await Task.WhenAll(scopes.Select(scope =>
                 SearchAsync(keyword, provider.Id, scope, cancellationToken)));
@@ -108,7 +107,8 @@ public sealed class SearchService(IProviderRegistry registry, IPlaybackSourcePro
                 : throw new ProviderException($"Provider '{providerId}' was not found.");
         var results = new List<SearchResult>();
 
-        foreach (var searchProvider in providers.OfType<ISearchProvider>())
+        foreach (var searchProvider in providers.OfType<ISearchProvider>()
+                     .Where(search => sourceNamespace is null || SupportsNamespace(search, sourceNamespace)))
             try
             {
                 var result = await SearchTracksAsync(searchProvider,
@@ -130,8 +130,13 @@ public sealed class SearchService(IProviderRegistry registry, IPlaybackSourcePro
         var result = await provider.SearchAsync(request, cancellationToken);
         return request.SourceNamespace is null ? result : result with
         {
-            Tracks = result.Tracks.Where(track => track.ExternalIds.Any(id =>
-                string.Equals(id.Namespace, request.SourceNamespace, StringComparison.OrdinalIgnoreCase))).ToArray()
+            Tracks = result.Tracks.Where(track =>
+                string.Equals(track.Id.ProviderId, request.SourceNamespace, StringComparison.OrdinalIgnoreCase) ||
+                track.ExternalIds.Any(id => string.Equals(id.Namespace, request.SourceNamespace,
+                    StringComparison.OrdinalIgnoreCase))).ToArray()
         };
     }
+
+    private static bool SupportsNamespace(ISearchProvider search, string sourceNamespace) =>
+        search.SearchNamespaces.Contains(sourceNamespace, StringComparer.OrdinalIgnoreCase);
 }

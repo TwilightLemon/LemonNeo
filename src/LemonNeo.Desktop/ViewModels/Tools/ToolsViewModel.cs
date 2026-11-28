@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.ComponentModel;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -6,8 +7,10 @@ using CommunityToolkit.Mvvm.Input;
 using LemonNeo.Abstractions.Playback;
 using LemonNeo.Abstractions.Plugins;
 using LemonNeo.Abstractions.Providers;
+using LemonNeo.Application.Providers;
 using LemonNeo.Abstractions.Settings;
 using LemonNeo.Application.Playback;
+using LemonNeo.Application.Library;
 using LemonNeo.Desktop.Services;
 using LemonNeo.Desktop.ViewModels.Shared;
 
@@ -34,12 +37,25 @@ public sealed partial class ToolsViewModel : PageViewModel
 
     public ToolsViewModel(DesktopContext context) : base(context, DesktopRoutes.Tools)
     {
+        LibraryOverview = new(() => _host.Get<LibraryService>().Current, _host.Get<IProviderRegistry>(), _text,
+            (id, paused) => Synchronization.SetPausedAsync(id, paused));
+        Context.LibraryChanged += OnLibraryChanged;
+        Synchronization.PropertyChanged += OnSynchronizationChanged;
+        LibraryOverview.Refresh();
         _playbackSettings = _host.Settings.ForPackage(PackageNames.Application);
         _playbackSubscription = _playbackSettings.Subscribe<PlaybackPreferences>(_ => RefreshDecoders());
         RefreshPluginInformation();
     }
 
     public string ApplicationName => "Lemon Neo";
+    public PlaylistSynchronizationViewModel Synchronization => Context.Synchronization;
+    public LibraryOverviewViewModel LibraryOverview { get; }
+
+    private void OnLibraryChanged(object? sender, EventArgs args) => LibraryOverview.Refresh();
+    private void OnSynchronizationChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName == nameof(Synchronization.IsPaused)) LibraryOverview.Refresh();
+    }
 
     public string ApplicationVersion => ApplicationAssembly
                                             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
@@ -93,7 +109,7 @@ public sealed partial class ToolsViewModel : PageViewModel
         var players = _host.Get<IPlayerRegistry>().Players;
         var groups = new Dictionary<string, List<PluginInformation>>
         {
-            ["MusicProviders"] = [], ["PlaybackProviders"] = [], ["MetadataProviders"] = [],
+            ["MusicProviders"] = [], ["PlaybackProviders"] = [], ["LyricsProviders"] = [],
             ["PlayerProviders"] = [], ["InteractivePlugins"] = [], ["OtherPlugins"] = []
         };
         foreach (var provider in providers)
@@ -112,17 +128,18 @@ public sealed partial class ToolsViewModel : PageViewModel
             Capability(provider is IPlaylistProvider, "CapabilityPlaylist");
             Capability(provider is IPlaylistCollectionProvider, "CapabilityCollections");
             Capability(provider is IPlaybackProvider, "CapabilityPlayback");
-            Capability(provider is IMetadataProvider, "CapabilityMetadata");
+            Capability(provider is ICatalogProvider, "CapabilityCatalog");
             Capability(provider is ILyricsProvider, "CapabilityLyrics");
             Capability(provider is IAuthenticationProvider, "CapabilityAuthentication");
             Capability(provider is IPlaylistExportProvider, "CapabilityPlaylistExport");
             var details = new List<PluginDetail>();
-            if (provider is ISearchNamespaceProvider search)
+            if (provider is ISearchProvider search)
                 details.Add(new PluginDetail(_text[LanguageManager.Keys.SearchSources],
                     string.Join(", ", NormalizeNamespaces(search.SearchNamespaces))));
-            if (provider is IMetadataProvider metadata)
+            var metadataNamespaces = MetadataService.GetSourceNamespaces(provider);
+            if (metadataNamespaces.Count > 0)
                 details.Add(new PluginDetail(_text[LanguageManager.Keys.MetadataSources],
-                    string.Join(", ", NormalizeNamespaces(metadata.MetadataNamespaces))));
+                    string.Join(", ", NormalizeNamespaces(metadataNamespaces))));
             if (provider is IPlaybackProvider playbackProvider && playbackProvider.AcceptedIdSchemes.Count > 0)
                 details.Add(new PluginDetail(_text[LanguageManager.Keys.AcceptedIds],
                     string.Join(", ",
@@ -138,8 +155,7 @@ public sealed partial class ToolsViewModel : PageViewModel
             var category = provider switch
             {
                 IPlaybackProvider => "PlaybackProviders",
-                IMetadataProvider => "MetadataProviders",
-                ILyricsProvider when provider is not ISearchProvider and not IPlaylistProvider => "MetadataProviders",
+                ILyricsProvider when provider is not ISearchProvider and not IPlaylistProvider => "LyricsProviders",
                 _ => "MusicProviders"
             };
             groups[category].Add(new PluginInformation(provider.Descriptor.Name, provider.Id,
@@ -262,8 +278,7 @@ public sealed partial class ToolsViewModel : PageViewModel
     private static IReadOnlyList<string> GetSupportedNamespaces(IMusicProvider provider)
     {
         var namespaces = new List<string>();
-        if (provider is ISearchNamespaceProvider search) namespaces.AddRange(search.SearchNamespaces);
-        if (provider is IMetadataProvider metadata) namespaces.AddRange(metadata.MetadataNamespaces);
+        if (provider is ISearchProvider search) namespaces.AddRange(search.SearchNamespaces);
         if (provider is ILyricsProvider lyrics) namespaces.AddRange(lyrics.AcceptedIdSchemes.Select(s => s.Namespace));
         if (provider is IPlaybackProvider playback)
             namespaces.AddRange(playback.AcceptedIdSchemes.Select(s => s.Namespace));
@@ -284,6 +299,7 @@ public sealed partial class ToolsViewModel : PageViewModel
 
     public override Task ActivateAsync()
     {
+        LibraryOverview.Refresh();
         RefreshPluginInformation();
         return Task.CompletedTask;
     }
@@ -291,12 +307,15 @@ public sealed partial class ToolsViewModel : PageViewModel
     protected override void RefreshLocalizedProperties()
     {
         base.RefreshLocalizedProperties();
+        LibraryOverview.Refresh();
         RefreshPluginInformation();
     }
 
     public override async ValueTask DisposeAsync()
     {
         _closing = true;
+        Context.LibraryChanged -= OnLibraryChanged;
+        Synchronization.PropertyChanged -= OnSynchronizationChanged;
         _playbackSubscription.Dispose();
         await base.DisposeAsync();
     }

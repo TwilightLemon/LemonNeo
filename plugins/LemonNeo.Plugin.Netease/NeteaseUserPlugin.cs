@@ -21,7 +21,6 @@ public sealed partial class NeteaseUserPlugin :
     IPlaylistProvider,
     IWebAuthenticationProvider,
     ISearchProvider,
-    ISearchNamespaceProvider,
     ICatalogProvider
 {
     private const string ProviderId = "netease";
@@ -179,7 +178,10 @@ public sealed partial class NeteaseUserPlugin :
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!TryReadId(playlist, "id", out var id) || !seen.Add(id)) continue;
                 yield return new RemotePlaylistSummary(id, ReadString(playlist, "name") ?? id,
-                    ReadInt32(playlist, "trackCount"));
+                    ReadInt32(playlist, "trackCount"))
+                {
+                    ArtworkUri = TryCreateAvatarUri(ReadString(playlist, "coverImgUrl"))
+                };
             }
 
             var count = playlists.GetArrayLength();
@@ -208,6 +210,7 @@ public sealed partial class NeteaseUserPlugin :
             return null;
 
         var tracks = new List<Track>();
+        var isComplete = false;
         if (playlist.TryGetProperty("tracks", out var values) && values.ValueKind == JsonValueKind.Array)
             foreach (var value in values.EnumerateArray())
                 if (TryMapTrack(value) is { } track)
@@ -236,10 +239,19 @@ public sealed partial class NeteaseUserPlugin :
 
             // Removed or unavailable songs may legitimately be absent from song/detail.
             tracks = ids.Where(byId.ContainsKey).Select(id => byId[id]).ToList();
+            var trackCount = ReadInt32(playlist, "trackCount");
+            isComplete = ids.Length == trackIds.GetArrayLength() && tracks.Count == ids.Length &&
+                         (trackCount is null || trackCount == ids.Length);
         }
         else if (ReadInt32(playlist, "trackCount") is { } total && total > tracks.Count)
         {
             throw new ProviderException("Netease returned an incomplete playlist without track ids. Please retry the import.");
+        }
+        else
+        {
+            isComplete = ReadInt32(playlist, "trackCount") is { } count && count == tracks.Count &&
+                         playlist.TryGetProperty("tracks", out var allTracks) &&
+                         allTracks.ValueKind == JsonValueKind.Array && allTracks.GetArrayLength() == tracks.Count;
         }
 
         return new RemotePlaylist
@@ -248,6 +260,8 @@ public sealed partial class NeteaseUserPlugin :
             ProviderId = ProviderId,
             Name = ReadString(playlist, "name") ?? playlistId,
             Description = ReadString(playlist, "description"),
+            ArtworkUri = TryCreateAvatarUri(ReadString(playlist, "coverImgUrl")),
+            IsComplete = isComplete,
             Tracks = tracks
         };
     }

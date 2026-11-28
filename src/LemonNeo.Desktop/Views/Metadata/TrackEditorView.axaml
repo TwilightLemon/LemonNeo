@@ -49,7 +49,7 @@
                         IsEnabled="{Binding CanInteract}"
                         IsVisible="{Binding EditorNeedsPlaylist}"
                         ItemTemplate="{StaticResource PlaylistOptionTemplate}"
-                        ItemsSource="{Binding Playlists}"
+                        ItemsSource="{Binding EditablePlaylists}"
                         Margin="0,0,10,8"
                         PlaceholderText="{Translate {x:Static i18n:LanguageManager+Keys.TargetPlaylist}}"
                         SelectedItem="{Binding TargetPlaylist}"
@@ -69,9 +69,13 @@
                                 IsEnabled="{Binding CanInteract}"
                                 Margin="0,16,12,16"
                                 Spacing="14">
+                                <TextBlock Classes="caption" IsVisible="{Binding IsSourceReadOnly}"
+                                           Text="{Translate {x:Static i18n:LanguageManager+Keys.PlaylistSyncReadOnlyHint}}"
+                                           TextWrapping="Wrap" />
                                 <TextBlock Classes="caption" Text="{Translate {x:Static i18n:LanguageManager+Keys.ItemId}}" />
                                 <SelectableTextBlock Text="{Binding Editor.ItemIdentity}" />
-                                <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                                <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+                                      IsEnabled="{Binding CanEditDetails}">
                                     <TextBlock Text="{Translate {x:Static i18n:LanguageManager+Keys.TrackTitle}}" VerticalAlignment="Center" />
                                     <TextBox
                                         AutomationProperties.Name="{Translate {x:Static i18n:LanguageManager+Keys.TrackTitle}}"

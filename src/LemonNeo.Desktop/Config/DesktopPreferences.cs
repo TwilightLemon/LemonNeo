@@ -17,6 +17,7 @@ public static class DesktopPreferences
                 ? TrackExportService.DefaultFileNameFormat
                 : value.FileNameFormat.Trim()
         });
+        settings.Register(nameof(UpdatePreferences), new UpdatePreferences());
         settings.Register(nameof(DesktopStoragePreferences), new DesktopStoragePreferences(), value => value with
         {
             LibraryDirectory = NormalizeOptionalPath(value.LibraryDirectory),

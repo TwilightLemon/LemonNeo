@@ -17,15 +17,14 @@ authentication together.
 | Capability | Contract | What it adds to the app |
 | --- | --- | --- |
 | Music provider | `IMusicProvider` | Identity for a source of tracks |
-| Search | `ISearchProvider` | Keyword search, with paging and limits |
-| Search namespaces | `ISearchNamespaceProvider` | Restricts a search to one of the plugin's sources |
+| Search | `ISearchProvider` | Keyword search with limits and selectable source namespaces |
 | Track lookup | `ITrackLookupProvider` | Exact retrieval by native ID, without approximating through search |
 | Playlist source | `IPlaylistProvider` | Remote playlists and their tracks |
 | Playlist collections | `IPlaylistCollectionProvider` | Named groups of user playlists (owned, followed, purchased, …) |
 | Playlist export | `IPlaylistExportProvider` | Pushes a local playlist back to the service |
 | Playback source | `IPlaybackProvider` | Resolves a track to a playable stream at a requested quality |
 | Lyrics | `ILyricsProvider` | Timed lyrics, translations, romanization |
-| Metadata | `IMetadataProvider` | Cross-source matching with confidence scores |
+| Catalog | `ICatalogProvider` | Album and artist search and detail lookup |
 | Authentication | `IAuthenticationProvider` | Cookie, browser, QR code, device code, or password sign-in |
 | Decoder | `IPlayerProvider` | Playback engine and the formats it understands |
 | System integration | `IInteractivePlugin` | Publishes playback to the OS and routes its controls back |
@@ -33,6 +32,12 @@ authentication together.
 Each capability is discovered through its interface, so the host knows at runtime which plugins can
 search, which can resolve playback, which can supply lyrics, and which can play a given file. The
 `Capabilities` section of each plugin's detail page lists exactly what it registered.
+
+For one-way playlist synchronization, set `RemotePlaylist.IsComplete = true` only after retrieving
+the complete ordered membership and all track details. Partial pages, unmapped tracks, missing
+details, or unknown completeness must leave it `false` (the default). One-time imports still work
+with incomplete snapshots. Authenticated providers must expose a stable `AuthenticationState.UserId`
+so source bindings cannot silently follow another account. See [playlist sync](playlist-sync.md).
 
 ### How capabilities are combined at runtime
 
@@ -43,10 +48,9 @@ search, which can resolve playback, which can supply lyrics, and which can play 
   An existing cache entry short-circuits the search, and an explicit local file always wins.
   Resolution is retried independently per provider, and failures are reported per provider rather
   than aborting the whole attempt.
-- **Metadata matching** (`MetadataService`). A lookup names the target namespaces, then queries each
-  metadata provider and returns candidate matches with a confidence score and match level. The host
-  applies a minimum confidence and reports per-source errors separately, so one failing source does
-  not hide the others.
+- **Metadata matching** (`MetadataService`). The host uses namespaced song search from catalog
+  providers to fetch candidate tracks. It scores candidates, applies the confidence threshold and
+  per-source limit, and reports each source's errors independently.
 - **Quality classification** (`AudioQualities`). Measured stream properties take precedence over a
   provider's declared quality; bitrate alone never establishes lossless or HiRes.
 - **Interaction** (`IInteractivePlugin`). The plugin receives a platform-independent snapshot of the
@@ -146,10 +150,15 @@ public sealed class MyProvider(IHttpClientFactory httpClientFactory)
 {
     public string Id => "mysource";
     public ProviderDescriptor Descriptor { get; } = new("My Source", "Example music provider");
+    public IReadOnlyCollection<string> SearchNamespaces { get; } = ["mysource"];
 
     public async Task<SearchResult> SearchAsync(
         SearchRequest request, CancellationToken cancellationToken = default)
     {
+        if (request.SourceNamespace is { } source &&
+            !SearchNamespaces.Contains(source, StringComparer.OrdinalIgnoreCase))
+            return new SearchResult(Id, []);
+
         var client = httpClientFactory.CreateClient(nameof(MyProvider));
         var tracks = await QueryMyServiceAsync(client, request.Keyword, cancellationToken);
         return new SearchResult(Id, tracks);
@@ -176,8 +185,7 @@ Notes for plugin authors:
   Fetch and parse that recording directly. The host selects the best result and owns caching;
   cache identity is shared by platform ID across plugins. Metadata expansion and cross-source
   fallback are outside this capability. A single provider can support multiple platforms and
-  ID kinds; Lyricify's main provider combines search, metadata and lyrics with eight accepted
-  lyric ID schemes. Plugins
+  ID kinds. Lyricify supports eight lyric ID schemes. Plugins
   implementing the previous Track-based or provider-scoped contract must be rebuilt and adapted.
 - Decoders implement `IPlayer.PrepareAsync` to open a request-owned `IPreparedPlayback`
   without changing the active stream or starting audio. Slow I/O must run outside the active
@@ -216,7 +224,7 @@ Notes for plugin authors:
 | `LemonNeo.Plugin.Netease` | Netease Cloud Music user library | all |
 | `LemonNeo.Plugin.QqMusic` | QQ Music user library | all |
 | `LemonNeo.Plugin.GdStudioNetease` | Alternative Netease playback source | all |
-| `LemonNeo.Plugin.Lyricify` | Lyrics and metadata matching | all |
+| `LemonNeo.Plugin.Lyricify` | Lyrics | all |
 | `LemonNeo.Plugin.MockMusic` | Reference implementation for plugin authors | all |
 
 The first-party plugins are built and deployed into the host's `plugins/` directory automatically by

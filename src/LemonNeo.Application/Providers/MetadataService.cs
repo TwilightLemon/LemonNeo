@@ -1,11 +1,18 @@
 using LemonNeo.Abstractions.Providers;
+using LemonNeo.Core.Exceptions;
 using LemonNeo.Core.Music;
 
 namespace LemonNeo.Application.Providers;
 
-public sealed class MetadataService(IProviderRegistry registry)
+public sealed class MetadataService(IProviderRegistry registry, TrackLookupService trackLookup)
 {
-    //Lemon Neo定义的行为，只使用tiele + artists 来检索元数据
+    private const int MinimumSearchCandidates = 10;
+
+    public static IReadOnlyCollection<string> GetSourceNamespaces(IMusicProvider provider) =>
+        provider is ISearchProvider scoped && provider is ICatalogProvider
+            ? scoped.SearchNamespaces
+            : [];
+
     public static string GetTrackSearchKeyword(Track track)
     {
         return string.Join(" ", new[] { track.Title }.Concat(track.Artists.Select(artist => artist.Name))
@@ -20,43 +27,44 @@ public sealed class MetadataService(IProviderRegistry registry)
         string? searchKeyword = null,
         CancellationToken cancellationToken = default)
     {
-        var matches = new List<MetadataMatch>();
+        cancellationToken.ThrowIfCancellationRequested();
         var errors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var request = new MetadataLookupRequest
-        {
-            Track = track,
-            SearchKeyword = string.IsNullOrWhiteSpace(searchKeyword)
-                ? GetTrackSearchKeyword(track)
-                : searchKeyword.Trim(),
-            TargetNamespaces = targetNamespaces ?? [],
-            LimitPerSource = limitPerSource,
-            MinimumConfidence = minimumConfidence
-        };
+        var keyword = string.IsNullOrWhiteSpace(searchKeyword) ? GetTrackSearchKeyword(track) : searchKeyword.Trim();
+        if (limitPerSource <= 0 || keyword.Length == 0) return new MetadataLookupResult([], errors);
 
-        foreach (var provider in registry.Providers.OfType<IMetadataProvider>())
+        var sources = registry.Providers.SelectMany(provider => GetSourceNamespaces(provider)
+            .Where(ns => !string.IsNullOrWhiteSpace(ns))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(ns => targetNamespaces is not { Count: > 0 } ||
+                         targetNamespaces.Contains(ns, StringComparer.OrdinalIgnoreCase))
+            .Select(ns => (Provider: provider, Namespace: ns)));
+        var matches = new List<MetadataMatch>();
+        foreach (var (provider, sourceNamespace) in sources)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (request.TargetNamespaces.Count > 0 && !provider.MetadataNamespaces.Any(ns =>
-                    request.TargetNamespaces.Contains(ns, StringComparer.OrdinalIgnoreCase))) continue;
-            var providerId = ((IMusicProvider)provider).Id;
             try
             {
-                var result = await provider.LookupMetadataAsync(request, cancellationToken);
-                matches.AddRange(result.Matches.Where(match => request.TargetNamespaces.Count == 0 ||
-                                                               request.TargetNamespaces.Contains(match.SourceNamespace,
-                                                                   StringComparer.OrdinalIgnoreCase)));
-                foreach (var error in result.SourceErrors) errors[$"{providerId}/{error.Key}"] = error.Value;
+                var request = new SearchRequest(keyword, Math.Max(MinimumSearchCandidates, limitPerSource), sourceNamespace);
+                var results = await ((ISearchProvider)provider).SearchAsync(request, cancellationToken);
+                foreach (var candidate in results.Tracks.DistinctBy(candidate => candidate.Id))
+                {
+                    var (confidence, level) = TrackMatchScorer.Compare(track, candidate);
+                    if (confidence >= minimumConfidence)
+                        matches.Add(new MetadataMatch(provider.Id, sourceNamespace, candidate, confidence, level));
+                }
             }
-            catch (Exception exception) when (exception is not OperationCanceledException)
+            catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
             {
-                errors[providerId] = exception.Message;
+                errors[$"{provider.Id}/{sourceNamespace}"] = exception.Message;
             }
         }
 
         cancellationToken.ThrowIfCancellationRequested();
         return new MetadataLookupResult(
-            matches.OrderByDescending(match => match.Confidence)
-                .ThenBy(match => match.SourceNamespace, StringComparer.Ordinal)
+            matches.GroupBy(match => match.SourceNamespace, StringComparer.OrdinalIgnoreCase)
+                .SelectMany(group => group.OrderByDescending(match => match.Confidence).Take(limitPerSource))
+                .OrderByDescending(match => match.Confidence)
+                .ThenBy(match => match.SourceNamespace, StringComparer.OrdinalIgnoreCase)
                 .ToArray(),
             errors);
     }
@@ -75,6 +83,7 @@ public sealed class MetadataService(IProviderRegistry registry)
         if (reliable.Length == 0) return (track, lookup);
 
         var best = reliable[0].Track;
+        var album = await ResolveAlbumAsync(track.Album, best.Album, reliable, cancellationToken);
         // An external-ID scheme is unique by namespace and kind. Metadata matching may
         // fill a missing scheme, but must never replace (or add a competing value for)
         // a scheme already carried by the source track.
@@ -91,15 +100,52 @@ public sealed class MetadataService(IProviderRegistry registry)
             Artists = best.Artists.Count == 0
                 ? track.Artists
                 : best.Artists,
-            Album = string.IsNullOrWhiteSpace(best.Album?.Title)
-                ? track.Album
-                : best.Album,
+            Album = album,
             Duration = best.Duration ?? track.Duration,
             ArtworkUri = best.ArtworkUri ?? track.ArtworkUri,
             ExternalIds = externalIds.ToArray()
         };
         return (enriched, lookup);
     }
+
+    private async Task<AlbumRef?> ResolveAlbumAsync(AlbumRef? original, AlbumRef? matched,
+        IReadOnlyList<MetadataMatch> reliable, CancellationToken cancellationToken)
+    {
+        if (matched is null || string.IsNullOrWhiteSpace(matched.Title)) return original;
+        if (matched.Id is not null) return matched;
+        if (original is { Id: { } originalId } && SameAlbumTitle(matched, original))
+            return matched with { Id = originalId };
+
+        foreach (var match in reliable)
+        {
+            if (match.Track.Album is not { } candidate || !SameAlbumTitle(matched, candidate)) continue;
+            if (candidate.Id is { } candidateId) return matched with { Id = candidateId };
+            if (registry.Get(match.MetadataProviderId) is not { } provider ||
+                provider is not (ICatalogProvider and ITrackLookupProvider)) continue;
+
+            var songIds = match.Track.ExternalIds.Where(id =>
+                    string.Equals(id.Namespace, match.SourceNamespace, StringComparison.OrdinalIgnoreCase) &&
+                    id.Kind is "song-mid" or "song-id")
+                .OrderBy(id => id.Kind == "song-mid" ? 0 : 1);
+            foreach (var songId in songIds)
+            {
+                try
+                {
+                    var track = await trackLookup.GetTrackAsync(provider.Id, songId.Value, cancellationToken);
+                    if (track?.Album is { Id: { } id } album && SameAlbumTitle(matched, album))
+                        return matched with { Id = id };
+                }
+                catch (ProviderException)
+                {
+                    // Keep the metadata match even when the source cannot resolve the album.
+                }
+            }
+        }
+        return matched;
+    }
+
+    private static bool SameAlbumTitle(AlbumRef left, AlbumRef right) =>
+        left.Title.Trim().Equals(right.Title.Trim(), StringComparison.OrdinalIgnoreCase);
 
     private static bool SameScheme(ExternalMusicId left, ExternalMusicId right)
     {

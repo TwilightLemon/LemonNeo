@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using LemonNeo.Abstractions.Providers;
+using LemonNeo.Application.Providers;
 
 namespace LemonNeo.Desktop.ViewModels.Metadata;
 
@@ -12,8 +13,8 @@ public sealed partial class MetadataSourceOption(string sourceNamespace, bool is
     public static IReadOnlyList<MetadataSourceOption> Create(IProviderRegistry providers,
         IPlaybackSourceProviderRegistry playbackSources)
     {
-        var namespaces = providers.Providers.OfType<IMetadataProvider>()
-            .SelectMany(provider => provider.MetadataNamespaces).Where(ns => !string.IsNullOrWhiteSpace(ns))
+        var namespaces = providers.Providers
+            .SelectMany(MetadataService.GetSourceNamespaces).Where(ns => !string.IsNullOrWhiteSpace(ns))
             .Select(ns => ns.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         var supported = playbackSources.Sources
             .SelectMany(source => source.AcceptedIdSchemes.Select(scheme => scheme.Namespace).Append(source.ProviderId))

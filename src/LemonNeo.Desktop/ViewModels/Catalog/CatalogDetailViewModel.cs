@@ -62,9 +62,9 @@ public sealed partial class CatalogDetailViewModel : TrackListViewModel
 
     private Task LoadAsync() => ExecuteAsync(async ct =>
     {
-        var provider = _host.Get<IProviderRegistry>().Get(Item.Id.ProviderId) as ICatalogProvider
+        var id = Item.Id ?? await ResolveItemIdAsync(ct);
+        var provider = _host.Get<IProviderRegistry>().Get(id.ProviderId) as ICatalogProvider
                        ?? throw new ProviderException(_text[LanguageManager.Keys.ProviderUnavailable]);
-        var id = Item.ResolveFromTrack ? await ResolveItemIdAsync(ct) : Item.Id;
         if (IsAlbum)
         {
             _album = await provider.GetAlbumAsync(id.RemoteId, ct)
@@ -82,12 +82,32 @@ public sealed partial class CatalogDetailViewModel : TrackListViewModel
 
     private async Task<MusicItemId> ResolveItemIdAsync(CancellationToken ct)
     {
-        var track = await _host.Get<TrackLookupService>().GetTrackAsync(Item.Id.ProviderId, Item.Id.RemoteId, ct);
-        var resolved = IsAlbum
-            ? track?.Album is { } album && album.Title.Equals(Item.Name, StringComparison.OrdinalIgnoreCase) ? album.Id : null
-            : track?.Artists.FirstOrDefault(artist => artist.Name.Equals(Item.Name, StringComparison.OrdinalIgnoreCase))?.Id;
-        return resolved ?? throw new ProviderException(_text[LanguageManager.Keys.CatalogItemUnavailable]);
+        var lookup = _host.Get<TrackLookupService>();
+        var registry = _host.Get<IProviderRegistry>();
+        ProviderException? lookupError = null;
+        foreach (var candidate in Item.SourceTrackIds)
+        {
+            Track? track;
+            try
+            {
+                track = await lookup.GetTrackAsync(candidate.ProviderId, candidate.RemoteId, ct);
+            }
+            catch (ProviderException exception)
+            {
+                lookupError ??= exception;
+                continue;
+            }
+
+            var resolved = IsAlbum
+                ? track?.Album is { } album && MatchesName(album.Title) ? album.Id : null
+                : track?.Artists.FirstOrDefault(artist => MatchesName(artist.Name))?.Id;
+            if (resolved is { } id && registry.Get(id.ProviderId) is ICatalogProvider) return id;
+        }
+
+        throw new ProviderException(_text[LanguageManager.Keys.CatalogItemUnavailable], lookupError);
     }
+
+    private bool MatchesName(string name) => name.Trim().Equals(Item.Name.Trim(), StringComparison.OrdinalIgnoreCase);
 
     private Task ImportAsync() => ExecuteAsync(async ct =>
     {
@@ -100,6 +120,7 @@ public sealed partial class CatalogDetailViewModel : TrackListViewModel
             ProviderId = album.Album.Id.ProviderId,
             Name = album.Album.Title,
             Description = album.Description,
+            ArtworkUri = album.Album.ArtworkUri ?? Item.ArtworkUri,
             Tracks = album.Tracks
         });
         try
